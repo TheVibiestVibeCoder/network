@@ -236,9 +236,9 @@
                 // Store contact ID on marker for editing
                 marker.contactId = contact.id;
 
-                // Add click handler to edit contact
+                // Add click handler to open overview modal
                 marker.on('click', function() {
-                    // Popup opens automatically, but we can add additional behavior here
+                    openOverviewModal(contact.id);
                 });
 
                 state.markers.addLayer(marker);
@@ -815,8 +815,9 @@
 
     function openEditFromOverview() {
         if (state.viewingContact) {
+            const contact = state.viewingContact;
             closeOverviewModal();
-            openContactModal(state.viewingContact);
+            openContactModal(contact);
         }
     }
 
