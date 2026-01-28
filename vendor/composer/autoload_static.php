@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c
+class ComposerStaticInitf57ef60be124e0da5beebd6b51f0d675
 {
     public static $files = array (
         '2cffec82183ee1cea088009cef9a6fc3' => __DIR__ . '/..' . '/ezyang/htmlpurifier/library/HTMLPurifier.composer.php',
@@ -22,15 +22,17 @@ class ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c
         'P' => 
         array (
             'Psr\\SimpleCache\\' => 16,
+            'Psr\\Http\\Message\\' => 17,
+            'Psr\\Http\\Client\\' => 16,
             'PhpOffice\\PhpSpreadsheet\\' => 25,
         ),
         'M' => 
         array (
+            'MyCLabs\\Enum\\' => 13,
             'Matrix\\' => 7,
         ),
         'C' => 
         array (
-            'Composer\\Pcre\\' => 14,
             'Complex\\' => 8,
         ),
     );
@@ -48,17 +50,26 @@ class ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c
         array (
             0 => __DIR__ . '/..' . '/psr/simple-cache/src',
         ),
+        'Psr\\Http\\Message\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/psr/http-factory/src',
+            1 => __DIR__ . '/..' . '/psr/http-message/src',
+        ),
+        'Psr\\Http\\Client\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/psr/http-client/src',
+        ),
         'PhpOffice\\PhpSpreadsheet\\' => 
         array (
             0 => __DIR__ . '/..' . '/phpoffice/phpspreadsheet/src/PhpSpreadsheet',
         ),
+        'MyCLabs\\Enum\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/myclabs/php-enum/src',
+        ),
         'Matrix\\' => 
         array (
             0 => __DIR__ . '/..' . '/markbaker/matrix/classes/src',
-        ),
-        'Composer\\Pcre\\' => 
-        array (
-            0 => __DIR__ . '/..' . '/composer/pcre/src',
         ),
         'Complex\\' => 
         array (
@@ -78,15 +89,16 @@ class ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'Stringable' => __DIR__ . '/..' . '/myclabs/php-enum/stubs/Stringable.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c::$prefixDirsPsr4;
-            $loader->prefixesPsr0 = ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c::$prefixesPsr0;
-            $loader->classMap = ComposerStaticInit17f0a333e1ba3e9d4f1cfd249d81864c::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitf57ef60be124e0da5beebd6b51f0d675::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitf57ef60be124e0da5beebd6b51f0d675::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInitf57ef60be124e0da5beebd6b51f0d675::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInitf57ef60be124e0da5beebd6b51f0d675::$classMap;
 
         }, null, ClassLoader::class);
     }
