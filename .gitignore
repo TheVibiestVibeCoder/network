@@ -27,8 +27,8 @@ tmp/
 temp/
 *.tmp
 
-# Vendor dependencies (if using composer later)
-vendor/
+# Vendor dependencies - now included for PhpSpreadsheet
+# vendor/
 
 # Node modules (if using npm later)
 node_modules/
