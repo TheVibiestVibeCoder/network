@@ -1,0 +1,249 @@
+<?php
+/**
+ * Contacts API Endpoint
+ * Handles CRUD operations for contacts
+ */
+
+define('APP_ROOT', dirname(__DIR__));
+
+require_once APP_ROOT . '/config/config.php';
+require_once APP_ROOT . '/includes/database.php';
+require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/Contact.php';
+
+// Set JSON response headers
+header('Content-Type: application/json');
+
+// Check authentication
+if (!Auth::isAuthenticated()) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// Get request method and action
+$method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
+$id = isset($_GET['id']) ? (int) $_GET['id'] : null;
+
+// Initialize contact model
+$contactModel = new Contact();
+
+try {
+    switch ($method) {
+        case 'GET':
+            handleGet($contactModel, $action, $id);
+            break;
+
+        case 'POST':
+            handlePost($contactModel, $action);
+            break;
+
+        case 'PUT':
+            handlePut($contactModel, $id);
+            break;
+
+        case 'DELETE':
+            handleDelete($contactModel, $id);
+            break;
+
+        default:
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+}
+
+/**
+ * Handle GET requests
+ */
+function handleGet(Contact $model, string $action, ?int $id): void
+{
+    if ($action === 'map') {
+        // Get contacts for map display
+        $contacts = $model->getForMap();
+        echo json_encode(['success' => true, 'data' => $contacts]);
+        return;
+    }
+
+    if ($id !== null) {
+        // Get single contact
+        $contact = $model->getById($id);
+
+        if ($contact === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Contact not found']);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'data' => $contact]);
+        return;
+    }
+
+    // Get all contacts with optional search and sort
+    $search = $_GET['search'] ?? '';
+    $sortBy = $_GET['sort'] ?? 'name';
+    $sortOrder = $_GET['order'] ?? 'ASC';
+
+    $contacts = $model->getAll($search, $sortBy, $sortOrder);
+    echo json_encode(['success' => true, 'data' => $contacts]);
+}
+
+/**
+ * Handle POST requests (create)
+ */
+function handlePost(Contact $model, string $action): void
+{
+    // Get JSON input
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if ($input === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON input']);
+        return;
+    }
+
+    // Validate required fields
+    if (empty($input['name'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name is required']);
+        return;
+    }
+
+    // Geocode location if provided
+    if (!empty($input['location']) && (empty($input['latitude']) || empty($input['longitude']))) {
+        $coords = geocodeLocation($input['location']);
+        if ($coords) {
+            $input['latitude'] = $coords['lat'];
+            $input['longitude'] = $coords['lng'];
+        }
+    }
+
+    // Create contact
+    $id = $model->create($input);
+    $contact = $model->getById($id);
+
+    http_response_code(201);
+    echo json_encode(['success' => true, 'data' => $contact]);
+}
+
+/**
+ * Handle PUT requests (update)
+ */
+function handlePut(Contact $model, ?int $id): void
+{
+    if ($id === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Contact ID is required']);
+        return;
+    }
+
+    // Check if contact exists
+    $existing = $model->getById($id);
+    if ($existing === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Contact not found']);
+        return;
+    }
+
+    // Get JSON input
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if ($input === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON input']);
+        return;
+    }
+
+    // Validate required fields
+    if (empty($input['name'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name is required']);
+        return;
+    }
+
+    // Geocode location if changed
+    if (!empty($input['location']) && $input['location'] !== $existing['location']) {
+        $coords = geocodeLocation($input['location']);
+        if ($coords) {
+            $input['latitude'] = $coords['lat'];
+            $input['longitude'] = $coords['lng'];
+        } else {
+            $input['latitude'] = null;
+            $input['longitude'] = null;
+        }
+    } elseif (empty($input['location'])) {
+        $input['latitude'] = null;
+        $input['longitude'] = null;
+    }
+
+    // Update contact
+    $model->update($id, $input);
+    $contact = $model->getById($id);
+
+    echo json_encode(['success' => true, 'data' => $contact]);
+}
+
+/**
+ * Handle DELETE requests
+ */
+function handleDelete(Contact $model, ?int $id): void
+{
+    if ($id === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Contact ID is required']);
+        return;
+    }
+
+    // Check if contact exists
+    $existing = $model->getById($id);
+    if ($existing === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Contact not found']);
+        return;
+    }
+
+    // Delete contact
+    $model->delete($id);
+
+    echo json_encode(['success' => true, 'message' => 'Contact deleted']);
+}
+
+/**
+ * Geocode a location string to coordinates
+ * Uses Nominatim (OpenStreetMap) - free and open source
+ */
+function geocodeLocation(string $location): ?array
+{
+    $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
+        'q' => $location,
+        'format' => 'json',
+        'limit' => 1
+    ]);
+
+    $context = stream_context_create([
+        'http' => [
+            'header' => 'User-Agent: SimpleCRM/1.0',
+            'timeout' => 5
+        ]
+    ]);
+
+    $response = @file_get_contents($url, false, $context);
+
+    if ($response === false) {
+        return null;
+    }
+
+    $data = json_decode($response, true);
+
+    if (empty($data) || !isset($data[0]['lat']) || !isset($data[0]['lon'])) {
+        return null;
+    }
+
+    return [
+        'lat' => (float) $data[0]['lat'],
+        'lng' => (float) $data[0]['lon']
+    ];
+}
