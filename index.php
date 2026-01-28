@@ -316,6 +316,35 @@ if ($isAuthenticated) {
             </div>
         </div>
 
+        <!-- Company Notes Modal -->
+        <div class="modal" id="companyNotesModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="company-avatar">
+                            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                                <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                            </svg>
+                        </div>
+                        <div class="overview-title-info">
+                            <h2 id="companyNotesTitle"></h2>
+                            <p class="overview-company">All notes from this company</p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeCompanyNotesModal">&times;</button>
+                </div>
+                <div class="modal-body overview-body">
+                    <div class="notes-timeline" id="companyNotesTimeline">
+                        <!-- Notes will be populated by JS -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="closeCompanyNotesBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Leaflet JS -->
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 

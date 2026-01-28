@@ -75,7 +75,14 @@
         addNoteBtn: document.getElementById('addNoteBtn'),
         closeOverviewModal: document.getElementById('closeOverviewModal'),
         closeOverviewBtn: document.getElementById('closeOverviewBtn'),
-        editContactBtn: document.getElementById('editContactBtn')
+        editContactBtn: document.getElementById('editContactBtn'),
+
+        // Company notes modal
+        companyNotesModal: document.getElementById('companyNotesModal'),
+        companyNotesTitle: document.getElementById('companyNotesTitle'),
+        companyNotesTimeline: document.getElementById('companyNotesTimeline'),
+        closeCompanyNotesModal: document.getElementById('closeCompanyNotesModal'),
+        closeCompanyNotesBtn: document.getElementById('closeCompanyNotesBtn')
     };
 
     // ============================================
@@ -127,6 +134,11 @@
         // Notes API
         async getNotes(contactId) {
             const response = await fetch(`api/notes.php?contact_id=${contactId}`);
+            return response.json();
+        },
+
+        async getCompanyNotes(company) {
+            const response = await fetch(`api/notes.php?company=${encodeURIComponent(company)}`);
             return response.json();
         },
 
@@ -233,13 +245,8 @@
                 const popupContent = createPopupContent(contact);
                 marker.bindPopup(popupContent);
 
-                // Store contact ID on marker for editing
+                // Store contact ID on marker
                 marker.contactId = contact.id;
-
-                // Add click handler to open overview modal
-                marker.on('click', function() {
-                    openOverviewModal(contact.id);
-                });
 
                 state.markers.addLayer(marker);
             }
@@ -270,7 +277,10 @@
             html += `<p class="popup-note">${escapeHtml(contact.note)}</p>`;
         }
 
-        html += `<button class="popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit Contact</button>`;
+        html += `<div class="popup-buttons">`;
+        html += `<button class="popup-btn popup-details-btn" onclick="window.CRM.openOverview(${contact.id})">Details</button>`;
+        html += `<button class="popup-btn popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit</button>`;
+        html += `</div>`;
         html += `</div>`;
 
         return html;
@@ -320,7 +330,7 @@
             if (group.company) {
                 // Company group with header
                 html += `<div class="company-group">`;
-                html += `<div class="company-header">
+                html += `<div class="company-header" data-company="${escapeHtml(group.company)}" title="Click to view company notes">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
                     </svg>
@@ -342,6 +352,15 @@
             card.addEventListener('click', () => {
                 const id = parseInt(card.dataset.id, 10);
                 openOverviewModal(id);
+            });
+        });
+
+        // Add click handlers to company headers - open company notes modal
+        elements.contactsList.querySelectorAll('.company-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const company = header.dataset.company;
+                openCompanyNotesModal(company);
             });
         });
     }
@@ -822,6 +841,84 @@
     }
 
     // ============================================
+    // Company Notes Modal Functions
+    // ============================================
+
+    async function openCompanyNotesModal(company) {
+        try {
+            elements.companyNotesTitle.textContent = company;
+
+            // Show loading state
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <p>Loading notes...</p>
+                </div>
+            `;
+
+            // Show modal
+            elements.companyNotesModal.classList.add('active');
+
+            // Load notes
+            const result = await api.getCompanyNotes(company);
+
+            if (result.success) {
+                renderCompanyNotesTimeline(result.data);
+            } else {
+                elements.companyNotesTimeline.innerHTML = `
+                    <div class="notes-empty">
+                        <p>Error loading notes</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading company notes:', error);
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <p>Error loading notes</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderCompanyNotesTimeline(notes) {
+        if (!notes || notes.length === 0) {
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                    </svg>
+                    <p>No notes yet for this company</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+
+        notes.forEach(note => {
+            const date = new Date(note.created_at);
+            const formattedDate = formatDate(date);
+            const contactName = note.contact_name || 'Unknown';
+
+            html += `
+                <div class="note-item">
+                    <div class="note-header">
+                        <span class="note-date">${formattedDate}</span>
+                        <span class="note-source">by ${escapeHtml(contactName)}</span>
+                    </div>
+                    <div class="note-content">${escapeHtml(note.content)}</div>
+                </div>
+            `;
+        });
+
+        elements.companyNotesTimeline.innerHTML = html;
+    }
+
+    function closeCompanyNotesModal() {
+        elements.companyNotesModal.classList.remove('active');
+    }
+
+    // ============================================
     // Contact CRUD Functions
     // ============================================
 
@@ -1033,6 +1130,11 @@
         elements.editContactBtn.addEventListener('click', openEditFromOverview);
         elements.addNoteBtn.addEventListener('click', addNote);
 
+        // Company notes modal
+        elements.closeCompanyNotesModal.addEventListener('click', closeCompanyNotesModal);
+        elements.closeCompanyNotesBtn.addEventListener('click', closeCompanyNotesModal);
+        elements.companyNotesModal.querySelector('.modal-backdrop').addEventListener('click', closeCompanyNotesModal);
+
         // Allow Enter key in note textarea to add note (with Ctrl/Cmd)
         elements.newNoteContent.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -1047,6 +1149,8 @@
             if (e.key === 'Escape') {
                 if (elements.deleteModal.classList.contains('active')) {
                     closeDeleteModal();
+                } else if (elements.companyNotesModal.classList.contains('active')) {
+                    closeCompanyNotesModal();
                 } else if (elements.overviewModal.classList.contains('active')) {
                     closeOverviewModal();
                 } else if (elements.contactModal.classList.contains('active')) {
@@ -1078,9 +1182,10 @@
         }
     }
 
-    // Expose editContact function globally for map popup buttons
+    // Expose functions globally for map popup buttons
     window.CRM = {
-        editContact: editContact
+        editContact: editContact,
+        openOverview: openOverviewModal
     };
 
     // Initialize when DOM is ready

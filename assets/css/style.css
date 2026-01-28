@@ -1216,3 +1216,62 @@ textarea.form-input {
         max-height: 200px;
     }
 }
+
+/* Company Avatar */
+.company-avatar {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-gray-400) 0%, var(--color-gray-600) 100%);
+    color: var(--color-white);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+}
+
+/* Clickable Company Header */
+.company-header {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.company-header:hover {
+    background-color: var(--color-gray-100);
+}
+
+/* Map Popup Buttons */
+.popup-buttons {
+    display: flex;
+    gap: var(--spacing-2);
+    margin-top: var(--spacing-3);
+}
+
+.popup-btn {
+    flex: 1;
+    padding: var(--spacing-2) var(--spacing-3);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.popup-details-btn {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+.popup-details-btn:hover {
+    background-color: #2563eb;
+}
+
+.popup-edit-btn {
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-700);
+}
+
+.popup-edit-btn:hover {
+    background-color: var(--color-gray-200);
+}
