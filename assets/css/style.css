@@ -962,3 +962,257 @@ textarea.form-input {
         padding: var(--spacing-2);
     }
 }
+
+/* ============================================
+   Overview Modal
+   ============================================ */
+
+.modal-large {
+    max-width: 600px;
+}
+
+.overview-header-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+}
+
+.overview-avatar {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-primary) 0%, #1d4ed8 100%);
+    color: var(--color-white);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.overview-title-info h2 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--color-gray-900);
+    margin-bottom: var(--spacing-1);
+}
+
+.overview-company {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-500);
+}
+
+.overview-body {
+    padding: var(--spacing-6);
+}
+
+.overview-section {
+    margin-bottom: var(--spacing-6);
+}
+
+.overview-section:last-child {
+    margin-bottom: 0;
+}
+
+.overview-section-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-4);
+    padding-bottom: var(--spacing-2);
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+/* Contact Details Grid */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-4);
+}
+
+.detail-item {
+    display: flex;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+    background-color: var(--color-gray-50);
+    border-radius: var(--radius-md);
+}
+
+.detail-item-full {
+    grid-column: 1 / -1;
+}
+
+.detail-icon {
+    color: var(--color-gray-400);
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.detail-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-label {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-500);
+    margin-bottom: var(--spacing-1);
+}
+
+.detail-value {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-900);
+    word-break: break-word;
+}
+
+.detail-link {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.detail-link:hover {
+    text-decoration: underline;
+}
+
+.no-details {
+    text-align: center;
+    color: var(--color-gray-400);
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-6);
+}
+
+/* Notes Timeline */
+.notes-timeline {
+    margin-bottom: var(--spacing-4);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notes-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-6);
+    color: var(--color-gray-400);
+    text-align: center;
+}
+
+.notes-empty svg {
+    margin-bottom: var(--spacing-2);
+}
+
+.notes-empty p {
+    font-size: var(--font-size-sm);
+}
+
+.note-item {
+    padding: var(--spacing-4);
+    background-color: var(--color-gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-3);
+    border-left: 3px solid var(--color-primary);
+}
+
+.note-item:last-child {
+    margin-bottom: 0;
+}
+
+.note-company {
+    border-left-color: var(--color-gray-300);
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-left: 3px solid var(--color-gray-300);
+}
+
+.note-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-2);
+}
+
+.note-date {
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-500);
+    font-weight: 500;
+}
+
+.note-source {
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-400);
+    font-style: italic;
+}
+
+.note-delete-btn {
+    margin-left: auto;
+    padding: var(--spacing-1);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-400);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.15s ease;
+}
+
+.note-item:hover .note-delete-btn {
+    opacity: 1;
+}
+
+.note-delete-btn:hover {
+    color: var(--color-danger);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.note-content {
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-700);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* Add Note Form */
+.add-note-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.add-note-form textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.add-note-form .btn {
+    align-self: flex-end;
+}
+
+/* Responsive adjustments for overview modal */
+@media (max-width: 768px) {
+    .modal-large {
+        max-width: none;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-header-info {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .overview-title-info {
+        text-align: center;
+    }
+
+    .notes-timeline {
+        max-height: 200px;
+    }
+}
