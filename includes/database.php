@@ -85,5 +85,32 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_id ON notes(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_company ON notes(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)");
+
+        // Create tags table
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL UNIQUE,
+                color VARCHAR(7) DEFAULT '#3b82f6',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        // Create contact_tags junction table (many-to-many)
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS contact_tags (
+                contact_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (contact_id, tag_id),
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create indexes for tags
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_contact_tags_contact ON contact_tags(contact_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_contact_tags_tag ON contact_tags(tag_id)");
     }
 }

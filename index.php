@@ -141,19 +141,36 @@ if ($isAuthenticated) {
                             </svg>
                             <input type="text" id="searchInput" placeholder="Search contacts..." class="search-input">
                         </div>
-                        <div class="sort-controls">
-                            <label>Sort by:</label>
-                            <select id="sortField" class="form-select">
-                                <option value="name">Name</option>
-                                <option value="company">Company</option>
-                                <option value="location">Location</option>
-                                <option value="created_at">Date Added</option>
-                            </select>
-                            <button type="button" id="sortOrderBtn" class="btn btn-icon" title="Toggle sort order">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="sortOrderIcon">
-                                    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                                </svg>
-                            </button>
+                        <div class="list-controls">
+                            <!-- Group By Toggle -->
+                            <div class="group-toggle">
+                                <button type="button" class="group-btn active" data-group="company" title="Group by Company">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                                    </svg>
+                                    <span>Firma</span>
+                                </button>
+                                <button type="button" class="group-btn" data-group="tags" title="Group by Tags">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+                                    </svg>
+                                    <span>Tags</span>
+                                </button>
+                            </div>
+                            <div class="sort-controls">
+                                <label>Sort:</label>
+                                <select id="sortField" class="form-select">
+                                    <option value="name">Name</option>
+                                    <option value="company">Company</option>
+                                    <option value="location">Location</option>
+                                    <option value="created_at">Date Added</option>
+                                </select>
+                                <button type="button" id="sortOrderBtn" class="btn btn-icon" title="Toggle sort order">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="sortOrderIcon">
+                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="contacts-list" id="contactsList">
@@ -282,6 +299,26 @@ if ($isAuthenticated) {
                         <h3 class="overview-section-title">Contact Information</h3>
                         <div class="overview-details" id="overviewDetails">
                             <!-- Details will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Tags Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Tags</h3>
+                        <div class="tags-container" id="contactTags">
+                            <!-- Tags will be populated by JS -->
+                        </div>
+                        <div class="add-tag-form">
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newTagInput" class="form-input" placeholder="Add or create tag..." autocomplete="off">
+                                <div class="tag-suggestions" id="tagSuggestions"></div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="addTagBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Add
+                            </button>
                         </div>
                     </div>
 
