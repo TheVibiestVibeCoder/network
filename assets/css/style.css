@@ -554,6 +554,39 @@ textarea.form-input {
     padding: var(--spacing-4) var(--spacing-6);
 }
 
+/* Company Groups */
+.company-group {
+    margin-bottom: var(--spacing-6);
+}
+
+.company-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    margin-bottom: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-gray-600);
+    background-color: var(--color-gray-100);
+    border-radius: var(--radius-md);
+}
+
+.company-header svg {
+    color: var(--color-gray-500);
+    flex-shrink: 0;
+}
+
+.company-count {
+    margin-left: auto;
+    padding: 2px 8px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-gray-500);
+    background-color: var(--color-white);
+    border-radius: var(--radius-full);
+}
+
 .contact-card {
     display: flex;
     align-items: center;
@@ -567,9 +600,18 @@ textarea.form-input {
     transition: all 0.15s ease;
 }
 
+.contact-card.in-group {
+    margin-left: var(--spacing-4);
+    border-left: 3px solid var(--color-primary-light);
+}
+
 .contact-card:hover {
     border-color: var(--color-primary);
     box-shadow: var(--shadow-md);
+}
+
+.contact-card.in-group:hover {
+    border-left-color: var(--color-primary);
 }
 
 .contact-avatar {
@@ -700,6 +742,7 @@ textarea.form-input {
     width: 100%;
     max-width: 500px;
     max-height: 90vh;
+    max-height: 90dvh; /* Dynamic viewport height for mobile */
     background-color: var(--color-white);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-xl);
@@ -718,6 +761,7 @@ textarea.form-input {
     justify-content: space-between;
     padding: var(--spacing-4) var(--spacing-6);
     border-bottom: 1px solid var(--color-gray-200);
+    flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -747,9 +791,11 @@ textarea.form-input {
 }
 
 .modal-body {
-    flex: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     padding: var(--spacing-6);
+    min-height: 0; /* Important for flexbox scrolling */
 }
 
 .modal-footer {
@@ -760,6 +806,7 @@ textarea.form-input {
     padding: var(--spacing-4) var(--spacing-6);
     border-top: 1px solid var(--color-gray-200);
     background-color: var(--color-gray-50);
+    flex-shrink: 0;
 }
 
 /* Form sections in modal */
@@ -876,11 +923,17 @@ textarea.form-input {
 
     .modal-content {
         max-height: 100vh;
+        max-height: 100dvh;
+        height: 100%;
         border-radius: 0;
     }
 
     .modal {
         padding: 0;
+    }
+
+    .modal-body {
+        padding: var(--spacing-4);
     }
 }
 

@@ -116,13 +116,28 @@
 
     function initMap() {
         // Initialize the map centered on a world view
-        state.map = L.map(elements.mapContainer).setView([30, 0], 2);
+        // Explicitly enable all interaction options for mobile and desktop
+        state.map = L.map(elements.mapContainer, {
+            center: [30, 0],
+            zoom: 2,
+            zoomControl: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            touchZoom: true,
+            dragging: true,
+            tap: true,
+            boxZoom: true,
+            keyboard: true
+        });
 
         // Add OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(state.map);
+
+        // Add zoom control to bottom right for better mobile UX
+        state.map.zoomControl.setPosition('bottomright');
 
         // Initialize marker cluster group
         state.markers = L.markerClusterGroup({
@@ -244,7 +259,29 @@
             return;
         }
 
-        const html = state.contacts.map(contact => createContactCard(contact)).join('');
+        // Group contacts by company
+        const grouped = groupContactsByCompany(state.contacts);
+        let html = '';
+
+        grouped.forEach(group => {
+            if (group.company) {
+                // Company group with header
+                html += `<div class="company-group">`;
+                html += `<div class="company-header">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                    </svg>
+                    <span>${escapeHtml(group.company)}</span>
+                    <span class="company-count">${group.contacts.length}</span>
+                </div>`;
+                html += group.contacts.map(contact => createContactCard(contact, true)).join('');
+                html += `</div>`;
+            } else {
+                // Contacts without company (individual)
+                html += group.contacts.map(contact => createContactCard(contact, false)).join('');
+            }
+        });
+
         elements.contactsList.innerHTML = html;
 
         // Add click handlers to contact cards
@@ -256,17 +293,64 @@
         });
     }
 
-    function createContactCard(contact) {
+    /**
+     * Group contacts by company
+     * Returns array of { company: string|null, contacts: array }
+     */
+    function groupContactsByCompany(contacts) {
+        const companyMap = new Map();
+        const noCompany = [];
+
+        contacts.forEach(contact => {
+            const company = contact.company ? contact.company.trim() : '';
+
+            if (company) {
+                if (!companyMap.has(company)) {
+                    companyMap.set(company, []);
+                }
+                companyMap.get(company).push(contact);
+            } else {
+                noCompany.push(contact);
+            }
+        });
+
+        // Convert to array and sort by company name
+        const groups = [];
+
+        // Add company groups first (sorted by company name)
+        const sortedCompanies = Array.from(companyMap.keys()).sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase())
+        );
+
+        sortedCompanies.forEach(company => {
+            groups.push({
+                company: company,
+                contacts: companyMap.get(company)
+            });
+        });
+
+        // Add contacts without company at the end
+        if (noCompany.length > 0) {
+            groups.push({
+                company: null,
+                contacts: noCompany
+            });
+        }
+
+        return groups;
+    }
+
+    function createContactCard(contact, inGroup = false) {
         const hasLocation = contact.latitude && contact.longitude;
 
         return `
-            <div class="contact-card" data-id="${contact.id}">
+            <div class="contact-card${inGroup ? ' in-group' : ''}" data-id="${contact.id}">
                 <div class="contact-avatar">
                     ${getInitials(contact.name)}
                 </div>
                 <div class="contact-info">
                     <h3 class="contact-name">${escapeHtml(contact.name)}</h3>
-                    ${contact.company ? `<p class="contact-company">${escapeHtml(contact.company)}</p>` : ''}
+                    ${!inGroup && contact.company ? `<p class="contact-company">${escapeHtml(contact.company)}</p>` : ''}
                     ${contact.location ? `
                         <p class="contact-location">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
