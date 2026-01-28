@@ -485,7 +485,6 @@ textarea.form-input {
    ============================================ */
 
 #listView {
-    display: flex;
     flex-direction: column;
     background-color: var(--color-gray-50);
 }
@@ -552,6 +551,7 @@ textarea.form-input {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-4) var(--spacing-6);
+    min-height: 0; /* Required for flexbox scrolling */
 }
 
 /* Company Groups */
@@ -753,6 +753,14 @@ textarea.form-input {
 
 .modal-small {
     max-width: 400px;
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0; /* Required for flexbox scrolling */
+    overflow: hidden;
 }
 
 .modal-header {
