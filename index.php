@@ -262,60 +262,6 @@ if ($isAuthenticated) {
             </div>
         </div>
 
-        <!-- Contact Overview Modal -->
-        <div class="modal" id="overviewModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <div class="overview-header-info">
-                        <div class="overview-avatar" id="overviewAvatar"></div>
-                        <div class="overview-title-info">
-                            <h2 id="overviewName"></h2>
-                            <p class="overview-company" id="overviewCompany"></p>
-                        </div>
-                    </div>
-                    <button type="button" class="modal-close" id="closeOverviewModal">&times;</button>
-                </div>
-                <div class="modal-body overview-body">
-                    <!-- Contact Details Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Contact Information</h3>
-                        <div class="overview-details" id="overviewDetails">
-                            <!-- Details will be populated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Notes Timeline Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Notes Timeline</h3>
-                        <div class="notes-timeline" id="notesTimeline">
-                            <!-- Notes will be populated by JS -->
-                        </div>
-
-                        <!-- Add Note Form -->
-                        <div class="add-note-form">
-                            <textarea id="newNoteContent" class="form-input" placeholder="Add a note..." rows="3"></textarea>
-                            <button type="button" class="btn btn-primary" id="addNoteBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                                </svg>
-                                Add Note
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="closeOverviewBtn">Close</button>
-                    <button type="button" class="btn btn-primary" id="editContactBtn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                        </svg>
-                        Edit Contact
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Leaflet JS -->
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 

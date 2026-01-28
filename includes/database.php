@@ -68,22 +68,5 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_location ON contacts(location)");
-
-        // Create notes table for timeline
-        $db->exec("
-            CREATE TABLE IF NOT EXISTS notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                contact_id INTEGER NOT NULL,
-                company VARCHAR(255),
-                content TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-            )
-        ");
-
-        // Create indexes for notes
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_id ON notes(contact_id)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_company ON notes(company)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)");
     }
 }

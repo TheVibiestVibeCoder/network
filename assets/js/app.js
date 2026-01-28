@@ -18,8 +18,6 @@
         sortOrder: 'ASC',
         searchQuery: '',
         editingContactId: null,
-        viewingContactId: null,
-        viewingContact: null,
         map: null,
         markers: null
     };
@@ -62,20 +60,7 @@
         deleteContactName: document.getElementById('deleteContactName'),
         closeDeleteModal: document.getElementById('closeDeleteModal'),
         cancelDeleteBtn: document.getElementById('cancelDeleteBtn'),
-        confirmDeleteBtn: document.getElementById('confirmDeleteBtn'),
-
-        // Overview modal
-        overviewModal: document.getElementById('overviewModal'),
-        overviewAvatar: document.getElementById('overviewAvatar'),
-        overviewName: document.getElementById('overviewName'),
-        overviewCompany: document.getElementById('overviewCompany'),
-        overviewDetails: document.getElementById('overviewDetails'),
-        notesTimeline: document.getElementById('notesTimeline'),
-        newNoteContent: document.getElementById('newNoteContent'),
-        addNoteBtn: document.getElementById('addNoteBtn'),
-        closeOverviewModal: document.getElementById('closeOverviewModal'),
-        closeOverviewBtn: document.getElementById('closeOverviewBtn'),
-        editContactBtn: document.getElementById('editContactBtn')
+        confirmDeleteBtn: document.getElementById('confirmDeleteBtn')
     };
 
     // ============================================
@@ -122,28 +107,6 @@
                 method: 'DELETE'
             });
             return response.json();
-        },
-
-        // Notes API
-        async getNotes(contactId) {
-            const response = await fetch(`api/notes.php?contact_id=${contactId}`);
-            return response.json();
-        },
-
-        async createNote(contactId, content) {
-            const response = await fetch('api/notes.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contact_id: contactId, content })
-            });
-            return response.json();
-        },
-
-        async deleteNote(id) {
-            const response = await fetch(`api/notes.php?id=${id}`, {
-                method: 'DELETE'
-            });
-            return response.json();
         }
     };
 
@@ -167,38 +130,22 @@
             keyboard: true
         });
 
-        // Add minimalistic CartoDB Positron tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
         }).addTo(state.map);
 
         // Add zoom control to bottom right for better mobile UX
         state.map.zoomControl.setPosition('bottomright');
 
-        // Initialize marker cluster group with smooth zoom animation
+        // Initialize marker cluster group
         state.markers = L.markerClusterGroup({
             chunkedLoading: true,
             spiderfyOnMaxZoom: true,
             showCoverageOnHover: false,
-            zoomToBoundsOnClick: false, // We'll handle this manually for smooth animation
-            maxClusterRadius: 50,
-            animate: true,
-            animateAddingMarkers: true
-        });
-
-        // Handle cluster click with smooth zoom animation
-        state.markers.on('clusterclick', function(event) {
-            const cluster = event.layer;
-            const bounds = cluster.getBounds();
-
-            // Smoothly zoom to the cluster's bounds with animation
-            state.map.fitBounds(bounds, {
-                padding: [40, 40],
-                animate: true,
-                duration: 0.5
-            });
+            zoomToBoundsOnClick: true,
+            maxClusterRadius: 50
         });
 
         state.map.addLayer(state.markers);
@@ -236,9 +183,9 @@
                 // Store contact ID on marker for editing
                 marker.contactId = contact.id;
 
-                // Add click handler to open overview modal
+                // Add click handler to edit contact
                 marker.on('click', function() {
-                    openOverviewModal(contact.id);
+                    // Popup opens automatically, but we can add additional behavior here
                 });
 
                 state.markers.addLayer(marker);
@@ -337,11 +284,11 @@
 
         elements.contactsList.innerHTML = html;
 
-        // Add click handlers to contact cards - open overview modal
+        // Add click handlers to contact cards
         elements.contactsList.querySelectorAll('.contact-card').forEach(card => {
             card.addEventListener('click', () => {
                 const id = parseInt(card.dataset.id, 10);
-                openOverviewModal(id);
+                editContact(id);
             });
         });
     }
@@ -515,310 +462,6 @@
 
     function closeDeleteModal() {
         elements.deleteModal.classList.remove('active');
-    }
-
-    // ============================================
-    // Overview Modal Functions
-    // ============================================
-
-    async function openOverviewModal(contactId) {
-        try {
-            const result = await api.getContact(contactId);
-
-            if (!result.success) {
-                alert('Error loading contact');
-                return;
-            }
-
-            const contact = result.data;
-            state.viewingContactId = contactId;
-            state.viewingContact = contact;
-
-            // Populate header
-            elements.overviewAvatar.textContent = getInitials(contact.name);
-            elements.overviewName.textContent = contact.name;
-            elements.overviewCompany.textContent = contact.company || '';
-            elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
-
-            // Populate details
-            renderOverviewDetails(contact);
-
-            // Load and render notes
-            await loadNotes(contactId);
-
-            // Show modal
-            elements.overviewModal.classList.add('active');
-
-        } catch (error) {
-            console.error('Error opening overview:', error);
-            alert('Error loading contact');
-        }
-    }
-
-    function renderOverviewDetails(contact) {
-        let html = '<div class="detail-grid">';
-
-        if (contact.location) {
-            html += `
-                <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Location</span>
-                        <span class="detail-value">${escapeHtml(contact.location)}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.email) {
-            html += `
-                <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Email</span>
-                        <a href="mailto:${escapeHtml(contact.email)}" class="detail-value detail-link">${escapeHtml(contact.email)}</a>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.phone) {
-            html += `
-                <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Phone</span>
-                        <a href="tel:${escapeHtml(contact.phone)}" class="detail-value detail-link">${escapeHtml(contact.phone)}</a>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.website) {
-            html += `
-                <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Website</span>
-                        <a href="${escapeHtml(contact.website)}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.address) {
-            html += `
-                <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Address</span>
-                        <span class="detail-value">${escapeHtml(contact.address).replace(/\n/g, '<br>')}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.note) {
-            html += `
-                <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                        </svg>
-                    </span>
-                    <div class="detail-content">
-                        <span class="detail-label">Note</span>
-                        <span class="detail-value">${escapeHtml(contact.note)}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        html += '</div>';
-
-        // Show empty state if no details
-        if (!contact.location && !contact.email && !contact.phone && !contact.website && !contact.address && !contact.note) {
-            html = '<p class="no-details">No contact details available</p>';
-        }
-
-        elements.overviewDetails.innerHTML = html;
-    }
-
-    async function loadNotes(contactId) {
-        try {
-            const result = await api.getNotes(contactId);
-
-            if (result.success) {
-                renderNotesTimeline(result.data);
-            }
-        } catch (error) {
-            console.error('Error loading notes:', error);
-        }
-    }
-
-    function renderNotesTimeline(notes) {
-        if (!notes || notes.length === 0) {
-            elements.notesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet</p>
-                </div>
-            `;
-            return;
-        }
-
-        let html = '';
-
-        notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
-            const isCompanyNote = note.source === 'company';
-            const contactName = note.contact_name || '';
-
-            html += `
-                <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
-                    <div class="note-header">
-                        <span class="note-date">${formattedDate}</span>
-                        ${isCompanyNote ? `<span class="note-source">from ${escapeHtml(contactName)}</span>` : ''}
-                        <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="note-content">${escapeHtml(note.content)}</div>
-                </div>
-            `;
-        });
-
-        elements.notesTimeline.innerHTML = html;
-
-        // Add delete handlers
-        elements.notesTimeline.querySelectorAll('.note-delete-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const noteId = parseInt(btn.dataset.noteId, 10);
-                await deleteNote(noteId);
-            });
-        });
-    }
-
-    function formatDate(date) {
-        const now = new Date();
-        const diff = now - date;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 7) {
-            return date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-            });
-        } else if (days > 0) {
-            return days === 1 ? 'Yesterday' : `${days} days ago`;
-        } else if (hours > 0) {
-            return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-        } else if (minutes > 0) {
-            return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
-        } else {
-            return 'Just now';
-        }
-    }
-
-    async function addNote() {
-        const content = elements.newNoteContent.value.trim();
-
-        if (!content) {
-            return;
-        }
-
-        if (!state.viewingContactId) {
-            return;
-        }
-
-        elements.addNoteBtn.disabled = true;
-        elements.addNoteBtn.innerHTML = 'Adding...';
-
-        try {
-            const result = await api.createNote(state.viewingContactId, content);
-
-            if (result.success) {
-                elements.newNoteContent.value = '';
-                await loadNotes(state.viewingContactId);
-            } else {
-                alert(result.error || 'Error adding note');
-            }
-        } catch (error) {
-            console.error('Error adding note:', error);
-            alert('Error adding note');
-        } finally {
-            elements.addNoteBtn.disabled = false;
-            elements.addNoteBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-                Add Note
-            `;
-        }
-    }
-
-    async function deleteNote(noteId) {
-        if (!confirm('Delete this note?')) {
-            return;
-        }
-
-        try {
-            const result = await api.deleteNote(noteId);
-
-            if (result.success) {
-                await loadNotes(state.viewingContactId);
-            } else {
-                alert(result.error || 'Error deleting note');
-            }
-        } catch (error) {
-            console.error('Error deleting note:', error);
-            alert('Error deleting note');
-        }
-    }
-
-    function closeOverviewModal() {
-        elements.overviewModal.classList.remove('active');
-        state.viewingContactId = null;
-        state.viewingContact = null;
-        elements.newNoteContent.value = '';
-    }
-
-    function openEditFromOverview() {
-        if (state.viewingContact) {
-            const contact = state.viewingContact;
-            closeOverviewModal();
-            openContactModal(contact);
-        }
     }
 
     // ============================================
@@ -1026,29 +669,12 @@
         elements.deleteModal.querySelector('.modal-backdrop').addEventListener('click', closeDeleteModal);
         elements.confirmDeleteBtn.addEventListener('click', deleteContact);
 
-        // Overview modal
-        elements.closeOverviewModal.addEventListener('click', closeOverviewModal);
-        elements.closeOverviewBtn.addEventListener('click', closeOverviewModal);
-        elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', closeOverviewModal);
-        elements.editContactBtn.addEventListener('click', openEditFromOverview);
-        elements.addNoteBtn.addEventListener('click', addNote);
-
-        // Allow Enter key in note textarea to add note (with Ctrl/Cmd)
-        elements.newNoteContent.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                addNote();
-            }
-        });
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
             if (e.key === 'Escape') {
                 if (elements.deleteModal.classList.contains('active')) {
                     closeDeleteModal();
-                } else if (elements.overviewModal.classList.contains('active')) {
-                    closeOverviewModal();
                 } else if (elements.contactModal.classList.contains('active')) {
                     closeContactModal();
                 }
