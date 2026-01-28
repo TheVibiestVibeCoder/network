@@ -1216,3 +1216,281 @@ textarea.form-input {
         max-height: 200px;
     }
 }
+
+/* Company Avatar */
+.company-avatar {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-gray-400) 0%, var(--color-gray-600) 100%);
+    color: var(--color-white);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+}
+
+/* Clickable Company Header */
+.company-header {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.company-header:hover {
+    background-color: var(--color-gray-100);
+}
+
+/* Map Popup Buttons */
+.popup-buttons {
+    display: flex;
+    gap: var(--spacing-2);
+    margin-top: var(--spacing-3);
+}
+
+.popup-btn {
+    flex: 1;
+    padding: var(--spacing-2) var(--spacing-3);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.popup-details-btn {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+.popup-details-btn:hover {
+    background-color: #2563eb;
+}
+
+.popup-edit-btn {
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-700);
+}
+
+.popup-edit-btn:hover {
+    background-color: var(--color-gray-200);
+}
+
+/* ============================================
+   Group Toggle (Firma/Tags)
+   ============================================ */
+
+.list-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+}
+
+.group-toggle {
+    display: flex;
+    background-color: var(--color-gray-100);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+
+.group-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    padding: var(--spacing-2) var(--spacing-3);
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.group-btn:hover {
+    color: var(--color-gray-700);
+}
+
+.group-btn.active {
+    background-color: var(--color-white);
+    color: var(--color-gray-900);
+    box-shadow: var(--shadow-sm);
+}
+
+.group-btn svg {
+    flex-shrink: 0;
+}
+
+/* ============================================
+   Tags in Overview Modal
+   ============================================ */
+
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-3);
+    min-height: 32px;
+}
+
+.no-tags {
+    color: var(--color-gray-400);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    padding: var(--spacing-1) var(--spacing-2);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    border: 1px solid;
+}
+
+.tag-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    margin: -2px -4px -2px 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    border-radius: var(--radius-full);
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.tag-remove:hover {
+    opacity: 1;
+}
+
+/* Add Tag Form */
+.add-tag-form {
+    display: flex;
+    gap: var(--spacing-2);
+}
+
+.tag-input-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.tag-input-wrapper .form-input {
+    width: 100%;
+}
+
+.tag-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    margin-top: var(--spacing-1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.tag-suggestions.visible {
+    display: block;
+}
+
+.tag-suggestion {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: background-color 0.1s ease;
+}
+
+.tag-suggestion:hover {
+    background-color: var(--color-gray-50);
+}
+
+.tag-suggestion.tag-create {
+    color: var(--color-primary);
+    font-weight: 500;
+    border-top: 1px solid var(--color-gray-100);
+}
+
+.tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+/* ============================================
+   Tag Groups in List View
+   ============================================ */
+
+.tag-group {
+    margin-bottom: var(--spacing-4);
+}
+
+.tag-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    background-color: var(--color-gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-gray-700);
+    border-left: 3px solid var(--color-primary);
+}
+
+.tag-header-untagged {
+    border-left-color: var(--color-gray-300);
+    color: var(--color-gray-500);
+}
+
+.tag-count {
+    margin-left: auto;
+    padding: 2px 8px;
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+}
+
+.tag-header-untagged .tag-count {
+    background-color: var(--color-gray-400);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .list-controls {
+        flex-wrap: wrap;
+        gap: var(--spacing-2);
+    }
+
+    .group-toggle {
+        order: -1;
+        width: 100%;
+    }
+
+    .group-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .group-btn span {
+        display: none;
+    }
+}

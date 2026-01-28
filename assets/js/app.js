@@ -21,7 +21,10 @@
         viewingContactId: null,
         viewingContact: null,
         map: null,
-        markers: null
+        markers: null,
+        groupBy: 'company', // 'company' or 'tags'
+        allTags: [],
+        taggedData: null
     };
 
     // ============================================
@@ -43,6 +46,13 @@
         sortOrderBtn: document.getElementById('sortOrderBtn'),
         sortOrderIcon: document.getElementById('sortOrderIcon'),
         contactsList: document.getElementById('contactsList'),
+        groupBtns: document.querySelectorAll('.group-btn'),
+
+        // Tag elements in overview modal
+        contactTags: document.getElementById('contactTags'),
+        newTagInput: document.getElementById('newTagInput'),
+        tagSuggestions: document.getElementById('tagSuggestions'),
+        addTagBtn: document.getElementById('addTagBtn'),
 
         // Contact modal
         contactModal: document.getElementById('contactModal'),
@@ -75,7 +85,14 @@
         addNoteBtn: document.getElementById('addNoteBtn'),
         closeOverviewModal: document.getElementById('closeOverviewModal'),
         closeOverviewBtn: document.getElementById('closeOverviewBtn'),
-        editContactBtn: document.getElementById('editContactBtn')
+        editContactBtn: document.getElementById('editContactBtn'),
+
+        // Company notes modal
+        companyNotesModal: document.getElementById('companyNotesModal'),
+        companyNotesTitle: document.getElementById('companyNotesTitle'),
+        companyNotesTimeline: document.getElementById('companyNotesTimeline'),
+        closeCompanyNotesModal: document.getElementById('closeCompanyNotesModal'),
+        closeCompanyNotesBtn: document.getElementById('closeCompanyNotesBtn')
     };
 
     // ============================================
@@ -130,6 +147,11 @@
             return response.json();
         },
 
+        async getCompanyNotes(company) {
+            const response = await fetch(`api/notes.php?company=${encodeURIComponent(company)}`);
+            return response.json();
+        },
+
         async createNote(contactId, content) {
             const response = await fetch('api/notes.php', {
                 method: 'POST',
@@ -141,6 +163,56 @@
 
         async deleteNote(id) {
             const response = await fetch(`api/notes.php?id=${id}`, {
+                method: 'DELETE'
+            });
+            return response.json();
+        },
+
+        // Tags API
+        async getAllTags() {
+            const response = await fetch('api/tags.php');
+            return response.json();
+        },
+
+        async getContactTags(contactId) {
+            const response = await fetch(`api/tags.php?action=contact&contact_id=${contactId}`);
+            return response.json();
+        },
+
+        async getTaggedContacts() {
+            const response = await fetch('api/tags.php?action=grouped');
+            return response.json();
+        },
+
+        async createTag(name, color = '#3b82f6') {
+            const response = await fetch('api/tags.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, color })
+            });
+            return response.json();
+        },
+
+        async assignTag(contactId, tagId) {
+            const response = await fetch('api/tags.php?action=assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
+            });
+            return response.json();
+        },
+
+        async unassignTag(contactId, tagId) {
+            const response = await fetch('api/tags.php?action=unassign', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
+            });
+            return response.json();
+        },
+
+        async deleteTag(id) {
+            const response = await fetch(`api/tags.php?id=${id}`, {
                 method: 'DELETE'
             });
             return response.json();
@@ -233,13 +305,8 @@
                 const popupContent = createPopupContent(contact);
                 marker.bindPopup(popupContent);
 
-                // Store contact ID on marker for editing
+                // Store contact ID on marker
                 marker.contactId = contact.id;
-
-                // Add click handler to open overview modal
-                marker.on('click', function() {
-                    openOverviewModal(contact.id);
-                });
 
                 state.markers.addLayer(marker);
             }
@@ -270,7 +337,10 @@
             html += `<p class="popup-note">${escapeHtml(contact.note)}</p>`;
         }
 
-        html += `<button class="popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit Contact</button>`;
+        html += `<div class="popup-buttons">`;
+        html += `<button class="popup-btn popup-details-btn" onclick="window.CRM.openOverview(${contact.id})">Details</button>`;
+        html += `<button class="popup-btn popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit</button>`;
+        html += `</div>`;
         html += `</div>`;
 
         return html;
@@ -282,15 +352,25 @@
 
     async function loadContacts() {
         try {
-            const result = await api.getContacts(
-                state.searchQuery,
-                state.sortField,
-                state.sortOrder
-            );
+            if (state.groupBy === 'tags') {
+                // Load tag-grouped contacts
+                const result = await api.getTaggedContacts();
+                if (result.success) {
+                    state.taggedData = result.data;
+                    renderContactsListByTags();
+                }
+            } else {
+                // Load company-grouped contacts
+                const result = await api.getContacts(
+                    state.searchQuery,
+                    state.sortField,
+                    state.sortOrder
+                );
 
-            if (result.success) {
-                state.contacts = result.data;
-                renderContactsList();
+                if (result.success) {
+                    state.contacts = result.data;
+                    renderContactsListByCompany();
+                }
             }
         } catch (error) {
             console.error('Error loading contacts:', error);
@@ -298,15 +378,15 @@
         }
     }
 
-    function renderContactsList() {
+    function renderContactsListByCompany() {
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
                     <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
-                    <h3>No contacts found</h3>
-                    <p>${state.searchQuery ? 'Try a different search term' : 'Add your first contact to get started'}</p>
+                    <h3>Keine Kontakte gefunden</h3>
+                    <p>${state.searchQuery ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
                 </div>
             `;
             return;
@@ -320,7 +400,7 @@
             if (group.company) {
                 // Company group with header
                 html += `<div class="company-group">`;
-                html += `<div class="company-header">
+                html += `<div class="company-header" data-company="${escapeHtml(group.company)}" title="Klicken für Firmen-Notizen">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
                     </svg>
@@ -336,12 +416,79 @@
         });
 
         elements.contactsList.innerHTML = html;
+        addContactListEventHandlers();
+    }
 
+    function renderContactsListByTags() {
+        const data = state.taggedData;
+        if (!data) return;
+
+        const totalContacts = data.tags.reduce((sum, t) => sum + t.contacts.length, 0) + data.untagged.length;
+
+        if (totalContacts === 0) {
+            elements.contactsList.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <h3>Keine Kontakte gefunden</h3>
+                    <p>Füge deinen ersten Kontakt hinzu</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+
+        // Render tagged groups
+        data.tags.forEach(tag => {
+            if (tag.contacts.length > 0) {
+                html += `<div class="tag-group">`;
+                html += `<div class="tag-header" style="border-left-color: ${tag.color}">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="${tag.color}">
+                        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+                    </svg>
+                    <span>${escapeHtml(tag.name)}</span>
+                    <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
+                </div>`;
+                html += tag.contacts.map(contact => createContactCard(contact, true)).join('');
+                html += `</div>`;
+            }
+        });
+
+        // Render untagged contacts
+        if (data.untagged.length > 0) {
+            html += `<div class="tag-group untagged-group">`;
+            html += `<div class="tag-header tag-header-untagged">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+                </svg>
+                <span>Ohne Tag</span>
+                <span class="tag-count">${data.untagged.length}</span>
+            </div>`;
+            html += data.untagged.map(contact => createContactCard(contact, true)).join('');
+            html += `</div>`;
+        }
+
+        elements.contactsList.innerHTML = html;
+        addContactListEventHandlers();
+    }
+
+    function addContactListEventHandlers() {
         // Add click handlers to contact cards - open overview modal
         elements.contactsList.querySelectorAll('.contact-card').forEach(card => {
             card.addEventListener('click', () => {
                 const id = parseInt(card.dataset.id, 10);
                 openOverviewModal(id);
+            });
+        });
+
+        // Add click handlers to company headers - open company notes modal
+        elements.contactsList.querySelectorAll('.company-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const company = header.dataset.company;
+                openCompanyNotesModal(company);
             });
         });
     }
@@ -543,6 +690,9 @@
             // Populate details
             renderOverviewDetails(contact);
 
+            // Load and render tags
+            await loadContactTags(contactId);
+
             // Load and render notes
             await loadNotes(contactId);
 
@@ -701,7 +851,7 @@
                 <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
-                        ${isCompanyNote ? `<span class="note-source">from ${escapeHtml(contactName)}</span>` : ''}
+                        ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -819,6 +969,236 @@
             closeOverviewModal();
             openContactModal(contact);
         }
+    }
+
+    // ============================================
+    // Tag Functions
+    // ============================================
+
+    async function loadAllTags() {
+        try {
+            const result = await api.getAllTags();
+            if (result.success) {
+                state.allTags = result.data;
+            }
+        } catch (error) {
+            console.error('Error loading tags:', error);
+        }
+    }
+
+    async function loadContactTags(contactId) {
+        try {
+            const result = await api.getContactTags(contactId);
+            if (result.success) {
+                renderContactTags(result.data);
+            }
+        } catch (error) {
+            console.error('Error loading contact tags:', error);
+        }
+    }
+
+    function renderContactTags(tags) {
+        if (!tags || tags.length === 0) {
+            elements.contactTags.innerHTML = '<span class="no-tags">Keine Tags</span>';
+            return;
+        }
+
+        let html = '';
+        tags.forEach(tag => {
+            html += `
+                <span class="tag" style="background-color: ${tag.color}20; color: ${tag.color}; border-color: ${tag.color}">
+                    ${escapeHtml(tag.name)}
+                    <button class="tag-remove" data-tag-id="${tag.id}" title="Tag entfernen">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                </span>
+            `;
+        });
+
+        elements.contactTags.innerHTML = html;
+
+        // Add remove handlers
+        elements.contactTags.querySelectorAll('.tag-remove').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const tagId = parseInt(btn.dataset.tagId, 10);
+                await removeTagFromContact(tagId);
+            });
+        });
+    }
+
+    async function removeTagFromContact(tagId) {
+        if (!state.viewingContactId) return;
+
+        try {
+            const result = await api.unassignTag(state.viewingContactId, tagId);
+            if (result.success) {
+                await loadContactTags(state.viewingContactId);
+            }
+        } catch (error) {
+            console.error('Error removing tag:', error);
+        }
+    }
+
+    function showTagSuggestions(query) {
+        const filtered = state.allTags.filter(tag =>
+            tag.name.toLowerCase().includes(query.toLowerCase())
+        );
+
+        let html = '';
+
+        // Show matching existing tags
+        filtered.forEach(tag => {
+            html += `
+                <div class="tag-suggestion" data-tag-id="${tag.id}">
+                    <span class="tag-dot" style="background-color: ${tag.color}"></span>
+                    ${escapeHtml(tag.name)}
+                </div>
+            `;
+        });
+
+        // Show create option if query doesn't match exactly
+        if (query && !state.allTags.some(t => t.name.toLowerCase() === query.toLowerCase())) {
+            html += `
+                <div class="tag-suggestion tag-create" data-create="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    Neuer Tag: "${escapeHtml(query)}"
+                </div>
+            `;
+        }
+
+        elements.tagSuggestions.innerHTML = html;
+        elements.tagSuggestions.classList.toggle('visible', html.length > 0);
+
+        // Add click handlers
+        elements.tagSuggestions.querySelectorAll('.tag-suggestion').forEach(item => {
+            item.addEventListener('click', async () => {
+                if (item.dataset.create) {
+                    await createAndAssignTag(query);
+                } else {
+                    const tagId = parseInt(item.dataset.tagId, 10);
+                    await assignTagToContact(tagId);
+                }
+            });
+        });
+    }
+
+    async function createAndAssignTag(name) {
+        if (!state.viewingContactId || !name.trim()) return;
+
+        try {
+            // Create the tag
+            const createResult = await api.createTag(name.trim());
+            if (createResult.success) {
+                const tag = createResult.data;
+                // Assign to contact
+                await api.assignTag(state.viewingContactId, tag.id);
+                // Refresh
+                await loadAllTags();
+                await loadContactTags(state.viewingContactId);
+                elements.newTagInput.value = '';
+                elements.tagSuggestions.classList.remove('visible');
+            }
+        } catch (error) {
+            console.error('Error creating tag:', error);
+        }
+    }
+
+    async function assignTagToContact(tagId) {
+        if (!state.viewingContactId) return;
+
+        try {
+            const result = await api.assignTag(state.viewingContactId, tagId);
+            if (result.success) {
+                await loadContactTags(state.viewingContactId);
+                elements.newTagInput.value = '';
+                elements.tagSuggestions.classList.remove('visible');
+            }
+        } catch (error) {
+            console.error('Error assigning tag:', error);
+        }
+    }
+
+    // ============================================
+    // Company Notes Modal Functions
+    // ============================================
+
+    async function openCompanyNotesModal(company) {
+        try {
+            elements.companyNotesTitle.textContent = company;
+
+            // Show loading state
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <p>Loading notes...</p>
+                </div>
+            `;
+
+            // Show modal
+            elements.companyNotesModal.classList.add('active');
+
+            // Load notes
+            const result = await api.getCompanyNotes(company);
+
+            if (result.success) {
+                renderCompanyNotesTimeline(result.data);
+            } else {
+                elements.companyNotesTimeline.innerHTML = `
+                    <div class="notes-empty">
+                        <p>Error loading notes</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading company notes:', error);
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <p>Error loading notes</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderCompanyNotesTimeline(notes) {
+        if (!notes || notes.length === 0) {
+            elements.companyNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                    </svg>
+                    <p>No notes yet for this company</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+
+        notes.forEach(note => {
+            const date = new Date(note.created_at);
+            const formattedDate = formatDate(date);
+            const contactName = note.contact_name || 'Unknown';
+
+            html += `
+                <div class="note-item">
+                    <div class="note-header">
+                        <span class="note-date">${formattedDate}</span>
+                        <span class="note-source">von ${escapeHtml(contactName)}</span>
+                    </div>
+                    <div class="note-content">${escapeHtml(note.content)}</div>
+                </div>
+            `;
+        });
+
+        elements.companyNotesTimeline.innerHTML = html;
+    }
+
+    function closeCompanyNotesModal() {
+        elements.companyNotesModal.classList.remove('active');
     }
 
     // ============================================
@@ -999,6 +1379,47 @@
             loadContacts();
         });
 
+        // Group by toggle (Company/Tags)
+        elements.groupBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.groupBy = btn.dataset.group;
+                elements.groupBtns.forEach(b => b.classList.toggle('active', b.dataset.group === state.groupBy));
+                loadContacts();
+            });
+        });
+
+        // Tag input - show suggestions
+        elements.newTagInput.addEventListener('input', () => {
+            const query = elements.newTagInput.value.trim();
+            if (query.length > 0) {
+                showTagSuggestions(query);
+            } else {
+                elements.tagSuggestions.classList.remove('visible');
+            }
+        });
+
+        // Tag input - focus shows all tags
+        elements.newTagInput.addEventListener('focus', () => {
+            if (elements.newTagInput.value.trim().length === 0 && state.allTags.length > 0) {
+                showTagSuggestions('');
+            }
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!elements.newTagInput.contains(e.target) && !elements.tagSuggestions.contains(e.target)) {
+                elements.tagSuggestions.classList.remove('visible');
+            }
+        });
+
+        // Add tag button
+        elements.addTagBtn.addEventListener('click', async () => {
+            const query = elements.newTagInput.value.trim();
+            if (query) {
+                await createAndAssignTag(query);
+            }
+        });
+
         // Add contact button
         elements.addContactBtn.addEventListener('click', () => openContactModal());
 
@@ -1033,6 +1454,11 @@
         elements.editContactBtn.addEventListener('click', openEditFromOverview);
         elements.addNoteBtn.addEventListener('click', addNote);
 
+        // Company notes modal
+        elements.closeCompanyNotesModal.addEventListener('click', closeCompanyNotesModal);
+        elements.closeCompanyNotesBtn.addEventListener('click', closeCompanyNotesModal);
+        elements.companyNotesModal.querySelector('.modal-backdrop').addEventListener('click', closeCompanyNotesModal);
+
         // Allow Enter key in note textarea to add note (with Ctrl/Cmd)
         elements.newNoteContent.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -1047,6 +1473,8 @@
             if (e.key === 'Escape') {
                 if (elements.deleteModal.classList.contains('active')) {
                     closeDeleteModal();
+                } else if (elements.companyNotesModal.classList.contains('active')) {
+                    closeCompanyNotesModal();
                 } else if (elements.overviewModal.classList.contains('active')) {
                     closeOverviewModal();
                 } else if (elements.contactModal.classList.contains('active')) {
@@ -1070,6 +1498,9 @@
         initEventListeners();
         initMap();
 
+        // Load all tags for suggestions
+        loadAllTags();
+
         // Load initial data based on current view
         if (state.currentView === 'map') {
             loadMapMarkers();
@@ -1078,9 +1509,10 @@
         }
     }
 
-    // Expose editContact function globally for map popup buttons
+    // Expose functions globally for map popup buttons
     window.CRM = {
-        editContact: editContact
+        editContact: editContact,
+        openOverview: openOverviewModal
     };
 
     // Initialize when DOM is ready
