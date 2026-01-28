@@ -24,7 +24,8 @@
         markers: null,
         groupBy: 'company', // 'company' or 'tags'
         allTags: [],
-        taggedData: null
+        taggedData: null,
+        selectedImportFile: null
     };
 
     // ============================================
@@ -92,7 +93,27 @@
         companyNotesTitle: document.getElementById('companyNotesTitle'),
         companyNotesTimeline: document.getElementById('companyNotesTimeline'),
         closeCompanyNotesModal: document.getElementById('closeCompanyNotesModal'),
-        closeCompanyNotesBtn: document.getElementById('closeCompanyNotesBtn')
+        closeCompanyNotesBtn: document.getElementById('closeCompanyNotesBtn'),
+
+        // Import/Export modal
+        importExportBtn: document.getElementById('importExportBtn'),
+        importExportModal: document.getElementById('importExportModal'),
+        closeImportExportModal: document.getElementById('closeImportExportModal'),
+        closeImportExportBtn: document.getElementById('closeImportExportBtn'),
+        exportBtn: document.getElementById('exportBtn'),
+        downloadTemplateBtn: document.getElementById('downloadTemplateBtn'),
+        fileUploadArea: document.getElementById('fileUploadArea'),
+        importFileInput: document.getElementById('importFileInput'),
+        uploadFileInfo: document.getElementById('uploadFileInfo'),
+        uploadFileName: document.getElementById('uploadFileName'),
+        removeFileBtn: document.getElementById('removeFileBtn'),
+        importBtn: document.getElementById('importBtn'),
+        importResults: document.getElementById('importResults'),
+        importProgress: document.getElementById('importProgress'),
+        importSuccess: document.getElementById('importSuccess'),
+        importSuccessText: document.getElementById('importSuccessText'),
+        importErrors: document.getElementById('importErrors'),
+        importErrorList: document.getElementById('importErrorList')
     };
 
     // ============================================
@@ -1202,6 +1223,212 @@
     }
 
     // ============================================
+    // Import/Export Functions
+    // ============================================
+
+    function openImportExportModal() {
+        // Reset the modal state
+        resetImportState();
+        elements.importExportModal.classList.add('active');
+    }
+
+    function closeImportExportModal() {
+        elements.importExportModal.classList.remove('active');
+        resetImportState();
+    }
+
+    function resetImportState() {
+        state.selectedImportFile = null;
+        elements.importFileInput.value = '';
+        elements.fileUploadArea.querySelector('.upload-content').style.display = 'flex';
+        elements.uploadFileInfo.style.display = 'none';
+        elements.importBtn.disabled = true;
+        elements.importResults.style.display = 'none';
+        elements.importProgress.style.display = 'none';
+        elements.importSuccess.style.display = 'none';
+        elements.importErrors.style.display = 'none';
+        elements.fileUploadArea.classList.remove('drag-over', 'has-file');
+    }
+
+    function handleFileSelect(file) {
+        if (!file) return;
+
+        const validExtensions = ['.xlsx', '.xls'];
+        const fileName = file.name.toLowerCase();
+        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+
+        if (!isValid) {
+            alert('Please select an Excel file (.xlsx or .xls)');
+            return;
+        }
+
+        state.selectedImportFile = file;
+        elements.uploadFileName.textContent = file.name;
+        elements.fileUploadArea.querySelector('.upload-content').style.display = 'none';
+        elements.uploadFileInfo.style.display = 'flex';
+        elements.fileUploadArea.classList.add('has-file');
+        elements.importBtn.disabled = false;
+    }
+
+    function removeSelectedFile() {
+        state.selectedImportFile = null;
+        elements.importFileInput.value = '';
+        elements.fileUploadArea.querySelector('.upload-content').style.display = 'flex';
+        elements.uploadFileInfo.style.display = 'none';
+        elements.fileUploadArea.classList.remove('has-file');
+        elements.importBtn.disabled = true;
+    }
+
+    async function exportContacts() {
+        elements.exportBtn.disabled = true;
+        elements.exportBtn.innerHTML = `
+            <div class="spinner-small"></div>
+            Exporting...
+        `;
+
+        try {
+            // Trigger download by navigating to the export endpoint
+            window.location.href = 'api/import-export.php?action=export';
+        } catch (error) {
+            console.error('Error exporting contacts:', error);
+            alert('Error exporting contacts');
+        } finally {
+            // Reset button after a short delay
+            setTimeout(() => {
+                elements.exportBtn.disabled = false;
+                elements.exportBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    Export All Contacts
+                `;
+            }, 1000);
+        }
+    }
+
+    function downloadTemplate() {
+        window.location.href = 'api/import-export.php?action=template';
+    }
+
+    async function importContacts() {
+        if (!state.selectedImportFile) {
+            alert('Please select a file first');
+            return;
+        }
+
+        // Show progress
+        elements.importResults.style.display = 'block';
+        elements.importProgress.style.display = 'flex';
+        elements.importSuccess.style.display = 'none';
+        elements.importErrors.style.display = 'none';
+        elements.importBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('file', state.selectedImportFile);
+
+        try {
+            const response = await fetch('api/import-export.php?action=import', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            elements.importProgress.style.display = 'none';
+
+            if (result.success) {
+                elements.importSuccess.style.display = 'flex';
+                elements.importSuccessText.textContent = `Successfully imported ${result.imported} of ${result.total_rows} contacts`;
+
+                // Show errors if any
+                if (result.errors && result.errors.length > 0) {
+                    elements.importErrors.style.display = 'block';
+                    elements.importErrorList.innerHTML = result.errors
+                        .map(err => `<li>Row ${err.row}: ${escapeHtml(err.error)}</li>`)
+                        .join('');
+                }
+
+                // Refresh data
+                refreshData();
+                updateContactCount();
+            } else {
+                elements.importErrors.style.display = 'block';
+                elements.importErrorList.innerHTML = `<li>${escapeHtml(result.error)}</li>`;
+            }
+
+        } catch (error) {
+            console.error('Error importing contacts:', error);
+            elements.importProgress.style.display = 'none';
+            elements.importErrors.style.display = 'block';
+            elements.importErrorList.innerHTML = '<li>Error uploading file. Please try again.</li>';
+        } finally {
+            elements.importBtn.disabled = false;
+        }
+    }
+
+    function initImportExportEvents() {
+        // Open modal
+        elements.importExportBtn.addEventListener('click', openImportExportModal);
+
+        // Close modal
+        elements.closeImportExportModal.addEventListener('click', closeImportExportModal);
+        elements.closeImportExportBtn.addEventListener('click', closeImportExportModal);
+        elements.importExportModal.querySelector('.modal-backdrop').addEventListener('click', closeImportExportModal);
+
+        // Export button
+        elements.exportBtn.addEventListener('click', exportContacts);
+
+        // Download template
+        elements.downloadTemplateBtn.addEventListener('click', downloadTemplate);
+
+        // File input change
+        elements.importFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        // Click on upload area to browse
+        elements.fileUploadArea.addEventListener('click', (e) => {
+            if (!elements.uploadFileInfo.contains(e.target)) {
+                elements.importFileInput.click();
+            }
+        });
+
+        // Drag and drop
+        elements.fileUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            elements.fileUploadArea.classList.add('drag-over');
+        });
+
+        elements.fileUploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            elements.fileUploadArea.classList.remove('drag-over');
+        });
+
+        elements.fileUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            elements.fileUploadArea.classList.remove('drag-over');
+
+            if (e.dataTransfer.files.length > 0) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Remove file button
+        elements.removeFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeSelectedFile();
+        });
+
+        // Import button
+        elements.importBtn.addEventListener('click', importContacts);
+    }
+
+    // ============================================
     // Contact CRUD Functions
     // ============================================
 
@@ -1473,6 +1700,8 @@
             if (e.key === 'Escape') {
                 if (elements.deleteModal.classList.contains('active')) {
                     closeDeleteModal();
+                } else if (elements.importExportModal.classList.contains('active')) {
+                    closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
                     closeCompanyNotesModal();
                 } else if (elements.overviewModal.classList.contains('active')) {
@@ -1496,6 +1725,7 @@
 
     function init() {
         initEventListeners();
+        initImportExportEvents();
         initMap();
 
         // Load all tags for suggestions

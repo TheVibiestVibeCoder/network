@@ -1,0 +1,14 @@
+{
+    "name": "simple-crm/network",
+    "description": "Simple CRM with map visualization",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpoffice/phpspreadsheet": "1.25.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "SimpleCRM\\": "includes/"
+        }
+    }
+}

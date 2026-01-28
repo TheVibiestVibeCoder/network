@@ -115,6 +115,12 @@ if ($isAuthenticated) {
                     </div>
                 </div>
                 <div class="header-right">
+                    <button type="button" class="btn btn-secondary" id="importExportBtn" title="Import/Export Contacts">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        Import/Export
+                    </button>
                     <button type="button" class="btn btn-primary" id="addContactBtn">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -378,6 +384,161 @@ if ($isAuthenticated) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="closeCompanyNotesBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import/Export Modal -->
+        <div class="modal" id="importExportModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="import-export-icon">
+                            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                        </div>
+                        <div class="overview-title-info">
+                            <h2>Import / Export Contacts</h2>
+                            <p class="overview-company">Bulk import from Excel or export all contacts</p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeImportExportModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Export Section -->
+                    <div class="import-export-section">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Export Contacts
+                        </h3>
+                        <p class="section-description">Download all your contacts as an Excel file (.xlsx)</p>
+                        <button type="button" class="btn btn-primary" id="exportBtn">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Export All Contacts
+                        </button>
+                    </div>
+
+                    <div class="import-export-divider"></div>
+
+                    <!-- Import Section -->
+                    <div class="import-export-section">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                            </svg>
+                            Import Contacts
+                        </h3>
+                        <p class="section-description">Upload an Excel file to bulk import contacts</p>
+
+                        <!-- Excel Format Instructions -->
+                        <div class="import-instructions">
+                            <h4>Excel File Format</h4>
+                            <p>Your Excel file should have these columns in the <strong>first row</strong> (header row):</p>
+                            <div class="column-list">
+                                <div class="column-item required">
+                                    <span class="column-name">Name</span>
+                                    <span class="column-badge">Required</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Company</span>
+                                    <span class="column-desc">Company or organization</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Location</span>
+                                    <span class="column-desc">City or address (for map)</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Email</span>
+                                    <span class="column-desc">Email address</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Phone</span>
+                                    <span class="column-desc">Phone number</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Website</span>
+                                    <span class="column-desc">Website URL</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Address</span>
+                                    <span class="column-desc">Full postal address</span>
+                                </div>
+                                <div class="column-item">
+                                    <span class="column-name">Note</span>
+                                    <span class="column-desc">Additional notes</span>
+                                </div>
+                            </div>
+                            <div class="import-tips">
+                                <p><strong>Tips:</strong></p>
+                                <ul>
+                                    <li>Column order doesn't matter - headers are matched by name</li>
+                                    <li>Empty cells are allowed and will be skipped</li>
+                                    <li>Rows without a name will be skipped</li>
+                                    <li>German column names are also supported (Firma, Telefon, etc.)</li>
+                                </ul>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-small" id="downloadTemplateBtn">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                                Download Template
+                            </button>
+                        </div>
+
+                        <!-- File Upload Area -->
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <input type="file" id="importFileInput" accept=".xlsx,.xls" hidden>
+                            <div class="upload-content">
+                                <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+                                    <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                                </svg>
+                                <p class="upload-text">Drop your Excel file here or <span class="upload-link">browse</span></p>
+                                <p class="upload-hint">Supports .xlsx and .xls files</p>
+                            </div>
+                            <div class="upload-file-info" id="uploadFileInfo" style="display: none;">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                                <span class="file-name" id="uploadFileName"></span>
+                                <button type="button" class="file-remove" id="removeFileBtn">&times;</button>
+                            </div>
+                        </div>
+
+                        <!-- Import Button -->
+                        <button type="button" class="btn btn-primary" id="importBtn" disabled>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                            </svg>
+                            Import Contacts
+                        </button>
+
+                        <!-- Import Progress/Results -->
+                        <div class="import-results" id="importResults" style="display: none;">
+                            <div class="import-progress" id="importProgress">
+                                <div class="spinner"></div>
+                                <span>Importing contacts...</span>
+                            </div>
+                            <div class="import-success" id="importSuccess" style="display: none;">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                                <span id="importSuccessText"></span>
+                            </div>
+                            <div class="import-errors" id="importErrors" style="display: none;">
+                                <h4>Import Errors:</h4>
+                                <ul id="importErrorList"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="closeImportExportBtn">Close</button>
                 </div>
             </div>
         </div>

@@ -148,4 +148,78 @@ class Contact
         $stmt = $this->db->query("SELECT COUNT(*) FROM contacts");
         return (int) $stmt->fetchColumn();
     }
+
+    /**
+     * Bulk create contacts (for import)
+     * Returns array with success count and errors
+     */
+    public function bulkCreate(array $contacts): array
+    {
+        $successCount = 0;
+        $errors = [];
+        $createdIds = [];
+
+        $this->db->beginTransaction();
+
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO contacts (name, company, location, latitude, longitude, note, email, phone, website, address)
+                VALUES (:name, :company, :location, :latitude, :longitude, :note, :email, :phone, :website, :address)
+            ");
+
+            foreach ($contacts as $index => $data) {
+                // Skip if name is empty
+                if (empty($data['name'])) {
+                    $errors[] = [
+                        'row' => $index + 2, // +2 because row 1 is header, and index is 0-based
+                        'error' => 'Name is required'
+                    ];
+                    continue;
+                }
+
+                try {
+                    $stmt->execute([
+                        'name' => $data['name'] ?? '',
+                        'company' => $data['company'] ?? null,
+                        'location' => $data['location'] ?? null,
+                        'latitude' => $data['latitude'] ?? null,
+                        'longitude' => $data['longitude'] ?? null,
+                        'note' => $data['note'] ?? null,
+                        'email' => $data['email'] ?? null,
+                        'phone' => $data['phone'] ?? null,
+                        'website' => $data['website'] ?? null,
+                        'address' => $data['address'] ?? null,
+                    ]);
+
+                    $createdIds[] = (int) $this->db->lastInsertId();
+                    $successCount++;
+                } catch (Exception $e) {
+                    $errors[] = [
+                        'row' => $index + 2,
+                        'error' => 'Database error: ' . $e->getMessage()
+                    ];
+                }
+            }
+
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+
+        return [
+            'success_count' => $successCount,
+            'errors' => $errors,
+            'created_ids' => $createdIds
+        ];
+    }
+
+    /**
+     * Export all contacts as array
+     */
+    public function exportAll(): array
+    {
+        $stmt = $this->db->query("SELECT name, company, location, email, phone, website, address, note FROM contacts ORDER BY name ASC");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
