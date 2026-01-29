@@ -7,6 +7,19 @@
     'use strict';
 
     // ============================================
+    // Custom Map Marker Icon
+    // ============================================
+
+    const markerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0zm0 20a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="%23ffffff" stroke="%23000" stroke-width="1"/><circle cx="14" cy="14" r="4" fill="%23000"/></svg>`;
+
+    const customIcon = L.icon({
+        iconUrl: 'data:image/svg+xml,' + encodeURIComponent(markerSvg.replace(/%23/g, '#')),
+        iconSize: [28, 40],
+        iconAnchor: [14, 40],
+        popupAnchor: [0, -36]
+    });
+
+    // ============================================
     // State Management
     // ============================================
 
@@ -251,6 +264,7 @@
             center: [30, 0],
             zoom: 2,
             zoomControl: true,
+            attributionControl: false,
             scrollWheelZoom: true,
             doubleClickZoom: true,
             touchZoom: true,
@@ -260,11 +274,17 @@
             keyboard: true
         });
 
-        // Add minimalistic CartoDB Positron tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        // Add dark CartoDB Dark Matter tile layer (no labels variant for cleaner look)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 20
+        }).addTo(state.map);
+
+        // Add labels as a separate layer on top (so pins sit between base and labels)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            pane: 'shadowPane'
         }).addTo(state.map);
 
         // Add zoom control to bottom right for better mobile UX
@@ -320,7 +340,7 @@
         // Add markers for each contact with coordinates
         state.mapContacts.forEach(contact => {
             if (contact.latitude && contact.longitude) {
-                const marker = L.marker([contact.latitude, contact.longitude]);
+                const marker = L.marker([contact.latitude, contact.longitude], { icon: customIcon });
 
                 // Create popup content
                 const popupContent = createPopupContent(contact);
@@ -440,6 +460,21 @@
         addContactListEventHandlers();
     }
 
+    /**
+     * Sort an array of contacts client-side using state.sortField / state.sortOrder
+     */
+    function sortContacts(contacts) {
+        const field = state.sortField;
+        const desc = state.sortOrder === 'DESC';
+
+        return contacts.slice().sort((a, b) => {
+            const valA = (a[field] || '').toString().toLowerCase();
+            const valB = (b[field] || '').toString().toLowerCase();
+            let cmp = valA.localeCompare(valB);
+            return desc ? -cmp : cmp;
+        });
+    }
+
     function renderContactsListByTags() {
         const data = state.taggedData;
         if (!data) return;
@@ -461,9 +496,10 @@
 
         let html = '';
 
-        // Render tagged groups
+        // Render tagged groups, sorting contacts within each tag
         data.tags.forEach(tag => {
             if (tag.contacts.length > 0) {
+                const sorted = sortContacts(tag.contacts);
                 html += `<div class="tag-group">`;
                 html += `<div class="tag-header" style="border-left-color: ${tag.color}">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="${tag.color}">
@@ -472,7 +508,7 @@
                     <span>${escapeHtml(tag.name)}</span>
                     <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
                 </div>`;
-                html += tag.contacts.map(contact => createContactCard(contact, true)).join('');
+                html += sorted.map(contact => createContactCard(contact, true)).join('');
                 html += `</div>`;
             }
         });
@@ -487,7 +523,7 @@
                 <span>Ohne Tag</span>
                 <span class="tag-count">${data.untagged.length}</span>
             </div>`;
-            html += data.untagged.map(contact => createContactCard(contact, true)).join('');
+            html += sortContacts(data.untagged).map(contact => createContactCard(contact, true)).join('');
             html += `</div>`;
         }
 
@@ -535,34 +571,64 @@
             }
         });
 
-        // Convert to array and sort by company name
         const groups = [];
+        const field = state.sortField;
+        const desc = state.sortOrder === 'DESC';
 
-        // Add company groups first (sorted by company name)
-        const sortedCompanies = Array.from(companyMap.keys()).sort((a, b) =>
-            a.toLowerCase().localeCompare(b.toLowerCase())
-        );
+        // Sort company groups based on the active sort field & direction
+        const companyKeys = Array.from(companyMap.keys());
 
-        sortedCompanies.forEach(company => {
+        companyKeys.sort((a, b) => {
+            const contactsA = companyMap.get(a);
+            const contactsB = companyMap.get(b);
+
+            let valA, valB;
+
+            if (field === 'company') {
+                valA = a.toLowerCase();
+                valB = b.toLowerCase();
+            } else {
+                // Sort groups by the first contact's value for the chosen field
+                valA = (contactsA[0][field] || '').toString().toLowerCase();
+                valB = (contactsB[0][field] || '').toString().toLowerCase();
+            }
+
+            let cmp = valA.localeCompare(valB);
+            return desc ? -cmp : cmp;
+        });
+
+        companyKeys.forEach(company => {
             groups.push({
                 company: company,
                 contacts: companyMap.get(company)
             });
         });
 
-        // Add contacts without company at the end
+        // Add contacts without company
         if (noCompany.length > 0) {
-            groups.push({
+            const ungrouped = {
                 company: null,
                 contacts: noCompany
-            });
+            };
+            // For DESC, put ungrouped first; for ASC, put at end
+            if (desc) {
+                groups.unshift(ungrouped);
+            } else {
+                groups.push(ungrouped);
+            }
         }
 
         return groups;
     }
 
     function createContactCard(contact, inGroup = false) {
-        const hasLocation = contact.latitude && contact.longitude;
+        // Show at most one secondary line: company (if not in group) or location
+        let secondaryLine = '';
+        if (!inGroup && contact.company) {
+            secondaryLine = `<p class="contact-company">${escapeHtml(contact.company)}</p>`;
+        } else if (contact.location) {
+            secondaryLine = `<p class="contact-location">${escapeHtml(contact.location)}</p>`;
+        }
 
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}" data-id="${contact.id}">
@@ -571,18 +637,7 @@
                 </div>
                 <div class="contact-info">
                     <h3 class="contact-name">${escapeHtml(contact.name)}</h3>
-                    ${!inGroup && contact.company ? `<p class="contact-company">${escapeHtml(contact.company)}</p>` : ''}
-                    ${contact.location ? `
-                        <p class="contact-location">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                            </svg>
-                            ${escapeHtml(contact.location)}
-                            ${hasLocation ? '<span class="location-badge">On Map</span>' : ''}
-                        </p>
-                    ` : ''}
-                    ${contact.email ? `<p class="contact-email">${escapeHtml(contact.email)}</p>` : ''}
-                    ${contact.phone ? `<p class="contact-phone">${escapeHtml(contact.phone)}</p>` : ''}
+                    ${secondaryLine}
                 </div>
                 <div class="contact-actions">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -1647,8 +1702,55 @@
             }
         });
 
-        // Add contact button
+        // List filter toggle (mobile - collapsible controls)
+        const listFilterToggle = document.getElementById('listFilterToggle');
+        const listControls = document.getElementById('listControls');
+
+        if (listFilterToggle && listControls) {
+            listFilterToggle.addEventListener('click', () => {
+                listControls.classList.toggle('open');
+                listFilterToggle.classList.toggle('active');
+            });
+        }
+
+        // Add contact button (desktop)
         elements.addContactBtn.addEventListener('click', () => openContactModal());
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mobileMenu.classList.toggle('open');
+            });
+
+            // Close mobile menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                    mobileMenu.classList.remove('open');
+                }
+            });
+
+            // Mobile: Add Contact
+            const addContactBtnMobile = document.getElementById('addContactBtnMobile');
+            if (addContactBtnMobile) {
+                addContactBtnMobile.addEventListener('click', () => {
+                    mobileMenu.classList.remove('open');
+                    openContactModal();
+                });
+            }
+
+            // Mobile: Import/Export
+            const importExportBtnMobile = document.getElementById('importExportBtnMobile');
+            if (importExportBtnMobile) {
+                importExportBtnMobile.addEventListener('click', () => {
+                    mobileMenu.classList.remove('open');
+                    openImportExportModal();
+                });
+            }
+        }
 
         // Modal close buttons
         elements.closeModal.addEventListener('click', closeContactModal);
