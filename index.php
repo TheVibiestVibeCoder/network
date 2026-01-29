@@ -289,7 +289,7 @@ if ($isAuthenticated) {
 
                                 <div class="form-group">
                                     <label for="contactWebsite">Website</label>
-                                    <input type="url" id="contactWebsite" name="website" class="form-input" placeholder="https://">
+                                    <input type="text" id="contactWebsite" name="website" class="form-input" placeholder="www.example.com">
                                 </div>
 
                                 <div class="form-group">

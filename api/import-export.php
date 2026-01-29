@@ -258,6 +258,14 @@ function handleImport(): void
             return;
         }
 
+        // Normalize website URLs
+        foreach ($contacts as &$contact) {
+            if (!empty($contact['website'])) {
+                $contact['website'] = Contact::normalizeWebsite($contact['website']);
+            }
+        }
+        unset($contact);
+
         // Import contacts
         $contactModel = new Contact();
         $result = $contactModel->bulkCreate($contacts);
@@ -416,12 +424,15 @@ function geocodeImportedContacts(array $contactIds): void
         return;
     }
 
+    // Allow enough time for geocoding
+    set_time_limit(300);
+
     $contactModel = new Contact();
     $db = Database::getInstance();
 
-    // Only geocode first 10 contacts to avoid rate limiting
+    // Geocode up to 50 contacts to avoid excessive rate limiting
     // Others will be geocoded when edited
-    $idsToGeocode = array_slice($contactIds, 0, 10);
+    $idsToGeocode = array_slice($contactIds, 0, 50);
 
     foreach ($idsToGeocode as $id) {
         $contact = $contactModel->getById($id);

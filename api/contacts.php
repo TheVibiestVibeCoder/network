@@ -112,6 +112,11 @@ function handlePost(Contact $model, string $action): void
         return;
     }
 
+    // Normalize website URL
+    if (!empty($input['website'])) {
+        $input['website'] = Contact::normalizeWebsite($input['website']);
+    }
+
     // Geocode location if provided
     if (!empty($input['location']) && (empty($input['latitude']) || empty($input['longitude']))) {
         $coords = geocodeLocation($input['location']);
@@ -162,6 +167,11 @@ function handlePut(Contact $model, ?int $id): void
         http_response_code(400);
         echo json_encode(['error' => 'Name is required']);
         return;
+    }
+
+    // Normalize website URL
+    if (!empty($input['website'])) {
+        $input['website'] = Contact::normalizeWebsite($input['website']);
     }
 
     // Geocode location if changed

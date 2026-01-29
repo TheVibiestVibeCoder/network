@@ -785,6 +785,8 @@
         let html = '<div class="detail-grid">';
 
         if (contact.location) {
+            const hasCoords = contact.latitude && contact.longitude;
+            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></span>` : '';
             html += `
                 <div class="detail-item">
                     <span class="detail-icon">
@@ -793,7 +795,7 @@
                         </svg>
                     </span>
                     <div class="detail-content">
-                        <span class="detail-label">Location</span>
+                        <span class="detail-label">Location ${geoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.location)}</span>
                     </div>
                 </div>
@@ -842,7 +844,7 @@
                     </span>
                     <div class="detail-content">
                         <span class="detail-label">Website</span>
-                        <a href="${escapeHtml(contact.website)}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
+                        <a href="${escapeHtml(normalizeUrl(contact.website))}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
                     </div>
                 </div>
             `;
@@ -1607,6 +1609,13 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function normalizeUrl(url) {
+        if (!url) return url;
+        url = url.trim();
+        if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
+        return 'https://' + url;
     }
 
     function getInitials(name) {
