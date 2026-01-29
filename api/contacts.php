@@ -96,6 +96,12 @@ function handleGet(Contact $model, string $action, ?int $id): void
  */
 function handlePost(Contact $model, string $action): void
 {
+    // One-time data fix: normalize URLs + geocode missing coordinates
+    if ($action === 'fix-data') {
+        handleFixData($model);
+        return;
+    }
+
     // Get JSON input
     $input = json_decode(file_get_contents('php://input'), true);
 
@@ -259,4 +265,59 @@ function geocodeLocation(string $location): ?array
         'lat' => (float) $data[0]['lat'],
         'lng' => (float) $data[0]['lon']
     ];
+}
+
+/**
+ * One-time fix for existing data:
+ * 1. Normalize all website URLs missing a protocol
+ * 2. Geocode contacts that have location/address but no coordinates
+ */
+function handleFixData(Contact $model): void
+{
+    set_time_limit(600);
+
+    $db = Database::getInstance();
+    $results = ['urls_fixed' => 0, 'geocoded' => 0, 'geocode_failed' => 0];
+
+    // 1. Normalize website URLs
+    $stmt = $db->query("SELECT id, website FROM contacts WHERE website IS NOT NULL AND website != ''");
+    $contacts = $stmt->fetchAll();
+
+    $update = $db->prepare("UPDATE contacts SET website = :website WHERE id = :id");
+    foreach ($contacts as $contact) {
+        $normalized = Contact::normalizeWebsite($contact['website']);
+        if ($normalized !== $contact['website']) {
+            $update->execute(['website' => $normalized, 'id' => $contact['id']]);
+            $results['urls_fixed']++;
+        }
+    }
+
+    // 2. Geocode contacts missing coordinates
+    $stmt = $db->query("
+        SELECT id, location, address FROM contacts
+        WHERE latitude IS NULL AND (location IS NOT NULL AND location != '' OR address IS NOT NULL AND address != '')
+    ");
+    $toGeocode = $stmt->fetchAll();
+
+    $update = $db->prepare("UPDATE contacts SET latitude = :lat, longitude = :lng WHERE id = :id");
+    foreach ($toGeocode as $contact) {
+        $locationToGeocode = !empty($contact['location']) ? $contact['location'] : $contact['address'];
+        $coords = geocodeLocation($locationToGeocode);
+
+        if ($coords) {
+            $update->execute(['lat' => $coords['lat'], 'lng' => $coords['lng'], 'id' => $contact['id']]);
+            $results['geocoded']++;
+        } else {
+            $results['geocode_failed']++;
+        }
+
+        // Respect Nominatim rate limit (1 req/sec)
+        usleep(1100000);
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => "Fixed {$results['urls_fixed']} URLs, geocoded {$results['geocoded']} contacts, {$results['geocode_failed']} could not be resolved.",
+        'data' => $results
+    ]);
 }
