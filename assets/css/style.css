@@ -396,6 +396,77 @@ textarea.form-input {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
+    position: relative;
+}
+
+/* Mobile menu */
+.header-mobile-only {
+    display: none;
+}
+
+.mobile-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 200px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    padding: var(--spacing-2);
+    z-index: 500;
+}
+
+.mobile-menu.open {
+    display: block;
+}
+
+.mobile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    width: 100%;
+    padding: 10px 14px;
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-decoration: none;
+}
+
+.mobile-menu-item:hover {
+    background-color: var(--color-accent-subtle);
+    color: var(--color-text);
+}
+
+.mobile-menu-item svg {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.mobile-menu-danger {
+    color: var(--color-danger);
+}
+
+.mobile-menu-danger svg {
+    color: var(--color-danger);
+}
+
+.mobile-menu-danger:hover {
+    background-color: var(--color-danger-subtle);
+    color: var(--color-danger);
+}
+
+.mobile-menu-divider {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: var(--spacing-2) 0;
 }
 
 /* ============================================
@@ -700,6 +771,7 @@ textarea.form-input {
     align-items: center;
     gap: var(--spacing-4);
     padding: var(--spacing-3) var(--spacing-4);
+    height: 64px;
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -724,15 +796,15 @@ textarea.form-input {
 }
 
 .contact-avatar {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     font-weight: 600;
     border-radius: var(--radius-full);
     flex-shrink: 0;
@@ -741,19 +813,24 @@ textarea.form-input {
 .contact-info {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
 }
 
 .contact-name {
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--color-text);
-    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .contact-company {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
-    margin-bottom: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .contact-location {
@@ -762,29 +839,22 @@ textarea.form-input {
     gap: var(--spacing-1);
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .contact-location svg {
     flex-shrink: 0;
 }
 
-.location-badge {
-    display: inline-block;
-    padding: 0 6px;
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--color-success);
-    background-color: var(--color-success-subtle);
-    border-radius: var(--radius-full);
-    margin-left: var(--spacing-1);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
 .contact-email,
 .contact-phone {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .contact-actions {
@@ -1817,6 +1887,15 @@ textarea.form-input {
         justify-content: center;
     }
 
+    /* Mobile menu: hide desktop buttons, show menu trigger */
+    .header-desktop-only {
+        display: none;
+    }
+
+    .header-mobile-only {
+        display: inline-flex;
+    }
+
     .list-header {
         flex-direction: column;
         gap: var(--spacing-3);
@@ -1825,6 +1904,7 @@ textarea.form-input {
 
     .search-box {
         max-width: none;
+        width: 100%;
     }
 
     .sort-controls {
@@ -1920,13 +2000,5 @@ textarea.form-input {
 
     .contact-count {
         display: none;
-    }
-
-    .btn span {
-        display: none;
-    }
-
-    .header-right .btn {
-        padding: 8px;
     }
 }

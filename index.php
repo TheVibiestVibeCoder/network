@@ -120,19 +120,50 @@ if ($isAuthenticated) {
                     </div>
                 </div>
                 <div class="header-right">
-                    <button type="button" class="btn btn-secondary" id="importExportBtn" title="Import/Export Contacts">
+                    <!-- Desktop buttons (hidden on mobile) -->
+                    <button type="button" class="btn btn-secondary header-desktop-only" id="importExportBtn" title="Import/Export Contacts">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                         </svg>
-                        Import/Export
+                        <span>Import/Export</span>
                     </button>
-                    <button type="button" class="btn btn-primary" id="addContactBtn">
+                    <button type="button" class="btn btn-primary header-desktop-only" id="addContactBtn">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                         </svg>
-                        Add Contact
+                        <span>Add Contact</span>
                     </button>
-                    <a href="index.php?action=logout" class="btn btn-secondary">Logout</a>
+                    <a href="index.php?action=logout" class="btn btn-secondary header-desktop-only">Logout</a>
+
+                    <!-- Mobile menu button (hidden on desktop) -->
+                    <button type="button" class="btn btn-icon header-mobile-only" id="mobileMenuBtn" aria-label="Menu">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                        </svg>
+                    </button>
+
+                    <!-- Mobile dropdown menu -->
+                    <div class="mobile-menu" id="mobileMenu">
+                        <button type="button" class="mobile-menu-item" id="addContactBtnMobile">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                            </svg>
+                            Add Contact
+                        </button>
+                        <button type="button" class="mobile-menu-item" id="importExportBtnMobile">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            Import / Export
+                        </button>
+                        <div class="mobile-menu-divider"></div>
+                        <a href="index.php?action=logout" class="mobile-menu-item mobile-menu-danger">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                            </svg>
+                            Logout
+                        </a>
+                    </div>
                 </div>
             </header>
 

@@ -7,6 +7,19 @@
     'use strict';
 
     // ============================================
+    // Custom Map Marker Icon
+    // ============================================
+
+    const markerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0zm0 20a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="%23ffffff" stroke="%23000" stroke-width="1"/><circle cx="14" cy="14" r="4" fill="%23000"/></svg>`;
+
+    const customIcon = L.icon({
+        iconUrl: 'data:image/svg+xml,' + encodeURIComponent(markerSvg.replace(/%23/g, '#')),
+        iconSize: [28, 40],
+        iconAnchor: [14, 40],
+        popupAnchor: [0, -36]
+    });
+
+    // ============================================
     // State Management
     // ============================================
 
@@ -320,7 +333,7 @@
         // Add markers for each contact with coordinates
         state.mapContacts.forEach(contact => {
             if (contact.latitude && contact.longitude) {
-                const marker = L.marker([contact.latitude, contact.longitude]);
+                const marker = L.marker([contact.latitude, contact.longitude], { icon: customIcon });
 
                 // Create popup content
                 const popupContent = createPopupContent(contact);
@@ -562,7 +575,13 @@
     }
 
     function createContactCard(contact, inGroup = false) {
-        const hasLocation = contact.latitude && contact.longitude;
+        // Show at most one secondary line: company (if not in group) or location
+        let secondaryLine = '';
+        if (!inGroup && contact.company) {
+            secondaryLine = `<p class="contact-company">${escapeHtml(contact.company)}</p>`;
+        } else if (contact.location) {
+            secondaryLine = `<p class="contact-location">${escapeHtml(contact.location)}</p>`;
+        }
 
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}" data-id="${contact.id}">
@@ -571,18 +590,7 @@
                 </div>
                 <div class="contact-info">
                     <h3 class="contact-name">${escapeHtml(contact.name)}</h3>
-                    ${!inGroup && contact.company ? `<p class="contact-company">${escapeHtml(contact.company)}</p>` : ''}
-                    ${contact.location ? `
-                        <p class="contact-location">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                            </svg>
-                            ${escapeHtml(contact.location)}
-                            ${hasLocation ? '<span class="location-badge">On Map</span>' : ''}
-                        </p>
-                    ` : ''}
-                    ${contact.email ? `<p class="contact-email">${escapeHtml(contact.email)}</p>` : ''}
-                    ${contact.phone ? `<p class="contact-phone">${escapeHtml(contact.phone)}</p>` : ''}
+                    ${secondaryLine}
                 </div>
                 <div class="contact-actions">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -1647,8 +1655,44 @@
             }
         });
 
-        // Add contact button
+        // Add contact button (desktop)
         elements.addContactBtn.addEventListener('click', () => openContactModal());
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+
+        if (mobileMenuBtn && mobileMenu) {
+            mobileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mobileMenu.classList.toggle('open');
+            });
+
+            // Close mobile menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                    mobileMenu.classList.remove('open');
+                }
+            });
+
+            // Mobile: Add Contact
+            const addContactBtnMobile = document.getElementById('addContactBtnMobile');
+            if (addContactBtnMobile) {
+                addContactBtnMobile.addEventListener('click', () => {
+                    mobileMenu.classList.remove('open');
+                    openContactModal();
+                });
+            }
+
+            // Mobile: Import/Export
+            const importExportBtnMobile = document.getElementById('importExportBtnMobile');
+            if (importExportBtnMobile) {
+                importExportBtnMobile.addEventListener('click', () => {
+                    mobileMenu.classList.remove('open');
+                    openImportExportModal();
+                });
+            }
+        }
 
         // Modal close buttons
         elements.closeModal.addEventListener('click', closeContactModal);
