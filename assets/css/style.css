@@ -2002,11 +2002,26 @@ textarea.form-input {
 
     .overview-header-info {
         flex-direction: column;
+        align-items: center;
         text-align: center;
+        width: 100%;
     }
 
     .overview-title-info {
         text-align: center;
+    }
+
+    /* On mobile, stack modal header vertically so name centers */
+    .modal-large .modal-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-2);
+    }
+
+    .modal-large .modal-header .modal-close {
+        position: absolute;
+        top: var(--spacing-3);
+        right: var(--spacing-3);
     }
 
     .notes-timeline {

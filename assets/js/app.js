@@ -264,6 +264,7 @@
             center: [30, 0],
             zoom: 2,
             zoomControl: true,
+            attributionControl: false,
             scrollWheelZoom: true,
             doubleClickZoom: true,
             touchZoom: true,
@@ -273,11 +274,17 @@
             keyboard: true
         });
 
-        // Add dark CartoDB Dark Matter tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        // Add dark CartoDB Dark Matter tile layer (no labels variant for cleaner look)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 20
+        }).addTo(state.map);
+
+        // Add labels as a separate layer on top (so pins sit between base and labels)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            pane: 'shadowPane'
         }).addTo(state.map);
 
         // Add zoom control to bottom right for better mobile UX
