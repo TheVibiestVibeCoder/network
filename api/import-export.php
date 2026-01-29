@@ -437,8 +437,9 @@ function geocodeImportedContacts(array $contactIds): void
     foreach ($idsToGeocode as $id) {
         $contact = $contactModel->getById($id);
 
-        if ($contact && !empty($contact['location']) && empty($contact['latitude'])) {
-            $coords = geocodeLocation($contact['location']);
+        $locationToGeocode = !empty($contact['location']) ? $contact['location'] : (!empty($contact['address']) ? $contact['address'] : null);
+        if ($contact && $locationToGeocode && empty($contact['latitude'])) {
+            $coords = geocodeLocation($locationToGeocode);
 
             if ($coords) {
                 $stmt = $db->prepare("UPDATE contacts SET latitude = :lat, longitude = :lng WHERE id = :id");

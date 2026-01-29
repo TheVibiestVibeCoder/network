@@ -786,7 +786,7 @@
 
         if (contact.location) {
             const hasCoords = contact.latitude && contact.longitude;
-            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></span>` : '';
+            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
             html += `
                 <div class="detail-item">
                     <span class="detail-icon">
@@ -851,6 +851,8 @@
         }
 
         if (contact.address) {
+            const hasCoords = contact.latitude && contact.longitude;
+            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
             html += `
                 <div class="detail-item detail-item-full">
                     <span class="detail-icon">
@@ -859,7 +861,7 @@
                         </svg>
                     </span>
                     <div class="detail-content">
-                        <span class="detail-label">Address</span>
+                        <span class="detail-label">Address ${addressGeoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.address).replace(/\n/g, '<br>')}</span>
                     </div>
                 </div>

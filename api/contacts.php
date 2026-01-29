@@ -117,9 +117,10 @@ function handlePost(Contact $model, string $action): void
         $input['website'] = Contact::normalizeWebsite($input['website']);
     }
 
-    // Geocode location if provided
-    if (!empty($input['location']) && (empty($input['latitude']) || empty($input['longitude']))) {
-        $coords = geocodeLocation($input['location']);
+    // Geocode location if provided (fall back to address field)
+    $locationToGeocode = !empty($input['location']) ? $input['location'] : (!empty($input['address']) ? $input['address'] : null);
+    if ($locationToGeocode && (empty($input['latitude']) || empty($input['longitude']))) {
+        $coords = geocodeLocation($locationToGeocode);
         if ($coords) {
             $input['latitude'] = $coords['lat'];
             $input['longitude'] = $coords['lng'];
@@ -174,9 +175,11 @@ function handlePut(Contact $model, ?int $id): void
         $input['website'] = Contact::normalizeWebsite($input['website']);
     }
 
-    // Geocode location if changed
-    if (!empty($input['location']) && $input['location'] !== $existing['location']) {
-        $coords = geocodeLocation($input['location']);
+    // Geocode location if changed (fall back to address field)
+    $locationToGeocode = !empty($input['location']) ? $input['location'] : (!empty($input['address']) ? $input['address'] : null);
+    $existingGeoSource = !empty($existing['location']) ? $existing['location'] : (!empty($existing['address']) ? $existing['address'] : null);
+    if ($locationToGeocode && $locationToGeocode !== $existingGeoSource) {
+        $coords = geocodeLocation($locationToGeocode);
         if ($coords) {
             $input['latitude'] = $coords['lat'];
             $input['longitude'] = $coords['lng'];
@@ -184,7 +187,7 @@ function handlePut(Contact $model, ?int $id): void
             $input['latitude'] = null;
             $input['longitude'] = null;
         }
-    } elseif (empty($input['location'])) {
+    } elseif (!$locationToGeocode) {
         $input['latitude'] = null;
         $input['longitude'] = null;
     }

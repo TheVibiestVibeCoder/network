@@ -1210,12 +1210,12 @@ textarea.form-input {
 }
 
 .geocode-warning {
-    display: inline-flex;
-    align-items: center;
-    color: #f59e0b;
-    margin-left: 4px;
+    display: inline;
+    color: var(--color-text-muted);
+    margin-left: 3px;
     cursor: help;
-    vertical-align: middle;
+    font-size: 10px;
+    letter-spacing: 0.02em;
 }
 
 .no-details {
