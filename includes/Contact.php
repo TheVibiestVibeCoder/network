@@ -222,4 +222,24 @@ class Contact
         $stmt = $this->db->query("SELECT name, company, location, email, phone, website, address, note FROM contacts ORDER BY name ASC");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Normalize a website URL by ensuring it has a protocol prefix.
+     * Accepts www.example.at or example.at and prepends https://
+     */
+    public static function normalizeWebsite(?string $url): ?string
+    {
+        if ($url === null || trim($url) === '') {
+            return $url;
+        }
+
+        $url = trim($url);
+
+        // Already has a protocol (http://, https://, ftp://, etc.)
+        if (preg_match('/^[a-z][a-z0-9+\-.]*:\/\//i', $url)) {
+            return $url;
+        }
+
+        return 'https://' . $url;
+    }
 }

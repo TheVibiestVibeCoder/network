@@ -1209,6 +1209,15 @@ textarea.form-input {
     border-color: var(--color-text);
 }
 
+.geocode-warning {
+    display: inline;
+    color: var(--color-text-muted);
+    margin-left: 3px;
+    cursor: help;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+}
+
 .no-details {
     text-align: center;
     color: var(--color-text-muted);
