@@ -659,12 +659,25 @@ textarea.form-input {
 }
 
 .list-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     padding: var(--spacing-3) var(--spacing-5);
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
+}
+
+.list-header-top {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.list-filter-toggle {
+    display: none;
+}
+
+.list-filter-toggle.active {
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    border-color: var(--color-text);
 }
 
 .search-box {
@@ -739,7 +752,7 @@ textarea.form-input {
     margin-bottom: var(--spacing-2);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    color: var(--color-text-tertiary);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     border-bottom: 1px solid var(--color-border);
@@ -748,11 +761,11 @@ textarea.form-input {
 }
 
 .company-header:hover {
-    color: var(--color-text-secondary);
+    color: var(--color-text);
 }
 
 .company-header svg {
-    color: var(--color-text-muted);
+    color: var(--color-text-tertiary);
     flex-shrink: 0;
 }
 
@@ -769,30 +782,30 @@ textarea.form-input {
 .contact-card {
     display: flex;
     align-items: center;
-    gap: var(--spacing-4);
+    gap: var(--spacing-3);
     padding: var(--spacing-3) var(--spacing-4);
-    height: 64px;
-    background-color: transparent;
-    border: 1px solid transparent;
+    height: 60px;
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    margin-bottom: 2px;
+    margin-bottom: 4px;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .contact-card:hover {
-    background-color: var(--color-accent-subtle);
-    border-color: var(--color-border);
+    background-color: var(--color-surface-3);
+    border-color: var(--color-text-muted);
 }
 
 .contact-card.in-group {
     margin-left: var(--spacing-2);
-    border-left: 2px solid var(--color-border);
+    border-left: 2px solid var(--color-text-muted);
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
 .contact-card.in-group:hover {
-    border-left-color: var(--color-text-tertiary);
+    border-left-color: var(--color-text-secondary);
 }
 
 .contact-avatar {
@@ -801,9 +814,9 @@ textarea.form-input {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--color-surface-3);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--color-text);
     font-size: var(--font-size-xs);
     font-weight: 600;
     border-radius: var(--radius-full);
@@ -1470,6 +1483,7 @@ textarea.form-input {
     display: flex;
     align-items: center;
     gap: var(--spacing-4);
+    margin-top: var(--spacing-3);
 }
 
 .group-toggle {
@@ -1884,6 +1898,15 @@ textarea.form-input {
     .header-center {
         order: 3;
         width: 100%;
+    }
+
+    /* Full-width view toggle on mobile */
+    .view-toggle {
+        width: 100%;
+    }
+
+    .toggle-btn {
+        flex: 1;
         justify-content: center;
     }
 
@@ -1896,20 +1919,49 @@ textarea.form-input {
         display: inline-flex;
     }
 
+    /* List header: collapsible filters */
     .list-header {
-        flex-direction: column;
-        gap: var(--spacing-3);
         padding: var(--spacing-3);
     }
 
     .search-box {
         max-width: none;
         width: 100%;
+        flex: 1;
+    }
+
+    .list-filter-toggle {
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    .list-controls {
+        display: none;
+        flex-wrap: wrap;
+        gap: var(--spacing-2);
+    }
+
+    .list-controls.open {
+        display: flex;
     }
 
     .sort-controls {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .group-toggle {
+        order: -1;
+        width: 100%;
+    }
+
+    .group-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .group-btn span {
+        display: none;
     }
 
     .contacts-list {
@@ -1959,25 +2011,6 @@ textarea.form-input {
 
     .notes-timeline {
         max-height: 200px;
-    }
-
-    .list-controls {
-        flex-wrap: wrap;
-        gap: var(--spacing-2);
-    }
-
-    .group-toggle {
-        order: -1;
-        width: 100%;
-    }
-
-    .group-btn {
-        flex: 1;
-        justify-content: center;
-    }
-
-    .group-btn span {
-        display: none;
     }
 
     .column-list {

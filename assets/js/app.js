@@ -453,6 +453,21 @@
         addContactListEventHandlers();
     }
 
+    /**
+     * Sort an array of contacts client-side using state.sortField / state.sortOrder
+     */
+    function sortContacts(contacts) {
+        const field = state.sortField;
+        const desc = state.sortOrder === 'DESC';
+
+        return contacts.slice().sort((a, b) => {
+            const valA = (a[field] || '').toString().toLowerCase();
+            const valB = (b[field] || '').toString().toLowerCase();
+            let cmp = valA.localeCompare(valB);
+            return desc ? -cmp : cmp;
+        });
+    }
+
     function renderContactsListByTags() {
         const data = state.taggedData;
         if (!data) return;
@@ -474,9 +489,10 @@
 
         let html = '';
 
-        // Render tagged groups
+        // Render tagged groups, sorting contacts within each tag
         data.tags.forEach(tag => {
             if (tag.contacts.length > 0) {
+                const sorted = sortContacts(tag.contacts);
                 html += `<div class="tag-group">`;
                 html += `<div class="tag-header" style="border-left-color: ${tag.color}">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="${tag.color}">
@@ -485,7 +501,7 @@
                     <span>${escapeHtml(tag.name)}</span>
                     <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
                 </div>`;
-                html += tag.contacts.map(contact => createContactCard(contact, true)).join('');
+                html += sorted.map(contact => createContactCard(contact, true)).join('');
                 html += `</div>`;
             }
         });
@@ -500,7 +516,7 @@
                 <span>Ohne Tag</span>
                 <span class="tag-count">${data.untagged.length}</span>
             </div>`;
-            html += data.untagged.map(contact => createContactCard(contact, true)).join('');
+            html += sortContacts(data.untagged).map(contact => createContactCard(contact, true)).join('');
             html += `</div>`;
         }
 
@@ -548,27 +564,51 @@
             }
         });
 
-        // Convert to array and sort by company name
         const groups = [];
+        const field = state.sortField;
+        const desc = state.sortOrder === 'DESC';
 
-        // Add company groups first (sorted by company name)
-        const sortedCompanies = Array.from(companyMap.keys()).sort((a, b) =>
-            a.toLowerCase().localeCompare(b.toLowerCase())
-        );
+        // Sort company groups based on the active sort field & direction
+        const companyKeys = Array.from(companyMap.keys());
 
-        sortedCompanies.forEach(company => {
+        companyKeys.sort((a, b) => {
+            const contactsA = companyMap.get(a);
+            const contactsB = companyMap.get(b);
+
+            let valA, valB;
+
+            if (field === 'company') {
+                valA = a.toLowerCase();
+                valB = b.toLowerCase();
+            } else {
+                // Sort groups by the first contact's value for the chosen field
+                valA = (contactsA[0][field] || '').toString().toLowerCase();
+                valB = (contactsB[0][field] || '').toString().toLowerCase();
+            }
+
+            let cmp = valA.localeCompare(valB);
+            return desc ? -cmp : cmp;
+        });
+
+        companyKeys.forEach(company => {
             groups.push({
                 company: company,
                 contacts: companyMap.get(company)
             });
         });
 
-        // Add contacts without company at the end
+        // Add contacts without company
         if (noCompany.length > 0) {
-            groups.push({
+            const ungrouped = {
                 company: null,
                 contacts: noCompany
-            });
+            };
+            // For DESC, put ungrouped first; for ASC, put at end
+            if (desc) {
+                groups.unshift(ungrouped);
+            } else {
+                groups.push(ungrouped);
+            }
         }
 
         return groups;
@@ -1654,6 +1694,17 @@
                 await createAndAssignTag(query);
             }
         });
+
+        // List filter toggle (mobile - collapsible controls)
+        const listFilterToggle = document.getElementById('listFilterToggle');
+        const listControls = document.getElementById('listControls');
+
+        if (listFilterToggle && listControls) {
+            listFilterToggle.addEventListener('click', () => {
+                listControls.classList.toggle('open');
+                listFilterToggle.classList.toggle('active');
+            });
+        }
 
         // Add contact button (desktop)
         elements.addContactBtn.addEventListener('click', () => openContactModal());
