@@ -1666,9 +1666,20 @@
             end.setHours(23, 59, 59);
         }
 
+        // Format using local time (not UTC) to avoid timezone offset shifting dates
+        function toLocalDatetime(dt) {
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            const h = String(dt.getHours()).padStart(2, '0');
+            const min = String(dt.getMinutes()).padStart(2, '0');
+            const s = String(dt.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${d} ${h}:${min}:${s}`;
+        }
+
         return {
-            start: start.toISOString().slice(0, 19).replace('T', ' '),
-            end: end.toISOString().slice(0, 19).replace('T', ' '),
+            start: toLocalDatetime(start),
+            end: toLocalDatetime(end),
             startDate: start,
             endDate: end
         };
@@ -1723,10 +1734,18 @@
         }
     }
 
+    function toLocalDateKey(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     function groupNotesByDate(notes) {
         const grouped = {};
         notes.forEach(note => {
-            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD
+            // Parse the created_at string as local time and format as local date key
+            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD from DB
             if (!grouped[dateKey]) grouped[dateKey] = [];
             grouped[dateKey].push(note);
         });
@@ -1772,7 +1791,7 @@
         html += '<div class="cal-month-body">';
         const cursor = new Date(range.startDate);
         while (cursor <= range.endDate) {
-            const dateKey = cursor.toISOString().slice(0, 10);
+            const dateKey = toLocalDateKey(cursor);
             const isToday = cursor.toDateString() === today.toDateString();
             const isOtherMonth = cursor.getMonth() !== currentMonth;
             const dayNotes = notesByDate[dateKey] || [];
@@ -1816,7 +1835,7 @@
 
         const cursor = new Date(range.startDate);
         for (let i = 0; i < 7; i++) {
-            const dateKey = cursor.toISOString().slice(0, 10);
+            const dateKey = toLocalDateKey(cursor);
             const isToday = cursor.toDateString() === today.toDateString();
             const dayNotes = notesByDate[dateKey] || [];
 
@@ -1844,7 +1863,7 @@
 
     function renderDayView() {
         const d = state.calendarDate;
-        const dateKey = d.toISOString().slice(0, 10);
+        const dateKey = toLocalDateKey(d);
         const notesByDate = groupNotesByDate(state.calendarNotes);
         const dayNotes = notesByDate[dateKey] || [];
 
