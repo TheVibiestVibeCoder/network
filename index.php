@@ -117,6 +117,12 @@ if ($isAuthenticated) {
                             </svg>
                             List
                         </button>
+                        <button type="button" class="toggle-btn" data-view="calendar">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+                            </svg>
+                            Kalender
+                        </button>
                     </div>
                 </div>
                 <div class="header-right">
@@ -172,6 +178,56 @@ if ($isAuthenticated) {
                 <!-- Map View -->
                 <div class="view-panel active" id="mapView">
                     <div id="map"></div>
+                </div>
+
+                <!-- Calendar View -->
+                <div class="view-panel" id="calendarView">
+                    <div class="calendar-container">
+                        <div class="calendar-toolbar">
+                            <div class="calendar-toolbar-left">
+                                <button type="button" class="btn btn-icon" id="calPrev" title="Zurück">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-small" id="calToday">Heute</button>
+                                <button type="button" class="btn btn-icon" id="calNext" title="Weiter">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                                    </svg>
+                                </button>
+                                <h2 class="calendar-title" id="calTitle"></h2>
+                            </div>
+                            <div class="calendar-toolbar-right">
+                                <div class="calendar-mode-toggle">
+                                    <button type="button" class="cal-mode-btn active" data-mode="month">Monat</button>
+                                    <button type="button" class="cal-mode-btn" data-mode="week">Woche</button>
+                                    <button type="button" class="cal-mode-btn" data-mode="day">Tag</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="calendar-filters" id="calendarFilters">
+                            <div class="calendar-search-box">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="cal-search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="calSearchInput" placeholder="Name oder Firma suchen..." class="cal-search-input">
+                            </div>
+                            <div class="calendar-tag-filter">
+                                <select id="calTagFilter" class="form-select">
+                                    <option value="">Alle Tags</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-icon calendar-filter-toggle-btn" id="calFilterToggle" title="Filter">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="calendar-body" id="calendarBody">
+                            <!-- Calendar grid rendered by JS -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- List View -->

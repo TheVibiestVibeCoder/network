@@ -38,7 +38,13 @@
         groupBy: 'company', // 'company' or 'tags'
         allTags: [],
         taggedData: null,
-        selectedImportFile: null
+        selectedImportFile: null,
+        // Calendar state
+        calendarMode: 'month', // 'month', 'week', 'day'
+        calendarDate: new Date(),
+        calendarNotes: [],
+        calendarSearch: '',
+        calendarTagFilter: ''
     };
 
     // ============================================
@@ -49,7 +55,20 @@
         // Views
         mapView: document.getElementById('mapView'),
         listView: document.getElementById('listView'),
+        calendarView: document.getElementById('calendarView'),
         mapContainer: document.getElementById('map'),
+
+        // Calendar elements
+        calendarBody: document.getElementById('calendarBody'),
+        calTitle: document.getElementById('calTitle'),
+        calPrev: document.getElementById('calPrev'),
+        calNext: document.getElementById('calNext'),
+        calToday: document.getElementById('calToday'),
+        calModeBtns: document.querySelectorAll('.cal-mode-btn'),
+        calSearchInput: document.getElementById('calSearchInput'),
+        calTagFilter: document.getElementById('calTagFilter'),
+        calFilterToggle: document.getElementById('calFilterToggle'),
+        calendarFilters: document.getElementById('calendarFilters'),
 
         // Toggle buttons
         toggleBtns: document.querySelectorAll('.toggle-btn'),
@@ -249,6 +268,17 @@
             const response = await fetch(`api/tags.php?id=${id}`, {
                 method: 'DELETE'
             });
+            return response.json();
+        },
+
+        // Calendar API
+        async getCalendarNotes(start, end, search = '', tagId = '') {
+            const params = new URLSearchParams();
+            if (start) params.set('start', start);
+            if (end) params.set('end', end);
+            if (search) params.set('search', search);
+            if (tagId) params.set('tag_id', tagId);
+            const response = await fetch(`api/calendar.php?${params}`);
             return response.json();
         }
     };
@@ -663,6 +693,7 @@
         // Update view panels
         elements.mapView.classList.toggle('active', view === 'map');
         elements.listView.classList.toggle('active', view === 'list');
+        elements.calendarView.classList.toggle('active', view === 'calendar');
 
         // Refresh data for the active view
         if (view === 'map') {
@@ -671,6 +702,8 @@
                 state.map.invalidateSize();
             }, 100);
             loadMapMarkers();
+        } else if (view === 'calendar') {
+            loadCalendarNotes();
         } else {
             loadContacts();
         }
@@ -1179,6 +1212,7 @@
                 await api.assignTag(state.viewingContactId, tag.id);
                 // Refresh
                 await loadAllTags();
+                populateCalendarTagFilter();
                 await loadContactTags(state.viewingContactId);
                 elements.newTagInput.value = '';
                 elements.tagSuggestions.classList.remove('visible');
@@ -1581,12 +1615,361 @@
     }
 
     // ============================================
+    // Calendar Functions
+    // ============================================
+
+    function getCalendarDateRange() {
+        const d = state.calendarDate;
+        const mode = state.calendarMode;
+        let start, end;
+
+        if (mode === 'month') {
+            start = new Date(d.getFullYear(), d.getMonth(), 1);
+            // Include days from previous month that appear in the grid
+            const dayOfWeek = start.getDay();
+            const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday start
+            start = new Date(start);
+            start.setDate(start.getDate() - offset);
+
+            end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            const endDow = end.getDay();
+            const endOffset = endDow === 0 ? 0 : 7 - endDow;
+            end = new Date(end);
+            end.setDate(end.getDate() + endOffset);
+            end.setHours(23, 59, 59);
+        } else if (mode === 'week') {
+            start = new Date(d);
+            const dow = start.getDay();
+            const mondayOffset = dow === 0 ? -6 : 1 - dow;
+            start.setDate(start.getDate() + mondayOffset);
+            start.setHours(0, 0, 0, 0);
+            end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            end.setHours(23, 59, 59);
+        } else {
+            start = new Date(d);
+            start.setHours(0, 0, 0, 0);
+            end = new Date(d);
+            end.setHours(23, 59, 59);
+        }
+
+        return {
+            start: start.toISOString().slice(0, 19).replace('T', ' '),
+            end: end.toISOString().slice(0, 19).replace('T', ' '),
+            startDate: start,
+            endDate: end
+        };
+    }
+
+    async function loadCalendarNotes() {
+        const range = getCalendarDateRange();
+        try {
+            const result = await api.getCalendarNotes(
+                range.start,
+                range.end,
+                state.calendarSearch,
+                state.calendarTagFilter
+            );
+            if (result.success) {
+                state.calendarNotes = result.data;
+                renderCalendar();
+            }
+        } catch (error) {
+            console.error('Error loading calendar notes:', error);
+        }
+    }
+
+    function renderCalendar() {
+        updateCalendarTitle();
+        if (state.calendarMode === 'month') {
+            renderMonthView();
+        } else if (state.calendarMode === 'week') {
+            renderWeekView();
+        } else {
+            renderDayView();
+        }
+    }
+
+    function updateCalendarTitle() {
+        const d = state.calendarDate;
+        const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+                        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+        if (state.calendarMode === 'month') {
+            elements.calTitle.textContent = `${months[d.getMonth()]} ${d.getFullYear()}`;
+        } else if (state.calendarMode === 'week') {
+            const range = getCalendarDateRange();
+            const s = range.startDate;
+            const e = range.endDate;
+            const sStr = `${s.getDate()}. ${months[s.getMonth()].substring(0, 3)}`;
+            const eStr = `${e.getDate()}. ${months[e.getMonth()].substring(0, 3)} ${e.getFullYear()}`;
+            elements.calTitle.textContent = `${sStr} – ${eStr}`;
+        } else {
+            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+    }
+
+    function groupNotesByDate(notes) {
+        const grouped = {};
+        notes.forEach(note => {
+            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD
+            if (!grouped[dateKey]) grouped[dateKey] = [];
+            grouped[dateKey].push(note);
+        });
+        return grouped;
+    }
+
+    function renderNoteChip(note) {
+        const name = escapeHtml(note.contact_name || '');
+        const company = note.contact_company ? escapeHtml(note.contact_company) : '';
+        const content = escapeHtml(note.content.length > 60 ? note.content.substring(0, 60) + '...' : note.content);
+        const tagDots = note.tags.map(t =>
+            `<span class="cal-tag-dot" style="background:${t.color}" title="${escapeHtml(t.name)}"></span>`
+        ).join('');
+
+        return `<div class="cal-note-chip" data-contact-id="${note.contact_id}">
+            <div class="cal-note-chip-header">
+                <span class="cal-note-person">${name}</span>
+                ${company ? `<span class="cal-note-company">${company}</span>` : ''}
+                ${tagDots ? `<span class="cal-note-tags">${tagDots}</span>` : ''}
+            </div>
+            <div class="cal-note-text">${content}</div>
+        </div>`;
+    }
+
+    function renderMonthView() {
+        const d = state.calendarDate;
+        const today = new Date();
+        const currentMonth = d.getMonth();
+        const range = getCalendarDateRange();
+        const notesByDate = groupNotesByDate(state.calendarNotes);
+
+        const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        let html = '<div class="cal-month-grid">';
+
+        // Header row
+        html += '<div class="cal-month-header">';
+        dayLabels.forEach(label => {
+            html += `<div class="cal-month-header-cell">${label}</div>`;
+        });
+        html += '</div>';
+
+        // Day cells
+        html += '<div class="cal-month-body">';
+        const cursor = new Date(range.startDate);
+        while (cursor <= range.endDate) {
+            const dateKey = cursor.toISOString().slice(0, 10);
+            const isToday = cursor.toDateString() === today.toDateString();
+            const isOtherMonth = cursor.getMonth() !== currentMonth;
+            const dayNotes = notesByDate[dateKey] || [];
+
+            html += `<div class="cal-month-cell${isToday ? ' cal-today' : ''}${isOtherMonth ? ' cal-other-month' : ''}" data-date="${dateKey}">`;
+            html += `<div class="cal-month-day-num">${cursor.getDate()}</div>`;
+            if (dayNotes.length > 0) {
+                html += '<div class="cal-month-notes">';
+                const maxShow = 3;
+                dayNotes.slice(0, maxShow).forEach(note => {
+                    const name = escapeHtml(note.contact_name || '');
+                    const tagDot = note.tags.length > 0
+                        ? `<span class="cal-tag-dot-sm" style="background:${note.tags[0].color}"></span>`
+                        : '';
+                    html += `<div class="cal-month-note-dot" data-contact-id="${note.contact_id}" title="${escapeHtml(note.content)}">
+                        ${tagDot}<span class="cal-month-note-label">${name}</span>
+                    </div>`;
+                });
+                if (dayNotes.length > maxShow) {
+                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} weitere</div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        html += '</div></div>';
+
+        elements.calendarBody.innerHTML = html;
+        addCalendarClickHandlers();
+    }
+
+    function renderWeekView() {
+        const range = getCalendarDateRange();
+        const today = new Date();
+        const notesByDate = groupNotesByDate(state.calendarNotes);
+        const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+        let html = '<div class="cal-week-grid">';
+
+        const cursor = new Date(range.startDate);
+        for (let i = 0; i < 7; i++) {
+            const dateKey = cursor.toISOString().slice(0, 10);
+            const isToday = cursor.toDateString() === today.toDateString();
+            const dayNotes = notesByDate[dateKey] || [];
+
+            html += `<div class="cal-week-day${isToday ? ' cal-today' : ''}" data-date="${dateKey}">`;
+            html += `<div class="cal-week-day-header">
+                <span class="cal-week-day-name">${dayNames[i]}</span>
+                <span class="cal-week-day-date">${cursor.getDate()}. ${months[cursor.getMonth()]}</span>
+                ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
+            </div>`;
+            html += '<div class="cal-week-day-body">';
+            dayNotes.forEach(note => {
+                html += renderNoteChip(note);
+            });
+            if (dayNotes.length === 0) {
+                html += '<div class="cal-week-empty">Keine Notizen</div>';
+            }
+            html += '</div></div>';
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        html += '</div>';
+        elements.calendarBody.innerHTML = html;
+        addCalendarClickHandlers();
+    }
+
+    function renderDayView() {
+        const d = state.calendarDate;
+        const dateKey = d.toISOString().slice(0, 10);
+        const notesByDate = groupNotesByDate(state.calendarNotes);
+        const dayNotes = notesByDate[dateKey] || [];
+
+        let html = '<div class="cal-day-view">';
+
+        if (dayNotes.length === 0) {
+            html += `<div class="cal-day-empty">
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
+                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+                </svg>
+                <p>Keine Notizen an diesem Tag</p>
+            </div>`;
+        } else {
+            dayNotes.forEach(note => {
+                const time = note.created_at.substring(11, 16);
+                const name = escapeHtml(note.contact_name || '');
+                const company = note.contact_company ? escapeHtml(note.contact_company) : '';
+                const content = escapeHtml(note.content);
+                const tagBadges = note.tags.map(t =>
+                    `<span class="cal-day-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`
+                ).join('');
+
+                html += `<div class="cal-day-note" data-contact-id="${note.contact_id}">
+                    <div class="cal-day-note-time">${time}</div>
+                    <div class="cal-day-note-body">
+                        <div class="cal-day-note-meta">
+                            <span class="cal-day-note-name">${name}</span>
+                            ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
+                            ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
+                        </div>
+                        <div class="cal-day-note-content">${content}</div>
+                    </div>
+                </div>`;
+            });
+        }
+
+        html += '</div>';
+        elements.calendarBody.innerHTML = html;
+        addCalendarClickHandlers();
+    }
+
+    function addCalendarClickHandlers() {
+        // Click on note chips -> open contact overview
+        elements.calendarBody.querySelectorAll('[data-contact-id]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const contactId = parseInt(el.dataset.contactId, 10);
+                if (contactId) openOverviewModal(contactId);
+            });
+        });
+
+        // Click on day cells in month view -> switch to day view
+        if (state.calendarMode === 'month') {
+            elements.calendarBody.querySelectorAll('.cal-month-cell').forEach(cell => {
+                cell.addEventListener('click', (e) => {
+                    if (e.target.closest('[data-contact-id]')) return;
+                    const dateStr = cell.dataset.date;
+                    if (dateStr) {
+                        state.calendarDate = new Date(dateStr + 'T12:00:00');
+                        state.calendarMode = 'day';
+                        elements.calModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === 'day'));
+                        loadCalendarNotes();
+                    }
+                });
+            });
+        }
+    }
+
+    function navigateCalendar(direction) {
+        const d = state.calendarDate;
+        if (state.calendarMode === 'month') {
+            d.setMonth(d.getMonth() + direction);
+        } else if (state.calendarMode === 'week') {
+            d.setDate(d.getDate() + (direction * 7));
+        } else {
+            d.setDate(d.getDate() + direction);
+        }
+        state.calendarDate = new Date(d);
+        loadCalendarNotes();
+    }
+
+    function populateCalendarTagFilter() {
+        const select = elements.calTagFilter;
+        // Keep the first "all" option
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        state.allTags.forEach(tag => {
+            const opt = document.createElement('option');
+            opt.value = tag.id;
+            opt.textContent = tag.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function initCalendarEvents() {
+        elements.calPrev.addEventListener('click', () => navigateCalendar(-1));
+        elements.calNext.addEventListener('click', () => navigateCalendar(1));
+        elements.calToday.addEventListener('click', () => {
+            state.calendarDate = new Date();
+            loadCalendarNotes();
+        });
+
+        elements.calModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.calendarMode = btn.dataset.mode;
+                elements.calModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === state.calendarMode));
+                loadCalendarNotes();
+            });
+        });
+
+        const debouncedCalSearch = debounce(() => {
+            state.calendarSearch = elements.calSearchInput.value.trim();
+            loadCalendarNotes();
+        }, 300);
+        elements.calSearchInput.addEventListener('input', debouncedCalSearch);
+
+        elements.calTagFilter.addEventListener('change', () => {
+            state.calendarTagFilter = elements.calTagFilter.value;
+            loadCalendarNotes();
+        });
+
+        // Mobile filter toggle
+        elements.calFilterToggle.addEventListener('click', () => {
+            elements.calendarFilters.classList.toggle('filters-open');
+            elements.calFilterToggle.classList.toggle('active');
+        });
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 
     function refreshData() {
         if (state.currentView === 'map') {
             loadMapMarkers();
+        } else if (state.currentView === 'calendar') {
+            loadCalendarNotes();
         } else {
             loadContacts();
         }
@@ -1839,14 +2222,19 @@
     function init() {
         initEventListeners();
         initImportExportEvents();
+        initCalendarEvents();
         initMap();
 
-        // Load all tags for suggestions
-        loadAllTags();
+        // Load all tags for suggestions and calendar filter
+        loadAllTags().then(() => {
+            populateCalendarTagFilter();
+        });
 
         // Load initial data based on current view
         if (state.currentView === 'map') {
             loadMapMarkers();
+        } else if (state.currentView === 'calendar') {
+            loadCalendarNotes();
         } else {
             loadContacts();
         }
