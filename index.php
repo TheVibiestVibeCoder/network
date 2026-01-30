@@ -14,6 +14,9 @@ require_once APP_ROOT . '/includes/Contact.php';
 // Start session
 Auth::startSession();
 
+// Send security headers on every response
+Auth::sendSecurityHeaders();
+
 // Handle actions
 $action = $_GET['action'] ?? '';
 
@@ -25,14 +28,32 @@ if ($action === 'logout') {
 }
 
 // Handle login form submission
+$loginError = null;
+$isLockedOut = false;
+$lockoutRemaining = 0;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
     $password = $_POST['password'] ?? '';
 
-    if (Auth::login($password)) {
+    $result = Auth::login($password);
+
+    if ($result['success']) {
         header('Location: index.php');
         exit;
     } else {
-        $loginError = 'Invalid password. Please try again.';
+        $loginError = $result['error'];
+        if (isset($result['locked_until'])) {
+            $isLockedOut = true;
+            $lockoutRemaining = max(0, $result['locked_until'] - time());
+        }
+    }
+} else {
+    // Check if already locked out (for GET requests to show lockout state)
+    $ip = Auth::getClientIp();
+    $lockoutInfo = Auth::getLockoutInfo($ip);
+    if ($lockoutInfo['locked']) {
+        $isLockedOut = true;
+        $lockoutRemaining = max(0, $lockoutInfo['locked_until'] - time());
     }
 }
 
@@ -76,21 +97,58 @@ if ($isAuthenticated) {
                 <h1><?= htmlspecialchars(APP_NAME) ?></h1>
                 <p class="login-subtitle">Please enter your password to continue</p>
 
-                <?php if (isset($loginError)): ?>
+                <?php if ($loginError !== null): ?>
                     <div class="alert alert-error"><?= htmlspecialchars($loginError) ?></div>
                 <?php endif; ?>
 
-                <form method="POST" action="index.php?action=login" class="login-form">
-                    <div class="form-group">
-                        <input type="password"
-                               name="password"
-                               placeholder="Enter password"
-                               required
-                               autofocus
-                               class="form-input">
+                <?php if ($isLockedOut): ?>
+                    <div class="alert alert-error lockout-alert">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="vertical-align: middle; margin-right: 6px;">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/>
+                        </svg>
+                        Account temporarily locked. Try again in <strong id="lockoutTimer"><?= ceil($lockoutRemaining / 60) ?></strong> minute(s).
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                </form>
+                    <form method="POST" action="index.php?action=login" class="login-form">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
+                        <div class="form-group">
+                            <input type="password"
+                                   name="password"
+                                   placeholder="Enter password"
+                                   required
+                                   disabled
+                                   class="form-input">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block" disabled>Locked</button>
+                    </form>
+                    <script>
+                        (function() {
+                            var remaining = <?= (int)$lockoutRemaining ?>;
+                            var timer = document.getElementById('lockoutTimer');
+                            var interval = setInterval(function() {
+                                remaining--;
+                                if (remaining <= 0) {
+                                    clearInterval(interval);
+                                    window.location.reload();
+                                } else {
+                                    timer.textContent = Math.ceil(remaining / 60);
+                                }
+                            }, 1000);
+                        })();
+                    </script>
+                <?php else: ?>
+                    <form method="POST" action="index.php?action=login" class="login-form">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
+                        <div class="form-group">
+                            <input type="password"
+                                   name="password"
+                                   placeholder="Enter password"
+                                   required
+                                   autofocus
+                                   class="form-input">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    </form>
+                <?php endif; ?>
             </div>
         </div>
     <?php else: ?>
@@ -639,6 +697,9 @@ if ($isAuthenticated) {
                 </div>
             </div>
         </div>
+
+        <!-- CSRF Token for AJAX requests -->
+        <meta name="csrf-token" content="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
 
         <!-- Leaflet JS -->
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

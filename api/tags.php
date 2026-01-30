@@ -10,8 +10,9 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 
-// Set JSON response headers
+// Set JSON response headers and security headers
 header('Content-Type: application/json');
+Auth::sendSecurityHeaders();
 
 // Check authentication
 if (!Auth::isAuthenticated()) {
@@ -25,6 +26,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $contactId = isset($_GET['contact_id']) ? (int) $_GET['contact_id'] : null;
+
+// Require CSRF token for state-changing requests
+if (in_array($method, ['POST', 'DELETE'])) {
+    Auth::requireCsrfToken();
+}
 
 $db = Database::getInstance();
 
@@ -48,7 +54,7 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -180,8 +186,13 @@ function handlePost(PDO $db, string $action): void
         return;
     }
 
-    $name = trim($input['name']);
-    $color = $input['color'] ?? '#3b82f6';
+    $name = Auth::sanitizeString($input['name'], 100);
+    $color = Auth::sanitizeString($input['color'] ?? '#3b82f6', 7);
+
+    // Validate color format (hex color)
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+        $color = '#3b82f6';
+    }
 
     // Check if tag already exists
     $checkStmt = $db->prepare("SELECT * FROM tags WHERE LOWER(name) = LOWER(?)");

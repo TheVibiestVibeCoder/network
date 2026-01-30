@@ -11,8 +11,9 @@ require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Contact.php';
 
-// Set JSON response headers
+// Set JSON response headers and security headers
 header('Content-Type: application/json');
+Auth::sendSecurityHeaders();
 
 // Check authentication
 if (!Auth::isAuthenticated()) {
@@ -25,6 +26,11 @@ if (!Auth::isAuthenticated()) {
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
+
+// Require CSRF token for state-changing requests
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+    Auth::requireCsrfToken();
+}
 
 // Initialize contact model
 $contactModel = new Contact();
@@ -53,7 +59,7 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -110,6 +116,9 @@ function handlePost(Contact $model, string $action): void
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
     }
+
+    // Sanitize all input fields
+    $input = Auth::sanitizeContactInput($input);
 
     // Validate required fields
     if (empty($input['name'])) {
@@ -168,6 +177,9 @@ function handlePut(Contact $model, ?int $id): void
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
     }
+
+    // Sanitize all input fields
+    $input = Auth::sanitizeContactInput($input);
 
     // Validate required fields
     if (empty($input['name'])) {

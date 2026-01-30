@@ -149,6 +149,15 @@
     };
 
     // ============================================
+    // CSRF Token Helper
+    // ============================================
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    // ============================================
     // API Functions
     // ============================================
 
@@ -172,7 +181,7 @@
         async createContact(data) {
             const response = await fetch('api/contacts.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(data)
             });
             return response.json();
@@ -181,7 +190,7 @@
         async updateContact(id, data) {
             const response = await fetch(`api/contacts.php?id=${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(data)
             });
             return response.json();
@@ -189,7 +198,8 @@
 
         async deleteContact(id) {
             const response = await fetch(`api/contacts.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -208,7 +218,7 @@
         async createNote(contactId, content) {
             const response = await fetch('api/notes.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, content })
             });
             return response.json();
@@ -216,7 +226,8 @@
 
         async deleteNote(id) {
             const response = await fetch(`api/notes.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -240,7 +251,7 @@
         async createTag(name, color = '#3b82f6') {
             const response = await fetch('api/tags.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ name, color })
             });
             return response.json();
@@ -249,7 +260,7 @@
         async assignTag(contactId, tagId) {
             const response = await fetch('api/tags.php?action=assign', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
             });
             return response.json();
@@ -258,7 +269,7 @@
         async unassignTag(contactId, tagId) {
             const response = await fetch('api/tags.php?action=unassign', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
             });
             return response.json();
@@ -266,7 +277,8 @@
 
         async deleteTag(id) {
             const response = await fetch(`api/tags.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -1422,6 +1434,7 @@
         try {
             const response = await fetch('api/import-export.php?action=import', {
                 method: 'POST',
+                headers: { 'X-CSRF-Token': getCsrfToken() },
                 body: formData
             });
 
