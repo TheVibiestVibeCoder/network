@@ -526,11 +526,35 @@
         });
     }
 
+    function contactMatchesSearch(contact, query) {
+        if (!query) return true;
+        const q = query.toLowerCase();
+        return (contact.name || '').toLowerCase().includes(q)
+            || (contact.company || '').toLowerCase().includes(q)
+            || (contact.location || '').toLowerCase().includes(q)
+            || (contact.email || '').toLowerCase().includes(q)
+            || (contact.phone || '').toLowerCase().includes(q);
+    }
+
     function renderContactsListByTags() {
         const data = state.taggedData;
         if (!data) return;
 
-        const totalContacts = data.tags.reduce((sum, t) => sum + t.contacts.length, 0) + data.untagged.length;
+        const query = state.searchQuery;
+
+        // Filter contacts within each tag group by search query
+        // If the tag name itself matches, show all its contacts
+        const q = query ? query.toLowerCase() : '';
+        const filteredTags = data.tags.map(tag => {
+            const tagNameMatches = q && tag.name.toLowerCase().includes(q);
+            return {
+                ...tag,
+                contacts: tagNameMatches ? tag.contacts : tag.contacts.filter(c => contactMatchesSearch(c, query))
+            };
+        });
+        const filteredUntagged = data.untagged.filter(c => contactMatchesSearch(c, query));
+
+        const totalContacts = filteredTags.reduce((sum, t) => sum + t.contacts.length, 0) + filteredUntagged.length;
 
         if (totalContacts === 0) {
             elements.contactsList.innerHTML = `
@@ -539,7 +563,7 @@
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
                     <h3>Keine Kontakte gefunden</h3>
-                    <p>Füge deinen ersten Kontakt hinzu</p>
+                    <p>${query ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
                 </div>
             `;
             return;
@@ -548,7 +572,7 @@
         let html = '';
 
         // Render tagged groups, sorting contacts within each tag
-        data.tags.forEach(tag => {
+        filteredTags.forEach(tag => {
             if (tag.contacts.length > 0) {
                 const sorted = sortContacts(tag.contacts);
                 html += `<div class="tag-group">`;
@@ -573,16 +597,16 @@
         });
 
         // Render untagged contacts
-        if (data.untagged.length > 0) {
+        if (filteredUntagged.length > 0) {
             html += `<div class="tag-group untagged-group">`;
             html += `<div class="tag-header tag-header-untagged">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                 </svg>
                 <span>Ohne Tag</span>
-                <span class="tag-count">${data.untagged.length}</span>
+                <span class="tag-count">${filteredUntagged.length}</span>
             </div>`;
-            html += sortContacts(data.untagged).map(contact => createContactCard(contact, true)).join('');
+            html += sortContacts(filteredUntagged).map(contact => createContactCard(contact, true)).join('');
             html += `</div>`;
         }
 
@@ -2177,7 +2201,11 @@
         // Search input (debounced)
         const debouncedSearch = debounce(() => {
             state.searchQuery = elements.searchInput.value.trim();
-            loadContacts();
+            if (state.groupBy === 'tags' && state.taggedData) {
+                renderContactsListByTags();
+            } else {
+                loadContacts();
+            }
         }, 300);
 
         elements.searchInput.addEventListener('input', debouncedSearch);

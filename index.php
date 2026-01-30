@@ -163,23 +163,20 @@ if ($isAuthenticated) {
                 <div class="header-center">
                     <!-- View Toggle -->
                     <div class="view-toggle">
-                        <button type="button" class="toggle-btn active" data-view="map">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <button type="button" class="toggle-btn active" data-view="map" title="Map">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
                             </svg>
-                            Map
                         </button>
-                        <button type="button" class="toggle-btn" data-view="list">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <button type="button" class="toggle-btn" data-view="list" title="List">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
                             </svg>
-                            List
                         </button>
-                        <button type="button" class="toggle-btn" data-view="calendar">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <button type="button" class="toggle-btn" data-view="calendar" title="Kalender">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
                             </svg>
-                            Kalender
                         </button>
                     </div>
                 </div>
