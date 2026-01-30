@@ -543,10 +543,15 @@
         const query = state.searchQuery;
 
         // Filter contacts within each tag group by search query
-        const filteredTags = data.tags.map(tag => ({
-            ...tag,
-            contacts: tag.contacts.filter(c => contactMatchesSearch(c, query))
-        }));
+        // If the tag name itself matches, show all its contacts
+        const q = query ? query.toLowerCase() : '';
+        const filteredTags = data.tags.map(tag => {
+            const tagNameMatches = q && tag.name.toLowerCase().includes(q);
+            return {
+                ...tag,
+                contacts: tagNameMatches ? tag.contacts : tag.contacts.filter(c => contactMatchesSearch(c, query))
+            };
+        });
         const filteredUntagged = data.untagged.filter(c => contactMatchesSearch(c, query));
 
         const totalContacts = filteredTags.reduce((sum, t) => sum + t.contacts.length, 0) + filteredUntagged.length;
