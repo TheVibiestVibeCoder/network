@@ -275,6 +275,15 @@
             return response.json();
         },
 
+        async updateTag(id, data) {
+            const response = await fetch(`api/tags.php?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        },
+
         async deleteTag(id) {
             const response = await fetch(`api/tags.php?id=${id}`, {
                 method: 'DELETE',
@@ -549,6 +558,14 @@
                     </svg>
                     <span>${escapeHtml(tag.name)}</span>
                     <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
+                    <span class="tag-actions">
+                        <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
+                        </button>
+                        <button class="tag-action-btn tag-delete-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" title="Tag l&ouml;schen">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                    </span>
                 </div>`;
                 html += sorted.map(contact => createContactCard(contact, true)).join('');
                 html += `</div>`;
@@ -588,6 +605,27 @@
                 e.stopPropagation();
                 const company = header.dataset.company;
                 openCompanyNotesModal(company);
+            });
+        });
+
+        // Tag edit buttons
+        elements.contactsList.querySelectorAll('.tag-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const tagId = parseInt(btn.dataset.tagId, 10);
+                const tagName = btn.dataset.tagName;
+                const tagColor = btn.dataset.tagColor;
+                openTagEditInline(btn.closest('.tag-header'), tagId, tagName, tagColor);
+            });
+        });
+
+        // Tag delete buttons
+        elements.contactsList.querySelectorAll('.tag-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const tagId = parseInt(btn.dataset.tagId, 10);
+                const tagName = btn.dataset.tagName;
+                confirmDeleteTag(tagId, tagName);
             });
         });
     }
@@ -1246,6 +1284,76 @@
             }
         } catch (error) {
             console.error('Error assigning tag:', error);
+        }
+    }
+
+    // ============================================
+    // Tag Edit / Delete Functions
+    // ============================================
+
+    function openTagEditInline(headerEl, tagId, tagName, tagColor) {
+        // Prevent double-opening
+        if (headerEl.querySelector('.tag-edit-form')) return;
+
+        const originalHTML = headerEl.innerHTML;
+
+        headerEl.innerHTML = `
+            <form class="tag-edit-form" data-tag-id="${tagId}">
+                <input type="color" class="tag-edit-color" value="${tagColor}" title="Farbe">
+                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag-Name">
+                <button type="submit" class="tag-edit-save" title="Speichern">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                </button>
+                <button type="button" class="tag-edit-cancel" title="Abbrechen">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </form>
+        `;
+
+        const form = headerEl.querySelector('.tag-edit-form');
+        const nameInput = headerEl.querySelector('.tag-edit-name');
+        nameInput.focus();
+        nameInput.select();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newName = nameInput.value.trim();
+            const newColor = headerEl.querySelector('.tag-edit-color').value;
+            if (!newName) return;
+
+            try {
+                const result = await api.updateTag(tagId, { name: newName, color: newColor });
+                if (result.success) {
+                    await loadAllTags();
+                    populateCalendarTagFilter();
+                    await loadContactsList();
+                }
+            } catch (error) {
+                console.error('Error updating tag:', error);
+                headerEl.innerHTML = originalHTML;
+            }
+        });
+
+        headerEl.querySelector('.tag-edit-cancel').addEventListener('click', () => {
+            headerEl.innerHTML = originalHTML;
+            addContactListEventHandlers();
+        });
+    }
+
+    async function confirmDeleteTag(tagId, tagName) {
+        if (!confirm(`Tag "${tagName}" wirklich l\u00f6schen?\n\nDer Tag wird von allen Kontakten entfernt.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.deleteTag(tagId);
+            if (result.success) {
+                await loadAllTags();
+                populateCalendarTagFilter();
+                await loadContactsList();
+            }
+        } catch (error) {
+            console.error('Error deleting tag:', error);
         }
     }
 

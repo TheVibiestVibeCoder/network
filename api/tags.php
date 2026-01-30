@@ -28,7 +28,7 @@ $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $contactId = isset($_GET['contact_id']) ? (int) $_GET['contact_id'] : null;
 
 // Require CSRF token for state-changing requests
-if (in_array($method, ['POST', 'DELETE'])) {
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
     Auth::requireCsrfToken();
 }
 
@@ -42,6 +42,10 @@ try {
 
         case 'POST':
             handlePost($db, $action);
+            break;
+
+        case 'PUT':
+            handlePut($db, $id);
             break;
 
         case 'DELETE':
@@ -215,6 +219,68 @@ function handlePost(PDO $db, string $action): void
     $tag = $newTag->fetch();
 
     http_response_code(201);
+    echo json_encode(['success' => true, 'data' => $tag]);
+}
+
+/**
+ * Handle PUT requests - update a tag
+ */
+function handlePut(PDO $db, ?int $id): void
+{
+    if ($id === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tag ID is required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    if ($input === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON input']);
+        return;
+    }
+
+    // Check tag exists
+    $checkStmt = $db->prepare("SELECT * FROM tags WHERE id = ?");
+    $checkStmt->execute([$id]);
+    $existing = $checkStmt->fetch();
+
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Tag not found']);
+        return;
+    }
+
+    $name = Auth::sanitizeString($input['name'] ?? $existing['name'], 100);
+    $color = Auth::sanitizeString($input['color'] ?? $existing['color'], 7);
+
+    if (empty($name)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tag name is required']);
+        return;
+    }
+
+    // Validate color format
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+        $color = $existing['color'];
+    }
+
+    // Check for name conflict with another tag
+    $conflictStmt = $db->prepare("SELECT id FROM tags WHERE LOWER(name) = LOWER(?) AND id != ?");
+    $conflictStmt->execute([$name, $id]);
+    if ($conflictStmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['error' => 'A tag with this name already exists']);
+        return;
+    }
+
+    $stmt = $db->prepare("UPDATE tags SET name = ?, color = ? WHERE id = ?");
+    $stmt->execute([$name, $color, $id]);
+
+    $updatedStmt = $db->prepare("SELECT * FROM tags WHERE id = ?");
+    $updatedStmt->execute([$id]);
+    $tag = $updatedStmt->fetch();
+
     echo json_encode(['success' => true, 'data' => $tag]);
 }
 
