@@ -10,8 +10,9 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 
-// Set JSON response headers
+// Set JSON response headers and security headers
 header('Content-Type: application/json');
+Auth::sendSecurityHeaders();
 
 // Check authentication
 if (!Auth::isAuthenticated()) {
@@ -25,6 +26,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 $contactId = isset($_GET['contact_id']) ? (int) $_GET['contact_id'] : null;
 $company = $_GET['company'] ?? null;
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
+
+// Require CSRF token for state-changing requests
+if (in_array($method, ['POST', 'DELETE'])) {
+    Auth::requireCsrfToken();
+}
 
 $db = Database::getInstance();
 
@@ -48,7 +54,7 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -136,6 +142,7 @@ function handlePost(PDO $db): void
         return;
     }
 
+    $input['content'] = Auth::sanitizeString($input['content'] ?? null, 10000);
     if (empty($input['content'])) {
         http_response_code(400);
         echo json_encode(['error' => 'content is required']);

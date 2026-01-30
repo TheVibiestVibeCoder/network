@@ -1484,6 +1484,115 @@ textarea.form-input {
     color: var(--color-text-muted);
 }
 
+/* Tag Action Buttons (edit / delete) */
+.tag-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.tag-header:hover .tag-actions {
+    opacity: 1;
+}
+
+.tag-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tag-action-btn:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text-primary);
+}
+
+.tag-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* Inline Tag Edit Form */
+.tag-edit-form {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: 100%;
+}
+
+.tag-edit-color {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: none;
+    padding: 1px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.tag-edit-name {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-2);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tag-edit-name:focus {
+    outline: none;
+    border-color: var(--color-accent);
+}
+
+.tag-edit-save,
+.tag-edit-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.tag-edit-save {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.tag-edit-save:hover {
+    background: rgba(34, 197, 94, 0.3);
+}
+
+.tag-edit-cancel {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.tag-edit-cancel:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
 /* ============================================
    Group Toggle
    ============================================ */

@@ -10,8 +10,9 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 
-// Set JSON response headers
+// Set JSON response headers and security headers
 header('Content-Type: application/json');
+Auth::sendSecurityHeaders();
 
 // Check authentication
 if (!Auth::isAuthenticated()) {
@@ -26,6 +27,11 @@ $action = $_GET['action'] ?? '';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $contactId = isset($_GET['contact_id']) ? (int) $_GET['contact_id'] : null;
 
+// Require CSRF token for state-changing requests
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+    Auth::requireCsrfToken();
+}
+
 $db = Database::getInstance();
 
 try {
@@ -38,6 +44,10 @@ try {
             handlePost($db, $action);
             break;
 
+        case 'PUT':
+            handlePut($db, $id);
+            break;
+
         case 'DELETE':
             handleDelete($db, $action, $id, $contactId);
             break;
@@ -48,7 +58,7 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -180,8 +190,13 @@ function handlePost(PDO $db, string $action): void
         return;
     }
 
-    $name = trim($input['name']);
-    $color = $input['color'] ?? '#3b82f6';
+    $name = Auth::sanitizeString($input['name'], 100);
+    $color = Auth::sanitizeString($input['color'] ?? '#3b82f6', 7);
+
+    // Validate color format (hex color)
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+        $color = '#3b82f6';
+    }
 
     // Check if tag already exists
     $checkStmt = $db->prepare("SELECT * FROM tags WHERE LOWER(name) = LOWER(?)");
@@ -204,6 +219,68 @@ function handlePost(PDO $db, string $action): void
     $tag = $newTag->fetch();
 
     http_response_code(201);
+    echo json_encode(['success' => true, 'data' => $tag]);
+}
+
+/**
+ * Handle PUT requests - update a tag
+ */
+function handlePut(PDO $db, ?int $id): void
+{
+    if ($id === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tag ID is required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+    if ($input === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON input']);
+        return;
+    }
+
+    // Check tag exists
+    $checkStmt = $db->prepare("SELECT * FROM tags WHERE id = ?");
+    $checkStmt->execute([$id]);
+    $existing = $checkStmt->fetch();
+
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Tag not found']);
+        return;
+    }
+
+    $name = Auth::sanitizeString($input['name'] ?? $existing['name'], 100);
+    $color = Auth::sanitizeString($input['color'] ?? $existing['color'], 7);
+
+    if (empty($name)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tag name is required']);
+        return;
+    }
+
+    // Validate color format
+    if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+        $color = $existing['color'];
+    }
+
+    // Check for name conflict with another tag
+    $conflictStmt = $db->prepare("SELECT id FROM tags WHERE LOWER(name) = LOWER(?) AND id != ?");
+    $conflictStmt->execute([$name, $id]);
+    if ($conflictStmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['error' => 'A tag with this name already exists']);
+        return;
+    }
+
+    $stmt = $db->prepare("UPDATE tags SET name = ?, color = ? WHERE id = ?");
+    $stmt->execute([$name, $color, $id]);
+
+    $updatedStmt = $db->prepare("SELECT * FROM tags WHERE id = ?");
+    $updatedStmt->execute([$id]);
+    $tag = $updatedStmt->fetch();
+
     echo json_encode(['success' => true, 'data' => $tag]);
 }
 

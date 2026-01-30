@@ -112,5 +112,17 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contact_tags_contact ON contact_tags(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contact_tags_tag ON contact_tags(tag_id)");
+
+        // Create login_attempts table for brute force protection
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip_address VARCHAR(45) NOT NULL,
+                attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                success INTEGER DEFAULT 0
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at)");
     }
 }

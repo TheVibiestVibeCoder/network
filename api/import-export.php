@@ -20,6 +20,9 @@ use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 
+// Send security headers
+Auth::sendSecurityHeaders();
+
 // Check authentication
 if (!Auth::isAuthenticated()) {
     http_response_code(401);
@@ -30,6 +33,29 @@ if (!Auth::isAuthenticated()) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
+
+// Require CSRF token for import (state-changing POST)
+if ($action === 'import' && $method === 'POST') {
+    // CSRF token is in the POST form data or header for multipart requests
+    $csrfValid = false;
+    $sessionToken = $_SESSION[CSRF_TOKEN_NAME] ?? '';
+    $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    $postToken = $_POST[CSRF_TOKEN_NAME] ?? '';
+
+    if (!empty($sessionToken)) {
+        if ((!empty($headerToken) && hash_equals($sessionToken, $headerToken)) ||
+            (!empty($postToken) && hash_equals($sessionToken, $postToken))) {
+            $csrfValid = true;
+        }
+    }
+
+    if (!$csrfValid) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Invalid or missing CSRF token']);
+        exit;
+    }
+}
 
 try {
     switch ($action) {
@@ -53,7 +79,7 @@ try {
 } catch (Exception $e) {
     http_response_code(500);
     header('Content-Type: application/json');
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -167,6 +193,15 @@ function handleImport(): void
     }
 
     $file = $_FILES['file'];
+
+    // Validate file size (max 10MB)
+    $maxFileSize = 10 * 1024 * 1024;
+    if ($file['size'] > $maxFileSize) {
+        http_response_code(400);
+        echo json_encode(['error' => 'File too large. Maximum size is 10MB.']);
+        return;
+    }
+
     $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
     // Validate file type

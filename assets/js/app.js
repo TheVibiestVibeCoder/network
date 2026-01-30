@@ -149,6 +149,15 @@
     };
 
     // ============================================
+    // CSRF Token Helper
+    // ============================================
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    // ============================================
     // API Functions
     // ============================================
 
@@ -172,7 +181,7 @@
         async createContact(data) {
             const response = await fetch('api/contacts.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(data)
             });
             return response.json();
@@ -181,7 +190,7 @@
         async updateContact(id, data) {
             const response = await fetch(`api/contacts.php?id=${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(data)
             });
             return response.json();
@@ -189,7 +198,8 @@
 
         async deleteContact(id) {
             const response = await fetch(`api/contacts.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -208,7 +218,7 @@
         async createNote(contactId, content) {
             const response = await fetch('api/notes.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, content })
             });
             return response.json();
@@ -216,7 +226,8 @@
 
         async deleteNote(id) {
             const response = await fetch(`api/notes.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -240,7 +251,7 @@
         async createTag(name, color = '#3b82f6') {
             const response = await fetch('api/tags.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ name, color })
             });
             return response.json();
@@ -249,7 +260,7 @@
         async assignTag(contactId, tagId) {
             const response = await fetch('api/tags.php?action=assign', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
             });
             return response.json();
@@ -258,15 +269,25 @@
         async unassignTag(contactId, tagId) {
             const response = await fetch('api/tags.php?action=unassign', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify({ contact_id: contactId, tag_id: tagId })
+            });
+            return response.json();
+        },
+
+        async updateTag(id, data) {
+            const response = await fetch(`api/tags.php?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
             });
             return response.json();
         },
 
         async deleteTag(id) {
             const response = await fetch(`api/tags.php?id=${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             });
             return response.json();
         },
@@ -537,6 +558,14 @@
                     </svg>
                     <span>${escapeHtml(tag.name)}</span>
                     <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
+                    <span class="tag-actions">
+                        <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
+                        </button>
+                        <button class="tag-action-btn tag-delete-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" title="Tag l&ouml;schen">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                    </span>
                 </div>`;
                 html += sorted.map(contact => createContactCard(contact, true)).join('');
                 html += `</div>`;
@@ -576,6 +605,27 @@
                 e.stopPropagation();
                 const company = header.dataset.company;
                 openCompanyNotesModal(company);
+            });
+        });
+
+        // Tag edit buttons
+        elements.contactsList.querySelectorAll('.tag-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const tagId = parseInt(btn.dataset.tagId, 10);
+                const tagName = btn.dataset.tagName;
+                const tagColor = btn.dataset.tagColor;
+                openTagEditInline(btn.closest('.tag-header'), tagId, tagName, tagColor);
+            });
+        });
+
+        // Tag delete buttons
+        elements.contactsList.querySelectorAll('.tag-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const tagId = parseInt(btn.dataset.tagId, 10);
+                const tagName = btn.dataset.tagName;
+                confirmDeleteTag(tagId, tagName);
             });
         });
     }
@@ -1238,6 +1288,76 @@
     }
 
     // ============================================
+    // Tag Edit / Delete Functions
+    // ============================================
+
+    function openTagEditInline(headerEl, tagId, tagName, tagColor) {
+        // Prevent double-opening
+        if (headerEl.querySelector('.tag-edit-form')) return;
+
+        const originalHTML = headerEl.innerHTML;
+
+        headerEl.innerHTML = `
+            <form class="tag-edit-form" data-tag-id="${tagId}">
+                <input type="color" class="tag-edit-color" value="${tagColor}" title="Farbe">
+                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag-Name">
+                <button type="submit" class="tag-edit-save" title="Speichern">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                </button>
+                <button type="button" class="tag-edit-cancel" title="Abbrechen">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </form>
+        `;
+
+        const form = headerEl.querySelector('.tag-edit-form');
+        const nameInput = headerEl.querySelector('.tag-edit-name');
+        nameInput.focus();
+        nameInput.select();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newName = nameInput.value.trim();
+            const newColor = headerEl.querySelector('.tag-edit-color').value;
+            if (!newName) return;
+
+            try {
+                const result = await api.updateTag(tagId, { name: newName, color: newColor });
+                if (result.success) {
+                    await loadAllTags();
+                    populateCalendarTagFilter();
+                    await loadContactsList();
+                }
+            } catch (error) {
+                console.error('Error updating tag:', error);
+                headerEl.innerHTML = originalHTML;
+            }
+        });
+
+        headerEl.querySelector('.tag-edit-cancel').addEventListener('click', () => {
+            headerEl.innerHTML = originalHTML;
+            addContactListEventHandlers();
+        });
+    }
+
+    async function confirmDeleteTag(tagId, tagName) {
+        if (!confirm(`Tag "${tagName}" wirklich l\u00f6schen?\n\nDer Tag wird von allen Kontakten entfernt.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.deleteTag(tagId);
+            if (result.success) {
+                await loadAllTags();
+                populateCalendarTagFilter();
+                await loadContactsList();
+            }
+        } catch (error) {
+            console.error('Error deleting tag:', error);
+        }
+    }
+
+    // ============================================
     // Company Notes Modal Functions
     // ============================================
 
@@ -1422,6 +1542,7 @@
         try {
             const response = await fetch('api/import-export.php?action=import', {
                 method: 'POST',
+                headers: { 'X-CSRF-Token': getCsrfToken() },
                 body: formData
             });
 
@@ -1653,9 +1774,20 @@
             end.setHours(23, 59, 59);
         }
 
+        // Format using local time (not UTC) to avoid timezone offset shifting dates
+        function toLocalDatetime(dt) {
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            const h = String(dt.getHours()).padStart(2, '0');
+            const min = String(dt.getMinutes()).padStart(2, '0');
+            const s = String(dt.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${d} ${h}:${min}:${s}`;
+        }
+
         return {
-            start: start.toISOString().slice(0, 19).replace('T', ' '),
-            end: end.toISOString().slice(0, 19).replace('T', ' '),
+            start: toLocalDatetime(start),
+            end: toLocalDatetime(end),
             startDate: start,
             endDate: end
         };
@@ -1710,10 +1842,18 @@
         }
     }
 
+    function toLocalDateKey(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     function groupNotesByDate(notes) {
         const grouped = {};
         notes.forEach(note => {
-            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD
+            // Parse the created_at string as local time and format as local date key
+            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD from DB
             if (!grouped[dateKey]) grouped[dateKey] = [];
             grouped[dateKey].push(note);
         });
@@ -1759,7 +1899,7 @@
         html += '<div class="cal-month-body">';
         const cursor = new Date(range.startDate);
         while (cursor <= range.endDate) {
-            const dateKey = cursor.toISOString().slice(0, 10);
+            const dateKey = toLocalDateKey(cursor);
             const isToday = cursor.toDateString() === today.toDateString();
             const isOtherMonth = cursor.getMonth() !== currentMonth;
             const dayNotes = notesByDate[dateKey] || [];
@@ -1803,7 +1943,7 @@
 
         const cursor = new Date(range.startDate);
         for (let i = 0; i < 7; i++) {
-            const dateKey = cursor.toISOString().slice(0, 10);
+            const dateKey = toLocalDateKey(cursor);
             const isToday = cursor.toDateString() === today.toDateString();
             const dayNotes = notesByDate[dateKey] || [];
 
@@ -1831,7 +1971,7 @@
 
     function renderDayView() {
         const d = state.calendarDate;
-        const dateKey = d.toISOString().slice(0, 10);
+        const dateKey = toLocalDateKey(d);
         const notesByDate = groupNotesByDate(state.calendarNotes);
         const dayNotes = notesByDate[dateKey] || [];
 

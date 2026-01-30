@@ -55,3 +55,8 @@ define('DB_PATH', APP_ROOT . '/data/crm.db');
 // Session configuration
 define('SESSION_NAME', 'crm_session');
 define('SESSION_LIFETIME', 86400); // 24 hours
+
+// Security configuration
+define('MAX_LOGIN_ATTEMPTS', 10);         // Lock out after this many failed attempts
+define('LOGIN_LOCKOUT_DURATION', 900);    // Lockout duration in seconds (15 minutes)
+define('CSRF_TOKEN_NAME', 'csrf_token');  // CSRF token parameter/header name
