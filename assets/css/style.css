@@ -1891,18 +1891,11 @@ textarea.form-input {
 #calendarView {
     flex-direction: column;
     background-color: var(--color-bg);
+    overflow: hidden;
 }
 
 #calendarView.active {
     display: flex;
-}
-
-.calendar-container {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
 }
 
 /* Toolbar */
