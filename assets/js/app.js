@@ -623,6 +623,20 @@
         }
     }
 
+    // Load all contacts without rendering (for autocomplete in projects)
+    async function loadAllContacts() {
+        try {
+            console.log('Loading all contacts for autocomplete...');
+            const result = await api.getContacts('', 'name', 'ASC');
+            if (result.success) {
+                state.contacts = result.data;
+                console.log('Loaded contacts:', state.contacts.length);
+            }
+        } catch (error) {
+            console.error('Error loading all contacts:', error);
+        }
+    }
+
     function renderContactsListByCompany() {
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
@@ -934,6 +948,10 @@
             loadCalendarNotes();
         } else if (view === 'projects') {
             loadProjects();
+            // Also load contacts for autocomplete in project assignment
+            if (!state.contacts || state.contacts.length === 0) {
+                loadAllContacts();
+            }
         } else {
             loadContacts();
         }
@@ -2520,6 +2538,11 @@
         try {
             state.viewingProjectId = projectId;
 
+            // Ensure contacts are loaded for autocomplete
+            if (!state.contacts || state.contacts.length === 0) {
+                await loadAllContacts();
+            }
+
             const [projectResult, contactsResult, tagsResult] = await Promise.all([
                 api.getProject(projectId),
                 api.getProjectContacts(projectId),
@@ -2528,6 +2551,7 @@
 
             if (projectResult.success) {
                 state.viewingProject = projectResult.data;
+                console.log('Project data loaded:', state.viewingProject);
                 renderProjectOverview(projectResult.data, contactsResult.data || [], tagsResult.data || []);
                 elements.projectOverviewModal.classList.add('active');
             } else {
@@ -2616,20 +2640,34 @@
     }
 
     async function addProjectTag(tagName) {
-        if (!tagName || !state.viewingProjectId) return;
+        console.log('addProjectTag called with:', tagName);
+        console.log('state.viewingProjectId:', state.viewingProjectId);
+
+        if (!tagName || !state.viewingProjectId) {
+            console.error('Missing tagName or viewingProjectId');
+            alert('Error: Cannot assign tag. Make sure you have opened a project first.');
+            return;
+        }
 
         try {
+            console.log('Creating/getting tag...');
             // First, create or get the tag
             const tagResult = await api.createTag(tagName);
+            console.log('Tag result:', tagResult);
+
             if (!tagResult.success) {
                 alert('Error: ' + tagResult.error);
                 return;
             }
 
             const tag = tagResult.data;
+            console.log('Tag data:', tag);
 
             // Then assign it to the project
+            console.log('Assigning tag to project...');
             const assignResult = await api.assignProjectTag(state.viewingProjectId, tag.id);
+            console.log('Assign result:', assignResult);
+
             if (assignResult.success) {
                 // Reload project tags
                 const tagsResult = await api.getProjectTags(state.viewingProjectId);
@@ -2643,6 +2681,7 @@
             }
         } catch (error) {
             console.error('Error adding tag to project:', error);
+            alert('An error occurred: ' + error.message);
         }
     }
 
@@ -2665,10 +2704,20 @@
     }
 
     async function addProjectContact(contactId) {
-        if (!contactId || !state.viewingProjectId) return;
+        console.log('addProjectContact called with:', contactId);
+        console.log('state.viewingProjectId:', state.viewingProjectId);
+
+        if (!contactId || !state.viewingProjectId) {
+            console.error('Missing contactId or viewingProjectId');
+            alert('Error: Cannot assign contact. Make sure you have opened a project first.');
+            return;
+        }
 
         try {
+            console.log('Calling assignProjectContact API...');
             const result = await api.assignProjectContact(state.viewingProjectId, contactId);
+            console.log('API result:', result);
+
             if (result.success) {
                 const contactsResult = await api.getProjectContacts(state.viewingProjectId);
                 if (contactsResult.success) {
@@ -2681,6 +2730,7 @@
             }
         } catch (error) {
             console.error('Error assigning contact to project:', error);
+            alert('An error occurred: ' + error.message);
         }
     }
 
@@ -3131,6 +3181,9 @@
         }
         if (elements.editProjectBtn) {
             elements.editProjectBtn.addEventListener('click', () => {
+                console.log('Edit button clicked');
+                console.log('state.viewingProject:', state.viewingProject);
+                console.log('state.viewingProjectId:', state.viewingProjectId);
                 closeProjectOverview();
                 openProjectModal(state.viewingProject);
             });
@@ -3156,7 +3209,9 @@
                         c.name.toLowerCase() === query.toLowerCase()
                     );
                     if (contacts.length > 0) {
-                        assignProjectContact(contacts[0].id);
+                        addProjectContact(contacts[0].id);
+                    } else {
+                        alert('Contact not found. Please select from suggestions.');
                     }
                 }
             });
