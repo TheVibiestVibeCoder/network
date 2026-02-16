@@ -178,6 +178,11 @@ if ($isAuthenticated) {
                                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
                             </svg>
                         </button>
+                        <button type="button" class="toggle-btn" data-view="projects" title="Projects">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <div class="header-right">
@@ -335,6 +340,46 @@ if ($isAuthenticated) {
                         <!-- Contacts will be loaded here -->
                     </div>
                 </div>
+
+                <!-- Projects View -->
+                <div class="view-panel" id="projectsView">
+                    <div class="list-header">
+                        <div class="list-header-top">
+                            <div class="search-box">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="searchProjectsInput" placeholder="Search projects..." class="search-input">
+                            </div>
+                            <button type="button" class="btn btn-primary" id="addProjectBtn">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                <span>Add Project</span>
+                            </button>
+                        </div>
+                        <div class="list-controls" id="projectControls">
+                            <div class="sort-controls">
+                                <label>Sort:</label>
+                                <select id="projectSortField" class="form-select">
+                                    <option value="name">Name</option>
+                                    <option value="company">Company</option>
+                                    <option value="start_date">Start Date</option>
+                                    <option value="stage">Stage</option>
+                                    <option value="success_chance">Success Chance</option>
+                                </select>
+                                <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="projectSortOrderIcon">
+                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="projects-list" id="projectsList">
+                        <!-- Projects will be loaded here -->
+                    </div>
+                </div>
             </main>
         </div>
 
@@ -477,6 +522,14 @@ if ($isAuthenticated) {
                                 </svg>
                                 Add
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Related Projects Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Related Projects</h3>
+                        <div class="contact-projects-list" id="contactProjects">
+                            <!-- Projects will be populated by JS -->
                         </div>
                     </div>
 
@@ -691,6 +744,191 @@ if ($isAuthenticated) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="closeImportExportBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Modal -->
+        <div class="modal" id="projectModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="projectModalTitle">Add Project</h2>
+                    <button type="button" class="modal-close" id="closeProjectModal">&times;</button>
+                </div>
+                <form id="projectForm">
+                    <input type="hidden" id="projectId" name="id">
+
+                    <div class="modal-body">
+                        <!-- Required Fields -->
+                        <div class="form-section">
+                            <h3>Basic Information</h3>
+
+                            <div class="form-group">
+                                <label for="projectName">Project Name *</label>
+                                <input type="text" id="projectName" name="name" required class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectStartDate">Start Date *</label>
+                                <input type="date" id="projectStartDate" name="start_date" required class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectDescription">Description *</label>
+                                <textarea id="projectDescription" name="description" required class="form-input" rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Optional Fields -->
+                        <div class="form-section">
+                            <h3>Additional Details</h3>
+
+                            <div class="form-group">
+                                <label for="projectCompany">Company</label>
+                                <input type="text" id="projectCompany" name="company" class="form-input">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="projectBudgetMin">Budget Min</label>
+                                    <input type="number" id="projectBudgetMin" name="budget_min" class="form-input" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="projectBudgetMax">Budget Max</label>
+                                    <input type="number" id="projectBudgetMax" name="budget_max" class="form-input" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectSuccessChance">Success Chance (%)</label>
+                                <input type="number" id="projectSuccessChance" name="success_chance" class="form-input" min="0" max="100" placeholder="0-100">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectStage">Stage</label>
+                                <select id="projectStage" name="stage" class="form-select">
+                                    <option value="Lead">Lead</option>
+                                    <option value="Proposal">Proposal</option>
+                                    <option value="Negotiation">Negotiation</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Complete">Complete</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectEstimatedCompletion">Estimated Completion</label>
+                                <input type="date" id="projectEstimatedCompletion" name="estimated_completion" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="cancelProjectBtn">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="deleteProjectBtn" style="display: none;">Delete</button>
+                        <button type="submit" class="btn btn-primary" id="saveProjectBtn">Save Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Project Confirmation Modal -->
+        <div class="modal" id="deleteProjectModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Delete Project</h2>
+                    <button type="button" class="modal-close" id="closeDeleteProjectModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong id="deleteProjectName"></strong>?</p>
+                    <p class="text-muted">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelDeleteProjectBtn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteProjectBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Overview Modal -->
+        <div class="modal" id="projectOverviewModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="overview-title-info">
+                            <h2 id="projectOverviewName">Project Name</h2>
+                            <p class="overview-company" id="projectOverviewCompany"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="overview-actions">
+                        <button type="button" class="btn btn-secondary btn-small" id="editProjectBtn">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                            </svg>
+                            Edit
+                        </button>
+                    </div>
+
+                    <!-- Project Details Grid -->
+                    <div class="overview-grid">
+                        <div class="overview-item">
+                            <span class="overview-label">Start Date</span>
+                            <span class="overview-value" id="projectOverviewStartDate"></span>
+                        </div>
+                        <div class="overview-item">
+                            <span class="overview-label">Stage</span>
+                            <span class="overview-value" id="projectOverviewStage"></span>
+                        </div>
+                        <div class="overview-item">
+                            <span class="overview-label">Budget</span>
+                            <span class="overview-value" id="projectOverviewBudget"></span>
+                        </div>
+                        <div class="overview-item">
+                            <span class="overview-label">Success Chance</span>
+                            <span class="overview-value" id="projectOverviewSuccessChance"></span>
+                        </div>
+                        <div class="overview-item">
+                            <span class="overview-label">Est. Completion</span>
+                            <span class="overview-value" id="projectOverviewEstCompletion"></span>
+                        </div>
+                        <div class="overview-item full-width">
+                            <span class="overview-label">Description</span>
+                            <span class="overview-value" id="projectOverviewDescription"></span>
+                        </div>
+                    </div>
+
+                    <!-- Project Tags -->
+                    <div class="overview-section">
+                        <div class="section-header">
+                            <h3>Tags</h3>
+                            <div class="tag-input-container">
+                                <input type="text" id="newProjectTagInput" placeholder="Add tag..." class="tag-input">
+                                <div class="tag-suggestions" id="projectTagSuggestions"></div>
+                            </div>
+                        </div>
+                        <div class="tags-container" id="projectTags">
+                            <!-- Tags will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Project Contacts -->
+                    <div class="overview-section">
+                        <div class="section-header">
+                            <h3>Assigned Contacts</h3>
+                            <div class="contact-input-container">
+                                <input type="text" id="newProjectContactInput" placeholder="Assign contact..." class="tag-input">
+                                <div class="contact-suggestions" id="projectContactSuggestions"></div>
+                            </div>
+                        </div>
+                        <div class="project-contacts-list" id="projectContacts">
+                            <!-- Contacts will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

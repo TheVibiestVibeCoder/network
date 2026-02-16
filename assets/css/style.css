@@ -2804,3 +2804,282 @@ textarea.form-input {
         vertical-align: middle;
     }
 }
+
+/* ============================================
+   Project Styles
+   ============================================ */
+
+/* Project Stage Badges */
+.project-stage-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.stage-lead {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.stage-proposal {
+    background-color: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
+.stage-negotiation {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.stage-in-progress {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.stage-complete {
+    background-color: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+}
+
+/* Projects List */
+.projects-list {
+    display: grid;
+    gap: var(--spacing-4);
+    padding: var(--spacing-6);
+    overflow-y: auto;
+    height: calc(100vh - var(--header-height) - 120px);
+}
+
+/* Project Cards (reuse contact-card styles but with project-specific additions) */
+.contact-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-3);
+}
+
+/* Project Overview Grid */
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+    margin-bottom: var(--spacing-6);
+}
+
+.overview-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+}
+
+.overview-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.overview-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.overview-value {
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+}
+
+/* Project Contacts List in Overview */
+.project-contacts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.project-contact-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-fast);
+}
+
+.project-contact-item:hover {
+    background: var(--color-surface-hover);
+}
+
+.project-contact-item .contact-avatar {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+}
+
+.project-contact-item .contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-contact-item .contact-name {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 2px;
+}
+
+.project-contact-item .contact-company {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+/* Contact Projects in Overview (mini cards) */
+.contact-projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.project-mini-card {
+    padding: var(--spacing-4);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.project-mini-card:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-subtle);
+    transform: translateY(-1px);
+}
+
+.project-mini-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-2);
+}
+
+.project-mini-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+}
+
+.project-mini-company {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-2);
+}
+
+.project-mini-desc {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Contact/Tag Suggestions for Projects */
+.contact-input-container {
+    position: relative;
+    flex: 1;
+}
+
+.contact-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: var(--spacing-1);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.contact-suggestion {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.contact-suggestion:hover {
+    background: var(--color-surface-hover);
+}
+
+.contact-suggestion .contact-avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.contact-suggestion .contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.contact-suggestion .contact-name {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.contact-suggestion .contact-company {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+/* Form Row for Budget Fields */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-4);
+}
+
+/* Empty State */
+.empty-hint {
+    text-align: center;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-6);
+}
+
+/* Mobile Responsive Adjustments for Projects */
+@media (max-width: 768px) {
+    .projects-list {
+        padding: var(--spacing-4);
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .project-mini-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .project-stage-badge {
+        align-self: flex-start;
+    }
+}
