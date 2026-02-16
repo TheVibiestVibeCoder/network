@@ -165,29 +165,39 @@ function handlePost(Project $model, string $action): void
     }
 
     // Sanitize input fields
-    $input = Auth::sanitizeInput($input);
+    $sanitized = [
+        'name' => Auth::sanitizeString($input['name'] ?? '', 255),
+        'start_date' => $input['start_date'] ?? null,
+        'description' => isset($input['description']) ? trim($input['description']) : '',
+        'company' => Auth::sanitizeString($input['company'] ?? null, 255),
+        'budget_min' => isset($input['budget_min']) && $input['budget_min'] !== '' ? (float)$input['budget_min'] : null,
+        'budget_max' => isset($input['budget_max']) && $input['budget_max'] !== '' ? (float)$input['budget_max'] : null,
+        'success_chance' => isset($input['success_chance']) && $input['success_chance'] !== '' ? (int)$input['success_chance'] : null,
+        'stage' => Auth::sanitizeString($input['stage'] ?? 'Lead', 50),
+        'estimated_completion' => $input['estimated_completion'] ?? null
+    ];
 
     // Validate required fields
-    if (empty($input['name'])) {
+    if (empty($sanitized['name'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Name is required']);
         return;
     }
 
-    if (empty($input['start_date'])) {
+    if (empty($sanitized['start_date'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Start date is required']);
         return;
     }
 
-    if (empty($input['description'])) {
+    if (empty($sanitized['description'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Description is required']);
         return;
     }
 
     // Create project
-    $id = $model->create($input);
+    $id = $model->create($sanitized);
     $project = $model->getById($id);
 
     http_response_code(201);
@@ -223,29 +233,39 @@ function handlePut(Project $model, ?int $id): void
     }
 
     // Sanitize input fields
-    $input = Auth::sanitizeInput($input);
+    $sanitized = [
+        'name' => Auth::sanitizeString($input['name'] ?? '', 255),
+        'start_date' => $input['start_date'] ?? null,
+        'description' => isset($input['description']) ? trim($input['description']) : '',
+        'company' => Auth::sanitizeString($input['company'] ?? null, 255),
+        'budget_min' => isset($input['budget_min']) && $input['budget_min'] !== '' ? (float)$input['budget_min'] : null,
+        'budget_max' => isset($input['budget_max']) && $input['budget_max'] !== '' ? (float)$input['budget_max'] : null,
+        'success_chance' => isset($input['success_chance']) && $input['success_chance'] !== '' ? (int)$input['success_chance'] : null,
+        'stage' => Auth::sanitizeString($input['stage'] ?? 'Lead', 50),
+        'estimated_completion' => $input['estimated_completion'] ?? null
+    ];
 
     // Validate required fields
-    if (empty($input['name'])) {
+    if (empty($sanitized['name'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Name is required']);
         return;
     }
 
-    if (empty($input['start_date'])) {
+    if (empty($sanitized['start_date'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Start date is required']);
         return;
     }
 
-    if (empty($input['description'])) {
+    if (empty($sanitized['description'])) {
         http_response_code(400);
         echo json_encode(['error' => 'Description is required']);
         return;
     }
 
     // Update project
-    $model->update($id, $input);
+    $model->update($id, $sanitized);
     $project = $model->getById($id);
 
     echo json_encode(['success' => true, 'data' => $project]);
