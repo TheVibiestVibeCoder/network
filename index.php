@@ -786,7 +786,10 @@ if ($isAuthenticated) {
 
                             <div class="form-group">
                                 <label for="projectCompany">Company</label>
-                                <input type="text" id="projectCompany" name="company" class="form-input">
+                                <div class="autocomplete-wrapper">
+                                    <input type="text" id="projectCompany" name="company" class="form-input" autocomplete="off" placeholder="Search or enter company name...">
+                                    <div class="autocomplete-suggestions" id="projectCompanySuggestions"></div>
+                                </div>
                             </div>
 
                             <div class="form-row">
@@ -864,71 +867,86 @@ if ($isAuthenticated) {
                     </div>
                     <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
                 </div>
-                <div class="modal-body">
-                    <div class="overview-actions">
-                        <button type="button" class="btn btn-secondary btn-small" id="editProjectBtn">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                            </svg>
-                            Edit
-                        </button>
-                    </div>
-
-                    <!-- Project Details Grid -->
-                    <div class="overview-grid">
-                        <div class="overview-item">
-                            <span class="overview-label">Start Date</span>
-                            <span class="overview-value" id="projectOverviewStartDate"></span>
-                        </div>
-                        <div class="overview-item">
-                            <span class="overview-label">Stage</span>
-                            <span class="overview-value" id="projectOverviewStage"></span>
-                        </div>
-                        <div class="overview-item">
-                            <span class="overview-label">Budget</span>
-                            <span class="overview-value" id="projectOverviewBudget"></span>
-                        </div>
-                        <div class="overview-item">
-                            <span class="overview-label">Success Chance</span>
-                            <span class="overview-value" id="projectOverviewSuccessChance"></span>
-                        </div>
-                        <div class="overview-item">
-                            <span class="overview-label">Est. Completion</span>
-                            <span class="overview-value" id="projectOverviewEstCompletion"></span>
-                        </div>
-                        <div class="overview-item full-width">
-                            <span class="overview-label">Description</span>
-                            <span class="overview-value" id="projectOverviewDescription"></span>
-                        </div>
-                    </div>
-
-                    <!-- Project Tags -->
+                <div class="modal-body overview-body">
+                    <!-- Project Details Section -->
                     <div class="overview-section">
-                        <div class="section-header">
-                            <h3>Tags</h3>
-                            <div class="tag-input-container">
-                                <input type="text" id="newProjectTagInput" placeholder="Add tag..." class="tag-input">
+                        <h3 class="overview-section-title">Project Information</h3>
+                        <div class="overview-details">
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Start Date</span>
+                                <span class="detail-value" id="projectOverviewStartDate"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Stage</span>
+                                <span class="detail-value" id="projectOverviewStage"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Budget</span>
+                                <span class="detail-value" id="projectOverviewBudget"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Success Chance</span>
+                                <span class="detail-value" id="projectOverviewSuccessChance"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Est. Completion</span>
+                                <span class="detail-value" id="projectOverviewEstCompletion"></span>
+                            </div>
+                            <div class="overview-detail-item full-width">
+                                <span class="detail-label">Description</span>
+                                <span class="detail-value" id="projectOverviewDescription"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tags Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Tags</h3>
+                        <div class="tags-container" id="projectTags">
+                            <!-- Tags will be populated by JS -->
+                        </div>
+                        <div class="add-tag-form">
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newProjectTagInput" class="form-input" placeholder="Add or create tag..." autocomplete="off">
                                 <div class="tag-suggestions" id="projectTagSuggestions"></div>
                             </div>
-                        </div>
-                        <div class="tags-container" id="projectTags">
-                            <!-- Tags will be loaded here -->
+                            <button type="button" class="btn btn-secondary" id="addProjectTagBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Add
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Project Contacts -->
+                    <!-- Assigned Contacts Section -->
                     <div class="overview-section">
-                        <div class="section-header">
-                            <h3>Assigned Contacts</h3>
-                            <div class="contact-input-container">
-                                <input type="text" id="newProjectContactInput" placeholder="Assign contact..." class="tag-input">
+                        <h3 class="overview-section-title">Assigned Contacts</h3>
+                        <div class="project-contacts-list" id="projectContacts">
+                            <!-- Contacts will be populated by JS -->
+                        </div>
+                        <div class="add-tag-form">
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newProjectContactInput" class="form-input" placeholder="Assign contact..." autocomplete="off">
                                 <div class="contact-suggestions" id="projectContactSuggestions"></div>
                             </div>
-                        </div>
-                        <div class="project-contacts-list" id="projectContacts">
-                            <!-- Contacts will be loaded here -->
+                            <button type="button" class="btn btn-secondary" id="addProjectContactBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Add
+                            </button>
                         </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="closeProjectOverviewBtn">Close</button>
+                    <button type="button" class="btn btn-secondary" id="editProjectBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                        Edit Project
+                    </button>
                 </div>
             </div>
         </div>

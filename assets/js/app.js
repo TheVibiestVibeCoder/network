@@ -170,6 +170,8 @@
         projectModalTitle: document.getElementById('projectModalTitle'),
         projectForm: document.getElementById('projectForm'),
         projectId: document.getElementById('projectId'),
+        projectCompany: document.getElementById('projectCompany'),
+        projectCompanySuggestions: document.getElementById('projectCompanySuggestions'),
         closeProjectModal: document.getElementById('closeProjectModal'),
         cancelProjectBtn: document.getElementById('cancelProjectBtn'),
         deleteProjectBtn: document.getElementById('deleteProjectBtn'),
@@ -195,10 +197,13 @@
         projectTags: document.getElementById('projectTags'),
         newProjectTagInput: document.getElementById('newProjectTagInput'),
         projectTagSuggestions: document.getElementById('projectTagSuggestions'),
+        addProjectTagBtn: document.getElementById('addProjectTagBtn'),
         projectContacts: document.getElementById('projectContacts'),
         newProjectContactInput: document.getElementById('newProjectContactInput'),
         projectContactSuggestions: document.getElementById('projectContactSuggestions'),
+        addProjectContactBtn: document.getElementById('addProjectContactBtn'),
         closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
+        closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
         editProjectBtn: document.getElementById('editProjectBtn')
     };
 
@@ -2402,12 +2407,16 @@
     }
 
     function openProjectModal(project = null) {
-        state.editingProjectId = project ? project.id : null;
+        // Debug logging
+        console.log('openProjectModal called with project:', project);
+
+        state.editingProjectId = project && project.id ? project.id : null;
+        console.log('state.editingProjectId set to:', state.editingProjectId);
 
         // Reset form
         elements.projectForm.reset();
 
-        if (project) {
+        if (project && project.id) {
             // Editing existing project
             elements.projectModalTitle.textContent = 'Edit Project';
             elements.deleteProjectBtn.style.display = 'block';
@@ -2442,6 +2451,8 @@
     async function saveProject(e) {
         e.preventDefault();
 
+        console.log('saveProject called, state.editingProjectId:', state.editingProjectId);
+
         const formData = {
             name: document.getElementById('projectName').value.trim(),
             start_date: document.getElementById('projectStartDate').value,
@@ -2457,10 +2468,14 @@
         try {
             let result;
             if (state.editingProjectId) {
+                console.log('Updating project:', state.editingProjectId, formData);
                 result = await api.updateProject(state.editingProjectId, formData);
             } else {
+                console.log('Creating new project:', formData);
                 result = await api.createProject(formData);
             }
+
+            console.log('Save result:', result);
 
             if (result.success) {
                 closeProjectModal();
@@ -2752,6 +2767,49 @@
 
         elements.projectContactSuggestions.innerHTML = html;
         elements.projectContactSuggestions.style.display = 'block';
+    }
+
+    function showCompanySuggestions(query) {
+        if (!state.contacts || state.contacts.length === 0) {
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+            return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        // Get unique companies from contacts
+        const companies = [...new Set(state.contacts
+            .filter(c => c.company && c.company.toLowerCase().includes(lowerQuery))
+            .map(c => c.company)
+        )].slice(0, 10);
+
+        if (companies.length === 0) {
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+            return;
+        }
+
+        const html = companies.map(company => `
+            <div class="autocomplete-suggestion" onclick="window.CRM.selectCompany('${escapeHtml(company).replace(/'/g, "\\'")}')">
+                ${escapeHtml(company)}
+            </div>
+        `).join('');
+
+        if (elements.projectCompanySuggestions) {
+            elements.projectCompanySuggestions.innerHTML = html;
+            elements.projectCompanySuggestions.classList.add('visible');
+        }
+    }
+
+    function selectCompany(company) {
+        if (elements.projectCompany) {
+            elements.projectCompany.value = company;
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+        }
     }
 
     // ============================================
@@ -3062,13 +3120,68 @@
         if (elements.closeProjectOverviewModal) {
             elements.closeProjectOverviewModal.addEventListener('click', closeProjectOverview);
         }
+        if (elements.closeProjectOverviewBtn) {
+            elements.closeProjectOverviewBtn.addEventListener('click', closeProjectOverview);
+        }
         if (elements.projectOverviewModal) {
-            elements.projectOverviewModal.querySelector('.modal-backdrop').addEventListener('click', closeProjectOverview);
+            const backdrop = elements.projectOverviewModal.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.addEventListener('click', closeProjectOverview);
+            }
         }
         if (elements.editProjectBtn) {
             elements.editProjectBtn.addEventListener('click', () => {
                 closeProjectOverview();
                 openProjectModal(state.viewingProject);
+            });
+        }
+
+        // Project tag add button
+        if (elements.addProjectTagBtn) {
+            elements.addProjectTagBtn.addEventListener('click', () => {
+                const tagName = elements.newProjectTagInput.value.trim();
+                if (tagName) {
+                    addProjectTag(tagName);
+                }
+            });
+        }
+
+        // Project contact add button
+        if (elements.addProjectContactBtn) {
+            elements.addProjectContactBtn.addEventListener('click', () => {
+                const query = elements.newProjectContactInput.value.trim();
+                if (query) {
+                    // Try to find exact match
+                    const contacts = state.contacts.filter(c =>
+                        c.name.toLowerCase() === query.toLowerCase()
+                    );
+                    if (contacts.length > 0) {
+                        assignProjectContact(contacts[0].id);
+                    }
+                }
+            });
+        }
+
+        // Company autocomplete
+        if (elements.projectCompany) {
+            elements.projectCompany.addEventListener('input', () => {
+                const query = elements.projectCompany.value.trim();
+                if (query.length > 0) {
+                    showCompanySuggestions(query);
+                } else {
+                    if (elements.projectCompanySuggestions) {
+                        elements.projectCompanySuggestions.classList.remove('visible');
+                    }
+                }
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (elements.projectCompanySuggestions &&
+                    !elements.projectCompany.contains(e.target) &&
+                    !elements.projectCompanySuggestions.contains(e.target)) {
+                    elements.projectCompanySuggestions.classList.remove('visible');
+                }
             });
         }
 
@@ -3170,7 +3283,8 @@
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,
-        removeProjectContact: removeProjectContact
+        removeProjectContact: removeProjectContact,
+        selectCompany: selectCompany
     };
 
     // Initialize when DOM is ready
