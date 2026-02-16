@@ -2855,13 +2855,73 @@ textarea.form-input {
     height: calc(100vh - var(--header-height) - 120px);
 }
 
-/* Project Cards (reuse contact-card styles but with project-specific additions) */
-.contact-card-header {
+/* Project Cards */
+.project-card {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-4);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.project-card:hover {
+    background: var(--color-surface-3);
+    border-color: var(--color-text-muted);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.project-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-3);
+}
+
+.project-card-header .contact-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-card-header .contact-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-1);
+}
+
+.project-card-header .contact-company {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.project-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-4);
+    margin-bottom: var(--spacing-3);
+}
+
+.project-details .detail-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.project-details .detail-item svg {
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.project-card .contact-note {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    margin: 0;
 }
 
 /* Project Overview Grid */

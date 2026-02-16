@@ -2342,27 +2342,41 @@
 
         const html = projects.map(project => createProjectCard(project)).join('');
         elements.projectsList.innerHTML = html;
+
+        // Add click event listeners to project cards
+        elements.projectsList.querySelectorAll('.project-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const projectId = parseInt(card.dataset.id, 10);
+                openProjectOverview(projectId);
+            });
+        });
     }
 
     function createProjectCard(project) {
-        const startDate = project.start_date ? formatDate(project.start_date) : 'N/A';
+        // Format date as absolute date (e.g., "Jan 15, 2024")
+        const startDate = project.start_date ? new Date(project.start_date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }) : 'N/A';
+
         const budget = project.budget_min && project.budget_max
-            ? `$${parseFloat(project.budget_min).toFixed(2)} - $${parseFloat(project.budget_max).toFixed(2)}`
+            ? `$${parseFloat(project.budget_min).toFixed(0)} - $${parseFloat(project.budget_max).toFixed(0)}`
             : project.budget_min
-            ? `$${parseFloat(project.budget_min).toFixed(2)}`
+            ? `$${parseFloat(project.budget_min).toFixed(0)}`
             : 'N/A';
         const successChance = project.success_chance ? `${project.success_chance}%` : 'N/A';
 
         return `
-            <div class="contact-card" data-id="${project.id}" onclick="window.CRM.openProjectOverview(${project.id})">
-                <div class="contact-card-header">
+            <div class="project-card" data-id="${project.id}">
+                <div class="project-card-header">
                     <div class="contact-info">
                         <h3 class="contact-name">${escapeHtml(project.name)}</h3>
                         ${project.company ? `<p class="contact-company">${escapeHtml(project.company)}</p>` : ''}
                     </div>
-                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(project.stage)}</span>
+                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(/ /g, '-')}">${escapeHtml(project.stage)}</span>
                 </div>
-                <div class="contact-details">
+                <div class="project-details">
                     <div class="detail-item">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
@@ -2513,18 +2527,24 @@
     function renderProjectOverview(project, contacts, tags) {
         elements.projectOverviewName.textContent = project.name;
         elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
-        elements.projectOverviewStartDate.textContent = project.start_date ? formatDate(project.start_date) : 'N/A';
+
+        // Format dates as absolute dates
+        elements.projectOverviewStartDate.textContent = project.start_date
+            ? new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'N/A';
         elements.projectOverviewStage.textContent = project.stage || 'N/A';
 
         const budget = project.budget_min && project.budget_max
-            ? `$${parseFloat(project.budget_min).toFixed(2)} - $${parseFloat(project.budget_max).toFixed(2)}`
+            ? `$${parseFloat(project.budget_min).toFixed(0)} - $${parseFloat(project.budget_max).toFixed(0)}`
             : project.budget_min
-            ? `$${parseFloat(project.budget_min).toFixed(2)}`
+            ? `$${parseFloat(project.budget_min).toFixed(0)}`
             : 'N/A';
         elements.projectOverviewBudget.textContent = budget;
 
         elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
-        elements.projectOverviewEstCompletion.textContent = project.estimated_completion ? formatDate(project.estimated_completion) : 'N/A';
+        elements.projectOverviewEstCompletion.textContent = project.estimated_completion
+            ? new Date(project.estimated_completion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'N/A';
         elements.projectOverviewDescription.textContent = project.description || 'No description';
 
         // Render tags
