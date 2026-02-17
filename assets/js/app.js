@@ -2339,6 +2339,56 @@
     // Project Functions
     // ============================================
 
+    function updateProjectsDashboard(projects) {
+        const total = projects.length;
+
+        // Budget potential: sum of all min budgets → sum of all max budgets
+        let sumMin = 0, sumMax = 0, hasBudget = false;
+        projects.forEach(p => {
+            const min = parseFloat(p.budget_min);
+            const max = parseFloat(p.budget_max);
+            if (!isNaN(min)) { sumMin += min; hasBudget = true; }
+            if (!isNaN(max)) { sumMax += max; hasBudget = true; }
+        });
+
+        // Success chance: weighted by mid-point budget if available, else simple average
+        const withChance = projects.filter(p => p.success_chance !== null && p.success_chance !== '');
+        let avgChance = null;
+        if (withChance.length > 0) {
+            const totalWeight = withChance.reduce((acc, p) => {
+                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
+                return acc + (mid > 0 ? mid : 1);
+            }, 0);
+            const weightedSum = withChance.reduce((acc, p) => {
+                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
+                const weight = mid > 0 ? mid : 1;
+                return acc + (parseFloat(p.success_chance) * weight);
+            }, 0);
+            avgChance = Math.round(weightedSum / totalWeight);
+        }
+
+        // Format budget range compactly
+        function formatBudget(n) {
+            if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
+            return n.toFixed(0);
+        }
+
+        document.getElementById('dashTotalProjects').textContent = total;
+
+        if (hasBudget) {
+            const potentialText = sumMin > 0 && sumMax > 0 && sumMin !== sumMax
+                ? `$${formatBudget(sumMin)} – $${formatBudget(sumMax)}`
+                : `$${formatBudget(sumMax || sumMin)}`;
+            document.getElementById('dashTotalPotential').textContent = potentialText;
+        } else {
+            document.getElementById('dashTotalPotential').textContent = 'N/A';
+        }
+
+        document.getElementById('dashSuccessChance').textContent =
+            avgChance !== null ? `${avgChance}%` : 'N/A';
+    }
+
     async function loadProjects() {
         try {
             const result = await api.getProjects(
@@ -2350,6 +2400,7 @@
             if (result.success) {
                 state.projects = result.data;
                 renderProjects(state.projects);
+                updateProjectsDashboard(state.projects);
             } else {
                 console.error('Failed to load projects:', result.error);
             }
@@ -2596,7 +2647,7 @@
         const html = tags.map(tag => `
             <span class="tag" style="background-color: ${tag.color}20; color: ${tag.color};">
                 ${escapeHtml(tag.name)}
-                <button class="tag-remove" onclick="window.CRM.removeProjectTag(${tag.id})" title="Remove tag">&times;</button>
+                <button class="tag-remove" data-remove-tag="${tag.id}" title="Remove tag">&times;</button>
             </span>
         `).join('');
 
@@ -2616,7 +2667,7 @@
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
                     ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
                 </div>
-                <button class="btn btn-icon btn-small" onclick="window.CRM.removeProjectContact(${contact.id})" title="Remove contact">
+                <button class="btn btn-icon btn-small" data-remove-contact="${contact.id}" title="Remove contact">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                     </svg>
@@ -2720,19 +2771,15 @@
     }
 
     function showProjectTagSuggestions(query) {
-        if (!state.allTags || state.allTags.length === 0) {
-            elements.projectTagSuggestions.style.display = 'none';
-            return;
-        }
-
         const lowerQuery = query.toLowerCase();
-        const filtered = state.allTags.filter(tag =>
+        const filtered = (state.allTags || []).filter(tag =>
             tag.name.toLowerCase().includes(lowerQuery)
         ).slice(0, 10);
 
-        if (filtered.length === 0 && query.length > 0) {
+        if (filtered.length === 0) {
+            // Show "create new" option when no match
             elements.projectTagSuggestions.innerHTML = `
-                <div class="tag-suggestion" onclick="window.CRM.addProjectTag('${escapeHtml(query)}')">
+                <div class="tag-suggestion" data-tag-name="${escapeHtml(query)}">
                     <span>Create "${escapeHtml(query)}"</span>
                 </div>
             `;
@@ -2741,18 +2788,14 @@
         }
 
         const html = filtered.map(tag => `
-            <div class="tag-suggestion" onclick="window.CRM.addProjectTag('${escapeHtml(tag.name)}')">
+            <div class="tag-suggestion" data-tag-name="${escapeHtml(tag.name)}">
                 <span class="tag-color" style="background-color: ${tag.color};"></span>
                 <span>${escapeHtml(tag.name)}</span>
             </div>
         `).join('');
 
-        if (html) {
-            elements.projectTagSuggestions.innerHTML = html;
-            elements.projectTagSuggestions.style.display = 'block';
-        } else {
-            elements.projectTagSuggestions.style.display = 'none';
-        }
+        elements.projectTagSuggestions.innerHTML = html;
+        elements.projectTagSuggestions.style.display = 'block';
     }
 
     function showProjectContactSuggestions(query) {
@@ -3259,6 +3302,13 @@
                 }
             });
 
+            elements.newProjectTagInput.addEventListener('blur', () => {
+                // Delay so mousedown on a suggestion fires first
+                setTimeout(() => {
+                    elements.projectTagSuggestions.style.display = 'none';
+                }, 150);
+            });
+
             elements.newProjectTagInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -3299,6 +3349,37 @@
                 const item = e.target.closest('[data-contact-id]');
                 if (item) {
                     addProjectContact(parseInt(item.dataset.contactId, 10));
+                }
+            });
+        }
+
+        // Mousedown on tag suggestions (same pattern — prevents blur, works inside overflow)
+        if (elements.projectTagSuggestions) {
+            elements.projectTagSuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const item = e.target.closest('[data-tag-name]');
+                if (item) {
+                    addProjectTag(item.dataset.tagName);
+                }
+            });
+        }
+
+        // Delegation for contact remove buttons (rendered dynamically)
+        if (elements.projectContacts) {
+            elements.projectContacts.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-remove-contact]');
+                if (btn) {
+                    removeProjectContact(parseInt(btn.dataset.removeContact, 10));
+                }
+            });
+        }
+
+        // Delegation for tag remove buttons (rendered dynamically)
+        if (elements.projectTags) {
+            elements.projectTags.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-remove-tag]');
+                if (btn) {
+                    removeProjectTag(parseInt(btn.dataset.removeTag, 10));
                 }
             });
         }

@@ -3006,6 +3006,7 @@ textarea.form-input {
     display: flex;
     flex-direction: column;
     gap: 0;
+    margin-bottom: var(--spacing-2);
 }
 
 .project-contact-item {
@@ -3185,8 +3186,83 @@ textarea.form-input {
     padding: var(--spacing-6);
 }
 
+/* ============================================
+   Projects Dashboard
+   ============================================ */
+
+.projects-dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-4);
+    padding: var(--spacing-5) var(--spacing-5) 0;
+}
+
+.dashboard-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+    padding: var(--spacing-4) var(--spacing-5);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.dashboard-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--color-primary)1a;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.dashboard-card-body {
+    min-width: 0;
+}
+
+.dashboard-card-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-card-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+}
+
 /* Mobile Responsive Adjustments for Projects */
 @media (max-width: 768px) {
+    .projects-dashboard {
+        grid-template-columns: 1fr;
+        padding: var(--spacing-4) var(--spacing-4) 0;
+        gap: var(--spacing-3);
+    }
+
+    .dashboard-card {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .dashboard-card-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .dashboard-card-value {
+        font-size: var(--font-size-lg);
+    }
+
     .projects-list {
         padding: var(--spacing-4);
     }
