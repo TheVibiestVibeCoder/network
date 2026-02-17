@@ -204,6 +204,7 @@
         addProjectContactBtn: document.getElementById('addProjectContactBtn'),
         closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
         closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
+        deleteProjectOverviewBtn: document.getElementById('deleteProjectOverviewBtn'),
         editProjectBtn: document.getElementById('editProjectBtn')
     };
 
@@ -2425,11 +2426,7 @@
     }
 
     function openProjectModal(project = null) {
-        // Debug logging
-        console.log('openProjectModal called with project:', project);
-
         state.editingProjectId = project && project.id ? project.id : null;
-        console.log('state.editingProjectId set to:', state.editingProjectId);
 
         // Reset form
         elements.projectForm.reset();
@@ -2469,8 +2466,6 @@
     async function saveProject(e) {
         e.preventDefault();
 
-        console.log('saveProject called, state.editingProjectId:', state.editingProjectId);
-
         const formData = {
             name: document.getElementById('projectName').value.trim(),
             start_date: document.getElementById('projectStartDate').value,
@@ -2486,14 +2481,10 @@
         try {
             let result;
             if (state.editingProjectId) {
-                console.log('Updating project:', state.editingProjectId, formData);
                 result = await api.updateProject(state.editingProjectId, formData);
             } else {
-                console.log('Creating new project:', formData);
                 result = await api.createProject(formData);
             }
-
-            console.log('Save result:', result);
 
             if (result.success) {
                 closeProjectModal();
@@ -2523,7 +2514,11 @@
 
             if (result.success) {
                 closeDeleteProjectModal();
-                closeProjectModal();
+                // Only close project modal if it's currently open
+                if (elements.projectModal.classList.contains('active')) {
+                    closeProjectModal();
+                }
+                state.editingProjectId = null;
                 loadProjects();
             } else {
                 alert('Error: ' + result.error);
@@ -2551,7 +2546,6 @@
 
             if (projectResult.success) {
                 state.viewingProject = projectResult.data;
-                console.log('Project data loaded:', state.viewingProject);
                 renderProjectOverview(projectResult.data, contactsResult.data || [], tagsResult.data || []);
                 elements.projectOverviewModal.classList.add('active');
             } else {
@@ -2640,36 +2634,21 @@
     }
 
     async function addProjectTag(tagName) {
-        console.log('addProjectTag called with:', tagName);
-        console.log('state.viewingProjectId:', state.viewingProjectId);
-
-        if (!tagName || !state.viewingProjectId) {
-            console.error('Missing tagName or viewingProjectId');
-            alert('Error: Cannot assign tag. Make sure you have opened a project first.');
-            return;
-        }
+        if (!tagName || !state.viewingProjectId) return;
 
         try {
-            console.log('Creating/getting tag...');
             // First, create or get the tag
             const tagResult = await api.createTag(tagName);
-            console.log('Tag result:', tagResult);
-
             if (!tagResult.success) {
                 alert('Error: ' + tagResult.error);
                 return;
             }
 
             const tag = tagResult.data;
-            console.log('Tag data:', tag);
 
             // Then assign it to the project
-            console.log('Assigning tag to project...');
             const assignResult = await api.assignProjectTag(state.viewingProjectId, tag.id);
-            console.log('Assign result:', assignResult);
-
             if (assignResult.success) {
-                // Reload project tags
                 const tagsResult = await api.getProjectTags(state.viewingProjectId);
                 if (tagsResult.success) {
                     renderProjectTags(tagsResult.data);
@@ -2681,7 +2660,6 @@
             }
         } catch (error) {
             console.error('Error adding tag to project:', error);
-            alert('An error occurred: ' + error.message);
         }
     }
 
@@ -2704,20 +2682,10 @@
     }
 
     async function addProjectContact(contactId) {
-        console.log('addProjectContact called with:', contactId);
-        console.log('state.viewingProjectId:', state.viewingProjectId);
-
-        if (!contactId || !state.viewingProjectId) {
-            console.error('Missing contactId or viewingProjectId');
-            alert('Error: Cannot assign contact. Make sure you have opened a project first.');
-            return;
-        }
+        if (!contactId || !state.viewingProjectId) return;
 
         try {
-            console.log('Calling assignProjectContact API...');
             const result = await api.assignProjectContact(state.viewingProjectId, contactId);
-            console.log('API result:', result);
-
             if (result.success) {
                 const contactsResult = await api.getProjectContacts(state.viewingProjectId);
                 if (contactsResult.success) {
@@ -2730,7 +2698,6 @@
             }
         } catch (error) {
             console.error('Error assigning contact to project:', error);
-            alert('An error occurred: ' + error.message);
         }
     }
 
@@ -2805,8 +2772,9 @@
             return;
         }
 
+        // Use data-contact-id attributes instead of inline onclick (avoids pointer-event issues)
         const html = filtered.map(contact => `
-            <div class="contact-suggestion" onclick="window.CRM.addProjectContact(${contact.id})">
+            <div class="contact-suggestion" data-contact-id="${contact.id}">
                 <div class="contact-avatar">${getInitials(contact.name)}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
@@ -2841,8 +2809,9 @@
             return;
         }
 
+        // Use data-company attributes instead of inline onclick
         const html = companies.map(company => `
-            <div class="autocomplete-suggestion" onclick="window.CRM.selectCompany('${escapeHtml(company).replace(/'/g, "\\'")}')">
+            <div class="autocomplete-suggestion" data-company="${escapeHtml(company)}">
                 ${escapeHtml(company)}
             </div>
         `).join('');
@@ -3179,13 +3148,26 @@
                 backdrop.addEventListener('click', closeProjectOverview);
             }
         }
+        // Delete from overview — opens the same confirmation modal
+        if (elements.deleteProjectOverviewBtn) {
+            elements.deleteProjectOverviewBtn.addEventListener('click', () => {
+                if (state.viewingProject) {
+                    const project = state.viewingProject;
+                    // Set editingProjectId so deleteProject() knows which to delete
+                    state.editingProjectId = project.id;
+                    elements.deleteProjectName.textContent = project.name;
+                    closeProjectOverview();
+                    elements.deleteProjectModal.classList.add('active');
+                }
+            });
+        }
+
         if (elements.editProjectBtn) {
             elements.editProjectBtn.addEventListener('click', () => {
-                console.log('Edit button clicked');
-                console.log('state.viewingProject:', state.viewingProject);
-                console.log('state.viewingProjectId:', state.viewingProjectId);
+                // Save project BEFORE closeProjectOverview() nulls it
+                const projectToEdit = state.viewingProject;
                 closeProjectOverview();
-                openProjectModal(state.viewingProject);
+                openProjectModal(projectToEdit);
             });
         }
 
@@ -3199,20 +3181,30 @@
             });
         }
 
-        // Project contact add button
+        // Project contact add button — match first suggestion if any
         if (elements.addProjectContactBtn) {
             elements.addProjectContactBtn.addEventListener('click', () => {
                 const query = elements.newProjectContactInput.value.trim();
-                if (query) {
-                    // Try to find exact match
-                    const contacts = state.contacts.filter(c =>
-                        c.name.toLowerCase() === query.toLowerCase()
-                    );
-                    if (contacts.length > 0) {
-                        addProjectContact(contacts[0].id);
-                    } else {
-                        alert('Contact not found. Please select from suggestions.');
-                    }
+                if (!query) return;
+
+                if (!state.contacts || state.contacts.length === 0) {
+                    alert('No contacts loaded. Please wait and try again.');
+                    return;
+                }
+
+                // First try exact match, then partial match
+                const exactMatch = state.contacts.find(c =>
+                    c.name.toLowerCase() === query.toLowerCase()
+                );
+                const partialMatch = state.contacts.find(c =>
+                    c.name.toLowerCase().includes(query.toLowerCase())
+                );
+                const contact = exactMatch || partialMatch;
+
+                if (contact) {
+                    addProjectContact(contact.id);
+                } else {
+                    alert('Contact not found. Please select from the suggestions dropdown.');
                 }
             });
         }
@@ -3222,7 +3214,12 @@
             elements.projectCompany.addEventListener('input', () => {
                 const query = elements.projectCompany.value.trim();
                 if (query.length > 0) {
-                    showCompanySuggestions(query);
+                    // Ensure contacts are loaded for company suggestions
+                    if (!state.contacts || state.contacts.length === 0) {
+                        loadAllContacts().then(() => showCompanySuggestions(query));
+                    } else {
+                        showCompanySuggestions(query);
+                    }
                 } else {
                     if (elements.projectCompanySuggestions) {
                         elements.projectCompanySuggestions.classList.remove('visible');
@@ -3230,12 +3227,23 @@
                 }
             });
 
-            // Hide suggestions when clicking outside
-            document.addEventListener('click', (e) => {
-                if (elements.projectCompanySuggestions &&
-                    !elements.projectCompany.contains(e.target) &&
-                    !elements.projectCompanySuggestions.contains(e.target)) {
-                    elements.projectCompanySuggestions.classList.remove('visible');
+            elements.projectCompany.addEventListener('blur', () => {
+                // Small delay so mousedown on a suggestion can fire first
+                setTimeout(() => {
+                    if (elements.projectCompanySuggestions) {
+                        elements.projectCompanySuggestions.classList.remove('visible');
+                    }
+                }, 150);
+            });
+        }
+
+        // Mousedown on company suggestions (fires before blur, bypasses overflow clipping)
+        if (elements.projectCompanySuggestions) {
+            elements.projectCompanySuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // prevent input blur
+                const item = e.target.closest('[data-company]');
+                if (item) {
+                    selectCompany(item.dataset.company);
                 }
             });
         }
@@ -3262,7 +3270,7 @@
             });
         }
 
-        // Project contact input
+        // Project contact input + suggestion selection via mousedown delegation
         if (elements.newProjectContactInput) {
             elements.newProjectContactInput.addEventListener('input', () => {
                 const query = elements.newProjectContactInput.value.trim();
@@ -3270,6 +3278,27 @@
                     showProjectContactSuggestions(query);
                 } else {
                     elements.projectContactSuggestions.style.display = 'none';
+                }
+            });
+
+            elements.newProjectContactInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const first = elements.projectContactSuggestions.querySelector('[data-contact-id]');
+                    if (first) {
+                        addProjectContact(parseInt(first.dataset.contactId, 10));
+                    }
+                }
+            });
+        }
+
+        // Mousedown on contact suggestions (fires before blur, bypasses overflow clipping)
+        if (elements.projectContactSuggestions) {
+            elements.projectContactSuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // prevent input blur
+                const item = e.target.closest('[data-contact-id]');
+                if (item) {
+                    addProjectContact(parseInt(item.dataset.contactId, 10));
                 }
             });
         }
