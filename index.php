@@ -362,6 +362,11 @@ if ($isAuthenticated) {
                                     <span class="dashboard-bar-stat-value" id="dashBarChance">—</span>
                                     <span>Avg. Chance</span>
                                 </div>
+                                <div class="dashboard-bar-stat">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+                                    <span class="dashboard-bar-stat-value" id="dashBarProjection">—</span>
+                                    <span>Projected</span>
+                                </div>
                             </div>
                             <button class="dashboard-toggle-btn" id="dashboardToggleBtn" title="Toggle dashboard">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -403,6 +408,34 @@ if ($isAuthenticated) {
                                 <div class="dashboard-card-body">
                                     <div class="dashboard-card-value" id="dashSuccessChance">—</div>
                                     <div class="dashboard-card-label">Avg. Success Chance</div>
+                                </div>
+                            </div>
+                            <!-- Revenue Projection — spans full width -->
+                            <div class="dashboard-card dashboard-card--projection">
+                                <div class="dashboard-card-icon dashboard-card-icon--success">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                        <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/>
+                                    </svg>
+                                </div>
+                                <div class="dashboard-card-body">
+                                    <div class="dashboard-card-label">Revenue Projection</div>
+                                    <div class="dashboard-proj-scenarios">
+                                        <div class="dashboard-proj-scenario">
+                                            <span class="dashboard-proj-scenario-label">Conservative</span>
+                                            <span class="dashboard-card-value" id="dashProjConservative">—</span>
+                                        </div>
+                                        <div class="dashboard-proj-scenario dashboard-proj-scenario--main">
+                                            <span class="dashboard-proj-scenario-label">Realistic</span>
+                                            <span class="dashboard-card-value" id="dashProjRealistic">—</span>
+                                        </div>
+                                        <div class="dashboard-proj-scenario">
+                                            <span class="dashboard-proj-scenario-label">Optimistic</span>
+                                            <span class="dashboard-card-value" id="dashProjOptimistic">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="dashboard-card-sub" id="dashProjSub">
+                                        Probability × budget midpoint · stage-blended · open projects only
+                                    </div>
                                 </div>
                             </div>
                         </div>

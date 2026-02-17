@@ -3337,6 +3337,46 @@ textarea.form-input {
     font-style: italic;
 }
 
+/* Projection card — spans full grid width */
+.dashboard-card--projection {
+    grid-column: 1 / -1;
+}
+
+.dashboard-card-icon--success {
+    background: var(--color-success-subtle);
+    color: var(--color-success);
+}
+
+.dashboard-proj-scenarios {
+    display: flex;
+    gap: var(--spacing-8);
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-top: var(--spacing-3);
+}
+
+.dashboard-proj-scenario {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dashboard-proj-scenario-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.dashboard-proj-scenario--main .dashboard-proj-scenario-label {
+    color: var(--color-success);
+}
+
+.dashboard-proj-scenario--main .dashboard-card-value {
+    color: var(--color-success);
+}
+
 /* Mobile Responsive Adjustments for Projects */
 @media (max-width: 768px) {
     .projects-dashboard {

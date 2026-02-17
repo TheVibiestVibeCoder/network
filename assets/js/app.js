@@ -2420,6 +2420,66 @@
         if (dashBarProjects) dashBarProjects.textContent = total;
         if (dashBarPotential) dashBarPotential.textContent = potentialText;
         if (dashBarChance) dashBarChance.textContent = chanceText;
+
+        // ---- Revenue Projection ----
+        // Per-stage fallback probability when success_chance is not set
+        const STAGE_DEFAULT_PROB = {
+            'Lead': 0.10, 'Proposal': 0.30,
+            'Negotiation': 0.55, 'In Progress': 0.80
+        };
+        // How much each stage anchors toward the default (vs. trusting user input)
+        const STAGE_BLEND = {
+            'Lead': 0.30, 'Proposal': 0.40,
+            'Negotiation': 0.55, 'In Progress': 0.70
+        };
+
+        let projEV = 0, projIncluded = 0, projExcluded = 0;
+
+        projects.forEach(function(p) {
+            if (p.stage === 'Complete') return; // excluded — already realised revenue
+            const stageDef = STAGE_DEFAULT_PROB[p.stage];
+            if (stageDef === undefined) return;
+
+            // Budget midpoint
+            const hasMin = hasBudgetVal(p.budget_min);
+            const hasMax = hasBudgetVal(p.budget_max);
+            let mid = null;
+            if (hasMin && hasMax)  mid = (parseFloat(p.budget_min) + parseFloat(p.budget_max)) / 2;
+            else if (hasMin)       mid = parseFloat(p.budget_min);
+            else if (hasMax)       mid = parseFloat(p.budget_max);
+            if (mid === null) { projExcluded++; return; }
+
+            // Effective probability: blend user input with stage anchor
+            const blendW = STAGE_BLEND[p.stage];
+            const userP  = (p.success_chance !== null && p.success_chance !== '')
+                           ? parseFloat(p.success_chance) / 100 : null;
+            const prob   = (userP === null)
+                           ? stageDef
+                           : userP * (1 - blendW) + stageDef * blendW;
+
+            projEV += mid * prob;
+            projIncluded++;
+        });
+
+        function fmtProj(n) { return formatBudget(Math.round(n)) + ' €'; }
+        const hasProj = projIncluded > 0 && projEV > 0;
+
+        const projConText = hasProj ? fmtProj(projEV * 0.60) : '—';
+        const projRelText = hasProj ? fmtProj(projEV)         : '—';
+        const projOptText = hasProj ? fmtProj(projEV * 1.35)  : '—';
+        const projSubText = projIncluded === 0
+            ? 'No open projects with budget data'
+            : projExcluded > 0
+                ? `${projIncluded} projects included · ${projExcluded} missing budget data`
+                : `All ${projIncluded} open projects included`;
+
+        ['dashProjConservative', 'dashProjRealistic', 'dashProjOptimistic', 'dashProjSub'].forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = [projConText, projRelText, projOptText, projSubText][i];
+        });
+
+        const dashBarProj = document.getElementById('dashBarProjection');
+        if (dashBarProj) dashBarProj.textContent = hasProj ? `~${fmtProj(projEV)}` : '—';
     }
 
     async function loadProjects() {
