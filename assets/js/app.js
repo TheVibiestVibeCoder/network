@@ -24,7 +24,7 @@
     // ============================================
 
     const state = {
-        currentView: 'map',
+        currentView: 'projects',
         contacts: [],
         mapContacts: [],
         sortField: 'name',
@@ -3350,7 +3350,10 @@
         });
 
         // Load initial data based on current view
-        if (state.currentView === 'map') {
+        if (state.currentView === 'projects') {
+            loadProjects();
+            loadAllContacts();
+        } else if (state.currentView === 'map') {
             loadMapMarkers();
         } else if (state.currentView === 'calendar') {
             loadCalendarNotes();

@@ -163,9 +163,9 @@ if ($isAuthenticated) {
                 <div class="header-center">
                     <!-- View Toggle -->
                     <div class="view-toggle">
-                        <button type="button" class="toggle-btn active" data-view="map" title="Map">
+                        <button type="button" class="toggle-btn active" data-view="projects" title="Projects">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
+                                <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
                             </svg>
                         </button>
                         <button type="button" class="toggle-btn" data-view="list" title="List">
@@ -178,9 +178,9 @@ if ($isAuthenticated) {
                                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
                             </svg>
                         </button>
-                        <button type="button" class="toggle-btn" data-view="projects" title="Projects">
+                        <button type="button" class="toggle-btn" data-view="map" title="Map">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
                             </svg>
                         </button>
                     </div>
@@ -236,7 +236,7 @@ if ($isAuthenticated) {
             <!-- Main Content -->
             <main class="app-main">
                 <!-- Map View -->
-                <div class="view-panel active" id="mapView">
+                <div class="view-panel" id="mapView">
                     <div id="map"></div>
                 </div>
 
@@ -342,7 +342,7 @@ if ($isAuthenticated) {
                 </div>
 
                 <!-- Projects View -->
-                <div class="view-panel" id="projectsView">
+                <div class="view-panel active" id="projectsView">
                     <div class="list-header">
                         <div class="list-header-top">
                             <div class="search-box">
