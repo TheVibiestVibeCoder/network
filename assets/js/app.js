@@ -2342,14 +2342,24 @@
     function updateProjectsDashboard(projects) {
         const total = projects.length;
 
-        // Budget potential: sum of all min budgets → sum of all max budgets
-        let sumMin = 0, sumMax = 0, hasBudget = false;
+        // Helper: check if a budget value is a real number (not null/empty)
+        function hasBudgetVal(v) {
+            return v !== null && v !== '' && v !== undefined && !isNaN(parseFloat(v));
+        }
+
+        // Budget potential: sum of all min/max budgets, tracking which projects contribute
+        let sumMin = 0, sumMax = 0;
+        let projectsWithBudget = 0;
         projects.forEach(p => {
-            const min = parseFloat(p.budget_min);
-            const max = parseFloat(p.budget_max);
-            if (!isNaN(min)) { sumMin += min; hasBudget = true; }
-            if (!isNaN(max)) { sumMax += max; hasBudget = true; }
+            const hasMin = hasBudgetVal(p.budget_min);
+            const hasMax = hasBudgetVal(p.budget_max);
+            if (hasMin || hasMax) {
+                projectsWithBudget++;
+                if (hasMin) sumMin += parseFloat(p.budget_min);
+                if (hasMax) sumMax += parseFloat(p.budget_max);
+            }
         });
+        const projectsUndetermined = total - projectsWithBudget;
 
         // Success chance: weighted by mid-point budget if available, else simple average
         const withChance = projects.filter(p => p.success_chance !== null && p.success_chance !== '');
@@ -2374,19 +2384,42 @@
             return n.toFixed(0);
         }
 
-        document.getElementById('dashTotalProjects').textContent = total;
-
-        if (hasBudget) {
-            const potentialText = sumMin > 0 && sumMax > 0 && sumMin !== sumMax
-                ? `$${formatBudget(sumMin)} – $${formatBudget(sumMax)}`
-                : `$${formatBudget(sumMax || sumMin)}`;
-            document.getElementById('dashTotalPotential').textContent = potentialText;
+        const chanceText = avgChance !== null ? `${avgChance}%` : 'N/A';
+        let potentialText;
+        if (projectsWithBudget === 0) {
+            potentialText = 'Undetermined';
+        } else if (sumMin === 0 && sumMax === 0) {
+            potentialText = 'Undetermined';
+        } else if (sumMin > 0 && sumMax > 0 && sumMin !== sumMax) {
+            potentialText = `${formatBudget(sumMin)} – ${formatBudget(sumMax)} €`;
         } else {
-            document.getElementById('dashTotalPotential').textContent = 'N/A';
+            potentialText = `${formatBudget(sumMax || sumMin)} €`;
         }
 
-        document.getElementById('dashSuccessChance').textContent =
-            avgChance !== null ? `${avgChance}%` : 'N/A';
+        // Update expanded card view
+        document.getElementById('dashTotalProjects').textContent = total;
+        document.getElementById('dashTotalPotential').textContent = potentialText;
+        document.getElementById('dashSuccessChance').textContent = chanceText;
+
+        // Sub-line: how many projects contribute to the potential
+        const subEl = document.getElementById('dashPotentialSub');
+        if (subEl) {
+            if (projectsWithBudget === 0) {
+                subEl.textContent = 'No budget data available';
+            } else if (projectsUndetermined > 0) {
+                subEl.textContent = `${projectsWithBudget} of ${total} projects · ${projectsUndetermined} undetermined`;
+            } else {
+                subEl.textContent = `All ${total} projects included`;
+            }
+        }
+
+        // Update compact bar stats
+        const dashBarProjects = document.getElementById('dashBarProjects');
+        const dashBarPotential = document.getElementById('dashBarPotential');
+        const dashBarChance = document.getElementById('dashBarChance');
+        if (dashBarProjects) dashBarProjects.textContent = total;
+        if (dashBarPotential) dashBarPotential.textContent = potentialText;
+        if (dashBarChance) dashBarChance.textContent = chanceText;
     }
 
     async function loadProjects() {
@@ -2435,11 +2468,22 @@
             year: 'numeric'
         }) : 'N/A';
 
-        const budget = project.budget_min && project.budget_max
-            ? `$${parseFloat(project.budget_min).toFixed(0)} - $${parseFloat(project.budget_max).toFixed(0)}`
-            : project.budget_min
-            ? `$${parseFloat(project.budget_min).toFixed(0)}`
-            : 'N/A';
+        const bMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
+        const bMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
+        let budget;
+        if (bMin === null && bMax === null) {
+            budget = 'N/A';
+        } else if (bMin === 0 && bMax === 0) {
+            budget = 'Undetermined';
+        } else if (bMin !== null && bMax !== null) {
+            budget = bMin === bMax
+                ? `${bMin.toFixed(0)} €`
+                : `${bMin.toFixed(0)} – ${bMax.toFixed(0)} €`;
+        } else if (bMin !== null) {
+            budget = `${bMin.toFixed(0)} €`;
+        } else {
+            budget = `${bMax.toFixed(0)} €`;
+        }
         const successChance = project.success_chance ? `${project.success_chance}%` : 'N/A';
 
         return `
@@ -2618,11 +2662,22 @@
             : 'N/A';
         elements.projectOverviewStage.textContent = project.stage || 'N/A';
 
-        const budget = project.budget_min && project.budget_max
-            ? `$${parseFloat(project.budget_min).toFixed(0)} - $${parseFloat(project.budget_max).toFixed(0)}`
-            : project.budget_min
-            ? `$${parseFloat(project.budget_min).toFixed(0)}`
-            : 'N/A';
+        const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
+        const ovBMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
+        let budget;
+        if (ovBMin === null && ovBMax === null) {
+            budget = 'N/A';
+        } else if (ovBMin === 0 && ovBMax === 0) {
+            budget = 'Undetermined';
+        } else if (ovBMin !== null && ovBMax !== null) {
+            budget = ovBMin === ovBMax
+                ? `${ovBMin.toFixed(0)} €`
+                : `${ovBMin.toFixed(0)} – ${ovBMax.toFixed(0)} €`;
+        } else if (ovBMin !== null) {
+            budget = `${ovBMin.toFixed(0)} €`;
+        } else {
+            budget = `${ovBMax.toFixed(0)} €`;
+        }
         elements.projectOverviewBudget.textContent = budget;
 
         elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
@@ -3157,6 +3212,18 @@
         // Project form submission
         if (elements.projectForm) {
             elements.projectForm.addEventListener('submit', saveProject);
+        }
+
+        // Dashboard collapse/expand toggle
+        const dashboardBar = document.getElementById('dashboardBar');
+        if (dashboardBar) {
+            dashboardBar.addEventListener('click', () => {
+                const wrapper = document.getElementById('dashboardWrapper');
+                if (wrapper) {
+                    wrapper.classList.toggle('collapsed');
+                    wrapper.classList.toggle('expanded');
+                }
+            });
         }
 
         // Delete project button

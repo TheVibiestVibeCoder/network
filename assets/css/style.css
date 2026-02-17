@@ -532,6 +532,12 @@ textarea.form-input {
     display: block;
 }
 
+#projectsView.active {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 /* ============================================
    Map View
    ============================================ */
@@ -2900,7 +2906,10 @@ textarea.form-input {
     gap: var(--spacing-4);
     padding: var(--spacing-6);
     overflow-y: auto;
-    height: calc(100vh - var(--header-height) - 120px);
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+    box-sizing: border-box;
 }
 
 /* Project Cards */
@@ -3190,18 +3199,96 @@ textarea.form-input {
    Projects Dashboard
    ============================================ */
 
+.dashboard-wrapper {
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+/* Collapsed bar — always visible */
+.dashboard-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-3) var(--spacing-5);
+    cursor: pointer;
+    user-select: none;
+}
+
+.dashboard-bar:hover {
+    background: var(--color-surface-2);
+}
+
+.dashboard-bar-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-5);
+    flex-wrap: wrap;
+}
+
+.dashboard-bar-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.dashboard-bar-stat svg {
+    color: var(--color-primary);
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.dashboard-bar-stat-value {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.dashboard-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.dashboard-toggle-btn:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+}
+
+.dashboard-toggle-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.dashboard-wrapper.expanded .dashboard-toggle-btn svg {
+    transform: rotate(180deg);
+}
+
+/* Expanded card grid */
 .projects-dashboard {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-4);
-    padding: var(--spacing-5) var(--spacing-5) 0;
+    padding: var(--spacing-5);
+}
+
+.dashboard-wrapper.collapsed .projects-dashboard {
+    display: none;
 }
 
 .dashboard-card {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--spacing-4);
-    padding: var(--spacing-4) var(--spacing-5);
+    padding: var(--spacing-5) var(--spacing-5);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
@@ -3217,6 +3304,7 @@ textarea.form-input {
     background: var(--color-primary)1a;
     color: var(--color-primary);
     flex-shrink: 0;
+    margin-top: 2px;
 }
 
 .dashboard-card-body {
@@ -3239,14 +3327,21 @@ textarea.form-input {
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-top: 2px;
+    margin-top: 3px;
+}
+
+.dashboard-card-sub {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--spacing-1);
+    font-style: italic;
 }
 
 /* Mobile Responsive Adjustments for Projects */
 @media (max-width: 768px) {
     .projects-dashboard {
         grid-template-columns: 1fr;
-        padding: var(--spacing-4) var(--spacing-4) 0;
+        padding: var(--spacing-4);
         gap: var(--spacing-3);
     }
 
@@ -3261,6 +3356,14 @@ textarea.form-input {
 
     .dashboard-card-value {
         font-size: var(--font-size-lg);
+    }
+
+    .dashboard-bar {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .dashboard-bar-stats {
+        gap: var(--spacing-4);
     }
 
     .projects-list {
