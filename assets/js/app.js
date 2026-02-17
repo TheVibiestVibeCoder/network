@@ -24,7 +24,7 @@
     // ============================================
 
     const state = {
-        currentView: 'map',
+        currentView: 'projects',
         contacts: [],
         mapContacts: [],
         sortField: 'name',
@@ -44,7 +44,15 @@
         calendarDate: new Date(),
         calendarNotes: [],
         calendarSearch: '',
-        calendarTagFilter: ''
+        calendarTagFilter: '',
+        // Project state
+        projects: [],
+        projectSortField: 'name',
+        projectSortOrder: 'ASC',
+        projectSearchQuery: '',
+        editingProjectId: null,
+        viewingProjectId: null,
+        viewingProject: null
     };
 
     // ============================================
@@ -113,6 +121,7 @@
         overviewName: document.getElementById('overviewName'),
         overviewCompany: document.getElementById('overviewCompany'),
         overviewDetails: document.getElementById('overviewDetails'),
+        contactProjects: document.getElementById('contactProjects'),
         notesTimeline: document.getElementById('notesTimeline'),
         newNoteContent: document.getElementById('newNoteContent'),
         addNoteBtn: document.getElementById('addNoteBtn'),
@@ -145,7 +154,58 @@
         importSuccess: document.getElementById('importSuccess'),
         importSuccessText: document.getElementById('importSuccessText'),
         importErrors: document.getElementById('importErrors'),
-        importErrorList: document.getElementById('importErrorList')
+        importErrorList: document.getElementById('importErrorList'),
+
+        // Projects view
+        projectsView: document.getElementById('projectsView'),
+        projectsList: document.getElementById('projectsList'),
+        searchProjectsInput: document.getElementById('searchProjectsInput'),
+        projectSortField: document.getElementById('projectSortField'),
+        projectSortOrderBtn: document.getElementById('projectSortOrderBtn'),
+        projectSortOrderIcon: document.getElementById('projectSortOrderIcon'),
+        addProjectBtn: document.getElementById('addProjectBtn'),
+
+        // Project modal
+        projectModal: document.getElementById('projectModal'),
+        projectModalTitle: document.getElementById('projectModalTitle'),
+        projectForm: document.getElementById('projectForm'),
+        projectId: document.getElementById('projectId'),
+        projectCompany: document.getElementById('projectCompany'),
+        projectCompanySuggestions: document.getElementById('projectCompanySuggestions'),
+        closeProjectModal: document.getElementById('closeProjectModal'),
+        cancelProjectBtn: document.getElementById('cancelProjectBtn'),
+        deleteProjectBtn: document.getElementById('deleteProjectBtn'),
+        saveProjectBtn: document.getElementById('saveProjectBtn'),
+
+        // Delete project modal
+        deleteProjectModal: document.getElementById('deleteProjectModal'),
+        deleteProjectName: document.getElementById('deleteProjectName'),
+        closeDeleteProjectModal: document.getElementById('closeDeleteProjectModal'),
+        cancelDeleteProjectBtn: document.getElementById('cancelDeleteProjectBtn'),
+        confirmDeleteProjectBtn: document.getElementById('confirmDeleteProjectBtn'),
+
+        // Project overview modal
+        projectOverviewModal: document.getElementById('projectOverviewModal'),
+        projectOverviewName: document.getElementById('projectOverviewName'),
+        projectOverviewCompany: document.getElementById('projectOverviewCompany'),
+        projectOverviewStartDate: document.getElementById('projectOverviewStartDate'),
+        projectOverviewStage: document.getElementById('projectOverviewStage'),
+        projectOverviewBudget: document.getElementById('projectOverviewBudget'),
+        projectOverviewSuccessChance: document.getElementById('projectOverviewSuccessChance'),
+        projectOverviewEstCompletion: document.getElementById('projectOverviewEstCompletion'),
+        projectOverviewDescription: document.getElementById('projectOverviewDescription'),
+        projectTags: document.getElementById('projectTags'),
+        newProjectTagInput: document.getElementById('newProjectTagInput'),
+        projectTagSuggestions: document.getElementById('projectTagSuggestions'),
+        addProjectTagBtn: document.getElementById('addProjectTagBtn'),
+        projectContacts: document.getElementById('projectContacts'),
+        newProjectContactInput: document.getElementById('newProjectContactInput'),
+        projectContactSuggestions: document.getElementById('projectContactSuggestions'),
+        addProjectContactBtn: document.getElementById('addProjectContactBtn'),
+        closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
+        closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
+        deleteProjectOverviewBtn: document.getElementById('deleteProjectOverviewBtn'),
+        editProjectBtn: document.getElementById('editProjectBtn')
     };
 
     // ============================================
@@ -300,6 +360,100 @@
             if (search) params.set('search', search);
             if (tagId) params.set('tag_id', tagId);
             const response = await fetch(`api/calendar.php?${params}`);
+            return response.json();
+        },
+
+        // Projects API
+        async getProjects(search = '', sort = 'name', order = 'ASC') {
+            const params = new URLSearchParams({ search, sort, order });
+            const response = await fetch(`api/projects.php?${params}`);
+            return response.json();
+        },
+
+        async getProject(id) {
+            const response = await fetch(`api/projects.php?id=${id}`);
+            return response.json();
+        },
+
+        async getProjectsByContact(contactId) {
+            const response = await fetch(`api/projects.php?action=contact&contact_id=${contactId}`);
+            return response.json();
+        },
+
+        async getProjectsByCompany(company) {
+            const response = await fetch(`api/projects.php?action=company&company=${encodeURIComponent(company)}`);
+            return response.json();
+        },
+
+        async getProjectContacts(projectId) {
+            const response = await fetch(`api/projects.php?action=contacts&id=${projectId}`);
+            return response.json();
+        },
+
+        async getProjectTags(projectId) {
+            const response = await fetch(`api/projects.php?action=tags&id=${projectId}`);
+            return response.json();
+        },
+
+        async createProject(data) {
+            const response = await fetch('api/projects.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        },
+
+        async updateProject(id, data) {
+            const response = await fetch(`api/projects.php?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        },
+
+        async deleteProject(id) {
+            const response = await fetch(`api/projects.php?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
+        },
+
+        async assignProjectContact(projectId, contactId) {
+            const response = await fetch('api/projects.php?action=assign-contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ project_id: projectId, contact_id: contactId })
+            });
+            return response.json();
+        },
+
+        async unassignProjectContact(projectId, contactId) {
+            const response = await fetch('api/projects.php?action=unassign-contact', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ project_id: projectId, contact_id: contactId })
+            });
+            return response.json();
+        },
+
+        async assignProjectTag(projectId, tagId) {
+            const response = await fetch('api/projects.php?action=assign-tag', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ project_id: projectId, tag_id: tagId })
+            });
+            return response.json();
+        },
+
+        async unassignProjectTag(projectId, tagId) {
+            const response = await fetch('api/projects.php?action=unassign-tag', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ project_id: projectId, tag_id: tagId })
+            });
             return response.json();
         }
     };
@@ -467,6 +621,20 @@
         } catch (error) {
             console.error('Error loading contacts:', error);
             elements.contactsList.innerHTML = '<div class="error-message">Error loading contacts</div>';
+        }
+    }
+
+    // Load all contacts without rendering (for autocomplete in projects)
+    async function loadAllContacts() {
+        try {
+            console.log('Loading all contacts for autocomplete...');
+            const result = await api.getContacts('', 'name', 'ASC');
+            if (result.success) {
+                state.contacts = result.data;
+                console.log('Loaded contacts:', state.contacts.length);
+            }
+        } catch (error) {
+            console.error('Error loading all contacts:', error);
         }
     }
 
@@ -768,6 +936,7 @@
         elements.mapView.classList.toggle('active', view === 'map');
         elements.listView.classList.toggle('active', view === 'list');
         elements.calendarView.classList.toggle('active', view === 'calendar');
+        elements.projectsView.classList.toggle('active', view === 'projects');
 
         // Refresh data for the active view
         if (view === 'map') {
@@ -778,6 +947,12 @@
             loadMapMarkers();
         } else if (view === 'calendar') {
             loadCalendarNotes();
+        } else if (view === 'projects') {
+            loadProjects();
+            // Also load contacts for autocomplete in project assignment
+            if (!state.contacts || state.contacts.length === 0) {
+                loadAllContacts();
+            }
         } else {
             loadContacts();
         }
@@ -878,6 +1053,9 @@
 
             // Load and render notes
             await loadNotes(contactId);
+
+            // Load and render related projects
+            await loadContactProjects(contactId);
 
             // Show modal
             elements.overviewModal.classList.add('active');
@@ -1141,6 +1319,38 @@
             console.error('Error deleting note:', error);
             alert('Error deleting note');
         }
+    }
+
+    async function loadContactProjects(contactId) {
+        try {
+            const result = await api.getProjectsByContact(contactId);
+
+            if (result.success) {
+                renderContactProjects(result.data);
+            }
+        } catch (error) {
+            console.error('Error loading contact projects:', error);
+        }
+    }
+
+    function renderContactProjects(projects) {
+        if (!projects || projects.length === 0) {
+            elements.contactProjects.innerHTML = '<p class="empty-hint">No related projects</p>';
+            return;
+        }
+
+        const html = projects.map(project => `
+            <div class="project-mini-card" onclick="window.CRM.openProjectOverview(${project.id})">
+                <div class="project-mini-header">
+                    <h4 class="project-mini-name">${escapeHtml(project.name)}</h4>
+                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(project.stage)}</span>
+                </div>
+                ${project.company ? `<p class="project-mini-company">${escapeHtml(project.company)}</p>` : ''}
+                <p class="project-mini-desc">${escapeHtml(project.description).substring(0, 100)}${project.description.length > 100 ? '...' : ''}</p>
+            </div>
+        `).join('');
+
+        elements.contactProjects.innerHTML = html;
     }
 
     function closeOverviewModal() {
@@ -2126,6 +2336,660 @@
     }
 
     // ============================================
+    // Project Functions
+    // ============================================
+
+    function updateProjectsDashboard(projects) {
+        const total = projects.length;
+
+        // Helper: check if a budget value is a real number (not null/empty)
+        function hasBudgetVal(v) {
+            return v !== null && v !== '' && v !== undefined && !isNaN(parseFloat(v));
+        }
+
+        // Budget potential: sum of all min/max budgets, tracking which projects contribute
+        let sumMin = 0, sumMax = 0;
+        let projectsWithBudget = 0;
+        projects.forEach(p => {
+            const hasMin = hasBudgetVal(p.budget_min);
+            const hasMax = hasBudgetVal(p.budget_max);
+            if (hasMin || hasMax) {
+                projectsWithBudget++;
+                if (hasMin) sumMin += parseFloat(p.budget_min);
+                if (hasMax) sumMax += parseFloat(p.budget_max);
+            }
+        });
+        const projectsUndetermined = total - projectsWithBudget;
+
+        // Success chance: weighted by mid-point budget if available, else simple average
+        const withChance = projects.filter(p => p.success_chance !== null && p.success_chance !== '');
+        let avgChance = null;
+        if (withChance.length > 0) {
+            const totalWeight = withChance.reduce((acc, p) => {
+                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
+                return acc + (mid > 0 ? mid : 1);
+            }, 0);
+            const weightedSum = withChance.reduce((acc, p) => {
+                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
+                const weight = mid > 0 ? mid : 1;
+                return acc + (parseFloat(p.success_chance) * weight);
+            }, 0);
+            avgChance = Math.round(weightedSum / totalWeight);
+        }
+
+        // Format budget range compactly
+        function formatBudget(n) {
+            if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
+            return n.toFixed(0);
+        }
+
+        const chanceText = avgChance !== null ? `${avgChance}%` : 'N/A';
+        let potentialText;
+        if (projectsWithBudget === 0) {
+            potentialText = 'Undetermined';
+        } else if (sumMin === 0 && sumMax === 0) {
+            potentialText = 'Undetermined';
+        } else if (sumMin > 0 && sumMax > 0 && sumMin !== sumMax) {
+            potentialText = `${formatBudget(sumMin)} – ${formatBudget(sumMax)} €`;
+        } else {
+            potentialText = `${formatBudget(sumMax || sumMin)} €`;
+        }
+
+        // Update expanded card view
+        document.getElementById('dashTotalProjects').textContent = total;
+        document.getElementById('dashTotalPotential').textContent = potentialText;
+        document.getElementById('dashSuccessChance').textContent = chanceText;
+
+        // Sub-line: how many projects contribute to the potential
+        const subEl = document.getElementById('dashPotentialSub');
+        if (subEl) {
+            if (projectsWithBudget === 0) {
+                subEl.textContent = 'No budget data available';
+            } else if (projectsUndetermined > 0) {
+                subEl.textContent = `${projectsWithBudget} of ${total} projects · ${projectsUndetermined} undetermined`;
+            } else {
+                subEl.textContent = `All ${total} projects included`;
+            }
+        }
+
+        // Update compact bar stats
+        const dashBarProjects = document.getElementById('dashBarProjects');
+        const dashBarPotential = document.getElementById('dashBarPotential');
+        const dashBarChance = document.getElementById('dashBarChance');
+        if (dashBarProjects) dashBarProjects.textContent = total;
+        if (dashBarPotential) dashBarPotential.textContent = potentialText;
+        if (dashBarChance) dashBarChance.textContent = chanceText;
+
+        // ---- Revenue Projection ----
+        // Per-stage fallback probability when success_chance is not set
+        const STAGE_DEFAULT_PROB = {
+            'Lead': 0.10, 'Proposal': 0.30,
+            'Negotiation': 0.55, 'In Progress': 0.80
+        };
+        // How much each stage anchors toward the default (vs. trusting user input)
+        const STAGE_BLEND = {
+            'Lead': 0.30, 'Proposal': 0.40,
+            'Negotiation': 0.55, 'In Progress': 0.70
+        };
+
+        let projEV = 0, projIncluded = 0, projExcluded = 0;
+
+        projects.forEach(function(p) {
+            if (p.stage === 'Complete') return; // excluded — already realised revenue
+            const stageDef = STAGE_DEFAULT_PROB[p.stage];
+            if (stageDef === undefined) return;
+
+            // Budget midpoint
+            const hasMin = hasBudgetVal(p.budget_min);
+            const hasMax = hasBudgetVal(p.budget_max);
+            let mid = null;
+            if (hasMin && hasMax)  mid = (parseFloat(p.budget_min) + parseFloat(p.budget_max)) / 2;
+            else if (hasMin)       mid = parseFloat(p.budget_min);
+            else if (hasMax)       mid = parseFloat(p.budget_max);
+            if (mid === null) { projExcluded++; return; }
+
+            // Effective probability: blend user input with stage anchor
+            const blendW = STAGE_BLEND[p.stage];
+            const userP  = (p.success_chance !== null && p.success_chance !== '')
+                           ? parseFloat(p.success_chance) / 100 : null;
+            const prob   = (userP === null)
+                           ? stageDef
+                           : userP * (1 - blendW) + stageDef * blendW;
+
+            projEV += mid * prob;
+            projIncluded++;
+        });
+
+        function fmtProj(n) { return formatBudget(Math.round(n)) + ' €'; }
+        const hasProj = projIncluded > 0 && projEV > 0;
+
+        const projConText = hasProj ? fmtProj(projEV * 0.60) : '—';
+        const projRelText = hasProj ? fmtProj(projEV)         : '—';
+        const projOptText = hasProj ? fmtProj(projEV * 1.35)  : '—';
+        const projSubText = projIncluded === 0
+            ? 'No open projects with budget data'
+            : projExcluded > 0
+                ? `${projIncluded} projects included · ${projExcluded} missing budget data`
+                : `All ${projIncluded} open projects included`;
+
+        ['dashProjConservative', 'dashProjRealistic', 'dashProjOptimistic', 'dashProjSub'].forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = [projConText, projRelText, projOptText, projSubText][i];
+        });
+
+        const dashBarProj = document.getElementById('dashBarProjection');
+        if (dashBarProj) dashBarProj.textContent = hasProj ? `~${fmtProj(projEV)}` : '—';
+    }
+
+    async function loadProjects() {
+        try {
+            const result = await api.getProjects(
+                state.projectSearchQuery,
+                state.projectSortField,
+                state.projectSortOrder
+            );
+
+            if (result.success) {
+                state.projects = result.data;
+                renderProjects(state.projects);
+                updateProjectsDashboard(state.projects);
+            } else {
+                console.error('Failed to load projects:', result.error);
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+
+    function renderProjects(projects) {
+        if (!projects || projects.length === 0) {
+            elements.projectsList.innerHTML = '<div class="empty-state">No projects found</div>';
+            return;
+        }
+
+        const html = projects.map(project => createProjectCard(project)).join('');
+        elements.projectsList.innerHTML = html;
+
+        // Add click event listeners to project cards
+        elements.projectsList.querySelectorAll('.project-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const projectId = parseInt(card.dataset.id, 10);
+                openProjectOverview(projectId);
+            });
+        });
+    }
+
+    function createProjectCard(project) {
+        // Format date as absolute date (e.g., "Jan 15, 2024")
+        const startDate = project.start_date ? new Date(project.start_date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }) : 'N/A';
+
+        const bMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
+        const bMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
+        let budget;
+        if (bMin === null && bMax === null) {
+            budget = 'N/A';
+        } else if (bMin === 0 && bMax === 0) {
+            budget = 'Undetermined';
+        } else if (bMin !== null && bMax !== null) {
+            budget = bMin === bMax
+                ? `${bMin.toFixed(0)} €`
+                : `${bMin.toFixed(0)} – ${bMax.toFixed(0)} €`;
+        } else if (bMin !== null) {
+            budget = `${bMin.toFixed(0)} €`;
+        } else {
+            budget = `${bMax.toFixed(0)} €`;
+        }
+        const successChance = project.success_chance ? `${project.success_chance}%` : 'N/A';
+
+        return `
+            <div class="project-card" data-id="${project.id}">
+                <div class="project-card-header">
+                    <div class="contact-info">
+                        <h3 class="contact-name">${escapeHtml(project.name)}</h3>
+                        ${project.company ? `<p class="contact-company">${escapeHtml(project.company)}</p>` : ''}
+                    </div>
+                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(/ /g, '-')}">${escapeHtml(project.stage)}</span>
+                </div>
+                <div class="project-details">
+                    <div class="detail-item">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+                        </svg>
+                        <span>${startDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                        </svg>
+                        <span>${budget}</span>
+                    </div>
+                    <div class="detail-item">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                        </svg>
+                        <span>${successChance} chance</span>
+                    </div>
+                </div>
+                <p class="contact-note">${escapeHtml(project.description).substring(0, 150)}${project.description.length > 150 ? '...' : ''}</p>
+            </div>
+        `;
+    }
+
+    function openProjectModal(project = null) {
+        state.editingProjectId = project && project.id ? project.id : null;
+
+        // Reset form
+        elements.projectForm.reset();
+
+        if (project && project.id) {
+            // Editing existing project
+            elements.projectModalTitle.textContent = 'Edit Project';
+            elements.deleteProjectBtn.style.display = 'block';
+
+            // Fill form fields
+            elements.projectId.value = project.id;
+            document.getElementById('projectName').value = project.name || '';
+            document.getElementById('projectStartDate').value = project.start_date || '';
+            document.getElementById('projectDescription').value = project.description || '';
+            document.getElementById('projectCompany').value = project.company || '';
+            document.getElementById('projectBudgetMin').value = project.budget_min || '';
+            document.getElementById('projectBudgetMax').value = project.budget_max || '';
+            document.getElementById('projectSuccessChance').value = project.success_chance || '';
+            document.getElementById('projectStage').value = project.stage || 'Lead';
+            document.getElementById('projectEstimatedCompletion').value = project.estimated_completion || '';
+        } else {
+            // Adding new project
+            elements.projectModalTitle.textContent = 'Add Project';
+            elements.deleteProjectBtn.style.display = 'none';
+            // Set default start date to today
+            document.getElementById('projectStartDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        elements.projectModal.classList.add('active');
+    }
+
+    function closeProjectModal() {
+        elements.projectModal.classList.remove('active');
+        state.editingProjectId = null;
+    }
+
+    async function saveProject(e) {
+        e.preventDefault();
+
+        const formData = {
+            name: document.getElementById('projectName').value.trim(),
+            start_date: document.getElementById('projectStartDate').value,
+            description: document.getElementById('projectDescription').value.trim(),
+            company: document.getElementById('projectCompany').value.trim() || null,
+            budget_min: document.getElementById('projectBudgetMin').value || null,
+            budget_max: document.getElementById('projectBudgetMax').value || null,
+            success_chance: document.getElementById('projectSuccessChance').value || null,
+            stage: document.getElementById('projectStage').value,
+            estimated_completion: document.getElementById('projectEstimatedCompletion').value || null
+        };
+
+        try {
+            let result;
+            if (state.editingProjectId) {
+                result = await api.updateProject(state.editingProjectId, formData);
+            } else {
+                result = await api.createProject(formData);
+            }
+
+            if (result.success) {
+                closeProjectModal();
+                loadProjects();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('An error occurred while saving the project');
+        }
+    }
+
+    function openDeleteProjectModal() {
+        const projectName = document.getElementById('projectName').value;
+        elements.deleteProjectName.textContent = projectName;
+        elements.deleteProjectModal.classList.add('active');
+    }
+
+    function closeDeleteProjectModal() {
+        elements.deleteProjectModal.classList.remove('active');
+    }
+
+    async function deleteProject() {
+        try {
+            const result = await api.deleteProject(state.editingProjectId);
+
+            if (result.success) {
+                closeDeleteProjectModal();
+                // Only close project modal if it's currently open
+                if (elements.projectModal.classList.contains('active')) {
+                    closeProjectModal();
+                }
+                state.editingProjectId = null;
+                loadProjects();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            alert('An error occurred while deleting the project');
+        }
+    }
+
+    async function openProjectOverview(projectId) {
+        try {
+            state.viewingProjectId = projectId;
+
+            // Ensure contacts are loaded for autocomplete
+            if (!state.contacts || state.contacts.length === 0) {
+                await loadAllContacts();
+            }
+
+            const [projectResult, contactsResult, tagsResult] = await Promise.all([
+                api.getProject(projectId),
+                api.getProjectContacts(projectId),
+                api.getProjectTags(projectId)
+            ]);
+
+            if (projectResult.success) {
+                state.viewingProject = projectResult.data;
+                renderProjectOverview(projectResult.data, contactsResult.data || [], tagsResult.data || []);
+                elements.projectOverviewModal.classList.add('active');
+            } else {
+                alert('Error: ' + projectResult.error);
+            }
+        } catch (error) {
+            console.error('Error opening project overview:', error);
+            alert('An error occurred while loading the project');
+        }
+    }
+
+    function renderProjectOverview(project, contacts, tags) {
+        elements.projectOverviewName.textContent = project.name;
+        elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
+
+        // Format dates as absolute dates
+        elements.projectOverviewStartDate.textContent = project.start_date
+            ? new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'N/A';
+        elements.projectOverviewStage.textContent = project.stage || 'N/A';
+
+        const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
+        const ovBMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
+        let budget;
+        if (ovBMin === null && ovBMax === null) {
+            budget = 'N/A';
+        } else if (ovBMin === 0 && ovBMax === 0) {
+            budget = 'Undetermined';
+        } else if (ovBMin !== null && ovBMax !== null) {
+            budget = ovBMin === ovBMax
+                ? `${ovBMin.toFixed(0)} €`
+                : `${ovBMin.toFixed(0)} – ${ovBMax.toFixed(0)} €`;
+        } else if (ovBMin !== null) {
+            budget = `${ovBMin.toFixed(0)} €`;
+        } else {
+            budget = `${ovBMax.toFixed(0)} €`;
+        }
+        elements.projectOverviewBudget.textContent = budget;
+
+        elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
+        elements.projectOverviewEstCompletion.textContent = project.estimated_completion
+            ? new Date(project.estimated_completion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'N/A';
+        elements.projectOverviewDescription.textContent = project.description || 'No description';
+
+        // Render tags
+        renderProjectTags(tags);
+
+        // Render contacts
+        renderProjectContacts(contacts);
+    }
+
+    function renderProjectTags(tags) {
+        if (!tags || tags.length === 0) {
+            elements.projectTags.innerHTML = '<p class="empty-hint">No tags assigned</p>';
+            return;
+        }
+
+        const html = tags.map(tag => `
+            <span class="tag" style="background-color: ${tag.color}20; color: ${tag.color};">
+                ${escapeHtml(tag.name)}
+                <button class="tag-remove" data-remove-tag="${tag.id}" title="Remove tag">&times;</button>
+            </span>
+        `).join('');
+
+        elements.projectTags.innerHTML = html;
+    }
+
+    function renderProjectContacts(contacts) {
+        if (!contacts || contacts.length === 0) {
+            elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts assigned</p>';
+            return;
+        }
+
+        const html = contacts.map(contact => `
+            <div class="project-contact-item">
+                <div class="contact-avatar">${getInitials(contact.name)}</div>
+                <div class="contact-info">
+                    <div class="contact-name">${escapeHtml(contact.name)}</div>
+                    ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
+                </div>
+                <button class="btn btn-icon btn-small" data-remove-contact="${contact.id}" title="Remove contact">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+
+        elements.projectContacts.innerHTML = html;
+    }
+
+    function closeProjectOverview() {
+        elements.projectOverviewModal.classList.remove('active');
+        state.viewingProjectId = null;
+        state.viewingProject = null;
+    }
+
+    async function addProjectTag(tagName) {
+        if (!tagName || !state.viewingProjectId) return;
+
+        try {
+            // First, create or get the tag
+            const tagResult = await api.createTag(tagName);
+            if (!tagResult.success) {
+                alert('Error: ' + tagResult.error);
+                return;
+            }
+
+            const tag = tagResult.data;
+
+            // Then assign it to the project
+            const assignResult = await api.assignProjectTag(state.viewingProjectId, tag.id);
+            if (assignResult.success) {
+                const tagsResult = await api.getProjectTags(state.viewingProjectId);
+                if (tagsResult.success) {
+                    renderProjectTags(tagsResult.data);
+                }
+                elements.newProjectTagInput.value = '';
+                elements.projectTagSuggestions.style.display = 'none';
+            } else {
+                alert('Error: ' + assignResult.error);
+            }
+        } catch (error) {
+            console.error('Error adding tag to project:', error);
+        }
+    }
+
+    async function removeProjectTag(tagId) {
+        if (!state.viewingProjectId) return;
+
+        try {
+            const result = await api.unassignProjectTag(state.viewingProjectId, tagId);
+            if (result.success) {
+                const tagsResult = await api.getProjectTags(state.viewingProjectId);
+                if (tagsResult.success) {
+                    renderProjectTags(tagsResult.data);
+                }
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error removing tag from project:', error);
+        }
+    }
+
+    async function addProjectContact(contactId) {
+        if (!contactId || !state.viewingProjectId) return;
+
+        try {
+            const result = await api.assignProjectContact(state.viewingProjectId, contactId);
+            if (result.success) {
+                const contactsResult = await api.getProjectContacts(state.viewingProjectId);
+                if (contactsResult.success) {
+                    renderProjectContacts(contactsResult.data);
+                }
+                elements.newProjectContactInput.value = '';
+                elements.projectContactSuggestions.style.display = 'none';
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error assigning contact to project:', error);
+        }
+    }
+
+    async function removeProjectContact(contactId) {
+        if (!state.viewingProjectId) return;
+
+        try {
+            const result = await api.unassignProjectContact(state.viewingProjectId, contactId);
+            if (result.success) {
+                const contactsResult = await api.getProjectContacts(state.viewingProjectId);
+                if (contactsResult.success) {
+                    renderProjectContacts(contactsResult.data);
+                }
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error removing contact from project:', error);
+        }
+    }
+
+    function showProjectTagSuggestions(query) {
+        const lowerQuery = query.toLowerCase();
+        const filtered = (state.allTags || []).filter(tag =>
+            tag.name.toLowerCase().includes(lowerQuery)
+        ).slice(0, 10);
+
+        if (filtered.length === 0) {
+            // Show "create new" option when no match
+            elements.projectTagSuggestions.innerHTML = `
+                <div class="tag-suggestion" data-tag-name="${escapeHtml(query)}">
+                    <span>Create "${escapeHtml(query)}"</span>
+                </div>
+            `;
+            elements.projectTagSuggestions.style.display = 'block';
+            return;
+        }
+
+        const html = filtered.map(tag => `
+            <div class="tag-suggestion" data-tag-name="${escapeHtml(tag.name)}">
+                <span class="tag-color" style="background-color: ${tag.color};"></span>
+                <span>${escapeHtml(tag.name)}</span>
+            </div>
+        `).join('');
+
+        elements.projectTagSuggestions.innerHTML = html;
+        elements.projectTagSuggestions.style.display = 'block';
+    }
+
+    function showProjectContactSuggestions(query) {
+        if (!state.contacts || state.contacts.length === 0) {
+            elements.projectContactSuggestions.style.display = 'none';
+            return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        const filtered = state.contacts.filter(contact =>
+            contact.name.toLowerCase().includes(lowerQuery) ||
+            (contact.company && contact.company.toLowerCase().includes(lowerQuery))
+        ).slice(0, 10);
+
+        if (filtered.length === 0) {
+            elements.projectContactSuggestions.style.display = 'none';
+            return;
+        }
+
+        // Use data-contact-id attributes instead of inline onclick (avoids pointer-event issues)
+        const html = filtered.map(contact => `
+            <div class="contact-suggestion" data-contact-id="${contact.id}">
+                <div class="contact-avatar">${getInitials(contact.name)}</div>
+                <div class="contact-info">
+                    <div class="contact-name">${escapeHtml(contact.name)}</div>
+                    ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        elements.projectContactSuggestions.innerHTML = html;
+        elements.projectContactSuggestions.style.display = 'block';
+    }
+
+    function showCompanySuggestions(query) {
+        if (!state.contacts || state.contacts.length === 0) {
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+            return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        // Get unique companies from contacts
+        const companies = [...new Set(state.contacts
+            .filter(c => c.company && c.company.toLowerCase().includes(lowerQuery))
+            .map(c => c.company)
+        )].slice(0, 10);
+
+        if (companies.length === 0) {
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+            return;
+        }
+
+        // Use data-company attributes instead of inline onclick
+        const html = companies.map(company => `
+            <div class="autocomplete-suggestion" data-company="${escapeHtml(company)}">
+                ${escapeHtml(company)}
+            </div>
+        `).join('');
+
+        if (elements.projectCompanySuggestions) {
+            elements.projectCompanySuggestions.innerHTML = html;
+            elements.projectCompanySuggestions.classList.add('visible');
+        }
+    }
+
+    function selectCompany(company) {
+        if (elements.projectCompany) {
+            elements.projectCompany.value = company;
+            if (elements.projectCompanySuggestions) {
+                elements.projectCompanySuggestions.classList.remove('visible');
+            }
+        }
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 
@@ -2134,6 +2998,8 @@
             loadMapMarkers();
         } else if (state.currentView === 'calendar') {
             loadCalendarNotes();
+        } else if (state.currentView === 'projects') {
+            loadProjects();
         } else {
             loadContacts();
         }
@@ -2358,12 +3224,305 @@
             }
         });
 
+        // ===== Project Event Listeners =====
+
+        // Project search input (debounced)
+        const debouncedProjectSearch = debounce(() => {
+            state.projectSearchQuery = elements.searchProjectsInput.value.trim();
+            loadProjects();
+        }, 300);
+
+        if (elements.searchProjectsInput) {
+            elements.searchProjectsInput.addEventListener('input', debouncedProjectSearch);
+        }
+
+        // Project sort field
+        if (elements.projectSortField) {
+            elements.projectSortField.addEventListener('change', () => {
+                state.projectSortField = elements.projectSortField.value;
+                loadProjects();
+            });
+        }
+
+        // Project sort order toggle
+        if (elements.projectSortOrderBtn) {
+            elements.projectSortOrderBtn.addEventListener('click', () => {
+                state.projectSortOrder = state.projectSortOrder === 'ASC' ? 'DESC' : 'ASC';
+                elements.projectSortOrderIcon.style.transform = state.projectSortOrder === 'DESC' ? 'rotate(180deg)' : '';
+                loadProjects();
+            });
+        }
+
+        // Add project button
+        if (elements.addProjectBtn) {
+            elements.addProjectBtn.addEventListener('click', () => openProjectModal());
+        }
+
+        // Project modal close buttons
+        if (elements.closeProjectModal) {
+            elements.closeProjectModal.addEventListener('click', closeProjectModal);
+        }
+        if (elements.cancelProjectBtn) {
+            elements.cancelProjectBtn.addEventListener('click', closeProjectModal);
+        }
+        if (elements.projectModal) {
+            elements.projectModal.querySelector('.modal-backdrop').addEventListener('click', closeProjectModal);
+        }
+
+        // Project form submission
+        if (elements.projectForm) {
+            elements.projectForm.addEventListener('submit', saveProject);
+        }
+
+        // Dashboard collapse/expand toggle
+        const dashboardBar = document.getElementById('dashboardBar');
+        if (dashboardBar) {
+            dashboardBar.addEventListener('click', () => {
+                const wrapper = document.getElementById('dashboardWrapper');
+                if (wrapper) {
+                    wrapper.classList.toggle('collapsed');
+                    wrapper.classList.toggle('expanded');
+                }
+            });
+        }
+
+        // Delete project button
+        if (elements.deleteProjectBtn) {
+            elements.deleteProjectBtn.addEventListener('click', openDeleteProjectModal);
+        }
+
+        // Delete project modal
+        if (elements.closeDeleteProjectModal) {
+            elements.closeDeleteProjectModal.addEventListener('click', closeDeleteProjectModal);
+        }
+        if (elements.cancelDeleteProjectBtn) {
+            elements.cancelDeleteProjectBtn.addEventListener('click', closeDeleteProjectModal);
+        }
+        if (elements.deleteProjectModal) {
+            elements.deleteProjectModal.querySelector('.modal-backdrop').addEventListener('click', closeDeleteProjectModal);
+        }
+        if (elements.confirmDeleteProjectBtn) {
+            elements.confirmDeleteProjectBtn.addEventListener('click', deleteProject);
+        }
+
+        // Project overview modal
+        if (elements.closeProjectOverviewModal) {
+            elements.closeProjectOverviewModal.addEventListener('click', closeProjectOverview);
+        }
+        if (elements.closeProjectOverviewBtn) {
+            elements.closeProjectOverviewBtn.addEventListener('click', closeProjectOverview);
+        }
+        if (elements.projectOverviewModal) {
+            const backdrop = elements.projectOverviewModal.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.addEventListener('click', closeProjectOverview);
+            }
+        }
+        // Delete from overview — opens the same confirmation modal
+        if (elements.deleteProjectOverviewBtn) {
+            elements.deleteProjectOverviewBtn.addEventListener('click', () => {
+                if (state.viewingProject) {
+                    const project = state.viewingProject;
+                    // Set editingProjectId so deleteProject() knows which to delete
+                    state.editingProjectId = project.id;
+                    elements.deleteProjectName.textContent = project.name;
+                    closeProjectOverview();
+                    elements.deleteProjectModal.classList.add('active');
+                }
+            });
+        }
+
+        if (elements.editProjectBtn) {
+            elements.editProjectBtn.addEventListener('click', () => {
+                // Save project BEFORE closeProjectOverview() nulls it
+                const projectToEdit = state.viewingProject;
+                closeProjectOverview();
+                openProjectModal(projectToEdit);
+            });
+        }
+
+        // Project tag add button
+        if (elements.addProjectTagBtn) {
+            elements.addProjectTagBtn.addEventListener('click', () => {
+                const tagName = elements.newProjectTagInput.value.trim();
+                if (tagName) {
+                    addProjectTag(tagName);
+                }
+            });
+        }
+
+        // Project contact add button — match first suggestion if any
+        if (elements.addProjectContactBtn) {
+            elements.addProjectContactBtn.addEventListener('click', () => {
+                const query = elements.newProjectContactInput.value.trim();
+                if (!query) return;
+
+                if (!state.contacts || state.contacts.length === 0) {
+                    alert('No contacts loaded. Please wait and try again.');
+                    return;
+                }
+
+                // First try exact match, then partial match
+                const exactMatch = state.contacts.find(c =>
+                    c.name.toLowerCase() === query.toLowerCase()
+                );
+                const partialMatch = state.contacts.find(c =>
+                    c.name.toLowerCase().includes(query.toLowerCase())
+                );
+                const contact = exactMatch || partialMatch;
+
+                if (contact) {
+                    addProjectContact(contact.id);
+                } else {
+                    alert('Contact not found. Please select from the suggestions dropdown.');
+                }
+            });
+        }
+
+        // Company autocomplete
+        if (elements.projectCompany) {
+            elements.projectCompany.addEventListener('input', () => {
+                const query = elements.projectCompany.value.trim();
+                if (query.length > 0) {
+                    // Ensure contacts are loaded for company suggestions
+                    if (!state.contacts || state.contacts.length === 0) {
+                        loadAllContacts().then(() => showCompanySuggestions(query));
+                    } else {
+                        showCompanySuggestions(query);
+                    }
+                } else {
+                    if (elements.projectCompanySuggestions) {
+                        elements.projectCompanySuggestions.classList.remove('visible');
+                    }
+                }
+            });
+
+            elements.projectCompany.addEventListener('blur', () => {
+                // Small delay so mousedown on a suggestion can fire first
+                setTimeout(() => {
+                    if (elements.projectCompanySuggestions) {
+                        elements.projectCompanySuggestions.classList.remove('visible');
+                    }
+                }, 150);
+            });
+        }
+
+        // Mousedown on company suggestions (fires before blur, bypasses overflow clipping)
+        if (elements.projectCompanySuggestions) {
+            elements.projectCompanySuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // prevent input blur
+                const item = e.target.closest('[data-company]');
+                if (item) {
+                    selectCompany(item.dataset.company);
+                }
+            });
+        }
+
+        // Project tag input
+        if (elements.newProjectTagInput) {
+            elements.newProjectTagInput.addEventListener('input', () => {
+                const query = elements.newProjectTagInput.value.trim();
+                if (query.length > 0) {
+                    showProjectTagSuggestions(query);
+                } else {
+                    elements.projectTagSuggestions.style.display = 'none';
+                }
+            });
+
+            elements.newProjectTagInput.addEventListener('blur', () => {
+                // Delay so mousedown on a suggestion fires first
+                setTimeout(() => {
+                    elements.projectTagSuggestions.style.display = 'none';
+                }, 150);
+            });
+
+            elements.newProjectTagInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const tagName = elements.newProjectTagInput.value.trim();
+                    if (tagName) {
+                        addProjectTag(tagName);
+                    }
+                }
+            });
+        }
+
+        // Project contact input + suggestion selection via mousedown delegation
+        if (elements.newProjectContactInput) {
+            elements.newProjectContactInput.addEventListener('input', () => {
+                const query = elements.newProjectContactInput.value.trim();
+                if (query.length > 0) {
+                    showProjectContactSuggestions(query);
+                } else {
+                    elements.projectContactSuggestions.style.display = 'none';
+                }
+            });
+
+            elements.newProjectContactInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const first = elements.projectContactSuggestions.querySelector('[data-contact-id]');
+                    if (first) {
+                        addProjectContact(parseInt(first.dataset.contactId, 10));
+                    }
+                }
+            });
+        }
+
+        // Mousedown on contact suggestions (fires before blur, bypasses overflow clipping)
+        if (elements.projectContactSuggestions) {
+            elements.projectContactSuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // prevent input blur
+                const item = e.target.closest('[data-contact-id]');
+                if (item) {
+                    addProjectContact(parseInt(item.dataset.contactId, 10));
+                }
+            });
+        }
+
+        // Mousedown on tag suggestions (same pattern — prevents blur, works inside overflow)
+        if (elements.projectTagSuggestions) {
+            elements.projectTagSuggestions.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const item = e.target.closest('[data-tag-name]');
+                if (item) {
+                    addProjectTag(item.dataset.tagName);
+                }
+            });
+        }
+
+        // Delegation for contact remove buttons (rendered dynamically)
+        if (elements.projectContacts) {
+            elements.projectContacts.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-remove-contact]');
+                if (btn) {
+                    removeProjectContact(parseInt(btn.dataset.removeContact, 10));
+                }
+            });
+        }
+
+        // Delegation for tag remove buttons (rendered dynamically)
+        if (elements.projectTags) {
+            elements.projectTags.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-remove-tag]');
+                if (btn) {
+                    removeProjectTag(parseInt(btn.dataset.removeTag, 10));
+                }
+            });
+        }
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
             if (e.key === 'Escape') {
                 if (elements.deleteModal.classList.contains('active')) {
                     closeDeleteModal();
+                } else if (elements.deleteProjectModal.classList.contains('active')) {
+                    closeDeleteProjectModal();
+                } else if (elements.projectOverviewModal.classList.contains('active')) {
+                    closeProjectOverview();
+                } else if (elements.projectModal.classList.contains('active')) {
+                    closeProjectModal();
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
@@ -2399,7 +3558,10 @@
         });
 
         // Load initial data based on current view
-        if (state.currentView === 'map') {
+        if (state.currentView === 'projects') {
+            loadProjects();
+            loadAllContacts();
+        } else if (state.currentView === 'map') {
             loadMapMarkers();
         } else if (state.currentView === 'calendar') {
             loadCalendarNotes();
@@ -2408,10 +3570,16 @@
         }
     }
 
-    // Expose functions globally for map popup buttons
+    // Expose functions globally for map popup buttons and onclick handlers
     window.CRM = {
         editContact: editContact,
-        openOverview: openOverviewModal
+        openOverview: openOverviewModal,
+        openProjectOverview: openProjectOverview,
+        addProjectTag: addProjectTag,
+        removeProjectTag: removeProjectTag,
+        addProjectContact: addProjectContact,
+        removeProjectContact: removeProjectContact,
+        selectCompany: selectCompany
     };
 
     // Initialize when DOM is ready

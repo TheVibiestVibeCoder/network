@@ -124,5 +124,59 @@ class Database
         ");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at)");
+
+        // Create projects table
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(255) NOT NULL,
+                start_date DATE NOT NULL,
+                description TEXT NOT NULL,
+                company VARCHAR(255),
+                budget_min DECIMAL(10,2),
+                budget_max DECIMAL(10,2),
+                success_chance INTEGER,
+                stage VARCHAR(50) DEFAULT 'Lead',
+                estimated_completion DATE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        // Create indexes for projects
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_company ON projects(company)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_stage ON projects(stage)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_start_date ON projects(start_date)");
+
+        // Create project_contacts junction table (many-to-many)
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_contacts (
+                project_id INTEGER NOT NULL,
+                contact_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (project_id, contact_id),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create project_tags junction table (many-to-many)
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_tags (
+                project_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (project_id, tag_id),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create indexes for project junction tables
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_contacts_project ON project_contacts(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_contacts_contact ON project_contacts(contact_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_project ON project_tags(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_tag ON project_tags(tag_id)");
     }
 }

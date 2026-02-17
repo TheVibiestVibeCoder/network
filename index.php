@@ -163,9 +163,9 @@ if ($isAuthenticated) {
                 <div class="header-center">
                     <!-- View Toggle -->
                     <div class="view-toggle">
-                        <button type="button" class="toggle-btn active" data-view="map" title="Map">
+                        <button type="button" class="toggle-btn active" data-view="projects" title="Projects">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
+                                <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
                             </svg>
                         </button>
                         <button type="button" class="toggle-btn" data-view="list" title="List">
@@ -176,6 +176,11 @@ if ($isAuthenticated) {
                         <button type="button" class="toggle-btn" data-view="calendar" title="Kalender">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="toggle-btn" data-view="map" title="Map">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
                             </svg>
                         </button>
                     </div>
@@ -231,7 +236,7 @@ if ($isAuthenticated) {
             <!-- Main Content -->
             <main class="app-main">
                 <!-- Map View -->
-                <div class="view-panel active" id="mapView">
+                <div class="view-panel" id="mapView">
                     <div id="map"></div>
                 </div>
 
@@ -333,6 +338,144 @@ if ($isAuthenticated) {
                     </div>
                     <div class="contacts-list" id="contactsList">
                         <!-- Contacts will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Projects View -->
+                <div class="view-panel active" id="projectsView">
+                    <!-- Dashboard -->
+                    <div class="dashboard-wrapper collapsed" id="dashboardWrapper">
+                        <!-- Collapsed bar (always visible) -->
+                        <div class="dashboard-bar" id="dashboardBar">
+                            <div class="dashboard-bar-stats" id="dashboardBarStats">
+                                <div class="dashboard-bar-stat">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+                                    <span class="dashboard-bar-stat-value" id="dashBarProjects">—</span>
+                                    <span>Projects</span>
+                                </div>
+                                <div class="dashboard-bar-stat">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                                    <span class="dashboard-bar-stat-value" id="dashBarPotential">—</span>
+                                </div>
+                                <div class="dashboard-bar-stat">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+                                    <span class="dashboard-bar-stat-value" id="dashBarChance">—</span>
+                                    <span>Avg. Chance</span>
+                                </div>
+                                <div class="dashboard-bar-stat">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+                                    <span class="dashboard-bar-stat-value" id="dashBarProjection">—</span>
+                                    <span>Projected</span>
+                                </div>
+                            </div>
+                            <button class="dashboard-toggle-btn" id="dashboardToggleBtn" title="Toggle dashboard">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Expanded card grid -->
+                        <div class="projects-dashboard" id="projectsDashboard">
+                            <div class="dashboard-card">
+                                <div class="dashboard-card-icon">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                        <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
+                                    </svg>
+                                </div>
+                                <div class="dashboard-card-body">
+                                    <div class="dashboard-card-value" id="dashTotalProjects">—</div>
+                                    <div class="dashboard-card-label">Total Projects</div>
+                                </div>
+                            </div>
+                            <div class="dashboard-card">
+                                <div class="dashboard-card-icon">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                        <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                                    </svg>
+                                </div>
+                                <div class="dashboard-card-body">
+                                    <div class="dashboard-card-value" id="dashTotalPotential">—</div>
+                                    <div class="dashboard-card-label">Total Potential</div>
+                                    <div class="dashboard-card-sub" id="dashPotentialSub"></div>
+                                </div>
+                            </div>
+                            <div class="dashboard-card">
+                                <div class="dashboard-card-icon">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/>
+                                    </svg>
+                                </div>
+                                <div class="dashboard-card-body">
+                                    <div class="dashboard-card-value" id="dashSuccessChance">—</div>
+                                    <div class="dashboard-card-label">Avg. Success Chance</div>
+                                </div>
+                            </div>
+                            <!-- Revenue Projection — spans full width -->
+                            <div class="dashboard-card dashboard-card--projection">
+                                <div class="dashboard-card-icon dashboard-card-icon--success">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                        <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/>
+                                    </svg>
+                                </div>
+                                <div class="dashboard-card-body">
+                                    <div class="dashboard-card-label">Revenue Projection</div>
+                                    <div class="dashboard-proj-scenarios">
+                                        <div class="dashboard-proj-scenario">
+                                            <span class="dashboard-proj-scenario-label">Conservative</span>
+                                            <span class="dashboard-card-value" id="dashProjConservative">—</span>
+                                        </div>
+                                        <div class="dashboard-proj-scenario dashboard-proj-scenario--main">
+                                            <span class="dashboard-proj-scenario-label">Realistic</span>
+                                            <span class="dashboard-card-value" id="dashProjRealistic">—</span>
+                                        </div>
+                                        <div class="dashboard-proj-scenario">
+                                            <span class="dashboard-proj-scenario-label">Optimistic</span>
+                                            <span class="dashboard-card-value" id="dashProjOptimistic">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="dashboard-card-sub" id="dashProjSub">
+                                        Probability × budget midpoint · stage-blended · open projects only
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="list-header">
+                        <div class="list-header-top">
+                            <div class="search-box">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="searchProjectsInput" placeholder="Search projects..." class="search-input">
+                            </div>
+                            <button type="button" class="btn btn-primary" id="addProjectBtn">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                <span>Add Project</span>
+                            </button>
+                        </div>
+                        <div class="list-controls" id="projectControls">
+                            <div class="sort-controls">
+                                <label>Sort:</label>
+                                <select id="projectSortField" class="form-select">
+                                    <option value="name">Name</option>
+                                    <option value="company">Company</option>
+                                    <option value="start_date">Start Date</option>
+                                    <option value="stage">Stage</option>
+                                    <option value="success_chance">Success Chance</option>
+                                </select>
+                                <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="projectSortOrderIcon">
+                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="projects-list" id="projectsList">
+                        <!-- Projects will be loaded here -->
                     </div>
                 </div>
             </main>
@@ -477,6 +620,14 @@ if ($isAuthenticated) {
                                 </svg>
                                 Add
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Related Projects Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Related Projects</h3>
+                        <div class="contact-projects-list" id="contactProjects">
+                            <!-- Projects will be populated by JS -->
                         </div>
                     </div>
 
@@ -691,6 +842,215 @@ if ($isAuthenticated) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="closeImportExportBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Modal -->
+        <div class="modal" id="projectModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="projectModalTitle">Add Project</h2>
+                    <button type="button" class="modal-close" id="closeProjectModal">&times;</button>
+                </div>
+                <form id="projectForm">
+                    <input type="hidden" id="projectId" name="id">
+
+                    <div class="modal-body">
+                        <!-- Required Fields -->
+                        <div class="form-section">
+                            <h3>Basic Information</h3>
+
+                            <div class="form-group">
+                                <label for="projectName">Project Name *</label>
+                                <input type="text" id="projectName" name="name" required class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectStartDate">Start Date *</label>
+                                <input type="date" id="projectStartDate" name="start_date" required class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectDescription">Description *</label>
+                                <textarea id="projectDescription" name="description" required class="form-input" rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Optional Fields -->
+                        <div class="form-section">
+                            <h3>Additional Details</h3>
+
+                            <div class="form-group">
+                                <label for="projectCompany">Company</label>
+                                <div class="autocomplete-wrapper">
+                                    <input type="text" id="projectCompany" name="company" class="form-input" autocomplete="off" placeholder="Search or enter company name...">
+                                    <div class="autocomplete-suggestions" id="projectCompanySuggestions"></div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="projectBudgetMin">Budget Min</label>
+                                    <input type="number" id="projectBudgetMin" name="budget_min" class="form-input" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="projectBudgetMax">Budget Max</label>
+                                    <input type="number" id="projectBudgetMax" name="budget_max" class="form-input" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectSuccessChance">Success Chance (%)</label>
+                                <input type="number" id="projectSuccessChance" name="success_chance" class="form-input" min="0" max="100" placeholder="0-100">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectStage">Stage</label>
+                                <select id="projectStage" name="stage" class="form-select">
+                                    <option value="Lead">Lead</option>
+                                    <option value="Proposal">Proposal</option>
+                                    <option value="Negotiation">Negotiation</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Complete">Complete</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectEstimatedCompletion">Estimated Completion</label>
+                                <input type="date" id="projectEstimatedCompletion" name="estimated_completion" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="cancelProjectBtn">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="deleteProjectBtn" style="display: none;">Delete</button>
+                        <button type="submit" class="btn btn-primary" id="saveProjectBtn">Save Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Project Confirmation Modal -->
+        <div class="modal" id="deleteProjectModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Delete Project</h2>
+                    <button type="button" class="modal-close" id="closeDeleteProjectModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong id="deleteProjectName"></strong>?</p>
+                    <p class="text-muted">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelDeleteProjectBtn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteProjectBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Overview Modal -->
+        <div class="modal" id="projectOverviewModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="overview-title-info">
+                            <h2 id="projectOverviewName">Project Name</h2>
+                            <p class="overview-company" id="projectOverviewCompany"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
+                </div>
+                <div class="modal-body overview-body">
+                    <!-- Project Details Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Project Information</h3>
+                        <div class="overview-details">
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Start Date</span>
+                                <span class="detail-value" id="projectOverviewStartDate"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Stage</span>
+                                <span class="detail-value" id="projectOverviewStage"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Budget</span>
+                                <span class="detail-value" id="projectOverviewBudget"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Success Chance</span>
+                                <span class="detail-value" id="projectOverviewSuccessChance"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Est. Completion</span>
+                                <span class="detail-value" id="projectOverviewEstCompletion"></span>
+                            </div>
+                            <div class="overview-detail-item full-width">
+                                <span class="detail-label">Description</span>
+                                <span class="detail-value" id="projectOverviewDescription"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tags Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Tags</h3>
+                        <div class="tags-container" id="projectTags">
+                            <!-- Tags will be populated by JS -->
+                        </div>
+                        <div class="add-tag-form">
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newProjectTagInput" class="form-input" placeholder="Add or create tag..." autocomplete="off">
+                                <div class="tag-suggestions" id="projectTagSuggestions"></div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="addProjectTagBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Add
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Assigned Contacts Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Assigned Contacts</h3>
+                        <div class="project-contacts-list" id="projectContacts">
+                            <!-- Contacts will be populated by JS -->
+                        </div>
+                        <div class="add-tag-form">
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newProjectContactInput" class="form-input" placeholder="Assign contact..." autocomplete="off">
+                                <div class="contact-suggestions" id="projectContactSuggestions"></div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="addProjectContactBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="closeProjectOverviewBtn">Close</button>
+                    <button type="button" class="btn btn-danger" id="deleteProjectOverviewBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                        Delete
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="editProjectBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                        Edit Project
+                    </button>
                 </div>
             </div>
         </div>
