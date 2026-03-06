@@ -10,7 +10,13 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Contact.php';
-require_once APP_ROOT . '/includes/Project.php';
+// Project module is optional during deployment rollout
+$projectFeatureEnabled = false;
+$projectModelPath = APP_ROOT . '/includes/Project.php';
+if (is_file($projectModelPath)) {
+    require_once $projectModelPath;
+    $projectFeatureEnabled = class_exists('Project');
+}
 
 // Start session
 Auth::startSession();
@@ -45,9 +51,17 @@ $contactCount = 0;
 $projectCount = 0;
 if ($isAuthenticated) {
     $contactModel = new Contact();
-    $projectModel = new Project();
     $contactCount = $contactModel->count();
-    $projectCount = $projectModel->count();
+
+    if ($projectFeatureEnabled) {
+        try {
+            $projectModel = new Project();
+            $projectCount = $projectModel->count();
+        } catch (Throwable $e) {
+            $projectFeatureEnabled = false;
+            $projectCount = 0;
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -720,8 +734,13 @@ if ($isAuthenticated) {
 
         <!-- Application JS -->
         <script src="assets/js/app.js"></script>
+        <?php if ($projectFeatureEnabled): ?>
         <script src="assets/js/projects.js"></script>
+        <?php endif; ?>
     <?php endif; ?>
 </body>
 </html>
+
+
+
 
