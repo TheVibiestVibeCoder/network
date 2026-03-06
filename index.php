@@ -10,6 +10,7 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Contact.php';
+require_once APP_ROOT . '/includes/Project.php';
 
 // Start session
 Auth::startSession();
@@ -39,11 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
 // Check if authenticated
 $isAuthenticated = Auth::isAuthenticated();
 
-// Get contact count for dashboard
+// Get dashboard counts
 $contactCount = 0;
+$projectCount = 0;
 if ($isAuthenticated) {
     $contactModel = new Contact();
+    $projectModel = new Project();
     $contactCount = $contactModel->count();
+    $projectCount = $projectModel->count();
 }
 ?>
 <!DOCTYPE html>
@@ -100,7 +104,9 @@ if ($isAuthenticated) {
             <header class="app-header">
                 <div class="header-left">
                     <h1 class="app-title"><?= htmlspecialchars(APP_NAME) ?></h1>
-                    <span class="contact-count"><?= $contactCount ?> contact<?= $contactCount !== 1 ? 's' : '' ?></span>
+                    <span class="contact-count" id="entityCountBadge" data-contact-count="<?= $contactCount ?>" data-project-count="<?= $projectCount ?>">
+                        <?= $contactCount ?> contact<?= $contactCount !== 1 ? 's' : '' ?>
+                    </span>
                 </div>
                 <div class="header-center">
                     <!-- View Toggle -->
@@ -132,6 +138,12 @@ if ($isAuthenticated) {
                         </svg>
                         Add Contact
                     </button>
+                    <button type="button" class="btn btn-primary" id="addProjectBtn" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M3 5h18v2H3V5zm0 6h12v2H3v-2zm0 6h18v2H3v-2z"/>
+                        </svg>
+                        Add Project
+                    </button>
                     <a href="index.php?action=logout" class="btn btn-secondary">Logout</a>
                 </div>
             </header>
@@ -146,46 +158,80 @@ if ($isAuthenticated) {
                 <!-- List View -->
                 <div class="view-panel" id="listView">
                     <div class="list-header">
-                        <div class="search-box">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
-                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                            </svg>
-                            <input type="text" id="searchInput" placeholder="Search contacts..." class="search-input">
+                        <div class="entity-toggle" id="entityToggle">
+                            <button type="button" class="entity-btn active" data-entity="contacts">Contacts</button>
+                            <button type="button" class="entity-btn" data-entity="projects">Projects</button>
                         </div>
-                        <div class="list-controls">
-                            <!-- Group By Toggle -->
-                            <div class="group-toggle">
-                                <button type="button" class="group-btn active" data-group="company" title="Group by Company">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
-                                    </svg>
-                                    <span>Firma</span>
-                                </button>
-                                <button type="button" class="group-btn" data-group="tags" title="Group by Tags">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
-                                    </svg>
-                                    <span>Tags</span>
-                                </button>
+
+                        <div class="list-toolbar" id="contactListToolbar">
+                            <div class="search-box">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="searchInput" placeholder="Search contacts..." class="search-input">
                             </div>
-                            <div class="sort-controls">
-                                <label>Sort:</label>
-                                <select id="sortField" class="form-select">
+                            <div class="list-controls">
+                                <div class="group-toggle">
+                                    <button type="button" class="group-btn active" data-group="company" title="Group by Company">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                            <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                                        </svg>
+                                        <span>Firma</span>
+                                    </button>
+                                    <button type="button" class="group-btn" data-group="tags" title="Group by Tags">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                            <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+                                        </svg>
+                                        <span>Tags</span>
+                                    </button>
+                                </div>
+                                <div class="sort-controls">
+                                    <label>Sort:</label>
+                                    <select id="sortField" class="form-select">
+                                        <option value="name">Name</option>
+                                        <option value="company">Company</option>
+                                        <option value="location">Location</option>
+                                        <option value="created_at">Date Added</option>
+                                    </select>
+                                    <button type="button" id="sortOrderBtn" class="btn btn-icon" title="Toggle sort order">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="sortOrderIcon">
+                                            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="list-toolbar" id="projectListToolbar" style="display: none;">
+                            <div class="search-box">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="projectSearchInput" placeholder="Search projects..." class="search-input">
+                            </div>
+                            <div class="project-sort-controls">
+                                <label for="projectSortField">Sort:</label>
+                                <select id="projectSortField" class="form-select">
                                     <option value="name">Name</option>
-                                    <option value="company">Company</option>
-                                    <option value="location">Location</option>
+                                    <option value="client">Client</option>
+                                    <option value="status">Status</option>
                                     <option value="created_at">Date Added</option>
                                 </select>
-                                <button type="button" id="sortOrderBtn" class="btn btn-icon" title="Toggle sort order">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="sortOrderIcon">
+                                <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="projectSortOrderIcon">
                                         <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
                                     </svg>
                                 </button>
                             </div>
                         </div>
                     </div>
+
                     <div class="contacts-list" id="contactsList">
                         <!-- Contacts will be loaded here -->
+                    </div>
+
+                    <div class="projects-list" id="projectsList" style="display: none;">
+                        <!-- Projects will be loaded here -->
                     </div>
                 </div>
             </main>
@@ -393,6 +439,124 @@ if ($isAuthenticated) {
             </div>
         </div>
 
+        
+        <!-- Project Modal -->
+        <div class="modal" id="projectModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="projectModalTitle">Add Project</h2>
+                    <button type="button" class="modal-close" id="closeProjectModal">&times;</button>
+                </div>
+                <form id="projectForm">
+                    <input type="hidden" id="projectId" name="id">
+
+                    <div class="modal-body">
+                        <div class="form-section">
+                            <h3>Project Information</h3>
+
+                            <div class="form-group">
+                                <label for="projectName">Project Name *</label>
+                                <input type="text" id="projectName" name="name" required class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectClient">Client</label>
+                                <input type="text" id="projectClient" name="client" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectStatus">Status</label>
+                                <select id="projectStatus" name="status" class="form-select">
+                                    <option value="Planning">Planning</option>
+                                    <option value="Active">Active</option>
+                                    <option value="On Hold">On Hold</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="projectDescription">Description</label>
+                                <textarea id="projectDescription" name="description" class="form-input" rows="4"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="cancelProjectBtn">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="deleteProjectBtn" style="display: none;">Delete</button>
+                        <button type="submit" class="btn btn-primary" id="saveProjectBtn">Save Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Project Delete Confirmation Modal -->
+        <div class="modal" id="projectDeleteModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Delete Project</h2>
+                    <button type="button" class="modal-close" id="closeProjectDeleteModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete <strong id="deleteProjectName"></strong>?</p>
+                    <p class="text-muted">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelProjectDeleteBtn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmProjectDeleteBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Overview Modal -->
+        <div class="modal" id="projectOverviewModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="overview-avatar" id="projectOverviewAvatar"></div>
+                        <div class="overview-title-info">
+                            <h2 id="projectOverviewName"></h2>
+                            <p class="overview-company" id="projectOverviewSubtitle"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
+                </div>
+                <div class="modal-body overview-body">
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Project Details</h3>
+                        <div class="overview-details" id="projectOverviewDetails"></div>
+                    </div>
+
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Notes Timeline</h3>
+                        <div class="notes-timeline" id="projectNotesTimeline"></div>
+
+                        <div class="add-note-form">
+                            <textarea id="newProjectNoteContent" class="form-input" placeholder="Add a note..." rows="3"></textarea>
+                            <button type="button" class="btn btn-primary" id="addProjectNoteBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                </svg>
+                                Add Note
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="closeProjectOverviewBtn">Close</button>
+                    <button type="button" class="btn btn-primary" id="editProjectBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                        Edit Project
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Import/Export Modal -->
         <div class="modal" id="importExportModal">
             <div class="modal-backdrop"></div>
@@ -556,6 +720,8 @@ if ($isAuthenticated) {
 
         <!-- Application JS -->
         <script src="assets/js/app.js"></script>
+        <script src="assets/js/projects.js"></script>
     <?php endif; ?>
 </body>
 </html>
+

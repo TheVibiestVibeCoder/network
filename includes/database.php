@@ -69,6 +69,25 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_location ON contacts(location)");
 
+        // Create projects table
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(255) NOT NULL,
+                client VARCHAR(255),
+                status VARCHAR(50) DEFAULT 'Planning',
+                description TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        // Create indexes for projects
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_client ON projects(client)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at)");
+
         // Create notes table for timeline
         $db->exec("
             CREATE TABLE IF NOT EXISTS notes (
@@ -85,6 +104,21 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_id ON notes(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_company ON notes(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)");
+
+        // Create project notes table for project timeline
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create indexes for project notes
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_project_id ON project_notes(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_created_at ON project_notes(created_at)");
 
         // Create tags table
         $db->exec("

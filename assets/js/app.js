@@ -1540,8 +1540,16 @@
             if (result.success) {
                 const count = result.data.length;
                 const countElement = document.querySelector('.contact-count');
+
                 if (countElement) {
-                    countElement.textContent = `${count} contact${count !== 1 ? 's' : ''}`;
+                    countElement.dataset.contactCount = String(count);
+
+                    const activeEntityBtn = document.querySelector('.entity-btn.active');
+                    const isProjectsActive = activeEntityBtn && activeEntityBtn.dataset.entity === 'projects';
+
+                    if (!isProjectsActive) {
+                        countElement.textContent = `${count} contact${count !== 1 ? 's' : ''}`;
+                    }
                 }
             }
         });
@@ -1753,3 +1761,4 @@
     }
 
 })();
+

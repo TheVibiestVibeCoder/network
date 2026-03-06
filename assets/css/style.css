@@ -435,6 +435,12 @@ textarea.form-input {
     color: var(--color-bg);
 }
 
+.toggle-btn.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
 /* ============================================
    Main Content
    ============================================ */
@@ -648,7 +654,8 @@ textarea.form-input {
    Contacts List
    ============================================ */
 
-.contacts-list {
+.contacts-list,
+.projects-list {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-4) var(--spacing-5);
@@ -1440,6 +1447,191 @@ textarea.form-input {
 }
 
 /* ============================================
+   Entity Toggle + Project List
+   ============================================ */
+
+.list-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--spacing-3);
+}
+
+.list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    width: 100%;
+}
+
+.entity-toggle {
+    display: flex;
+    align-self: flex-start;
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+
+.entity-btn {
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.entity-btn:hover {
+    color: var(--color-text-secondary);
+}
+
+.entity-btn.active {
+    background-color: var(--color-text);
+    color: var(--color-bg);
+}
+
+.project-sort-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.project-sort-controls label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.project-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+    padding: var(--spacing-3) var(--spacing-4);
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    margin-bottom: 2px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.project-card:hover {
+    background-color: var(--color-accent-subtle);
+    border-color: var(--color-border);
+}
+
+.project-avatar {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-top-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: 2px;
+}
+
+.project-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    min-width: 0;
+    flex: 1;
+}
+
+.project-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid transparent;
+}
+
+.project-status.status-planning {
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-3);
+    border-color: var(--color-border);
+}
+
+.project-status.status-active {
+    color: var(--color-success);
+    background-color: var(--color-success-subtle);
+    border-color: rgba(34, 197, 94, 0.25);
+}
+
+.project-status.status-on-hold {
+    color: var(--color-warning);
+    background-color: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.project-status.status-completed {
+    color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.1);
+    border-color: rgba(96, 165, 250, 0.25);
+}
+
+.project-client {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    margin-bottom: 1px;
+}
+
+.project-description {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-updated {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.project-actions {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.project-card:hover .project-actions {
+    opacity: 1;
+}
+/* ============================================
    Company Avatar
    ============================================ */
 
@@ -1796,6 +1988,34 @@ textarea.form-input {
    ============================================ */
 
 @media (max-width: 768px) {
+    .list-toolbar {
+        flex-direction: column;
+        gap: var(--spacing-3);
+    }
+
+    .entity-toggle {
+        width: 100%;
+        align-self: stretch;
+    }
+
+    .entity-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .project-sort-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .project-card {
+        padding: var(--spacing-3);
+    }
+
+    .project-actions {
+        opacity: 1;
+    }
+
     .app-header {
         flex-wrap: wrap;
         height: auto;
@@ -1831,8 +2051,8 @@ textarea.form-input {
         width: 100%;
         justify-content: space-between;
     }
-
-    .contacts-list {
+    .contacts-list,
+    .projects-list {
         padding: var(--spacing-3);
     }
 
@@ -1914,6 +2134,15 @@ textarea.form-input {
 }
 
 @media (max-width: 480px) {
+    .project-top-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .project-status {
+        align-self: flex-start;
+    }
+
     .app-title {
         font-size: var(--font-size-base);
     }
@@ -1930,3 +2159,4 @@ textarea.form-input {
         padding: 8px;
     }
 }
+
