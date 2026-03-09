@@ -86,6 +86,19 @@ if ($isAuthenticated) {
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
 
+    <script>
+        (function() {
+            try {
+                var storedTheme = localStorage.getItem('crm-theme');
+                if (storedTheme === 'light' || storedTheme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', storedTheme);
+                }
+            } catch (e) {
+                // Ignore storage errors and keep default theme
+            }
+        })();
+    </script>
+
     <!-- Application CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -186,6 +199,13 @@ if ($isAuthenticated) {
                     </div>
                 </div>
                 <div class="header-right">
+                    <button type="button" class="btn btn-secondary theme-toggle-btn" id="themeToggleBtn" aria-label="Switch to light mode" title="Switch to light mode">
+                        <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8zM1 13h3v-2H1zm10 9h2v-3h-2zm7.04-2.05l1.41-1.41-1.79-1.8-1.41 1.42zM20 13h3v-2h-3zM17.24 4.84l1.79-1.79-1.41-1.41-1.8 1.79zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM4.22 19.78l1.41 1.41 1.8-1.79-1.42-1.41zM11 1h2v3h-2z"/>
+                        </svg>
+                        <span class="theme-toggle-label">Light Mode</span>
+                    </button>
+
                     <!-- Desktop buttons (hidden on mobile) -->
                     <button type="button" class="btn btn-secondary header-desktop-only" id="importExportBtn" title="Import/Export Contacts">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">

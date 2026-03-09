@@ -35,6 +35,9 @@
         viewingContact: null,
         map: null,
         markers: null,
+        mapBaseLayer: null,
+        mapLabelLayer: null,
+        theme: 'dark',
         groupBy: 'company', // 'company' or 'tags'
         allTags: [],
         taggedData: null,
@@ -80,6 +83,7 @@
 
         // Toggle buttons
         toggleBtns: document.querySelectorAll('.toggle-btn'),
+        themeToggleBtn: document.getElementById('themeToggleBtn'),
 
         // List controls
         searchInput: document.getElementById('searchInput'),
@@ -220,6 +224,69 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
+    // ============================================
+    // Theme Functions
+    // ============================================
+
+    const THEME_STORAGE_KEY = 'crm-theme';
+
+    function getStoredTheme() {
+        try {
+            const stored = localStorage.getItem(THEME_STORAGE_KEY);
+            return stored === 'light' || stored === 'dark' ? stored : 'dark';
+        } catch (e) {
+            return 'dark';
+        }
+    }
+
+    function getThemeToggleMarkup(theme) {
+        if (theme === 'light') {
+            return `
+                <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M9.37 5.51A7 7 0 0 0 17.49 13.63 7 7 0 1 1 9.37 5.51z"/>
+                </svg>
+                <span class="theme-toggle-label">Dark Mode</span>
+            `;
+        }
+
+        return `
+            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8zM1 13h3v-2H1zm10 9h2v-3h-2zm7.04-2.05l1.41-1.41-1.79-1.8-1.41 1.42zM20 13h3v-2h-3zM17.24 4.84l1.79-1.79-1.41-1.41-1.8 1.79zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM4.22 19.78l1.41 1.41 1.8-1.79-1.42-1.41zM11 1h2v3h-2z"/>
+            </svg>
+            <span class="theme-toggle-label">Light Mode</span>
+        `;
+    }
+
+    function updateThemeToggleButton() {
+        if (!elements.themeToggleBtn) {
+            return;
+        }
+
+        const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+        elements.themeToggleBtn.innerHTML = getThemeToggleMarkup(state.theme);
+        elements.themeToggleBtn.setAttribute('aria-label', `Switch to ${nextTheme} mode`);
+        elements.themeToggleBtn.setAttribute('title', `Switch to ${nextTheme} mode`);
+    }
+
+    function applyTheme(theme, persist = true) {
+        state.theme = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', state.theme);
+
+        if (persist) {
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, state.theme);
+            } catch (e) {
+                // Ignore storage errors; theme still works for current session
+            }
+        }
+
+        updateThemeToggleButton();
+        updateMapTheme();
+    }
+
+    function toggleTheme() {
+        applyTheme(state.theme === 'light' ? 'dark' : 'light');
+    }
     // ============================================
     // API Functions
     // ============================================
@@ -486,6 +553,49 @@
     // Map Functions
     // ============================================
 
+    function updateMapTheme() {
+        if (!state.map) {
+            return;
+        }
+
+        if (state.mapBaseLayer) {
+            state.map.removeLayer(state.mapBaseLayer);
+            state.mapBaseLayer = null;
+        }
+
+        if (state.mapLabelLayer) {
+            state.map.removeLayer(state.mapLabelLayer);
+            state.mapLabelLayer = null;
+        }
+
+        if (state.theme === 'light') {
+            state.mapBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 20
+            });
+
+            state.mapLabelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 20,
+                pane: 'shadowPane'
+            });
+        } else {
+            state.mapBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 20
+            });
+
+            state.mapLabelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 20,
+                pane: 'shadowPane'
+            });
+        }
+
+        state.mapBaseLayer.addTo(state.map);
+        state.mapLabelLayer.addTo(state.map);
+    }
+
     function initMap() {
         // Initialize the map centered on a world view
         // Explicitly enable all interaction options for mobile and desktop
@@ -503,18 +613,8 @@
             keyboard: true
         });
 
-        // Add dark CartoDB Dark Matter tile layer (no labels variant for cleaner look)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(state.map);
-
-        // Add labels as a separate layer on top (so pins sit between base and labels)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 20,
-            pane: 'shadowPane'
-        }).addTo(state.map);
+        // Apply themed map tile layers
+        updateMapTheme();
 
         // Add zoom control to bottom right for better mobile UX
         state.map.zoomControl.setPosition('bottomright');
@@ -3345,6 +3445,10 @@
             }
         }
 
+        if (elements.themeToggleBtn) {
+            elements.themeToggleBtn.addEventListener('click', toggleTheme);
+        }
+
         // Modal close buttons
         elements.closeModal.addEventListener('click', closeContactModal);
         elements.cancelBtn.addEventListener('click', closeContactModal);
@@ -3726,6 +3830,8 @@
     // ============================================
 
     function init() {
+        applyTheme(getStoredTheme(), false);
+
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();
