@@ -2806,6 +2806,33 @@
                 openProjectOverview(projectId);
             });
         });
+
+        triggerProjectDeckAnimation();
+    }
+
+    function triggerProjectDeckAnimation() {
+        if (!elements.projectsList) {
+            return;
+        }
+
+        const cards = elements.projectsList.querySelectorAll('.project-card');
+        if (!cards || cards.length === 0) {
+            return;
+        }
+
+        cards.forEach((card, index) => {
+            card.style.setProperty('--deck-order', Math.min(index, 18));
+            card.classList.remove('project-card--deck-enter');
+        });
+
+        // Reflow ensures animation restarts consistently after fast filter updates.
+        void elements.projectsList.offsetWidth;
+
+        requestAnimationFrame(() => {
+            cards.forEach((card) => {
+                card.classList.add('project-card--deck-enter');
+            });
+        });
     }
 
     function createProjectCard(project) {
@@ -4070,5 +4097,6 @@
     }
 
 })();
+
 
 
