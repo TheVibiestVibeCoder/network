@@ -3554,3 +3554,408 @@ textarea.form-input {
         padding: var(--spacing-4);
     }
 }
+
+/* ============================================
+   List + Card UI Refresh
+   ============================================ */
+
+#listView .list-header,
+#projectsView > .list-header {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    background-color: var(--color-bg);
+}
+
+.contacts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5);
+}
+
+.company-group,
+.tag-group {
+    margin-bottom: 0;
+    padding: var(--spacing-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.company-group--ungrouped .company-header {
+    cursor: default;
+}
+
+.company-header,
+.tag-header {
+    margin-bottom: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: linear-gradient(180deg, var(--color-surface-2), var(--color-surface));
+}
+
+.company-header {
+    border-left: 3px solid var(--color-text-muted);
+}
+
+.company-header--muted {
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tag-header {
+    border-left: 3px solid var(--color-border);
+}
+
+.tag-header-untagged {
+    border-left-color: var(--color-text-muted);
+}
+
+.contact-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    min-height: 74px;
+    padding: var(--spacing-3) var(--spacing-4);
+    margin-bottom: var(--spacing-2);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.contact-card:hover {
+    transform: translateY(-1px);
+    background: var(--color-surface-3);
+    border-color: var(--color-text-muted);
+    box-shadow: var(--shadow-md);
+}
+
+.contact-card.in-group {
+    margin-left: 0;
+    border-left: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.contact-card-main {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    min-width: 0;
+    flex: 1;
+}
+
+.contact-card .contact-avatar {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--color-border-subtle);
+    background: linear-gradient(145deg, var(--color-surface-3), var(--color-surface-2));
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.contact-card-content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.contact-card-name {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.contact-card-subtitle {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.contact-card-flags {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.contact-card-flag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.contact-card-chevron {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.contact-card:hover .contact-card-chevron {
+    transform: translateX(2px);
+    color: var(--color-text-secondary);
+}
+
+.company-group .contact-card:last-child,
+.tag-group .contact-card:last-child {
+    margin-bottom: 0;
+}
+
+.projects-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-content: start;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5);
+}
+
+.project-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+    padding: var(--spacing-4);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.project-card:hover {
+    transform: translateY(-2px);
+    background: var(--color-surface-3);
+    border-color: var(--color-text-muted);
+    box-shadow: var(--shadow-md);
+}
+
+.project-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+}
+
+.project-card-title-wrap {
+    min-width: 0;
+    flex: 1;
+}
+
+.project-card-title {
+    margin: 0;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.35;
+}
+
+.project-card-company {
+    margin-top: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-stage-badge {
+    border: 1px solid currentColor;
+    padding: 0.2rem 0.65rem;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+}
+
+.project-card-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+}
+
+.project-metric-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.2;
+}
+
+.project-metric-chip svg {
+    flex-shrink: 0;
+    opacity: 0.75;
+}
+
+.project-card-progress {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.project-card-progress-track {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    overflow: hidden;
+}
+
+.project-card-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    border-radius: var(--radius-full);
+    background: linear-gradient(90deg, var(--color-success), #34d399);
+}
+
+.project-card-progress-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.project-card-progress--empty .project-card-progress-label {
+    color: var(--color-text-tertiary);
+}
+
+.project-card-description {
+    margin: 0;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+}
+
+.project-card-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.project-card-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+@media (max-width: 768px) {
+    .contacts-list {
+        padding: var(--spacing-3);
+        gap: var(--spacing-3);
+    }
+
+    .company-group,
+    .tag-group {
+        padding: var(--spacing-2);
+        border-radius: var(--radius-md);
+    }
+
+    .contact-card {
+        min-height: 70px;
+        padding: var(--spacing-3);
+    }
+
+    .contact-card .contact-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .contact-card-flags {
+        gap: 4px;
+    }
+
+    .projects-list {
+        grid-template-columns: 1fr;
+        padding: var(--spacing-4);
+        gap: var(--spacing-3);
+    }
+
+    .project-card {
+        padding: var(--spacing-3);
+        border-radius: var(--radius-md);
+    }
+
+    .project-card-head {
+        gap: var(--spacing-2);
+    }
+
+    .project-card-metrics {
+        gap: 6px;
+    }
+
+    .project-metric-chip {
+        max-width: 100%;
+    }
+
+    .project-card-progress {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .project-card-progress-label {
+        white-space: normal;
+    }
+}
+
+@media (max-width: 480px) {
+    .contacts-list {
+        padding: var(--spacing-2);
+    }
+
+    .contact-card {
+        padding: var(--spacing-3) var(--spacing-2);
+        gap: var(--spacing-2);
+    }
+
+    .contact-card-name {
+        font-size: var(--font-size-sm);
+    }
+
+    .contact-card-subtitle {
+        font-size: 11px;
+    }
+
+    .project-card-title {
+        font-size: var(--font-size-sm);
+    }
+
+    .project-stage-badge {
+        font-size: 9px;
+        padding: 0.2rem 0.5rem;
+    }
+
+    .project-card-metrics {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+}

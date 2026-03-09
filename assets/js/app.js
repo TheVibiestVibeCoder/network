@@ -794,8 +794,17 @@
                 html += group.contacts.map(contact => createContactCard(contact, true)).join('');
                 html += `</div>`;
             } else {
-                // Contacts without company (individual)
+                // Contacts without company get their own section for cleaner visual rhythm
+                html += `<div class="company-group company-group--ungrouped">`;
+                html += `<div class="company-header company-header--muted">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <span>No Company</span>
+                    <span class="company-count">${group.contacts.length}</span>
+                </div>`;
                 html += group.contacts.map(contact => createContactCard(contact, false)).join('');
+                html += `</div>`;
             }
         });
 
@@ -920,6 +929,9 @@
             header.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const company = header.dataset.company;
+                if (!company) {
+                    return;
+                }
                 openCompanyNotesModal(company);
             });
         });
@@ -1018,25 +1030,35 @@
     }
 
     function createContactCard(contact, inGroup = false) {
-        // Show at most one secondary line: company (if not in group) or location
-        let secondaryLine = '';
-        if (!inGroup && contact.company) {
-            secondaryLine = `<p class="contact-company">${escapeHtml(contact.company)}</p>`;
-        } else if (contact.location) {
-            secondaryLine = `<p class="contact-location">${escapeHtml(contact.location)}</p>`;
-        }
+        const company = (contact.company || '').trim();
+        const location = (contact.location || '').trim();
+        const fallbackText = inGroup ? 'No location set' : 'No company set';
+        const subtitleText = (!inGroup && company) ? company : (location || fallbackText);
+
+        const flags = [];
+        if (contact.email) flags.push('Email');
+        if (contact.phone) flags.push('Phone');
+        if (contact.website) flags.push('Web');
+        if (contact.note) flags.push('Note');
+
+        const flagHtml = flags.length > 0
+            ? `<div class="contact-card-flags">${flags.slice(0, 3).map(flag => `<span class="contact-card-flag">${flag}</span>`).join('')}</div>`
+            : '';
 
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}" data-id="${contact.id}">
-                <div class="contact-avatar">
-                    ${getInitials(contact.name)}
+                <div class="contact-card-main">
+                    <div class="contact-avatar">
+                        ${getInitials(contact.name)}
+                    </div>
+                    <div class="contact-card-content">
+                        <h3 class="contact-card-name">${escapeHtml(contact.name)}</h3>
+                        <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
+                        ${flagHtml}
+                    </div>
                 </div>
-                <div class="contact-info">
-                    <h3 class="contact-name">${escapeHtml(contact.name)}</h3>
-                    ${secondaryLine}
-                </div>
-                <div class="contact-actions">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <div class="contact-card-chevron" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                         <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
                     </svg>
                 </div>
@@ -2796,6 +2818,9 @@
 
         const bMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
         const bMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
+
+        const formatAmount = (value) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+
         let budget;
         if (bMin === null && bMax === null) {
             budget = 'N/A';
@@ -2803,45 +2828,73 @@
             budget = 'Undetermined';
         } else if (bMin !== null && bMax !== null) {
             budget = bMin === bMax
-                ? `${bMin.toFixed(0)} €`
-                : `${bMin.toFixed(0)} – ${bMax.toFixed(0)} €`;
+                ? `${formatAmount(bMin)} EUR`
+                : `${formatAmount(bMin)} - ${formatAmount(bMax)} EUR`;
         } else if (bMin !== null) {
-            budget = `${bMin.toFixed(0)} €`;
+            budget = `${formatAmount(bMin)} EUR`;
         } else {
-            budget = `${bMax.toFixed(0)} €`;
+            budget = `${formatAmount(bMax)} EUR`;
         }
-        const successChance = project.success_chance ? `${project.success_chance}%` : 'N/A';
+
+        const chanceRaw = project.success_chance !== null && project.success_chance !== '' ? parseFloat(project.success_chance) : null;
+        const chanceValue = Number.isFinite(chanceRaw) ? Math.max(0, Math.min(100, chanceRaw)) : null;
+        const successChance = chanceValue !== null ? `${Math.round(chanceValue)}%` : 'N/A';
+
+        const descriptionText = (project.description || '').trim();
+        const summary = descriptionText
+            ? `${escapeHtml(descriptionText).substring(0, 140)}${descriptionText.length > 140 ? '...' : ''}`
+            : 'No description yet';
+
+        const stageLabel = project.stage || 'Lead';
+        const stageClass = stageLabel.toLowerCase().replace(/ /g, '-');
+
+        const progressMarkup = chanceValue !== null ? `
+            <div class="project-card-progress">
+                <div class="project-card-progress-track">
+                    <div class="project-card-progress-fill" style="width: ${chanceValue}%;"></div>
+                </div>
+                <span class="project-card-progress-label">${Math.round(chanceValue)}% confidence</span>
+            </div>
+        ` : `
+            <div class="project-card-progress project-card-progress--empty">
+                <span class="project-card-progress-label">Success chance not set</span>
+            </div>
+        `;
 
         return `
             <div class="project-card" data-id="${project.id}">
-                <div class="project-card-header">
-                    <div class="contact-info">
-                        <h3 class="contact-name">${escapeHtml(project.name)}</h3>
-                        ${project.company ? `<p class="contact-company">${escapeHtml(project.company)}</p>` : ''}
+                <div class="project-card-head">
+                    <div class="project-card-title-wrap">
+                        <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
+                        ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                     </div>
-                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(/ /g, '-')}">${escapeHtml(project.stage)}</span>
+                    <span class="project-stage-badge stage-${stageClass}">${escapeHtml(stageLabel)}</span>
                 </div>
-                <div class="project-details">
-                    <div class="detail-item">
+                <div class="project-card-metrics">
+                    <span class="project-metric-chip">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
                         </svg>
                         <span>${startDate}</span>
-                    </div>
-                    <div class="detail-item">
+                    </span>
+                    <span class="project-metric-chip">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
                         </svg>
                         <span>${budget}</span>
-                    </div>
-                    <div class="detail-item">
+                    </span>
+                    <span class="project-metric-chip">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
                         </svg>
                         <span>${successChance} chance</span>
-                    </div>
+                    </span>
                 </div>
-                <p class="contact-note">${escapeHtml(project.description).substring(0, 150)}${project.description.length > 150 ? '...' : ''}</p>
+                ${progressMarkup}
+                <p class="project-card-description">${summary}</p>
+                <div class="project-card-footer">
+                    <span class="project-card-cta">Open details</span>
+                </div>
             </div>
         `;
     }
@@ -4017,3 +4070,4 @@
     }
 
 })();
+
