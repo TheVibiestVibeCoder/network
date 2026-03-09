@@ -97,6 +97,13 @@ function handleGet(Project $model, string $action, ?int $id): void
         return;
     }
 
+    // Get notes for a project
+    if ($action === 'notes' && $id !== null) {
+        $notes = $model->getNotes($id);
+        echo json_encode(['success' => true, 'data' => $notes]);
+        return;
+    }
+
     if ($id !== null) {
         // Get single project
         $project = $model->getById($id);
@@ -121,7 +128,7 @@ function handleGet(Project $model, string $action, ?int $id): void
 }
 
 /**
- * Handle POST requests (create, assign contact, assign tag)
+ * Handle POST requests (create, assign contact/tag, add notes)
  */
 function handlePost(Project $model, string $action): void
 {
@@ -152,6 +159,45 @@ function handlePost(Project $model, string $action): void
 
         $success = $model->assignTag((int)$input['project_id'], (int)$input['tag_id']);
         echo json_encode(['success' => $success, 'message' => 'Tag assigned to project']);
+        return;
+    }
+
+    // Add note to project
+    if ($action === 'add-note') {
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if ($input === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON input']);
+            return;
+        }
+
+        $projectId = isset($input['project_id']) ? (int)$input['project_id'] : 0;
+        $contentText = Auth::sanitizeString($input['content'] ?? null, 10000);
+
+        if ($projectId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'project_id is required']);
+            return;
+        }
+
+        if (empty($contentText)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'content is required']);
+            return;
+        }
+
+        $project = $model->getById($projectId);
+        if ($project === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+
+        $note = $model->createNote($projectId, $contentText);
+
+        http_response_code(201);
+        echo json_encode(['success' => true, 'data' => $note]);
         return;
     }
 
@@ -303,6 +349,26 @@ function handleDelete(Project $model, string $action, ?int $id): void
 
         $success = $model->unassignTag((int)$input['project_id'], (int)$input['tag_id']);
         echo json_encode(['success' => $success, 'message' => 'Tag unassigned from project']);
+        return;
+    }
+
+    // Delete a note from project
+    if ($action === 'delete-note') {
+        if ($id === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Note ID is required']);
+            return;
+        }
+
+        $existingNote = $model->getNoteById($id);
+        if ($existingNote === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Note not found']);
+            return;
+        }
+
+        $model->deleteNote($id);
+        echo json_encode(['success' => true, 'message' => 'Note deleted']);
         return;
     }
 

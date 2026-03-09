@@ -1036,6 +1036,23 @@ if ($isAuthenticated) {
                             </button>
                         </div>
                     </div>
+
+                    <!-- Project Notes Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Project Notes</h3>
+                        <div class="notes-timeline" id="projectNotesTimeline">
+                            <!-- Project notes will be populated by JS -->
+                        </div>
+                        <div class="add-note-form">
+                            <textarea id="newProjectNoteContent" class="form-input" placeholder="Add a note..." rows="3"></textarea>
+                            <button type="button" class="btn btn-primary" id="addProjectNoteBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                </svg>
+                                Add Note
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="closeProjectOverviewBtn">Close</button>

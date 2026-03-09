@@ -1315,6 +1315,12 @@ textarea.form-input {
     opacity: 1;
 }
 
+@media (hover: none), (pointer: coarse) {
+    .note-item .note-delete-btn {
+        opacity: 1;
+    }
+}
+
 .note-delete-btn:hover {
     color: var(--color-danger);
     background-color: var(--color-danger-subtle);
@@ -3444,6 +3450,15 @@ textarea.form-input {
     #projectModal .modal-footer,
     #projectOverviewModal .modal-footer {
         padding: var(--spacing-3) var(--spacing-5);
+    }
+
+    #projectOverviewModal .notes-timeline {
+        max-height: 240px;
+    }
+
+    #projectOverviewModal .add-note-form .btn {
+        align-self: stretch;
+        justify-content: center;
     }
 
     /* Hide remove button labels, keep just X on mobile */

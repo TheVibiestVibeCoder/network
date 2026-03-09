@@ -148,6 +148,20 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_company ON projects(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_stage ON projects(stage)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_start_date ON projects(start_date)");
+        // Create project_notes table for project timeline entries
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create indexes for project notes
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_project_id ON project_notes(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_created_at ON project_notes(created_at)");
 
         // Create project_contacts junction table (many-to-many)
         $db->exec("
