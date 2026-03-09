@@ -83,6 +83,47 @@
     --header-height: 56px;
 }
 
+:root[data-theme="light"] {
+    /* Soft light palette */
+    --color-bg: #edf1f6;
+    --color-surface: #f5f7fb;
+    --color-surface-2: #ffffff;
+    --color-surface-3: #e8edf4;
+    --color-surface-hover: #dde5ef;
+
+    /* Borders */
+    --color-border: #d7dee9;
+    --color-border-subtle: #e1e7f0;
+
+    /* Text */
+    --color-text: #172033;
+    --color-text-secondary: #425168;
+    --color-text-tertiary: #6a7890;
+    --color-text-muted: #8b97ab;
+
+    /* Accent */
+    --color-accent: #111827;
+    --color-accent-subtle: rgba(17, 24, 39, 0.08);
+    --color-accent-hover: rgba(17, 24, 39, 0.12);
+
+    /* Semantic */
+    --color-primary: #1f2a3d;
+    --color-primary-hover: #151d2b;
+    --color-primary-subtle: rgba(31, 42, 61, 0.08);
+    --color-danger: #dc2626;
+    --color-danger-hover: #b91c1c;
+    --color-danger-subtle: rgba(220, 38, 38, 0.1);
+    --color-success: #16a34a;
+    --color-success-subtle: rgba(22, 163, 74, 0.12);
+    --color-warning: #d97706;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.1);
+    --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.12);
+    --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.16);
+}
+
 /* ============================================
    Reset & Base
    ============================================ */
@@ -108,7 +149,7 @@ body {
 }
 
 ::selection {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--color-accent-subtle);
     color: var(--color-text);
 }
 
@@ -397,6 +438,22 @@ textarea.form-input {
     align-items: center;
     gap: var(--spacing-2);
     position: relative;
+}
+
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    min-width: 124px;
+}
+
+.theme-toggle-icon {
+    flex-shrink: 0;
+}
+
+.theme-toggle-label {
+    white-space: nowrap;
 }
 
 /* Mobile menu */
@@ -2594,6 +2651,15 @@ textarea.form-input {
         display: inline-flex;
     }
 
+    .theme-toggle-btn {
+        min-width: 38px;
+        padding: 8px 10px;
+    }
+
+    .theme-toggle-label {
+        display: none;
+    }
+
     /* List header: collapsible filters */
     .list-header {
         padding: var(--spacing-3);
@@ -2820,6 +2886,13 @@ textarea.form-input {
 @media (max-width: 480px) {
     .app-title {
         font-size: var(--font-size-base);
+    }
+
+    .theme-toggle-btn {
+        width: 36px;
+        min-width: 36px;
+        height: 36px;
+        padding: 0;
     }
 
     .contact-count {
