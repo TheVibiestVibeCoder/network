@@ -3829,12 +3829,30 @@
 
         // Dashboard collapse/expand toggle
         const dashboardBar = document.getElementById('dashboardBar');
+        const dashboardToggleBtn = document.getElementById('dashboardToggleBtn');
         if (dashboardBar) {
+            const wrapper = document.getElementById('dashboardWrapper');
+            if (wrapper) {
+                const isExpanded = wrapper.classList.contains('expanded');
+                dashboardBar.setAttribute('aria-expanded', String(isExpanded));
+                if (dashboardToggleBtn) {
+                    dashboardToggleBtn.setAttribute('aria-expanded', String(isExpanded));
+                }
+            }
+
             dashboardBar.addEventListener('click', () => {
-                const wrapper = document.getElementById('dashboardWrapper');
-                if (wrapper) {
-                    wrapper.classList.toggle('collapsed');
-                    wrapper.classList.toggle('expanded');
+                const wrapperEl = document.getElementById('dashboardWrapper');
+                if (!wrapperEl) {
+                    return;
+                }
+
+                const isExpanding = wrapperEl.classList.contains('collapsed');
+                wrapperEl.classList.toggle('collapsed', !isExpanding);
+                wrapperEl.classList.toggle('expanded', isExpanding);
+
+                dashboardBar.setAttribute('aria-expanded', String(isExpanding));
+                if (dashboardToggleBtn) {
+                    dashboardToggleBtn.setAttribute('aria-expanded', String(isExpanding));
                 }
             });
         }
@@ -4159,6 +4177,8 @@
     }
 
 })();
+
+
 
 
 

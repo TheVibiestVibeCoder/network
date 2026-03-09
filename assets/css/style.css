@@ -4443,3 +4443,170 @@ textarea.form-input {
         filter: none !important;
     }
 }
+
+/* ============================================
+   Dashboard Expand/Collapse Motion
+   ============================================ */
+
+.dashboard-wrapper {
+    --dash-panel-ease: cubic-bezier(0.2, 0.74, 0.2, 1);
+}
+
+/* Keep grid display in both states so collapse can animate */
+.dashboard-wrapper.collapsed .projects-dashboard,
+.dashboard-wrapper.expanded .projects-dashboard {
+    display: grid;
+}
+
+.dashboard-wrapper .projects-dashboard {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.995);
+    padding-top: 0;
+    padding-bottom: 0;
+    pointer-events: none;
+    transition:
+        max-height 620ms var(--dash-panel-ease),
+        opacity 360ms ease,
+        transform 620ms var(--dash-panel-ease),
+        padding-top 420ms var(--dash-panel-ease),
+        padding-bottom 420ms var(--dash-panel-ease);
+}
+
+.dashboard-wrapper.expanded .projects-dashboard {
+    max-height: 1200px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    padding-top: var(--spacing-5);
+    padding-bottom: var(--spacing-5);
+    pointer-events: auto;
+}
+
+.dashboard-wrapper .dashboard-card {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.99);
+    transition:
+        opacity 320ms ease,
+        transform 520ms var(--dash-panel-ease),
+        box-shadow 260ms ease;
+}
+
+.dashboard-wrapper.expanded .dashboard-card {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.dashboard-wrapper.expanded .dashboard-card:nth-child(1) { transition-delay: 70ms; }
+.dashboard-wrapper.expanded .dashboard-card:nth-child(2) { transition-delay: 130ms; }
+.dashboard-wrapper.expanded .dashboard-card:nth-child(3) { transition-delay: 190ms; }
+.dashboard-wrapper.expanded .dashboard-card:nth-child(4) { transition-delay: 250ms; }
+
+.dashboard-wrapper .dashboard-toggle-btn {
+    transition: background 0.2s ease, color 0.2s ease, transform 0.32s ease;
+}
+
+.dashboard-wrapper.expanded .dashboard-toggle-btn {
+    transform: translateY(-1px);
+}
+
+/* ============================================
+   Login + App Entrance Motion
+   ============================================ */
+
+.login-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    inset: -20% -10% auto;
+    height: 68%;
+    background:
+        radial-gradient(1200px 360px at 20% 40%, var(--color-primary-subtle), transparent 68%),
+        radial-gradient(900px 280px at 80% 50%, var(--color-accent-subtle), transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    animation: loginBackdropIn 1s ease forwards;
+}
+
+.login-box {
+    position: relative;
+    opacity: 0;
+    transform: translateY(20px) scale(0.985);
+    animation: loginBoxIn 760ms cubic-bezier(0.22, 0.68, 0.2, 1) 80ms forwards;
+}
+
+.login-box > * {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: loginItemIn 520ms ease forwards;
+}
+
+.login-box > *:nth-child(1) { animation-delay: 220ms; }
+.login-box > *:nth-child(2) { animation-delay: 300ms; }
+.login-box > *:nth-child(3) { animation-delay: 380ms; }
+.login-box > *:nth-child(4) { animation-delay: 460ms; }
+.login-box > *:nth-child(5) { animation-delay: 540ms; }
+
+.app-container {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: appEnterIn 620ms cubic-bezier(0.2, 0.74, 0.2, 1) 70ms forwards;
+}
+
+@keyframes loginBackdropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loginBoxIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.985);
+        filter: blur(4px);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.002);
+        filter: blur(0);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+@keyframes loginItemIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes appEnterIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-wrapper .projects-dashboard,
+    .dashboard-wrapper .dashboard-card,
+    .login-container::before,
+    .login-box,
+    .login-box > *,
+    .app-container {
+        animation: none !important;
+        transition: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+}
