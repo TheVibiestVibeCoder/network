@@ -2866,7 +2866,7 @@
                 <div class="project-card-head">
                     <div class="project-card-title-wrap">
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
-                        ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
+                        <p class="project-card-company${project.company ? '' : ' is-empty'}">${project.company ? escapeHtml(project.company) : '&nbsp;'}</p>
                     </div>
                     <span class="project-stage-badge stage-${stageClass}">${escapeHtml(stageLabel)}</span>
                 </div>
@@ -4070,4 +4070,5 @@
     }
 
 })();
+
 

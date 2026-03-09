@@ -4146,3 +4146,129 @@ textarea.form-input {
     display: grid;
     align-content: start;
 }
+
+/* ============================================
+   Project Card Uniform Layout Lock
+   ============================================ */
+
+#projectsView .projects-list {
+    align-items: stretch;
+}
+
+#projectsView .project-card {
+    min-height: 272px;
+    display: grid;
+    grid-template-rows: auto auto auto 1fr auto;
+    gap: var(--spacing-3);
+    align-content: start;
+}
+
+#projectsView .project-card-head {
+    min-height: 56px;
+    align-items: flex-start;
+}
+
+#projectsView .project-card-title-wrap {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+#projectsView .project-card-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    min-height: calc(1.35em * 2);
+}
+
+#projectsView .project-card-company {
+    min-height: 1.2em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#projectsView .project-card-company.is-empty {
+    opacity: 0.55;
+}
+
+#projectsView .project-card-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    min-height: 36px;
+}
+
+#projectsView .project-metric-chip {
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 8px;
+    overflow: hidden;
+}
+
+#projectsView .project-metric-chip span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#projectsView .project-card-progress {
+    min-height: 32px;
+    align-items: center;
+}
+
+#projectsView .project-card-progress-track {
+    min-width: 0;
+}
+
+#projectsView .project-card-description {
+    min-height: calc(1.55em * 3);
+}
+
+#projectsView .project-card-footer {
+    min-height: 18px;
+    align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+    #projectsView .project-card {
+        min-height: 244px;
+        gap: var(--spacing-2);
+    }
+
+    #projectsView .project-card-head {
+        min-height: 52px;
+    }
+
+    #projectsView .project-card-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    #projectsView .project-metric-chip {
+        min-height: 32px;
+    }
+
+    #projectsView .project-card-description {
+        min-height: calc(1.5em * 2);
+    }
+}
+
+@media (max-width: 480px) {
+    #projectsView .project-card {
+        min-height: auto;
+    }
+
+    #projectsView .project-card-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    #projectsView .project-metric-chip {
+        min-height: 34px;
+    }
+}
