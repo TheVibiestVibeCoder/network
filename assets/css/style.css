@@ -3959,3 +3959,190 @@ textarea.form-input {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================
+   Alignment + Spacing Polish
+   ============================================ */
+
+/* Keep list control rows consistent across contacts/projects */
+#listView .list-header,
+#projectsView > .list-header {
+    padding-top: var(--spacing-4);
+    padding-bottom: var(--spacing-4);
+}
+
+#listView .list-header-top,
+#projectsView .list-header-top {
+    min-height: 42px;
+    align-items: center;
+}
+
+#listView .search-input,
+#projectsView .search-input {
+    min-height: 40px;
+}
+
+#listView .list-header .btn,
+#projectsView .list-header .btn {
+    min-height: 40px;
+}
+
+/* Contact cards: keep rows visually even */
+.contact-card {
+    min-height: 78px;
+}
+
+.contact-card-content {
+    justify-content: center;
+}
+
+.contact-card-subtitle {
+    line-height: 1.25;
+}
+
+.contact-card-flags {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    min-height: 18px;
+}
+
+.contact-card-flag:nth-child(n + 3) {
+    display: none;
+}
+
+/* Project cards: same height rhythm in grid */
+.projects-list {
+    grid-auto-rows: 1fr;
+}
+
+.project-card {
+    height: 100%;
+    grid-template-rows: auto auto auto 1fr auto;
+}
+
+.project-card-description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    min-height: calc(1.55em * 3);
+}
+
+.project-card-progress {
+    min-height: 24px;
+}
+
+/* Dashboard: align bar stats in consistent tracks */
+.dashboard-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--spacing-3);
+    align-items: center;
+}
+
+.dashboard-bar-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--spacing-2);
+    width: 100%;
+}
+
+.dashboard-bar-stat {
+    min-height: 42px;
+    padding: 7px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    justify-content: flex-start;
+}
+
+.dashboard-bar-stat-value {
+    white-space: nowrap;
+}
+
+.projects-dashboard {
+    grid-auto-rows: 1fr;
+}
+
+.dashboard-card {
+    height: 100%;
+}
+
+.dashboard-card--projection {
+    height: auto;
+}
+
+/* Mobile spacing + alignment */
+@media (max-width: 768px) {
+    #listView .list-header,
+    #projectsView > .list-header {
+        padding: var(--spacing-3);
+    }
+
+    #listView .list-header-top,
+    #projectsView .list-header-top {
+        min-height: 40px;
+    }
+
+    .contact-card {
+        min-height: 74px;
+    }
+
+    .dashboard-bar {
+        grid-template-columns: 1fr auto;
+        gap: var(--spacing-2);
+        padding: var(--spacing-3);
+    }
+
+    .dashboard-bar-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--spacing-2);
+    }
+
+    .dashboard-bar-stat {
+        min-height: 44px;
+        padding: 8px 10px;
+    }
+
+    .dashboard-toggle-btn {
+        align-self: start;
+        margin-top: 2px;
+    }
+
+    .project-card-description {
+        min-height: calc(1.5em * 2);
+        -webkit-line-clamp: 2;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-bar {
+        gap: var(--spacing-2);
+    }
+
+    .dashboard-bar-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-bar-stat {
+        min-height: 40px;
+    }
+
+    .contact-card {
+        min-height: 72px;
+    }
+
+    .contact-card-flags {
+        display: none;
+    }
+
+    .project-card {
+        gap: var(--spacing-2);
+    }
+}
+
+/* Final alignment fix */
+.project-card {
+    display: grid;
+    align-content: start;
+}
