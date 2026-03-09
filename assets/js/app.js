@@ -2226,6 +2226,42 @@
         } else {
             renderDayView();
         }
+
+        triggerCalendarDeckAnimation();
+    }
+
+    function triggerCalendarDeckAnimation() {
+        if (!elements.calendarBody) {
+            return;
+        }
+
+        let selector;
+        if (state.calendarMode === 'month') {
+            selector = '.cal-month-header-cell, .cal-month-cell';
+        } else if (state.calendarMode === 'week') {
+            selector = '.cal-week-day';
+        } else {
+            selector = '.cal-day-note, .cal-day-empty';
+        }
+
+        const animTargets = elements.calendarBody.querySelectorAll(selector);
+        if (!animTargets || animTargets.length === 0) {
+            return;
+        }
+
+        animTargets.forEach((el, index) => {
+            el.style.setProperty('--cal-deck-order', Math.min(index, 26));
+            el.classList.remove('calendar-anim-enter');
+        });
+
+        // Reflow ensures animation restarts when toggling modes quickly.
+        void elements.calendarBody.offsetWidth;
+
+        requestAnimationFrame(() => {
+            animTargets.forEach((el) => {
+                el.classList.add('calendar-anim-enter');
+            });
+        });
     }
 
     function updateCalendarTitle() {
@@ -4123,6 +4159,7 @@
     }
 
 })();
+
 
 
 

@@ -4376,3 +4376,70 @@ textarea.form-input {
         filter: none !important;
     }
 }
+
+/* ============================================
+   Animation Pace Tuning + Calendar Deck Animation
+   ============================================ */
+
+/* Slightly slower for smoother high-end feel */
+#projectsView .project-card.project-card--deck-enter {
+    animation-duration: 560ms;
+    animation-delay: calc(var(--deck-order, 0) * 44ms);
+}
+
+#listView .contact-card.contact-card--deck-enter {
+    animation-duration: 520ms;
+    animation-delay: calc(var(--deck-order, 0) * 36ms);
+}
+
+#calendarView .calendar-body {
+    perspective: 1400px;
+    transform-style: preserve-3d;
+}
+
+#calendarView .calendar-body .cal-month-header-cell,
+#calendarView .calendar-body .cal-month-cell,
+#calendarView .calendar-body .cal-week-day,
+#calendarView .calendar-body .cal-day-note,
+#calendarView .calendar-body .cal-day-empty {
+    transform-origin: 50% 10%;
+    backface-visibility: hidden;
+    will-change: transform, opacity, filter;
+}
+
+#calendarView .calendar-body .calendar-anim-enter {
+    animation-name: calendarDeckIn;
+    animation-duration: 540ms;
+    animation-timing-function: cubic-bezier(0.22, 0.68, 0.2, 1);
+    animation-fill-mode: both;
+    animation-delay: calc(var(--cal-deck-order, 0) * 20ms);
+}
+
+@keyframes calendarDeckIn {
+    0% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.986) rotateX(7deg);
+        filter: blur(4px) saturate(88%);
+    }
+
+    65% {
+        opacity: 1;
+        transform: translateY(-1px) scale(1.002) rotateX(0deg);
+        filter: blur(0) saturate(100%);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotateX(0deg);
+        filter: blur(0) saturate(100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #calendarView .calendar-body .calendar-anim-enter {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+}
