@@ -199,6 +199,9 @@
         projectTagSuggestions: document.getElementById('projectTagSuggestions'),
         addProjectTagBtn: document.getElementById('addProjectTagBtn'),
         projectContacts: document.getElementById('projectContacts'),
+        projectNotesTimeline: document.getElementById('projectNotesTimeline'),
+        newProjectNoteContent: document.getElementById('newProjectNoteContent'),
+        addProjectNoteBtn: document.getElementById('addProjectNoteBtn'),
         newProjectContactInput: document.getElementById('newProjectContactInput'),
         projectContactSuggestions: document.getElementById('projectContactSuggestions'),
         addProjectContactBtn: document.getElementById('addProjectContactBtn'),
@@ -395,6 +398,27 @@
             return response.json();
         },
 
+        async getProjectNotes(projectId) {
+            const response = await fetch(`api/projects.php?action=notes&id=${projectId}`);
+            return response.json();
+        },
+
+        async createProjectNote(projectId, content) {
+            const response = await fetch('api/projects.php?action=add-note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ project_id: projectId, content })
+            });
+            return response.json();
+        },
+
+        async deleteProjectNote(noteId) {
+            const response = await fetch(`api/projects.php?action=delete-note&id=${noteId}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
+        },
         async createProject(data) {
             const response = await fetch('api/projects.php', {
                 method: 'POST',
@@ -2693,15 +2717,21 @@
                 await loadAllContacts();
             }
 
-            const [projectResult, contactsResult, tagsResult] = await Promise.all([
+            const [projectResult, contactsResult, tagsResult, notesResult] = await Promise.all([
                 api.getProject(projectId),
                 api.getProjectContacts(projectId),
-                api.getProjectTags(projectId)
+                api.getProjectTags(projectId),
+                api.getProjectNotes(projectId)
             ]);
 
             if (projectResult.success) {
                 state.viewingProject = projectResult.data;
-                renderProjectOverview(projectResult.data, contactsResult.data || [], tagsResult.data || []);
+                renderProjectOverview(
+                    projectResult.data,
+                    contactsResult.data || [],
+                    tagsResult.data || [],
+                    notesResult.success ? (notesResult.data || []) : []
+                );
                 elements.projectOverviewModal.classList.add('active');
             } else {
                 alert('Error: ' + projectResult.error);
@@ -2712,7 +2742,7 @@
         }
     }
 
-    function renderProjectOverview(project, contacts, tags) {
+    function renderProjectOverview(project, contacts, tags, notes = []) {
         elements.projectOverviewName.textContent = project.name;
         elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
 
@@ -2751,6 +2781,9 @@
 
         // Render contacts
         renderProjectContacts(contacts);
+
+        // Render notes
+        renderProjectNotesTimeline(notes);
     }
 
     function renderProjectTags(tags) {
@@ -2793,10 +2826,142 @@
         elements.projectContacts.innerHTML = html;
     }
 
+    async function loadProjectNotes(projectId) {
+        if (!elements.projectNotesTimeline) {
+            return;
+        }
+
+        try {
+            const result = await api.getProjectNotes(projectId);
+            if (result.success) {
+                renderProjectNotesTimeline(result.data || []);
+            } else {
+                renderProjectNotesTimeline([]);
+            }
+        } catch (error) {
+            console.error('Error loading project notes:', error);
+        }
+    }
+
+    function renderProjectNotesTimeline(notes) {
+        if (!elements.projectNotesTimeline) {
+            return;
+        }
+
+        if (!notes || notes.length === 0) {
+            elements.projectNotesTimeline.innerHTML = `
+                <div class="notes-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+                    </svg>
+                    <p>No notes yet for this project</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        notes.forEach(note => {
+            const date = new Date(note.created_at);
+            const formattedDate = formatDate(date);
+
+            html += `
+                <div class="note-item">
+                    <div class="note-header">
+                        <span class="note-date">${formattedDate}</span>
+                        <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="note-content">${escapeHtml(note.content)}</div>
+                </div>
+            `;
+        });
+
+        elements.projectNotesTimeline.innerHTML = html;
+
+        elements.projectNotesTimeline.querySelectorAll('.project-note-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const noteId = parseInt(btn.dataset.noteId, 10);
+                await deleteProjectNote(noteId);
+            });
+        });
+    }
+
+    async function addProjectNote() {
+        if (!elements.newProjectNoteContent || !state.viewingProjectId) {
+            return;
+        }
+
+        const content = elements.newProjectNoteContent.value.trim();
+        if (!content) {
+            return;
+        }
+
+        if (elements.addProjectNoteBtn) {
+            elements.addProjectNoteBtn.disabled = true;
+            elements.addProjectNoteBtn.innerHTML = 'Adding...';
+        }
+
+        try {
+            const result = await api.createProjectNote(state.viewingProjectId, content);
+            if (result.success) {
+                elements.newProjectNoteContent.value = '';
+                await loadProjectNotes(state.viewingProjectId);
+            } else {
+                alert(result.error || 'Error adding note');
+            }
+        } catch (error) {
+            console.error('Error adding project note:', error);
+            alert('Error adding note');
+        } finally {
+            if (elements.addProjectNoteBtn) {
+                elements.addProjectNoteBtn.disabled = false;
+                elements.addProjectNoteBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                    Add Note
+                `;
+            }
+        }
+    }
+
+    async function deleteProjectNote(noteId) {
+        if (!confirm('Delete this note?')) {
+            return;
+        }
+
+        try {
+            const result = await api.deleteProjectNote(noteId);
+            if (result.success) {
+                if (state.viewingProjectId) {
+                    await loadProjectNotes(state.viewingProjectId);
+                }
+            } else {
+                alert(result.error || 'Error deleting note');
+            }
+        } catch (error) {
+            console.error('Error deleting project note:', error);
+            alert('Error deleting note');
+        }
+    }
+
     function closeProjectOverview() {
         elements.projectOverviewModal.classList.remove('active');
         state.viewingProjectId = null;
         state.viewingProject = null;
+
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.value = '';
+        }
+
+        if (elements.projectNotesTimeline) {
+            elements.projectNotesTimeline.innerHTML = '';
+        }
     }
 
     async function addProjectTag(tagName) {
@@ -3318,6 +3483,20 @@
                 backdrop.addEventListener('click', closeProjectOverview);
             }
         }
+
+        if (elements.addProjectNoteBtn) {
+            elements.addProjectNoteBtn.addEventListener('click', addProjectNote);
+        }
+
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    addProjectNote();
+                }
+            });
+        }
+
         // Delete from overview — opens the same confirmation modal
         if (elements.deleteProjectOverviewBtn) {
             elements.deleteProjectOverviewBtn.addEventListener('click', () => {

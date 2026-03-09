@@ -262,4 +262,65 @@ class Project
 
         return $stmt->fetchAll();
     }
+    /**
+     * Get all notes for a project
+     */
+    public function getNotes(int $projectId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT *
+            FROM project_notes
+            WHERE project_id = :project_id
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute(['project_id' => $projectId]);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Get a single project note by ID
+     */
+    public function getNoteById(int $noteId): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT *
+            FROM project_notes
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $noteId]);
+
+        $note = $stmt->fetch();
+        return $note ?: null;
+    }
+
+    /**
+     * Create a note for a project
+     */
+    public function createNote(int $projectId, string $content): ?array
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO project_notes (project_id, content)
+            VALUES (:project_id, :content)
+        ");
+        $stmt->execute([
+            'project_id' => $projectId,
+            'content' => $content
+        ]);
+
+        $noteId = (int) $this->db->lastInsertId();
+        return $this->getNoteById($noteId);
+    }
+
+    /**
+     * Delete a project note
+     */
+    public function deleteNote(int $noteId): bool
+    {
+        $stmt = $this->db->prepare("
+            DELETE FROM project_notes
+            WHERE id = :id
+        ");
+        return $stmt->execute(['id' => $noteId]);
+    }
 }
