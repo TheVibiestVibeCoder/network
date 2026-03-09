@@ -4324,3 +4324,55 @@ textarea.form-input {
         filter: none !important;
     }
 }
+
+/* ============================================
+   Contact Deck Entrance Animation
+   ============================================ */
+
+#listView .contacts-list {
+    perspective: 1400px;
+    transform-style: preserve-3d;
+}
+
+#listView .contact-card {
+    transform-origin: 50% 8%;
+    backface-visibility: hidden;
+    will-change: transform, opacity, filter;
+}
+
+#listView .contact-card.contact-card--deck-enter {
+    animation-name: contactDeckIn;
+    animation-duration: 390ms;
+    animation-timing-function: cubic-bezier(0.22, 0.68, 0.2, 1);
+    animation-fill-mode: both;
+    animation-delay: calc(var(--deck-order, 0) * 28ms);
+}
+
+@keyframes contactDeckIn {
+    0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.987) rotateX(6deg);
+        filter: blur(4px) saturate(88%);
+    }
+
+    65% {
+        opacity: 1;
+        transform: translateY(-1px) scale(1.002) rotateX(0deg);
+        filter: blur(0) saturate(100%);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotateX(0deg);
+        filter: blur(0) saturate(100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #listView .contact-card.contact-card--deck-enter {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+}

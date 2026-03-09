@@ -810,6 +810,7 @@
 
         elements.contactsList.innerHTML = html;
         addContactListEventHandlers();
+        triggerContactDeckAnimation();
     }
 
     /**
@@ -913,8 +914,33 @@
 
         elements.contactsList.innerHTML = html;
         addContactListEventHandlers();
+        triggerContactDeckAnimation();
     }
 
+    function triggerContactDeckAnimation() {
+        if (!elements.contactsList) {
+            return;
+        }
+
+        const cards = elements.contactsList.querySelectorAll('.contact-card');
+        if (!cards || cards.length === 0) {
+            return;
+        }
+
+        cards.forEach((card, index) => {
+            card.style.setProperty('--deck-order', Math.min(index, 24));
+            card.classList.remove('contact-card--deck-enter');
+        });
+
+        // Reflow ensures animation restarts during fast search/filter updates.
+        void elements.contactsList.offsetWidth;
+
+        requestAnimationFrame(() => {
+            cards.forEach((card) => {
+                card.classList.add('contact-card--deck-enter');
+            });
+        });
+    }
     function addContactListEventHandlers() {
         // Add click handlers to contact cards - open overview modal
         elements.contactsList.querySelectorAll('.contact-card').forEach(card => {
@@ -4097,6 +4123,7 @@
     }
 
 })();
+
 
 
 
