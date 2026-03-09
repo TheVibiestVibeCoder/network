@@ -454,7 +454,7 @@ if ($isAuthenticated) {
                                         </div>
                                     </div>
                                     <div class="dashboard-card-sub" id="dashProjSub">
-                                        Probability × budget midpoint · stage-blended · open projects only
+                                        Stage-aware probability bands - timeline-adjusted - open projects only
                                     </div>
                                 </div>
                             </div>

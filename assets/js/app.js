@@ -2465,59 +2465,222 @@
 
     function updateProjectsDashboard(projects) {
         const total = projects.length;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        // Helper: check if a budget value is a real number (not null/empty)
-        function hasBudgetVal(v) {
-            return v !== null && v !== '' && v !== undefined && !isNaN(parseFloat(v));
+        const STAGE_MODEL = {
+            'Lead':        { base: 0.12, blend: 0.45, spread: 0.28 },
+            'Proposal':    { base: 0.32, blend: 0.35, spread: 0.22 },
+            'Negotiation': { base: 0.58, blend: 0.25, spread: 0.16 },
+            'In Progress': { base: 0.82, blend: 0.12, spread: 0.10 },
+            'Complete':    { base: 1.00, blend: 0.00, spread: 0.00 }
+        };
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
         }
 
-        // Budget potential: sum of all min/max budgets, tracking which projects contribute
-        let sumMin = 0, sumMax = 0;
-        let projectsWithBudget = 0;
-        projects.forEach(p => {
-            const hasMin = hasBudgetVal(p.budget_min);
-            const hasMax = hasBudgetVal(p.budget_max);
-            if (hasMin || hasMax) {
-                projectsWithBudget++;
-                if (hasMin) sumMin += parseFloat(p.budget_min);
-                if (hasMax) sumMax += parseFloat(p.budget_max);
+        function parseNumber(v) {
+            if (v === null || v === '' || v === undefined) {
+                return null;
             }
-        });
-        const projectsUndetermined = total - projectsWithBudget;
-
-        // Success chance: weighted by mid-point budget if available, else simple average
-        const withChance = projects.filter(p => p.success_chance !== null && p.success_chance !== '');
-        let avgChance = null;
-        if (withChance.length > 0) {
-            const totalWeight = withChance.reduce((acc, p) => {
-                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
-                return acc + (mid > 0 ? mid : 1);
-            }, 0);
-            const weightedSum = withChance.reduce((acc, p) => {
-                const mid = ((parseFloat(p.budget_min) || 0) + (parseFloat(p.budget_max) || 0)) / 2;
-                const weight = mid > 0 ? mid : 1;
-                return acc + (parseFloat(p.success_chance) * weight);
-            }, 0);
-            avgChance = Math.round(weightedSum / totalWeight);
+            const num = parseFloat(v);
+            return Number.isFinite(num) ? num : null;
         }
 
-        // Format budget range compactly
+        function parseDate(dateValue) {
+            if (!dateValue) {
+                return null;
+            }
+            const date = new Date(`${dateValue}T00:00:00`);
+            if (Number.isNaN(date.getTime())) {
+                return null;
+            }
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        function parseProjectBudget(project) {
+            const minRaw = parseNumber(project.budget_min);
+            const maxRaw = parseNumber(project.budget_max);
+
+            if (minRaw === null && maxRaw === null) {
+                return null;
+            }
+
+            let low = minRaw !== null ? minRaw : maxRaw;
+            let high = maxRaw !== null ? maxRaw : minRaw;
+
+            low = Math.max(0, low);
+            high = Math.max(0, high);
+
+            if (high < low) {
+                const tmp = low;
+                low = high;
+                high = tmp;
+            }
+
+            return {
+                low: low,
+                high: high,
+                mid: (low + high) / 2,
+                isUndetermined: low === 0 && high === 0
+            };
+        }
+
+        function getChanceModel(project) {
+            const stageCfg = STAGE_MODEL[project.stage] || STAGE_MODEL.Lead;
+            const chanceRaw = parseNumber(project.success_chance);
+            const userP = chanceRaw === null ? null : clamp(chanceRaw / 100, 0, 1);
+
+            let blendedP = userP === null
+                ? stageCfg.base
+                : (userP * (1 - stageCfg.blend)) + (stageCfg.base * stageCfg.blend);
+
+            let timelineFactor = 1;
+            let timelineSpread = 0;
+
+            const completionDate = parseDate(project.estimated_completion);
+            const startDate = parseDate(project.start_date);
+
+            if (completionDate !== null) {
+                const daysToCompletion = Math.round((completionDate - today) / 86400000);
+
+                if (daysToCompletion > 365) {
+                    timelineFactor = 0.91;
+                    timelineSpread += 0.07;
+                } else if (daysToCompletion > 180) {
+                    timelineFactor = 0.95;
+                    timelineSpread += 0.04;
+                } else if (daysToCompletion > 90) {
+                    timelineFactor = 0.98;
+                    timelineSpread += 0.02;
+                } else if (daysToCompletion < -30) {
+                    timelineFactor = 0.94;
+                    timelineSpread += 0.05;
+                }
+            } else {
+                timelineFactor = 0.96;
+                timelineSpread += 0.05;
+
+                if (startDate !== null) {
+                    const daysToStart = Math.round((startDate - today) / 86400000);
+                    if (daysToStart > 90) {
+                        timelineFactor *= 0.95;
+                        timelineSpread += 0.03;
+                    }
+                }
+            }
+
+            let prob = clamp(blendedP * timelineFactor, 0, 1);
+
+            if (project.stage === 'Complete' || userP === 1) {
+                prob = 1;
+            } else if (userP === 0) {
+                prob = 0;
+            }
+
+            const spread = (project.stage === 'Complete' || userP === 1)
+                ? 0
+                : clamp(stageCfg.spread + timelineSpread + (userP === null ? 0.03 : 0), 0.05, 0.40);
+
+            return {
+                prob: prob,
+                spread: spread,
+                userP: userP
+            };
+        }
+
         function formatBudget(n) {
-            if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-            if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
+            if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
             return n.toFixed(0);
         }
 
+        function formatCurrency(n) {
+            return `${formatBudget(Math.round(n))} EUR`;
+        }
+
+        let sumMinPotential = 0;
+        let sumMaxPotential = 0;
+        let projectsWithBudget = 0;
+        let guaranteedAtMax = 0;
+
+        let weightedChanceSum = 0;
+        let weightedChanceWeight = 0;
+
+        let projConservative = 0;
+        let projRealistic = 0;
+        let projOptimistic = 0;
+        let projIncluded = 0;
+        let projExcluded = 0;
+        const openProjects = projects.filter(p => p.stage !== 'Complete').length;
+
+        projects.forEach((project) => {
+            const budget = parseProjectBudget(project);
+            const isOpen = project.stage !== 'Complete';
+
+            if (!budget || budget.isUndetermined) {
+                if (isOpen) {
+                    projExcluded++;
+                }
+                return;
+            }
+
+            const chance = getChanceModel(project);
+            const isGuaranteedMax = chance.userP === 1;
+
+            projectsWithBudget++;
+            if (isGuaranteedMax) {
+                sumMinPotential += budget.high;
+                sumMaxPotential += budget.high;
+                guaranteedAtMax++;
+            } else {
+                sumMinPotential += budget.low;
+                sumMaxPotential += budget.high;
+            }
+
+            if (!isOpen) {
+                return;
+            }
+
+            const mode = budget.low + ((budget.high - budget.low) * chance.prob);
+            const expectedBudget = (budget.low + budget.high + mode) / 3;
+            const weight = expectedBudget > 0 ? expectedBudget : 1;
+
+            weightedChanceSum += (chance.prob * 100) * weight;
+            weightedChanceWeight += weight;
+
+            if (isGuaranteedMax || chance.prob === 1) {
+                projConservative += budget.high;
+                projRealistic += budget.high;
+                projOptimistic += budget.high;
+            } else {
+                const pLow = clamp(chance.prob - chance.spread, 0, 1);
+                const pHigh = clamp(chance.prob + chance.spread, 0, 1);
+
+                projConservative += budget.low * pLow;
+                projRealistic += expectedBudget * chance.prob;
+                projOptimistic += budget.high * pHigh;
+            }
+
+            projIncluded++;
+        });
+
+        const projectsUndetermined = total - projectsWithBudget;
+        const avgChance = weightedChanceWeight > 0
+            ? Math.round(weightedChanceSum / weightedChanceWeight)
+            : null;
+
         const chanceText = avgChance !== null ? `${avgChance}%` : 'N/A';
+
         let potentialText;
-        if (projectsWithBudget === 0) {
+        if (projectsWithBudget === 0 || (sumMinPotential === 0 && sumMaxPotential === 0)) {
             potentialText = 'Undetermined';
-        } else if (sumMin === 0 && sumMax === 0) {
-            potentialText = 'Undetermined';
-        } else if (sumMin > 0 && sumMax > 0 && sumMin !== sumMax) {
-            potentialText = `${formatBudget(sumMin)} – ${formatBudget(sumMax)} €`;
+        } else if (sumMinPotential !== sumMaxPotential) {
+            potentialText = `${formatBudget(sumMinPotential)} - ${formatBudget(sumMaxPotential)} EUR`;
         } else {
-            potentialText = `${formatBudget(sumMax || sumMin)} €`;
+            potentialText = `${formatBudget(sumMaxPotential)} EUR`;
         }
 
         // Update expanded card view
@@ -2525,15 +2688,19 @@
         document.getElementById('dashTotalPotential').textContent = potentialText;
         document.getElementById('dashSuccessChance').textContent = chanceText;
 
-        // Sub-line: how many projects contribute to the potential
-        const subEl = document.getElementById('dashPotentialSub');
-        if (subEl) {
+        const potentialSub = document.getElementById('dashPotentialSub');
+        if (potentialSub) {
             if (projectsWithBudget === 0) {
-                subEl.textContent = 'No budget data available';
-            } else if (projectsUndetermined > 0) {
-                subEl.textContent = `${projectsWithBudget} of ${total} projects · ${projectsUndetermined} undetermined`;
+                potentialSub.textContent = 'No budget data available';
             } else {
-                subEl.textContent = `All ${total} projects included`;
+                const parts = [`${projectsWithBudget} of ${total} projects with budget`];
+                if (projectsUndetermined > 0) {
+                    parts.push(`${projectsUndetermined} undetermined`);
+                }
+                if (guaranteedAtMax > 0) {
+                    parts.push(`${guaranteedAtMax} at 100% counted with max budget`);
+                }
+                potentialSub.textContent = parts.join(' - ');
             }
         }
 
@@ -2545,67 +2712,42 @@
         if (dashBarPotential) dashBarPotential.textContent = potentialText;
         if (dashBarChance) dashBarChance.textContent = chanceText;
 
-        // ---- Revenue Projection ----
-        // Per-stage fallback probability when success_chance is not set
-        const STAGE_DEFAULT_PROB = {
-            'Lead': 0.10, 'Proposal': 0.30,
-            'Negotiation': 0.55, 'In Progress': 0.80
-        };
-        // How much each stage anchors toward the default (vs. trusting user input)
-        const STAGE_BLEND = {
-            'Lead': 0.30, 'Proposal': 0.40,
-            'Negotiation': 0.55, 'In Progress': 0.70
-        };
+        const hasProjection = projIncluded > 0 && projOptimistic > 0;
+        const projConText = hasProjection ? formatCurrency(projConservative) : '--';
+        const projRelText = hasProjection ? formatCurrency(projRealistic) : '--';
+        const projOptText = hasProjection ? formatCurrency(projOptimistic) : '--';
 
-        let projEV = 0, projIncluded = 0, projExcluded = 0;
+        let projSubText;
+        if (projIncluded === 0) {
+            projSubText = 'No open projects with usable budget data';
+        } else {
+            const projParts = [`${projIncluded} of ${openProjects} open projects included`];
+            if (projExcluded > 0) {
+                projParts.push(`${projExcluded} missing budget data`);
+            }
+            if (guaranteedAtMax > 0) {
+                projParts.push(`100% projects fixed at max budget`);
+            }
+            projSubText = projParts.join(' - ');
+        }
 
-        projects.forEach(function(p) {
-            if (p.stage === 'Complete') return; // excluded — already realised revenue
-            const stageDef = STAGE_DEFAULT_PROB[p.stage];
-            if (stageDef === undefined) return;
-
-            // Budget midpoint
-            const hasMin = hasBudgetVal(p.budget_min);
-            const hasMax = hasBudgetVal(p.budget_max);
-            let mid = null;
-            if (hasMin && hasMax)  mid = (parseFloat(p.budget_min) + parseFloat(p.budget_max)) / 2;
-            else if (hasMin)       mid = parseFloat(p.budget_min);
-            else if (hasMax)       mid = parseFloat(p.budget_max);
-            if (mid === null) { projExcluded++; return; }
-
-            // Effective probability: blend user input with stage anchor
-            const blendW = STAGE_BLEND[p.stage];
-            const userP  = (p.success_chance !== null && p.success_chance !== '')
-                           ? parseFloat(p.success_chance) / 100 : null;
-            const prob   = (userP === null)
-                           ? stageDef
-                           : userP * (1 - blendW) + stageDef * blendW;
-
-            projEV += mid * prob;
-            projIncluded++;
-        });
-
-        function fmtProj(n) { return formatBudget(Math.round(n)) + ' €'; }
-        const hasProj = projIncluded > 0 && projEV > 0;
-
-        const projConText = hasProj ? fmtProj(projEV * 0.60) : '—';
-        const projRelText = hasProj ? fmtProj(projEV)         : '—';
-        const projOptText = hasProj ? fmtProj(projEV * 1.35)  : '—';
-        const projSubText = projIncluded === 0
-            ? 'No open projects with budget data'
-            : projExcluded > 0
-                ? `${projIncluded} projects included · ${projExcluded} missing budget data`
-                : `All ${projIncluded} open projects included`;
-
-        ['dashProjConservative', 'dashProjRealistic', 'dashProjOptimistic', 'dashProjSub'].forEach((id, i) => {
+        ['dashProjConservative', 'dashProjRealistic', 'dashProjOptimistic', 'dashProjSub'].forEach((id, idx) => {
             const el = document.getElementById(id);
-            if (el) el.textContent = [projConText, projRelText, projOptText, projSubText][i];
+            if (!el) {
+                return;
+            }
+
+            if (idx === 0) el.textContent = projConText;
+            if (idx === 1) el.textContent = projRelText;
+            if (idx === 2) el.textContent = projOptText;
+            if (idx === 3) el.textContent = projSubText;
         });
 
-        const dashBarProj = document.getElementById('dashBarProjection');
-        if (dashBarProj) dashBarProj.textContent = hasProj ? `~${fmtProj(projEV)}` : '—';
+        const dashBarProjection = document.getElementById('dashBarProjection');
+        if (dashBarProjection) {
+            dashBarProjection.textContent = hasProjection ? `~${formatCurrency(projRealistic)}` : '--';
+        }
     }
-
     async function loadProjects() {
         try {
             const result = await api.getProjects(
