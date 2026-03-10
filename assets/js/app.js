@@ -64,6 +64,7 @@
         todoContactFilterId: '',
         todoProjectFilterId: '',
         todoFilterOptionsInitialized: false,
+        editingTodoId: null,
         todoModalContext: null
     };
 
@@ -593,6 +594,11 @@
 
             const url = query.toString() ? `api/todos.php?${query}` : 'api/todos.php';
             const response = await fetch(url);
+            return response.json();
+        },
+
+        async getTodo(id) {
+            const response = await fetch(`api/todos.php?id=${id}`);
             return response.json();
         },
 
@@ -1413,11 +1419,16 @@
                         </div>
                         ${openButtons}
                     </div>
-                    <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                        </svg>
-                    </button>
+                    <div class="todo-actions">
+                        <button type="button" class="btn btn-secondary btn-small todo-edit-btn" data-todo-edit="${todo.id}">
+                            Bearbeiten
+                        </button>
+                        <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -1477,22 +1488,48 @@
         elements.todoAssigneeId.value = selectedId ? String(selectedId) : '';
     }
 
-    async function openTodoModal(context = null) {
+    function updateTodoModalForMode(isEditMode) {
+        if (!elements.todoModalTitle || !elements.saveTodoBtn) {
+            return;
+        }
+
+        if (isEditMode) {
+            elements.todoModalTitle.textContent = 'To-Do Bearbeiten';
+            elements.saveTodoBtn.textContent = 'Speichern';
+        } else {
+            elements.todoModalTitle.textContent = 'New To-Do';
+            elements.saveTodoBtn.textContent = 'Create To-Do';
+        }
+    }
+
+    async function openTodoModal(context = null, todoData = null) {
         if (!elements.todoModal || !elements.todoForm) {
             return;
         }
 
+        const isEditMode = !!(todoData && todoData.id);
+
         state.todoModalContext = context;
+        state.editingTodoId = isEditMode ? Number(todoData.id) : null;
         elements.todoForm.reset();
         elements.todoAssignType.disabled = false;
         elements.todoAssigneeId.disabled = false;
-        elements.todoModalTitle.textContent = 'New To-Do';
+        updateTodoModalForMode(isEditMode);
 
         await ensureTodoAssignmentData(true);
 
         let assignType = 'contact';
         let assigneeId = null;
-        if (context && context.type === 'project') {
+
+        if (isEditMode) {
+            if (todoData.project_id) {
+                assignType = 'project';
+                assigneeId = todoData.project_id;
+            } else if (todoData.contact_id) {
+                assignType = 'contact';
+                assigneeId = todoData.contact_id;
+            }
+        } else if (context && context.type === 'project') {
             assignType = 'project';
             assigneeId = context.id || null;
             elements.todoModalTitle.textContent = 'New To-Do for Project';
@@ -1505,13 +1542,38 @@
         elements.todoAssignType.value = assignType;
         populateTodoAssigneeOptions(assignType, assigneeId);
 
-        if (context && context.locked) {
+        if (!isEditMode && context && context.locked) {
             elements.todoAssignType.disabled = true;
             elements.todoAssigneeId.disabled = true;
         }
 
+        if (isEditMode) {
+            elements.todoTitle.value = todoData.title || '';
+            elements.todoDescription.value = todoData.description || '';
+            elements.todoDueDate.value = todoData.due_date || '';
+        }
+
         elements.todoModal.classList.add('active');
         elements.todoTitle.focus();
+    }
+
+    async function openTodoEditModal(todoId) {
+        if (!Number.isInteger(todoId) || todoId <= 0) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (!result.success) {
+                alert(result.error || 'Error loading to-do');
+                return;
+            }
+
+            await openTodoModal(null, result.data);
+        } catch (error) {
+            console.error('Error loading to-do for editing:', error);
+            alert('Error loading to-do');
+        }
     }
 
     function closeTodoModal() {
@@ -1521,9 +1583,11 @@
 
         elements.todoModal.classList.remove('active');
         state.todoModalContext = null;
+        state.editingTodoId = null;
         if (elements.todoForm) {
             elements.todoForm.reset();
         }
+        updateTodoModalForMode(false);
     }
 
     async function saveTodo(e) {
@@ -1562,24 +1626,27 @@
 
         if (elements.saveTodoBtn) {
             elements.saveTodoBtn.disabled = true;
-            elements.saveTodoBtn.textContent = 'Creating...';
+            elements.saveTodoBtn.textContent = state.editingTodoId ? 'Saving...' : 'Creating...';
         }
 
         try {
-            const result = await api.createTodo(payload);
+            const result = state.editingTodoId
+                ? await api.updateTodo(state.editingTodoId, payload)
+                : await api.createTodo(payload);
+
             if (result.success) {
                 closeTodoModal();
                 await refreshVisibleTodoLists();
             } else {
-                alert(result.error || 'Error creating to-do');
+                alert(result.error || (state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do'));
             }
         } catch (error) {
-            console.error('Error creating to-do:', error);
-            alert('Error creating to-do');
+            console.error(state.editingTodoId ? 'Error updating to-do:' : 'Error creating to-do:', error);
+            alert(state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do');
         } finally {
             if (elements.saveTodoBtn) {
                 elements.saveTodoBtn.disabled = false;
-                elements.saveTodoBtn.textContent = 'Create To-Do';
+                updateTodoModalForMode(!!state.editingTodoId);
             }
         }
     }
@@ -1666,6 +1733,15 @@
         });
 
         container.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('[data-todo-edit]');
+            if (editBtn) {
+                const todoId = parseInt(editBtn.dataset.todoEdit, 10);
+                if (Number.isInteger(todoId)) {
+                    await openTodoEditModal(todoId);
+                }
+                return;
+            }
+
             const deleteBtn = e.target.closest('[data-todo-delete]');
             if (deleteBtn) {
                 const todoId = parseInt(deleteBtn.dataset.todoDelete, 10);

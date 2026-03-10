@@ -890,6 +890,18 @@ textarea.form-input {
     flex-wrap: wrap;
 }
 
+.todo-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-2);
+    flex-shrink: 0;
+}
+
+.todo-edit-btn {
+    min-width: 92px;
+}
+
 .todo-delete-btn {
     opacity: 0.65;
 }
