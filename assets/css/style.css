@@ -727,6 +727,192 @@ textarea.form-input {
     display: flex;
 }
 
+/* ============================================
+   To-Do View
+   ============================================ */
+
+#todoView {
+    display: none;
+    flex-direction: column;
+    background-color: var(--color-bg);
+}
+
+#todoView.active {
+    display: flex;
+}
+
+.todo-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+.todo-controls .search-box {
+    flex: 1;
+    min-width: 240px;
+    max-width: none;
+}
+
+.todo-controls .form-select {
+    min-width: 140px;
+    width: auto;
+}
+
+.todos-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-4) var(--spacing-5);
+    display: grid;
+    gap: var(--spacing-3);
+    align-content: flex-start;
+}
+
+.todo-list {
+    margin-bottom: var(--spacing-4);
+    max-height: 320px;
+    overflow-y: auto;
+    display: grid;
+    gap: var(--spacing-2);
+}
+
+.todo-item {
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-3);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.todo-item:hover {
+    border-color: var(--color-text-muted);
+}
+
+.todo-main {
+    display: flex;
+    gap: var(--spacing-3);
+    align-items: flex-start;
+}
+
+.todo-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.todo-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.todo-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.todo-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-1);
+}
+
+.todo-title {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.todo-description {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.todo-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-2);
+}
+
+.todo-due {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+}
+
+.todo-due-overdue {
+    color: var(--color-danger);
+    background-color: var(--color-danger-subtle);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+.todo-context {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    border: 1px solid transparent;
+}
+
+.todo-context--contact {
+    color: #6ee7b7;
+    background-color: rgba(52, 211, 153, 0.12);
+    border-color: rgba(52, 211, 153, 0.35);
+}
+
+.todo-context--project {
+    color: #93c5fd;
+    background-color: rgba(96, 165, 250, 0.12);
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.todo-open-links {
+    margin-top: var(--spacing-2);
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+.todo-delete-btn {
+    opacity: 0.65;
+}
+
+.todo-item:hover .todo-delete-btn {
+    opacity: 1;
+}
+
+.todo-completed .todo-title {
+    text-decoration: line-through;
+    color: var(--color-text-muted);
+}
+
+.todo-completed .todo-description {
+    color: var(--color-text-muted);
+}
+
+.todo-assignment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-4);
+}
+
 .list-header {
     padding: var(--spacing-3) var(--spacing-5);
     background-color: var(--color-bg);
@@ -2665,6 +2851,29 @@ textarea.form-input {
         padding: var(--spacing-3);
     }
 
+    .todo-controls {
+        width: 100%;
+    }
+
+    .todo-controls .search-box {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .todo-controls .form-select,
+    .todo-controls .btn {
+        width: 100%;
+    }
+
+    .todos-list {
+        padding: var(--spacing-3);
+    }
+
+    .todo-assignment-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
     .search-box {
         max-width: none;
         width: 100%;
@@ -2907,6 +3116,14 @@ textarea.form-input {
     .toggle-btn svg {
         width: 18px;
         height: 18px;
+    }
+
+    .todo-main {
+        gap: var(--spacing-2);
+    }
+
+    .todo-open-links .btn {
+        flex: 1;
     }
 
     .calendar-title {

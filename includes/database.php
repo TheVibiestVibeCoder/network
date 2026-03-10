@@ -192,5 +192,30 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_contacts_contact ON project_contacts(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_project ON project_tags(project_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_tag ON project_tags(tag_id)");
+
+        // Create todos table (can belong to a contact or a project)
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                due_date DATE,
+                is_completed INTEGER NOT NULL DEFAULT 0,
+                contact_id INTEGER,
+                project_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                CHECK (contact_id IS NOT NULL OR project_id IS NOT NULL),
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        ");
+
+        // Create indexes for todos
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_contact_id ON todos(contact_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_is_completed ON todos(is_completed)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at)");
     }
 }
