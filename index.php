@@ -369,13 +369,20 @@ if ($isAuthenticated) {
                 <!-- To-Do View -->
                 <div class="view-panel" id="todoView">
                     <div class="list-header">
-                        <div class="todo-controls">
+                        <div class="list-header-top">
                             <div class="search-box">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
                                     <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                                 </svg>
                                 <input type="text" id="searchTodosInput" placeholder="Search to-dos..." class="search-input">
                             </div>
+                            <button type="button" class="btn btn-icon list-filter-toggle" id="todoFilterToggle" title="Filters">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="todo-controls list-controls" id="todoFilterControls">
                             <select id="todoContactFilter" class="form-select">
                                 <option value="">All People</option>
                             </select>
@@ -406,6 +413,7 @@ if ($isAuthenticated) {
                     <div class="dashboard-wrapper collapsed" id="dashboardWrapper">
                         <!-- Collapsed bar (always visible) -->
                         <div class="dashboard-bar" id="dashboardBar">
+                            <div class="dashboard-mobile-label">Project Dashboard</div>
                             <div class="dashboard-bar-stats" id="dashboardBarStats">
                                 <div class="dashboard-bar-stat">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>

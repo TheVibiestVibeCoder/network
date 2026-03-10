@@ -1421,6 +1421,7 @@
                 showContext: false,
                 emptyMessage: 'No to-dos found'
             });
+            triggerTodoDeckAnimation(container);
             return;
         }
 
@@ -1473,6 +1474,32 @@
         }).join('');
 
         container.innerHTML = html;
+        triggerTodoDeckAnimation(container);
+    }
+
+    function triggerTodoDeckAnimation(container = elements.todosList) {
+        if (!container) {
+            return;
+        }
+
+        const animTargets = container.querySelectorAll('.todo-group, .todo-item, .notes-empty');
+        if (!animTargets || animTargets.length === 0) {
+            return;
+        }
+
+        animTargets.forEach((el, index) => {
+            el.style.setProperty('--todo-deck-order', Math.min(index, 24));
+            el.classList.remove('todo-deck-enter');
+        });
+
+        // Reflow ensures animation restarts during rapid filter/search updates.
+        void container.offsetWidth;
+
+        requestAnimationFrame(() => {
+            animTargets.forEach((el) => {
+                el.classList.add('todo-deck-enter');
+            });
+        });
     }
 
     function createTodoItemMarkup(todo, options = {}) {
@@ -4639,6 +4666,17 @@
             listFilterToggle.addEventListener('click', () => {
                 listControls.classList.toggle('open');
                 listFilterToggle.classList.toggle('active');
+            });
+        }
+
+        // To-do filter toggle (mobile - collapsible controls)
+        const todoFilterToggle = document.getElementById('todoFilterToggle');
+        const todoFilterControls = document.getElementById('todoFilterControls');
+
+        if (todoFilterToggle && todoFilterControls) {
+            todoFilterToggle.addEventListener('click', () => {
+                todoFilterControls.classList.toggle('open');
+                todoFilterToggle.classList.toggle('active');
             });
         }
 
