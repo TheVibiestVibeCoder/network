@@ -181,6 +181,11 @@ if ($isAuthenticated) {
                                 <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
                             </svg>
                         </button>
+                        <button type="button" class="toggle-btn" data-view="todos" title="To-Dos">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                            </svg>
+                        </button>
                         <button type="button" class="toggle-btn" data-view="list" title="List">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
@@ -290,7 +295,7 @@ if ($isAuthenticated) {
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="cal-search-icon">
                                 <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                             </svg>
-                            <input type="text" id="calSearchInput" placeholder="Name oder Firma suchen..." class="cal-search-input">
+                            <input type="text" id="calSearchInput" placeholder="Name, Firma, Projekt oder To-do suchen..." class="cal-search-input">
                         </div>
                         <div class="calendar-tag-filter">
                             <select id="calTagFilter" class="form-select">
@@ -358,6 +363,40 @@ if ($isAuthenticated) {
                     </div>
                     <div class="contacts-list" id="contactsList">
                         <!-- Contacts will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- To-Do View -->
+                <div class="view-panel" id="todoView">
+                    <div class="list-header">
+                        <div class="todo-controls">
+                            <div class="search-box">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" class="search-icon">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                <input type="text" id="searchTodosInput" placeholder="Search to-dos..." class="search-input">
+                            </div>
+                            <select id="todoContactFilter" class="form-select">
+                                <option value="">All People</option>
+                            </select>
+                            <select id="todoProjectFilter" class="form-select">
+                                <option value="">All Projects</option>
+                            </select>
+                            <select id="todoStatusFilter" class="form-select">
+                                <option value="open">Open</option>
+                                <option value="completed">Completed</option>
+                                <option value="all">All</option>
+                            </select>
+                            <button type="button" class="btn btn-primary" id="addTodoBtn">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                <span>New To-Do</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="todos-list" id="todosList">
+                        <!-- To-dos will be loaded here -->
                     </div>
                 </div>
 
@@ -648,6 +687,22 @@ if ($isAuthenticated) {
                         <h3 class="overview-section-title">Related Projects</h3>
                         <div class="contact-projects-list" id="contactProjects">
                             <!-- Projects will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Contact To-Dos Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">To-Dos</h3>
+                        <div class="todo-list" id="contactTodosList">
+                            <!-- To-dos will be populated by JS -->
+                        </div>
+                        <div class="add-note-form">
+                            <button type="button" class="btn btn-secondary" id="addContactTodoBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                New To-Do
+                            </button>
                         </div>
                     </div>
 
@@ -1057,6 +1112,22 @@ if ($isAuthenticated) {
                         </div>
                     </div>
 
+                    <!-- Project To-Dos Section -->
+                    <div class="overview-section">
+                        <h3 class="overview-section-title">Project To-Dos</h3>
+                        <div class="todo-list" id="projectTodosList">
+                            <!-- Project to-dos will be populated by JS -->
+                        </div>
+                        <div class="add-note-form">
+                            <button type="button" class="btn btn-secondary" id="addProjectTodoBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                New To-Do
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Project Notes Section -->
                     <div class="overview-section">
                         <h3 class="overview-section-title">Project Notes</h3>
@@ -1089,6 +1160,57 @@ if ($isAuthenticated) {
                         Edit Project
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- To-Do Modal -->
+        <div class="modal" id="todoModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="todoModalTitle">New To-Do</h2>
+                    <button type="button" class="modal-close" id="closeTodoModal">&times;</button>
+                </div>
+                <form id="todoForm">
+                    <div class="modal-body">
+                        <div class="form-section">
+                            <div class="form-group">
+                                <label for="todoTitle">Title *</label>
+                                <input type="text" id="todoTitle" class="form-input" required maxlength="255" placeholder="Follow up with client">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="todoDescription">Description</label>
+                                <textarea id="todoDescription" class="form-input" rows="3" placeholder="Optional details"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="todoDueDate">Due Date</label>
+                                <input type="date" id="todoDueDate" class="form-input">
+                            </div>
+
+                            <div class="todo-assignment-grid">
+                                <div class="form-group">
+                                    <label for="todoAssignType">Assign To *</label>
+                                    <select id="todoAssignType" class="form-select" required>
+                                        <option value="contact">Contact</option>
+                                        <option value="project">Project</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="todoAssigneeId">Assignee *</label>
+                                    <select id="todoAssigneeId" class="form-select" required>
+                                        <option value="">Select...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="cancelTodoBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveTodoBtn">Create To-Do</button>
+                    </div>
+                </form>
             </div>
         </div>
 

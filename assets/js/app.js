@@ -37,7 +37,7 @@
         markers: null,
         mapBaseLayer: null,
         mapLabelLayer: null,
-        theme: 'dark',
+        theme: 'light',
         groupBy: 'company', // 'company' or 'tags'
         allTags: [],
         taggedData: null,
@@ -50,12 +50,22 @@
         calendarTagFilter: '',
         // Project state
         projects: [],
+        allProjects: [],
         projectSortField: 'name',
         projectSortOrder: 'ASC',
         projectSearchQuery: '',
         editingProjectId: null,
         viewingProjectId: null,
-        viewingProject: null
+        viewingProject: null,
+        // To-do state
+        todos: [],
+        todoSearchQuery: '',
+        todoStatusFilter: 'open',
+        todoContactFilterId: '',
+        todoProjectFilterId: '',
+        todoFilterOptionsInitialized: false,
+        editingTodoId: null,
+        todoModalContext: null
     };
 
     // ============================================
@@ -67,6 +77,7 @@
         mapView: document.getElementById('mapView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
+        todoView: document.getElementById('todoView'),
         mapContainer: document.getElementById('map'),
 
         // Calendar elements
@@ -92,6 +103,14 @@
         sortOrderIcon: document.getElementById('sortOrderIcon'),
         contactsList: document.getElementById('contactsList'),
         groupBtns: document.querySelectorAll('.group-btn'),
+
+        // To-do view
+        todosList: document.getElementById('todosList'),
+        searchTodosInput: document.getElementById('searchTodosInput'),
+        todoContactFilter: document.getElementById('todoContactFilter'),
+        todoProjectFilter: document.getElementById('todoProjectFilter'),
+        todoStatusFilter: document.getElementById('todoStatusFilter'),
+        addTodoBtn: document.getElementById('addTodoBtn'),
 
         // Tag elements in overview modal
         contactTags: document.getElementById('contactTags'),
@@ -126,6 +145,8 @@
         overviewCompany: document.getElementById('overviewCompany'),
         overviewDetails: document.getElementById('overviewDetails'),
         contactProjects: document.getElementById('contactProjects'),
+        contactTodosList: document.getElementById('contactTodosList'),
+        addContactTodoBtn: document.getElementById('addContactTodoBtn'),
         notesTimeline: document.getElementById('notesTimeline'),
         newNoteContent: document.getElementById('newNoteContent'),
         addNoteBtn: document.getElementById('addNoteBtn'),
@@ -203,6 +224,8 @@
         projectTagSuggestions: document.getElementById('projectTagSuggestions'),
         addProjectTagBtn: document.getElementById('addProjectTagBtn'),
         projectContacts: document.getElementById('projectContacts'),
+        projectTodosList: document.getElementById('projectTodosList'),
+        addProjectTodoBtn: document.getElementById('addProjectTodoBtn'),
         projectNotesTimeline: document.getElementById('projectNotesTimeline'),
         newProjectNoteContent: document.getElementById('newProjectNoteContent'),
         addProjectNoteBtn: document.getElementById('addProjectNoteBtn'),
@@ -212,7 +235,20 @@
         closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
         closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
         deleteProjectOverviewBtn: document.getElementById('deleteProjectOverviewBtn'),
-        editProjectBtn: document.getElementById('editProjectBtn')
+        editProjectBtn: document.getElementById('editProjectBtn'),
+
+        // To-do modal
+        todoModal: document.getElementById('todoModal'),
+        todoModalTitle: document.getElementById('todoModalTitle'),
+        todoForm: document.getElementById('todoForm'),
+        todoTitle: document.getElementById('todoTitle'),
+        todoDescription: document.getElementById('todoDescription'),
+        todoDueDate: document.getElementById('todoDueDate'),
+        todoAssignType: document.getElementById('todoAssignType'),
+        todoAssigneeId: document.getElementById('todoAssigneeId'),
+        closeTodoModal: document.getElementById('closeTodoModal'),
+        cancelTodoBtn: document.getElementById('cancelTodoBtn'),
+        saveTodoBtn: document.getElementById('saveTodoBtn')
     };
 
     // ============================================
@@ -233,9 +269,9 @@
     function getStoredTheme() {
         try {
             const stored = localStorage.getItem(THEME_STORAGE_KEY);
-            return stored === 'light' || stored === 'dark' ? stored : 'dark';
+            return stored === 'light' || stored === 'dark' ? stored : 'light';
         } catch (e) {
-            return 'dark';
+            return 'light';
         }
     }
 
@@ -250,8 +286,16 @@
         }
 
         return `
-            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8zM1 13h3v-2H1zm10 9h2v-3h-2zm7.04-2.05l1.41-1.41-1.79-1.8-1.41 1.42zM20 13h3v-2h-3zM17.24 4.84l1.79-1.79-1.41-1.41-1.8 1.79zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM4.22 19.78l1.41 1.41 1.8-1.79-1.42-1.41zM11 1h2v3h-2z"/>
+            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"></circle>
+                <line x1="12" y1="1.5" x2="12" y2="4.5"></line>
+                <line x1="12" y1="19.5" x2="12" y2="22.5"></line>
+                <line x1="1.5" y1="12" x2="4.5" y2="12"></line>
+                <line x1="19.5" y1="12" x2="22.5" y2="12"></line>
+                <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"></line>
+                <line x1="17.7" y1="17.7" x2="19.8" y2="19.8"></line>
+                <line x1="17.7" y1="6.3" x2="19.8" y2="4.2"></line>
+                <line x1="4.2" y1="19.8" x2="6.3" y2="17.7"></line>
             </svg>
             <span class="theme-toggle-label">Light Mode</span>
         `;
@@ -546,6 +590,50 @@
                 body: JSON.stringify({ project_id: projectId, tag_id: tagId })
             });
             return response.json();
+        },
+
+        // To-dos API
+        async getTodos(params = {}) {
+            const query = new URLSearchParams();
+            if (params.contact_id) query.set('contact_id', params.contact_id);
+            if (params.project_id) query.set('project_id', params.project_id);
+            if (params.status) query.set('status', params.status);
+            if (params.search) query.set('search', params.search);
+
+            const url = query.toString() ? `api/todos.php?${query}` : 'api/todos.php';
+            const response = await fetch(url);
+            return response.json();
+        },
+
+        async getTodo(id) {
+            const response = await fetch(`api/todos.php?id=${id}`);
+            return response.json();
+        },
+
+        async createTodo(data) {
+            const response = await fetch('api/todos.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        },
+
+        async updateTodo(id, data) {
+            const response = await fetch(`api/todos.php?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify(data)
+            });
+            return response.json();
+        },
+
+        async deleteTodo(id) {
+            const response = await fetch(`api/todos.php?id=${id}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
         }
     };
 
@@ -751,11 +839,10 @@
     // Load all contacts without rendering (for autocomplete in projects)
     async function loadAllContacts() {
         try {
-            console.log('Loading all contacts for autocomplete...');
             const result = await api.getContacts('', 'name', 'ASC');
             if (result.success) {
                 state.contacts = result.data;
-                console.log('Loaded contacts:', state.contacts.length);
+                populateTodoOwnerFilters();
             }
         } catch (error) {
             console.error('Error loading all contacts:', error);
@@ -1108,6 +1195,7 @@
         elements.mapView.classList.toggle('active', view === 'map');
         elements.listView.classList.toggle('active', view === 'list');
         elements.calendarView.classList.toggle('active', view === 'calendar');
+        elements.todoView.classList.toggle('active', view === 'todos');
         elements.projectsView.classList.toggle('active', view === 'projects');
 
         // Refresh data for the active view
@@ -1119,6 +1207,8 @@
             loadMapMarkers();
         } else if (view === 'calendar') {
             loadCalendarNotes();
+        } else if (view === 'todos') {
+            loadTodos();
         } else if (view === 'projects') {
             loadProjects();
             // Also load contacts for autocomplete in project assignment
@@ -1128,6 +1218,664 @@
         } else {
             loadContacts();
         }
+    }
+
+    // ============================================
+    // To-Do Functions
+    // ============================================
+
+    async function loadAllProjectsForAssignment() {
+        try {
+            const result = await api.getProjects('', 'name', 'ASC');
+            if (result.success) {
+                state.allProjects = result.data || [];
+                populateTodoOwnerFilters();
+            }
+        } catch (error) {
+            console.error('Error loading projects for to-do assignment:', error);
+        }
+    }
+
+    async function loadTodos() {
+        if (!elements.todosList) {
+            return;
+        }
+
+        try {
+            if (!state.todoFilterOptionsInitialized) {
+                await ensureTodoAssignmentData(true);
+                state.todoFilterOptionsInitialized = true;
+            } else {
+                await ensureTodoAssignmentData();
+            }
+            populateTodoOwnerFilters();
+
+            const result = await api.getTodos({
+                status: state.todoStatusFilter,
+                search: state.todoSearchQuery,
+                contact_id: state.todoContactFilterId || '',
+                project_id: state.todoProjectFilterId || ''
+            });
+
+            if (result.success) {
+                state.todos = result.data || [];
+                renderGroupedTodosList(elements.todosList, state.todos);
+            } else {
+                elements.todosList.innerHTML = '<div class="empty-state">Error loading to-dos</div>';
+            }
+        } catch (error) {
+            console.error('Error loading to-dos:', error);
+            elements.todosList.innerHTML = '<div class="empty-state">Error loading to-dos</div>';
+        }
+    }
+
+    async function loadContactTodos(contactId) {
+        if (!elements.contactTodosList) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodos({ contact_id: contactId, status: 'all' });
+            if (result.success) {
+                renderTodoCollection(elements.contactTodosList, result.data || [], {
+                    showContext: false,
+                    emptyMessage: 'No to-dos yet for this contact'
+                });
+            } else {
+                renderTodoCollection(elements.contactTodosList, [], {
+                    showContext: false,
+                    emptyMessage: 'No to-dos yet for this contact'
+                });
+            }
+        } catch (error) {
+            console.error('Error loading contact to-dos:', error);
+        }
+    }
+
+    async function loadProjectTodos(projectId) {
+        if (!elements.projectTodosList) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodos({ project_id: projectId, status: 'all' });
+            if (result.success) {
+                renderTodoCollection(elements.projectTodosList, result.data || [], {
+                    showContext: false,
+                    emptyMessage: 'No to-dos yet for this project'
+                });
+            } else {
+                renderTodoCollection(elements.projectTodosList, [], {
+                    showContext: false,
+                    emptyMessage: 'No to-dos yet for this project'
+                });
+            }
+        } catch (error) {
+            console.error('Error loading project to-dos:', error);
+        }
+    }
+
+    function populateTodoOwnerFilters() {
+        if (elements.todoContactFilter) {
+            const contacts = (state.contacts || []).slice().sort((a, b) => {
+                return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
+            });
+
+            let contactOptions = '<option value="">All People</option>';
+            contacts.forEach(contact => {
+                const label = contact.company
+                    ? `${contact.name} (${contact.company})`
+                    : contact.name;
+                contactOptions += `<option value="${contact.id}">${escapeHtml(label)}</option>`;
+            });
+
+            elements.todoContactFilter.innerHTML = contactOptions;
+            elements.todoContactFilter.value = state.todoContactFilterId ? String(state.todoContactFilterId) : '';
+        }
+
+        if (elements.todoProjectFilter) {
+            const projects = (state.allProjects || []).slice().sort((a, b) => {
+                return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
+            });
+
+            let projectOptions = '<option value="">All Projects</option>';
+            projects.forEach(project => {
+                projectOptions += `<option value="${project.id}">${escapeHtml(project.name || `Project #${project.id}`)}</option>`;
+            });
+
+            elements.todoProjectFilter.innerHTML = projectOptions;
+            elements.todoProjectFilter.value = state.todoProjectFilterId ? String(state.todoProjectFilterId) : '';
+        }
+    }
+
+    function renderTodoCollection(container, todos, options = {}) {
+        if (!container) {
+            return;
+        }
+
+        const showContext = options.showContext === true;
+        const emptyMessage = options.emptyMessage || 'No to-dos yet';
+
+        if (!todos || todos.length === 0) {
+            container.innerHTML = `
+                <div class="notes-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+                    </svg>
+                    <p>${escapeHtml(emptyMessage)}</p>
+                </div>
+            `;
+            return;
+        }
+
+        const html = todos.map(todo => createTodoItemMarkup(todo, { showContext })).join('');
+        container.innerHTML = html;
+    }
+
+    function getTodoGroupMeta(todo) {
+        const hasProject = !!todo.project_id;
+        const hasContact = !!todo.contact_id;
+
+        const projectLabel = todo.project_name || `Project #${todo.project_id}`;
+        const contactLabel = todo.contact_name || `Contact #${todo.contact_id}`;
+
+        if (hasProject && hasContact) {
+            return {
+                key: `project:${todo.project_id}|contact:${todo.contact_id}`,
+                title: projectLabel,
+                subtitle: contactLabel,
+                kind: 'project-contact',
+                projectId: Number(todo.project_id),
+                contactId: Number(todo.contact_id)
+            };
+        }
+
+        if (hasProject) {
+            return {
+                key: `project:${todo.project_id}`,
+                title: projectLabel,
+                subtitle: 'Project',
+                kind: 'project',
+                projectId: Number(todo.project_id),
+                contactId: null
+            };
+        }
+
+        return {
+            key: `contact:${todo.contact_id}`,
+            title: contactLabel,
+            subtitle: 'Contact',
+            kind: 'contact',
+            projectId: null,
+            contactId: Number(todo.contact_id)
+        };
+    }
+
+    function renderGroupedTodosList(container, todos) {
+        if (!container) {
+            return;
+        }
+
+        if (!todos || todos.length === 0) {
+            renderTodoCollection(container, [], {
+                showContext: false,
+                emptyMessage: 'No to-dos found'
+            });
+            return;
+        }
+
+        const groupMap = new Map();
+        todos.forEach(todo => {
+            const meta = getTodoGroupMeta(todo);
+            if (!groupMap.has(meta.key)) {
+                groupMap.set(meta.key, {
+                    meta,
+                    items: []
+                });
+            }
+            groupMap.get(meta.key).items.push(todo);
+        });
+
+        const groups = Array.from(groupMap.values());
+
+        const html = groups.map(group => {
+            const { meta, items } = group;
+
+            const typeLabel = meta.kind === 'project-contact'
+                ? 'Project + Contact'
+                : (meta.kind === 'project' ? 'Project' : 'Contact');
+
+            const headerActions = `
+                <div class="todo-group-actions">
+                    ${meta.projectId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-project="${meta.projectId}">Open Project</button>` : ''}
+                    ${meta.contactId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-contact="${meta.contactId}">Open Contact</button>` : ''}
+                </div>
+            `;
+
+            return `
+                <div class="todo-group">
+                    <div class="todo-group-header">
+                        <div class="todo-group-title-wrap">
+                            <h3 class="todo-group-title">${escapeHtml(meta.title)}</h3>
+                            <p class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</p>
+                        </div>
+                        <div class="todo-group-meta">
+                            <span class="todo-group-type">${escapeHtml(typeLabel)}</span>
+                            <span class="todo-group-count">${items.length}</span>
+                        </div>
+                    </div>
+                    ${headerActions}
+                    <div class="todo-group-items">
+                        ${items.map(todo => createTodoItemMarkup(todo, { showContext: false })).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    function createTodoItemMarkup(todo, options = {}) {
+        const showContext = options.showContext === true;
+        const isCompleted = Number(todo.is_completed) === 1;
+        const dueDate = parseTodoDueDate(todo.due_date);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
+
+        let dueText = 'No due date';
+        if (dueDate) {
+            dueText = `Due ${dueDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            })}`;
+        }
+
+        let contextLabel = '';
+        let contextClass = '';
+        if (todo.contact_id) {
+            contextLabel = `Contact: ${todo.contact_name || `#${todo.contact_id}`}`;
+            contextClass = 'todo-context--contact';
+        } else if (todo.project_id) {
+            contextLabel = `Project: ${todo.project_name || `#${todo.project_id}`}`;
+            contextClass = 'todo-context--project';
+        }
+
+        const openButtons = showContext ? `
+            <div class="todo-open-links">
+                ${todo.contact_id ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-contact="${todo.contact_id}">Open Contact</button>` : ''}
+                ${todo.project_id ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-project="${todo.project_id}">Open Project</button>` : ''}
+            </div>
+        ` : '';
+
+        return `
+            <div class="todo-item${isCompleted ? ' todo-completed' : ''}" data-todo-id="${todo.id}">
+                <div class="todo-main">
+                    <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
+                        <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
+                        <span class="todo-check-indicator"></span>
+                    </label>
+                    <div class="todo-content">
+                        <div class="todo-title-row">
+                            <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
+                            ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
+                        </div>
+                        ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
+                        <div class="todo-meta">
+                            <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
+                        </div>
+                        ${openButtons}
+                    </div>
+                    <div class="todo-actions">
+                        <button type="button" class="btn btn-secondary btn-small todo-edit-btn" data-todo-edit="${todo.id}">
+                            Bearbeiten
+                        </button>
+                        <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function parseTodoDueDate(value) {
+        if (!value || typeof value !== 'string') {
+            return null;
+        }
+
+        const parsed = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) {
+            return null;
+        }
+
+        return parsed;
+    }
+
+    async function ensureTodoAssignmentData(forceReload = false) {
+        const tasks = [];
+
+        if (forceReload || !state.contacts || state.contacts.length === 0) {
+            tasks.push(loadAllContacts());
+        }
+
+        if (forceReload || !state.allProjects || state.allProjects.length === 0) {
+            tasks.push(loadAllProjectsForAssignment());
+        }
+
+        if (tasks.length > 0) {
+            await Promise.all(tasks);
+        }
+    }
+
+    function populateTodoAssigneeOptions(assignType, selectedId = null) {
+        if (!elements.todoAssigneeId) {
+            return;
+        }
+
+        const safeType = assignType === 'project' ? 'project' : 'contact';
+        const options = safeType === 'project' ? (state.allProjects || []) : (state.contacts || []);
+        const placeholder = safeType === 'project' ? 'Select project...' : 'Select contact...';
+
+        let html = `<option value="">${placeholder}</option>`;
+        options.forEach(item => {
+            const label = safeType === 'project'
+                ? (item.name || `Project #${item.id}`)
+                : (item.company ? `${item.name} (${item.company})` : item.name);
+            html += `<option value="${item.id}">${escapeHtml(label)}</option>`;
+        });
+
+        if (selectedId && !options.some(item => Number(item.id) === Number(selectedId))) {
+            html += `<option value="${selectedId}">Selected item not found</option>`;
+        }
+
+        elements.todoAssigneeId.innerHTML = html;
+        elements.todoAssigneeId.value = selectedId ? String(selectedId) : '';
+    }
+
+    function updateTodoModalForMode(isEditMode) {
+        if (!elements.todoModalTitle || !elements.saveTodoBtn) {
+            return;
+        }
+
+        if (isEditMode) {
+            elements.todoModalTitle.textContent = 'To-Do Bearbeiten';
+            elements.saveTodoBtn.textContent = 'Speichern';
+        } else {
+            elements.todoModalTitle.textContent = 'New To-Do';
+            elements.saveTodoBtn.textContent = 'Create To-Do';
+        }
+    }
+
+    async function openTodoModal(context = null, todoData = null) {
+        if (!elements.todoModal || !elements.todoForm) {
+            return;
+        }
+
+        const isEditMode = !!(todoData && todoData.id);
+
+        state.todoModalContext = context;
+        state.editingTodoId = isEditMode ? Number(todoData.id) : null;
+        elements.todoForm.reset();
+        elements.todoAssignType.disabled = false;
+        elements.todoAssigneeId.disabled = false;
+        updateTodoModalForMode(isEditMode);
+
+        await ensureTodoAssignmentData(true);
+
+        let assignType = 'contact';
+        let assigneeId = null;
+
+        if (isEditMode) {
+            if (todoData.project_id) {
+                assignType = 'project';
+                assigneeId = todoData.project_id;
+            } else if (todoData.contact_id) {
+                assignType = 'contact';
+                assigneeId = todoData.contact_id;
+            }
+        } else if (context && context.type === 'project') {
+            assignType = 'project';
+            assigneeId = context.id || null;
+            elements.todoModalTitle.textContent = 'New To-Do for Project';
+        } else if (context && context.type === 'contact') {
+            assignType = 'contact';
+            assigneeId = context.id || null;
+            elements.todoModalTitle.textContent = 'New To-Do for Contact';
+        }
+
+        elements.todoAssignType.value = assignType;
+        populateTodoAssigneeOptions(assignType, assigneeId);
+
+        if (!isEditMode && context && context.locked) {
+            elements.todoAssignType.disabled = true;
+            elements.todoAssigneeId.disabled = true;
+        }
+
+        if (isEditMode) {
+            elements.todoTitle.value = todoData.title || '';
+            elements.todoDescription.value = todoData.description || '';
+            elements.todoDueDate.value = todoData.due_date || '';
+        }
+
+        elements.todoModal.classList.add('active');
+        elements.todoTitle.focus();
+    }
+
+    async function openTodoEditModal(todoId) {
+        if (!Number.isInteger(todoId) || todoId <= 0) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (!result.success) {
+                alert(result.error || 'Error loading to-do');
+                return;
+            }
+
+            await openTodoModal(null, result.data);
+        } catch (error) {
+            console.error('Error loading to-do for editing:', error);
+            alert('Error loading to-do');
+        }
+    }
+
+    function closeTodoModal() {
+        if (!elements.todoModal) {
+            return;
+        }
+
+        elements.todoModal.classList.remove('active');
+        state.todoModalContext = null;
+        state.editingTodoId = null;
+        if (elements.todoForm) {
+            elements.todoForm.reset();
+        }
+        updateTodoModalForMode(false);
+    }
+
+    async function saveTodo(e) {
+        e.preventDefault();
+
+        const title = elements.todoTitle ? elements.todoTitle.value.trim() : '';
+        const description = elements.todoDescription ? elements.todoDescription.value.trim() : '';
+        const dueDate = elements.todoDueDate ? elements.todoDueDate.value : '';
+        const assignType = elements.todoAssignType ? elements.todoAssignType.value : 'contact';
+        const assigneeIdRaw = elements.todoAssigneeId ? elements.todoAssigneeId.value : '';
+        const assigneeId = parseInt(assigneeIdRaw, 10);
+
+        if (!title) {
+            alert('Please provide a title for the to-do.');
+            return;
+        }
+
+        if (!Number.isInteger(assigneeId) || assigneeId <= 0) {
+            alert('Please choose a valid contact or project assignment.');
+            return;
+        }
+
+        const payload = {
+            title,
+            description: description || null,
+            due_date: dueDate || null,
+            contact_id: null,
+            project_id: null
+        };
+
+        if (assignType === 'project') {
+            payload.project_id = assigneeId;
+        } else {
+            payload.contact_id = assigneeId;
+        }
+
+        if (elements.saveTodoBtn) {
+            elements.saveTodoBtn.disabled = true;
+            elements.saveTodoBtn.textContent = state.editingTodoId ? 'Saving...' : 'Creating...';
+        }
+
+        try {
+            const result = state.editingTodoId
+                ? await api.updateTodo(state.editingTodoId, payload)
+                : await api.createTodo(payload);
+
+            if (result.success) {
+                closeTodoModal();
+                await refreshVisibleTodoLists();
+            } else {
+                alert(result.error || (state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do'));
+            }
+        } catch (error) {
+            console.error(state.editingTodoId ? 'Error updating to-do:' : 'Error creating to-do:', error);
+            alert(state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do');
+        } finally {
+            if (elements.saveTodoBtn) {
+                elements.saveTodoBtn.disabled = false;
+                updateTodoModalForMode(!!state.editingTodoId);
+            }
+        }
+    }
+
+    async function setTodoCompletion(todoId, completed) {
+        try {
+            const result = await api.updateTodo(todoId, { is_completed: completed ? 1 : 0 });
+            if (result.success) {
+                await refreshVisibleTodoLists();
+                return true;
+            }
+
+            alert(result.error || 'Error updating to-do');
+            return false;
+        } catch (error) {
+            console.error('Error updating to-do:', error);
+            alert('Error updating to-do');
+            return false;
+        }
+    }
+
+    async function removeTodo(todoId) {
+        if (!confirm('Delete this to-do?')) {
+            return false;
+        }
+
+        try {
+            const result = await api.deleteTodo(todoId);
+            if (result.success) {
+                await refreshVisibleTodoLists();
+                return true;
+            }
+
+            alert(result.error || 'Error deleting to-do');
+            return false;
+        } catch (error) {
+            console.error('Error deleting to-do:', error);
+            alert('Error deleting to-do');
+            return false;
+        }
+    }
+
+    async function refreshVisibleTodoLists() {
+        const tasks = [];
+
+        if (state.currentView === 'todos') {
+            tasks.push(loadTodos());
+        }
+
+        if (state.viewingContactId) {
+            tasks.push(loadContactTodos(state.viewingContactId));
+        }
+
+        if (state.viewingProjectId) {
+            tasks.push(loadProjectTodos(state.viewingProjectId));
+        }
+
+        if (tasks.length > 0) {
+            await Promise.all(tasks);
+        }
+    }
+
+    function bindTodoListInteractions(container) {
+        if (!container) {
+            return;
+        }
+
+        container.addEventListener('change', async (e) => {
+            const checkbox = e.target.closest('[data-todo-toggle]');
+            if (!checkbox) {
+                return;
+            }
+
+            const todoId = parseInt(checkbox.dataset.todoToggle, 10);
+            if (!Number.isInteger(todoId)) {
+                return;
+            }
+
+            const previousState = !checkbox.checked;
+            const success = await setTodoCompletion(todoId, checkbox.checked);
+            if (!success) {
+                checkbox.checked = previousState;
+            }
+        });
+
+        container.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('[data-todo-edit]');
+            if (editBtn) {
+                const todoId = parseInt(editBtn.dataset.todoEdit, 10);
+                if (Number.isInteger(todoId)) {
+                    await openTodoEditModal(todoId);
+                }
+                return;
+            }
+
+            const deleteBtn = e.target.closest('[data-todo-delete]');
+            if (deleteBtn) {
+                const todoId = parseInt(deleteBtn.dataset.todoDelete, 10);
+                if (Number.isInteger(todoId)) {
+                    await removeTodo(todoId);
+                }
+                return;
+            }
+
+            const openContactBtn = e.target.closest('[data-todo-open-contact]');
+            if (openContactBtn) {
+                const contactId = parseInt(openContactBtn.dataset.todoOpenContact, 10);
+                if (Number.isInteger(contactId)) {
+                    openOverviewModal(contactId);
+                }
+                return;
+            }
+
+            const openProjectBtn = e.target.closest('[data-todo-open-project]');
+            if (openProjectBtn) {
+                const projectId = parseInt(openProjectBtn.dataset.todoOpenProject, 10);
+                if (Number.isInteger(projectId)) {
+                    openProjectOverview(projectId);
+                }
+            }
+        });
     }
 
     // ============================================
@@ -1228,6 +1976,9 @@
 
             // Load and render related projects
             await loadContactProjects(contactId);
+
+            // Load and render to-dos
+            await loadContactTodos(contactId);
 
             // Show modal
             elements.overviewModal.classList.add('active');
@@ -1530,6 +2281,9 @@
         state.viewingContactId = null;
         state.viewingContact = null;
         elements.newNoteContent.value = '';
+        if (elements.contactTodosList) {
+            elements.contactTodosList.innerHTML = '';
+        }
     }
 
     function openEditFromOverview() {
@@ -2291,29 +3045,156 @@
         return `${y}-${m}-${d}`;
     }
 
-    function groupNotesByDate(notes) {
+    function groupNotesByDate(entries) {
         const grouped = {};
-        notes.forEach(note => {
-            // Parse the created_at string as local time and format as local date key
-            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD from DB
-            if (!grouped[dateKey]) grouped[dateKey] = [];
-            grouped[dateKey].push(note);
+        entries.forEach(entry => {
+            if (!entry || !entry.created_at) {
+                return;
+            }
+            const dateKey = entry.created_at.substring(0, 10);
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = [];
+            }
+            grouped[dateKey].push(entry);
         });
         return grouped;
     }
 
-    function renderNoteChip(note) {
-        const name = escapeHtml(note.contact_name || '');
-        const company = note.contact_company ? escapeHtml(note.contact_company) : '';
-        const content = escapeHtml(note.content.length > 60 ? note.content.substring(0, 60) + '...' : note.content);
-        const tagDots = note.tags.map(t =>
-            `<span class="cal-tag-dot" style="background:${t.color}" title="${escapeHtml(t.name)}"></span>`
+    function getCalendarEntryType(entry) {
+        const type = entry && entry.entry_type ? String(entry.entry_type) : '';
+        if (type === 'project_note' || type === 'todo') {
+            return type;
+        }
+        return 'contact_note';
+    }
+
+    function getCalendarEntryTypeClass(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'project_note') return 'project-note';
+        if (type === 'todo') return 'todo';
+        return 'contact-note';
+    }
+
+    function getCalendarEntryTypeLabel(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'project_note') return 'Projekt-Notiz';
+        if (type === 'todo') return 'To-do';
+        return 'Kontakt-Notiz';
+    }
+
+    function getCalendarEntryTags(entry) {
+        return Array.isArray(entry && entry.tags) ? entry.tags : [];
+    }
+
+    function getCalendarEntryContext(entry) {
+        const type = getCalendarEntryType(entry);
+
+        if (type === 'project_note') {
+            return {
+                primary: entry.project_name || 'Projekt',
+                secondary: entry.project_company || ''
+            };
+        }
+
+        if (type === 'todo') {
+            if (entry.project_name) {
+                const secondary = entry.contact_name
+                    ? `${entry.contact_name}${entry.contact_company ? ` (${entry.contact_company})` : ''}`
+                    : (entry.project_company || '');
+                return {
+                    primary: entry.project_name,
+                    secondary: secondary
+                };
+            }
+
+            return {
+                primary: entry.contact_name || 'Kontakt',
+                secondary: entry.contact_company || ''
+            };
+        }
+
+        return {
+            primary: entry.contact_name || 'Kontakt',
+            secondary: entry.contact_company || ''
+        };
+    }
+
+    function getCalendarEntryText(entry, maxLength = null) {
+        const type = getCalendarEntryType(entry);
+        let text = '';
+
+        if (type === 'todo') {
+            const title = (entry.title || '').trim();
+            const description = (entry.description || '').trim();
+
+            if (title && description) {
+                text = `${title}: ${description}`;
+            } else {
+                text = title || description || (entry.content || '');
+            }
+        } else {
+            text = (entry.content || '').trim();
+        }
+
+        if (!text) {
+            text = type === 'todo' ? 'To-do' : 'Notiz';
+        }
+
+        if (typeof maxLength === 'number' && maxLength > 0 && text.length > maxLength) {
+            return `${text.substring(0, maxLength)}...`;
+        }
+
+        return text;
+    }
+
+    function getCalendarEntryMonthLabel(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'todo') {
+            return entry.title || 'To-do';
+        }
+
+        const context = getCalendarEntryContext(entry);
+        return context.primary;
+    }
+
+    function getCalendarEntryNavigationAttrs(entry) {
+        const attrs = ['data-calendar-entry="1"'];
+        const contactId = parseInt(entry.contact_id, 10);
+        const projectId = parseInt(entry.project_id, 10);
+
+        if (Number.isInteger(contactId) && contactId > 0) {
+            attrs.push(`data-contact-id="${contactId}"`);
+        }
+        if (Number.isInteger(projectId) && projectId > 0) {
+            attrs.push(`data-project-id="${projectId}"`);
+        }
+
+        return attrs.join(' ');
+    }
+
+    function isCalendarTodoCompleted(entry) {
+        return getCalendarEntryType(entry) === 'todo' && Number(entry.is_completed) === 1;
+    }
+
+    function renderNoteChip(entry) {
+        const context = getCalendarEntryContext(entry);
+        const primary = escapeHtml(context.primary || '');
+        const secondary = context.secondary ? escapeHtml(context.secondary) : '';
+        const typeClass = getCalendarEntryTypeClass(entry);
+        const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
+        const content = escapeHtml(getCalendarEntryText(entry, 60));
+        const tags = getCalendarEntryTags(entry);
+        const navAttrs = getCalendarEntryNavigationAttrs(entry);
+        const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+        const tagDots = tags.map(tag =>
+            `<span class="cal-tag-dot" style="background:${tag.color}" title="${escapeHtml(tag.name)}"></span>`
         ).join('');
 
-        return `<div class="cal-note-chip" data-contact-id="${note.contact_id}">
+        return `<div class="cal-note-chip cal-note-chip--${typeClass}${completedClass}" ${navAttrs}>
             <div class="cal-note-chip-header">
-                <span class="cal-note-person">${name}</span>
-                ${company ? `<span class="cal-note-company">${company}</span>` : ''}
+                <span class="cal-note-person">${primary}</span>
+                ${secondary ? `<span class="cal-note-company">${secondary}</span>` : ''}
+                <span class="cal-note-type cal-note-type--${typeClass}">${typeLabel}</span>
                 ${tagDots ? `<span class="cal-note-tags">${tagDots}</span>` : ''}
             </div>
             <div class="cal-note-text">${content}</div>
@@ -2351,13 +3232,19 @@
             if (dayNotes.length > 0) {
                 html += '<div class="cal-month-notes">';
                 const maxShow = 3;
-                dayNotes.slice(0, maxShow).forEach(note => {
-                    const name = escapeHtml(note.contact_name || '');
-                    const tagDot = note.tags.length > 0
-                        ? `<span class="cal-tag-dot-sm" style="background:${note.tags[0].color}"></span>`
+                dayNotes.slice(0, maxShow).forEach(entry => {
+                    const label = escapeHtml(getCalendarEntryMonthLabel(entry));
+                    const preview = escapeHtml(getCalendarEntryText(entry, 140));
+                    const tags = getCalendarEntryTags(entry);
+                    const typeClass = getCalendarEntryTypeClass(entry);
+                    const navAttrs = getCalendarEntryNavigationAttrs(entry);
+                    const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                    const tagDot = tags.length > 0
+                        ? `<span class="cal-tag-dot-sm" style="background:${tags[0].color}"></span>`
                         : '';
-                    html += `<div class="cal-month-note-dot" data-contact-id="${note.contact_id}" title="${escapeHtml(note.content)}">
-                        ${tagDot}<span class="cal-month-note-label">${name}</span>
+
+                    html += `<div class="cal-month-note-dot cal-month-note-dot--${typeClass}${completedClass}" ${navAttrs} title="${preview}">
+                        ${tagDot}<span class="cal-month-note-label">${label}</span>
                     </div>`;
                 });
                 if (dayNotes.length > maxShow) {
@@ -2396,11 +3283,11 @@
                 ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
             </div>`;
             html += '<div class="cal-week-day-body">';
-            dayNotes.forEach(note => {
-                html += renderNoteChip(note);
+            dayNotes.forEach(entry => {
+                html += renderNoteChip(entry);
             });
             if (dayNotes.length === 0) {
-                html += '<div class="cal-week-empty">Keine Notizen</div>';
+                html += '<div class="cal-week-empty">Keine Aktivitaeten</div>';
             }
             html += '</div></div>';
             cursor.setDate(cursor.getDate() + 1);
@@ -2424,24 +3311,35 @@
                 <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
                     <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
                 </svg>
-                <p>Keine Notizen an diesem Tag</p>
+                <p>Keine Aktivitaeten an diesem Tag</p>
             </div>`;
         } else {
-            dayNotes.forEach(note => {
-                const time = note.created_at.substring(11, 16);
-                const name = escapeHtml(note.contact_name || '');
-                const company = note.contact_company ? escapeHtml(note.contact_company) : '';
-                const content = escapeHtml(note.content);
-                const tagBadges = note.tags.map(t =>
-                    `<span class="cal-day-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`
+            dayNotes.forEach(entry => {
+                const time = entry.created_at ? entry.created_at.substring(11, 16) : '--:--';
+                const context = getCalendarEntryContext(entry);
+                const name = escapeHtml(context.primary || '');
+                const company = context.secondary ? escapeHtml(context.secondary) : '';
+                const typeClass = getCalendarEntryTypeClass(entry);
+                const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
+                const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                const content = escapeHtml(getCalendarEntryText(entry));
+                const navAttrs = getCalendarEntryNavigationAttrs(entry);
+                const tags = getCalendarEntryTags(entry);
+                const tagBadges = tags.map(tag =>
+                    `<span class="cal-day-tag" style="background:${tag.color}20;color:${tag.color};border-color:${tag.color}">${escapeHtml(tag.name)}</span>`
                 ).join('');
+                const todoMeta = getCalendarEntryType(entry) === 'todo'
+                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Erledigt' : 'Offen'}${entry.due_date ? ` - Faellig ${escapeHtml(entry.due_date)}` : ''}</span>`
+                    : '';
 
-                html += `<div class="cal-day-note" data-contact-id="${note.contact_id}">
+                html += `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
                     <div class="cal-day-note-time">${time}</div>
                     <div class="cal-day-note-body">
                         <div class="cal-day-note-meta">
                             <span class="cal-day-note-name">${name}</span>
                             ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
+                            <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
+                            ${todoMeta}
                             ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
                         </div>
                         <div class="cal-day-note-content">${content}</div>
@@ -2456,12 +3354,19 @@
     }
 
     function addCalendarClickHandlers() {
-        // Click on note chips -> open contact overview
-        elements.calendarBody.querySelectorAll('[data-contact-id]').forEach(el => {
+        // Click on activity cards -> open project or contact overview
+        elements.calendarBody.querySelectorAll('[data-calendar-entry]').forEach(el => {
             el.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const projectId = parseInt(el.dataset.projectId, 10);
                 const contactId = parseInt(el.dataset.contactId, 10);
-                if (contactId) openOverviewModal(contactId);
+                if (Number.isInteger(projectId) && projectId > 0) {
+                    openProjectOverview(projectId);
+                    return;
+                }
+                if (Number.isInteger(contactId) && contactId > 0) {
+                    openOverviewModal(contactId);
+                }
             });
         });
 
@@ -2469,7 +3374,7 @@
         if (state.calendarMode === 'month') {
             elements.calendarBody.querySelectorAll('.cal-month-cell').forEach(cell => {
                 cell.addEventListener('click', (e) => {
-                    if (e.target.closest('[data-contact-id]')) return;
+                    if (e.target.closest('[data-calendar-entry]')) return;
                     const dateStr = cell.dataset.date;
                     if (dateStr) {
                         state.calendarDate = new Date(dateStr + 'T12:00:00');
@@ -3101,11 +4006,12 @@
                 await loadAllContacts();
             }
 
-            const [projectResult, contactsResult, tagsResult, notesResult] = await Promise.all([
+            const [projectResult, contactsResult, tagsResult, notesResult, todosResult] = await Promise.all([
                 api.getProject(projectId),
                 api.getProjectContacts(projectId),
                 api.getProjectTags(projectId),
-                api.getProjectNotes(projectId)
+                api.getProjectNotes(projectId),
+                api.getTodos({ project_id: projectId, status: 'all' })
             ]);
 
             if (projectResult.success) {
@@ -3114,7 +4020,8 @@
                     projectResult.data,
                     contactsResult.data || [],
                     tagsResult.data || [],
-                    notesResult.success ? (notesResult.data || []) : []
+                    notesResult.success ? (notesResult.data || []) : [],
+                    todosResult.success ? (todosResult.data || []) : []
                 );
                 elements.projectOverviewModal.classList.add('active');
             } else {
@@ -3126,7 +4033,7 @@
         }
     }
 
-    function renderProjectOverview(project, contacts, tags, notes = []) {
+    function renderProjectOverview(project, contacts, tags, notes = [], todos = []) {
         elements.projectOverviewName.textContent = project.name;
         elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
 
@@ -3165,6 +4072,12 @@
 
         // Render contacts
         renderProjectContacts(contacts);
+
+        // Render to-dos
+        renderTodoCollection(elements.projectTodosList, todos, {
+            showContext: false,
+            emptyMessage: 'No to-dos yet for this project'
+        });
 
         // Render notes
         renderProjectNotesTimeline(notes);
@@ -3345,6 +4258,10 @@
 
         if (elements.projectNotesTimeline) {
             elements.projectNotesTimeline.innerHTML = '';
+        }
+
+        if (elements.projectTodosList) {
+            elements.projectTodosList.innerHTML = '';
         }
     }
 
@@ -3647,6 +4564,41 @@
             });
         });
 
+        // To-do search (debounced)
+        const debouncedTodoSearch = debounce(() => {
+            state.todoSearchQuery = elements.searchTodosInput.value.trim();
+            loadTodos();
+        }, 300);
+
+        if (elements.searchTodosInput) {
+            elements.searchTodosInput.addEventListener('input', debouncedTodoSearch);
+        }
+
+        if (elements.todoContactFilter) {
+            elements.todoContactFilter.addEventListener('change', () => {
+                state.todoContactFilterId = elements.todoContactFilter.value;
+                loadTodos();
+            });
+        }
+
+        if (elements.todoProjectFilter) {
+            elements.todoProjectFilter.addEventListener('change', () => {
+                state.todoProjectFilterId = elements.todoProjectFilter.value;
+                loadTodos();
+            });
+        }
+
+        if (elements.todoStatusFilter) {
+            elements.todoStatusFilter.addEventListener('change', () => {
+                state.todoStatusFilter = elements.todoStatusFilter.value;
+                loadTodos();
+            });
+        }
+
+        if (elements.addTodoBtn) {
+            elements.addTodoBtn.addEventListener('click', () => openTodoModal());
+        }
+
         // Tag input - show suggestions
         elements.newTagInput.addEventListener('input', () => {
             const query = elements.newTagInput.value.trim();
@@ -3763,6 +4715,14 @@
         elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', closeOverviewModal);
         elements.editContactBtn.addEventListener('click', openEditFromOverview);
         elements.addNoteBtn.addEventListener('click', addNote);
+        if (elements.addContactTodoBtn) {
+            elements.addContactTodoBtn.addEventListener('click', () => {
+                if (!state.viewingContactId) {
+                    return;
+                }
+                openTodoModal({ type: 'contact', id: state.viewingContactId, locked: true });
+            });
+        }
 
         // Company notes modal
         elements.closeCompanyNotesModal.addEventListener('click', closeCompanyNotesModal);
@@ -3892,6 +4852,15 @@
 
         if (elements.addProjectNoteBtn) {
             elements.addProjectNoteBtn.addEventListener('click', addProjectNote);
+        }
+
+        if (elements.addProjectTodoBtn) {
+            elements.addProjectTodoBtn.addEventListener('click', () => {
+                if (!state.viewingProjectId) {
+                    return;
+                }
+                openTodoModal({ type: 'project', id: state.viewingProjectId, locked: true });
+            });
         }
 
         if (elements.newProjectNoteContent) {
@@ -4096,6 +5065,33 @@
             });
         }
 
+        // To-do list interactions
+        bindTodoListInteractions(elements.todosList);
+        bindTodoListInteractions(elements.contactTodosList);
+        bindTodoListInteractions(elements.projectTodosList);
+
+        // To-do modal
+        if (elements.closeTodoModal) {
+            elements.closeTodoModal.addEventListener('click', closeTodoModal);
+        }
+        if (elements.cancelTodoBtn) {
+            elements.cancelTodoBtn.addEventListener('click', closeTodoModal);
+        }
+        if (elements.todoModal) {
+            const todoBackdrop = elements.todoModal.querySelector('.modal-backdrop');
+            if (todoBackdrop) {
+                todoBackdrop.addEventListener('click', closeTodoModal);
+            }
+        }
+        if (elements.todoForm) {
+            elements.todoForm.addEventListener('submit', saveTodo);
+        }
+        if (elements.todoAssignType) {
+            elements.todoAssignType.addEventListener('change', () => {
+                populateTodoAssigneeOptions(elements.todoAssignType.value);
+            });
+        }
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
@@ -4108,6 +5104,8 @@
                     closeProjectOverview();
                 } else if (elements.projectModal.classList.contains('active')) {
                     closeProjectModal();
+                } else if (elements.todoModal.classList.contains('active')) {
+                    closeTodoModal();
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
@@ -4148,6 +5146,8 @@
         if (state.currentView === 'projects') {
             loadProjects();
             loadAllContacts();
+        } else if (state.currentView === 'todos') {
+            loadTodos();
         } else if (state.currentView === 'map') {
             loadMapMarkers();
         } else if (state.currentView === 'calendar') {

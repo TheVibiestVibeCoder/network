@@ -1,7 +1,7 @@
 <?php
 /**
  * Calendar API Endpoint
- * Returns notes with contact/company/tag information for calendar display
+ * Returns a unified activity stream (contact notes, project notes, and to-dos).
  */
 
 define('APP_ROOT', dirname(__DIR__));
@@ -20,7 +20,6 @@ if (!Auth::isAuthenticated()) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
-
 if ($method !== 'GET') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
@@ -30,25 +29,64 @@ if ($method !== 'GET') {
 $db = Database::getInstance();
 
 try {
-    $start = $_GET['start'] ?? null;
-    $end = $_GET['end'] ?? null;
+    $start = normalizeDateTimeFilter($_GET['start'] ?? null);
+    $end = normalizeDateTimeFilter($_GET['end'] ?? null);
     $tagId = isset($_GET['tag_id']) ? (int) $_GET['tag_id'] : null;
-    $search = $_GET['search'] ?? '';
+    $search = trim((string) ($_GET['search'] ?? ''));
 
-    $params = [];
+    if ($tagId !== null && $tagId <= 0) {
+        $tagId = null;
+    }
+
+    $entries = array_merge(
+        fetchContactNoteEntries($db, $start, $end, $search, $tagId),
+        fetchProjectNoteEntries($db, $start, $end, $search, $tagId),
+        fetchTodoEntries($db, $start, $end, $search, $tagId)
+    );
+
+    usort($entries, static function (array $a, array $b): int {
+        return strcmp((string) ($b['created_at'] ?? ''), (string) ($a['created_at'] ?? ''));
+    });
+
+    attachEntryTags($db, $entries);
+
+    echo json_encode(['success' => true, 'data' => $entries]);
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'An internal error occurred']);
+}
+
+function normalizeDateTimeFilter($value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+
+    if (!is_string($value)) {
+        return null;
+    }
+
+    $value = trim($value);
+    return $value !== '' ? $value : null;
+}
+
+function fetchContactNoteEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array
+{
     $conditions = [];
+    $params = [];
 
     if ($start !== null) {
-        $conditions[] = "n.created_at >= ?";
+        $conditions[] = 'n.created_at >= ?';
         $params[] = $start;
     }
+
     if ($end !== null) {
-        $conditions[] = "n.created_at <= ?";
+        $conditions[] = 'n.created_at <= ?';
         $params[] = $end;
     }
 
     if ($search !== '') {
-        $conditions[] = "(c.name LIKE ? OR c.company LIKE ? OR n.content LIKE ?)";
+        $conditions[] = '(c.name LIKE ? OR c.company LIKE ? OR n.content LIKE ?)';
         $searchParam = '%' . $search . '%';
         $params[] = $searchParam;
         $params[] = $searchParam;
@@ -56,62 +94,297 @@ try {
     }
 
     if ($tagId !== null) {
-        $conditions[] = "c.id IN (SELECT contact_id FROM contact_tags WHERE tag_id = ?)";
+        $conditions[] = 'EXISTS (
+            SELECT 1
+            FROM contact_tags ct
+            WHERE ct.contact_id = n.contact_id AND ct.tag_id = ?
+        )';
         $params[] = $tagId;
     }
 
-    $where = count($conditions) > 0 ? 'WHERE ' . implode(' AND ', $conditions) : '';
+    $where = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
     $sql = "
-        SELECT n.id, n.contact_id, n.company, n.content, n.created_at,
-               c.name as contact_name, c.company as contact_company
+        SELECT
+            n.id,
+            'contact_note' AS entry_type,
+            n.created_at,
+            n.content,
+            NULL AS title,
+            NULL AS description,
+            NULL AS due_date,
+            NULL AS is_completed,
+            n.contact_id,
+            c.name AS contact_name,
+            c.company AS contact_company,
+            NULL AS project_id,
+            NULL AS project_name,
+            NULL AS project_company
         FROM notes n
-        JOIN contacts c ON n.contact_id = c.id
+        JOIN contacts c ON c.id = n.contact_id
         {$where}
-        ORDER BY n.created_at DESC
     ";
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
-    $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
-    // Fetch tags for each contact involved
-    $contactIds = array_unique(array_column($notes, 'contact_id'));
-    $contactTags = [];
+function fetchProjectNoteEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array
+{
+    $conditions = [];
+    $params = [];
 
-    if (count($contactIds) > 0) {
-        $placeholders = implode(',', array_fill(0, count($contactIds), '?'));
-        $tagStmt = $db->prepare("
-            SELECT ct.contact_id, t.id as tag_id, t.name as tag_name, t.color as tag_color
-            FROM contact_tags ct
-            JOIN tags t ON ct.tag_id = t.id
-            WHERE ct.contact_id IN ({$placeholders})
-        ");
-        $tagStmt->execute(array_values($contactIds));
-        $tagRows = $tagStmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($start !== null) {
+        $conditions[] = 'pn.created_at >= ?';
+        $params[] = $start;
+    }
 
-        foreach ($tagRows as $row) {
-            $cid = $row['contact_id'];
-            if (!isset($contactTags[$cid])) {
-                $contactTags[$cid] = [];
-            }
-            $contactTags[$cid][] = [
-                'id' => $row['tag_id'],
-                'name' => $row['tag_name'],
-                'color' => $row['tag_color']
-            ];
+    if ($end !== null) {
+        $conditions[] = 'pn.created_at <= ?';
+        $params[] = $end;
+    }
+
+    if ($search !== '') {
+        $conditions[] = '(p.name LIKE ? OR p.company LIKE ? OR pn.content LIKE ?)';
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+    }
+
+    if ($tagId !== null) {
+        $conditions[] = '(
+            EXISTS (
+                SELECT 1
+                FROM project_tags pt
+                WHERE pt.project_id = pn.project_id AND pt.tag_id = ?
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM project_contacts pc
+                JOIN contact_tags ct ON ct.contact_id = pc.contact_id
+                WHERE pc.project_id = pn.project_id AND ct.tag_id = ?
+            )
+        )';
+        $params[] = $tagId;
+        $params[] = $tagId;
+    }
+
+    $where = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+    $sql = "
+        SELECT
+            pn.id,
+            'project_note' AS entry_type,
+            pn.created_at,
+            pn.content,
+            NULL AS title,
+            NULL AS description,
+            NULL AS due_date,
+            NULL AS is_completed,
+            NULL AS contact_id,
+            NULL AS contact_name,
+            NULL AS contact_company,
+            pn.project_id,
+            p.name AS project_name,
+            p.company AS project_company
+        FROM project_notes pn
+        JOIN projects p ON p.id = pn.project_id
+        {$where}
+    ";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function fetchTodoEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array
+{
+    $conditions = ['t.parent_todo_id IS NULL'];
+    $params = [];
+
+    if ($start !== null) {
+        $conditions[] = 't.created_at >= ?';
+        $params[] = $start;
+    }
+
+    if ($end !== null) {
+        $conditions[] = 't.created_at <= ?';
+        $params[] = $end;
+    }
+
+    if ($search !== '') {
+        $conditions[] = '(
+            t.title LIKE ?
+            OR t.description LIKE ?
+            OR c.name LIKE ?
+            OR c.company LIKE ?
+            OR p.name LIKE ?
+            OR p.company LIKE ?
+        )';
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+    }
+
+    if ($tagId !== null) {
+        $conditions[] = '(
+            (t.contact_id IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM contact_tags ct
+                WHERE ct.contact_id = t.contact_id AND ct.tag_id = ?
+            ))
+            OR
+            (t.project_id IS NOT NULL AND (
+                EXISTS (
+                    SELECT 1
+                    FROM project_tags pt
+                    WHERE pt.project_id = t.project_id AND pt.tag_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_contacts pc
+                    JOIN contact_tags ct ON ct.contact_id = pc.contact_id
+                    WHERE pc.project_id = t.project_id AND ct.tag_id = ?
+                )
+            ))
+        )';
+        $params[] = $tagId;
+        $params[] = $tagId;
+        $params[] = $tagId;
+    }
+
+    $where = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+    $sql = "
+        SELECT
+            t.id,
+            'todo' AS entry_type,
+            t.created_at,
+            COALESCE(NULLIF(t.description, ''), t.title) AS content,
+            t.title,
+            t.description,
+            t.due_date,
+            t.is_completed,
+            t.contact_id,
+            c.name AS contact_name,
+            c.company AS contact_company,
+            t.project_id,
+            p.name AS project_name,
+            p.company AS project_company
+        FROM todos t
+        LEFT JOIN contacts c ON c.id = t.contact_id
+        LEFT JOIN projects p ON p.id = t.project_id
+        {$where}
+    ";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function attachEntryTags(PDO $db, array &$entries): void
+{
+    if (empty($entries)) {
+        return;
+    }
+
+    $contactIds = [];
+    $projectIds = [];
+
+    foreach ($entries as $entry) {
+        $contactId = (int) ($entry['contact_id'] ?? 0);
+        $projectId = (int) ($entry['project_id'] ?? 0);
+
+        if ($contactId > 0) {
+            $contactIds[$contactId] = $contactId;
+        }
+        if ($projectId > 0) {
+            $projectIds[$projectId] = $projectId;
         }
     }
 
-    // Attach tags to notes
-    foreach ($notes as &$note) {
-        $note['tags'] = $contactTags[$note['contact_id']] ?? [];
+    $contactTags = fetchTagMap($db, 'contact', array_values($contactIds));
+    $projectTags = fetchTagMap($db, 'project', array_values($projectIds));
+
+    foreach ($entries as &$entry) {
+        $mergedTags = [];
+        $contactId = (int) ($entry['contact_id'] ?? 0);
+        $projectId = (int) ($entry['project_id'] ?? 0);
+
+        if ($contactId > 0 && isset($contactTags[$contactId])) {
+            foreach ($contactTags[$contactId] as $tag) {
+                $mergedTags[(int) $tag['id']] = $tag;
+            }
+        }
+
+        if ($projectId > 0 && isset($projectTags[$projectId])) {
+            foreach ($projectTags[$projectId] as $tag) {
+                $mergedTags[(int) $tag['id']] = $tag;
+            }
+        }
+
+        $entry['tags'] = array_values($mergedTags);
     }
-    unset($note);
+    unset($entry);
+}
 
-    echo json_encode(['success' => true, 'data' => $notes]);
+function fetchTagMap(PDO $db, string $ownerType, array $ownerIds): array
+{
+    if (empty($ownerIds)) {
+        return [];
+    }
 
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'An internal error occurred']);
+    if ($ownerType === 'contact') {
+        $ownerColumn = 'ct.contact_id';
+        $joinSql = 'FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id';
+        $inColumn = 'ct.contact_id';
+    } elseif ($ownerType === 'project') {
+        $ownerColumn = 'pt.project_id';
+        $joinSql = 'FROM project_tags pt JOIN tags t ON t.id = pt.tag_id';
+        $inColumn = 'pt.project_id';
+    } else {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ownerIds), '?'));
+    $sql = "
+        SELECT
+            {$ownerColumn} AS owner_id,
+            t.id AS tag_id,
+            t.name AS tag_name,
+            t.color AS tag_color
+        {$joinSql}
+        WHERE {$inColumn} IN ({$placeholders})
+        ORDER BY t.name ASC
+    ";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute(array_values($ownerIds));
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $map = [];
+    foreach ($rows as $row) {
+        $ownerId = (int) ($row['owner_id'] ?? 0);
+        if ($ownerId <= 0) {
+            continue;
+        }
+
+        if (!isset($map[$ownerId])) {
+            $map[$ownerId] = [];
+        }
+
+        $map[$ownerId][] = [
+            'id' => (int) ($row['tag_id'] ?? 0),
+            'name' => (string) ($row['tag_name'] ?? ''),
+            'color' => (string) ($row['tag_color'] ?? '#3b82f6')
+        ];
+    }
+
+    return $map;
 }
