@@ -2631,6 +2631,22 @@ textarea.form-input {
     background-color: var(--color-accent-subtle);
 }
 
+.cal-month-note-dot--project-note {
+    border-left: 2px solid var(--color-warning);
+}
+
+.cal-month-note-dot--todo {
+    border-left: 2px solid var(--color-success);
+}
+
+.cal-month-note-dot--contact-note {
+    border-left: 2px solid var(--color-text-muted);
+}
+
+.cal-month-note-dot.is-completed {
+    opacity: 0.65;
+}
+
 .cal-month-note-label {
     font-size: 10px;
     color: var(--color-text-secondary);
@@ -2743,6 +2759,22 @@ textarea.form-input {
     border-left-color: var(--color-text-secondary);
 }
 
+.cal-note-chip--project-note {
+    border-left-color: var(--color-warning);
+}
+
+.cal-note-chip--todo {
+    border-left-color: var(--color-success);
+}
+
+.cal-note-chip--contact-note {
+    border-left-color: var(--color-text-muted);
+}
+
+.cal-note-chip.is-completed {
+    opacity: 0.7;
+}
+
 .cal-note-chip-header {
     display: flex;
     align-items: center;
@@ -2760,6 +2792,29 @@ textarea.form-input {
 .cal-note-company {
     font-size: 10px;
     color: var(--color-text-muted);
+}
+
+.cal-note-type {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-2);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-text-secondary);
+}
+
+.cal-note-type--project-note {
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+.cal-note-type--todo {
+    border-color: var(--color-success);
+    color: var(--color-success);
 }
 
 .cal-note-tags {
@@ -2829,6 +2884,22 @@ textarea.form-input {
     border-color: var(--color-text-muted);
 }
 
+.cal-day-note--project-note {
+    border-left: 3px solid var(--color-warning);
+}
+
+.cal-day-note--todo {
+    border-left: 3px solid var(--color-success);
+}
+
+.cal-day-note--contact-note {
+    border-left: 3px solid var(--color-text-muted);
+}
+
+.cal-day-note.is-completed {
+    opacity: 0.72;
+}
+
 .cal-day-note-time {
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -2859,6 +2930,33 @@ textarea.form-input {
 
 .cal-day-note-company {
     font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.cal-day-note-type {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-3);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.cal-day-note-type--project-note {
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+.cal-day-note-type--todo {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.cal-day-note-extra {
+    font-size: 10px;
     color: var(--color-text-muted);
 }
 

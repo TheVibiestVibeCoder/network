@@ -3037,29 +3037,156 @@
         return `${y}-${m}-${d}`;
     }
 
-    function groupNotesByDate(notes) {
+    function groupNotesByDate(entries) {
         const grouped = {};
-        notes.forEach(note => {
-            // Parse the created_at string as local time and format as local date key
-            const dateKey = note.created_at.substring(0, 10); // YYYY-MM-DD from DB
-            if (!grouped[dateKey]) grouped[dateKey] = [];
-            grouped[dateKey].push(note);
+        entries.forEach(entry => {
+            if (!entry || !entry.created_at) {
+                return;
+            }
+            const dateKey = entry.created_at.substring(0, 10);
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = [];
+            }
+            grouped[dateKey].push(entry);
         });
         return grouped;
     }
 
-    function renderNoteChip(note) {
-        const name = escapeHtml(note.contact_name || '');
-        const company = note.contact_company ? escapeHtml(note.contact_company) : '';
-        const content = escapeHtml(note.content.length > 60 ? note.content.substring(0, 60) + '...' : note.content);
-        const tagDots = note.tags.map(t =>
-            `<span class="cal-tag-dot" style="background:${t.color}" title="${escapeHtml(t.name)}"></span>`
+    function getCalendarEntryType(entry) {
+        const type = entry && entry.entry_type ? String(entry.entry_type) : '';
+        if (type === 'project_note' || type === 'todo') {
+            return type;
+        }
+        return 'contact_note';
+    }
+
+    function getCalendarEntryTypeClass(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'project_note') return 'project-note';
+        if (type === 'todo') return 'todo';
+        return 'contact-note';
+    }
+
+    function getCalendarEntryTypeLabel(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'project_note') return 'Projekt-Notiz';
+        if (type === 'todo') return 'To-do';
+        return 'Kontakt-Notiz';
+    }
+
+    function getCalendarEntryTags(entry) {
+        return Array.isArray(entry && entry.tags) ? entry.tags : [];
+    }
+
+    function getCalendarEntryContext(entry) {
+        const type = getCalendarEntryType(entry);
+
+        if (type === 'project_note') {
+            return {
+                primary: entry.project_name || 'Projekt',
+                secondary: entry.project_company || ''
+            };
+        }
+
+        if (type === 'todo') {
+            if (entry.project_name) {
+                const secondary = entry.contact_name
+                    ? `${entry.contact_name}${entry.contact_company ? ` (${entry.contact_company})` : ''}`
+                    : (entry.project_company || '');
+                return {
+                    primary: entry.project_name,
+                    secondary: secondary
+                };
+            }
+
+            return {
+                primary: entry.contact_name || 'Kontakt',
+                secondary: entry.contact_company || ''
+            };
+        }
+
+        return {
+            primary: entry.contact_name || 'Kontakt',
+            secondary: entry.contact_company || ''
+        };
+    }
+
+    function getCalendarEntryText(entry, maxLength = null) {
+        const type = getCalendarEntryType(entry);
+        let text = '';
+
+        if (type === 'todo') {
+            const title = (entry.title || '').trim();
+            const description = (entry.description || '').trim();
+
+            if (title && description) {
+                text = `${title}: ${description}`;
+            } else {
+                text = title || description || (entry.content || '');
+            }
+        } else {
+            text = (entry.content || '').trim();
+        }
+
+        if (!text) {
+            text = type === 'todo' ? 'To-do' : 'Notiz';
+        }
+
+        if (typeof maxLength === 'number' && maxLength > 0 && text.length > maxLength) {
+            return `${text.substring(0, maxLength)}...`;
+        }
+
+        return text;
+    }
+
+    function getCalendarEntryMonthLabel(entry) {
+        const type = getCalendarEntryType(entry);
+        if (type === 'todo') {
+            return entry.title || 'To-do';
+        }
+
+        const context = getCalendarEntryContext(entry);
+        return context.primary;
+    }
+
+    function getCalendarEntryNavigationAttrs(entry) {
+        const attrs = ['data-calendar-entry="1"'];
+        const contactId = parseInt(entry.contact_id, 10);
+        const projectId = parseInt(entry.project_id, 10);
+
+        if (Number.isInteger(contactId) && contactId > 0) {
+            attrs.push(`data-contact-id="${contactId}"`);
+        }
+        if (Number.isInteger(projectId) && projectId > 0) {
+            attrs.push(`data-project-id="${projectId}"`);
+        }
+
+        return attrs.join(' ');
+    }
+
+    function isCalendarTodoCompleted(entry) {
+        return getCalendarEntryType(entry) === 'todo' && Number(entry.is_completed) === 1;
+    }
+
+    function renderNoteChip(entry) {
+        const context = getCalendarEntryContext(entry);
+        const primary = escapeHtml(context.primary || '');
+        const secondary = context.secondary ? escapeHtml(context.secondary) : '';
+        const typeClass = getCalendarEntryTypeClass(entry);
+        const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
+        const content = escapeHtml(getCalendarEntryText(entry, 60));
+        const tags = getCalendarEntryTags(entry);
+        const navAttrs = getCalendarEntryNavigationAttrs(entry);
+        const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+        const tagDots = tags.map(tag =>
+            `<span class="cal-tag-dot" style="background:${tag.color}" title="${escapeHtml(tag.name)}"></span>`
         ).join('');
 
-        return `<div class="cal-note-chip" data-contact-id="${note.contact_id}">
+        return `<div class="cal-note-chip cal-note-chip--${typeClass}${completedClass}" ${navAttrs}>
             <div class="cal-note-chip-header">
-                <span class="cal-note-person">${name}</span>
-                ${company ? `<span class="cal-note-company">${company}</span>` : ''}
+                <span class="cal-note-person">${primary}</span>
+                ${secondary ? `<span class="cal-note-company">${secondary}</span>` : ''}
+                <span class="cal-note-type cal-note-type--${typeClass}">${typeLabel}</span>
                 ${tagDots ? `<span class="cal-note-tags">${tagDots}</span>` : ''}
             </div>
             <div class="cal-note-text">${content}</div>
@@ -3097,13 +3224,19 @@
             if (dayNotes.length > 0) {
                 html += '<div class="cal-month-notes">';
                 const maxShow = 3;
-                dayNotes.slice(0, maxShow).forEach(note => {
-                    const name = escapeHtml(note.contact_name || '');
-                    const tagDot = note.tags.length > 0
-                        ? `<span class="cal-tag-dot-sm" style="background:${note.tags[0].color}"></span>`
+                dayNotes.slice(0, maxShow).forEach(entry => {
+                    const label = escapeHtml(getCalendarEntryMonthLabel(entry));
+                    const preview = escapeHtml(getCalendarEntryText(entry, 140));
+                    const tags = getCalendarEntryTags(entry);
+                    const typeClass = getCalendarEntryTypeClass(entry);
+                    const navAttrs = getCalendarEntryNavigationAttrs(entry);
+                    const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                    const tagDot = tags.length > 0
+                        ? `<span class="cal-tag-dot-sm" style="background:${tags[0].color}"></span>`
                         : '';
-                    html += `<div class="cal-month-note-dot" data-contact-id="${note.contact_id}" title="${escapeHtml(note.content)}">
-                        ${tagDot}<span class="cal-month-note-label">${name}</span>
+
+                    html += `<div class="cal-month-note-dot cal-month-note-dot--${typeClass}${completedClass}" ${navAttrs} title="${preview}">
+                        ${tagDot}<span class="cal-month-note-label">${label}</span>
                     </div>`;
                 });
                 if (dayNotes.length > maxShow) {
@@ -3142,11 +3275,11 @@
                 ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
             </div>`;
             html += '<div class="cal-week-day-body">';
-            dayNotes.forEach(note => {
-                html += renderNoteChip(note);
+            dayNotes.forEach(entry => {
+                html += renderNoteChip(entry);
             });
             if (dayNotes.length === 0) {
-                html += '<div class="cal-week-empty">Keine Notizen</div>';
+                html += '<div class="cal-week-empty">Keine Aktivitaeten</div>';
             }
             html += '</div></div>';
             cursor.setDate(cursor.getDate() + 1);
@@ -3170,24 +3303,35 @@
                 <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
                     <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
                 </svg>
-                <p>Keine Notizen an diesem Tag</p>
+                <p>Keine Aktivitaeten an diesem Tag</p>
             </div>`;
         } else {
-            dayNotes.forEach(note => {
-                const time = note.created_at.substring(11, 16);
-                const name = escapeHtml(note.contact_name || '');
-                const company = note.contact_company ? escapeHtml(note.contact_company) : '';
-                const content = escapeHtml(note.content);
-                const tagBadges = note.tags.map(t =>
-                    `<span class="cal-day-tag" style="background:${t.color}20;color:${t.color};border-color:${t.color}">${escapeHtml(t.name)}</span>`
+            dayNotes.forEach(entry => {
+                const time = entry.created_at ? entry.created_at.substring(11, 16) : '--:--';
+                const context = getCalendarEntryContext(entry);
+                const name = escapeHtml(context.primary || '');
+                const company = context.secondary ? escapeHtml(context.secondary) : '';
+                const typeClass = getCalendarEntryTypeClass(entry);
+                const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
+                const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                const content = escapeHtml(getCalendarEntryText(entry));
+                const navAttrs = getCalendarEntryNavigationAttrs(entry);
+                const tags = getCalendarEntryTags(entry);
+                const tagBadges = tags.map(tag =>
+                    `<span class="cal-day-tag" style="background:${tag.color}20;color:${tag.color};border-color:${tag.color}">${escapeHtml(tag.name)}</span>`
                 ).join('');
+                const todoMeta = getCalendarEntryType(entry) === 'todo'
+                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Erledigt' : 'Offen'}${entry.due_date ? ` - Faellig ${escapeHtml(entry.due_date)}` : ''}</span>`
+                    : '';
 
-                html += `<div class="cal-day-note" data-contact-id="${note.contact_id}">
+                html += `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
                     <div class="cal-day-note-time">${time}</div>
                     <div class="cal-day-note-body">
                         <div class="cal-day-note-meta">
                             <span class="cal-day-note-name">${name}</span>
                             ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
+                            <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
+                            ${todoMeta}
                             ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
                         </div>
                         <div class="cal-day-note-content">${content}</div>
@@ -3202,12 +3346,19 @@
     }
 
     function addCalendarClickHandlers() {
-        // Click on note chips -> open contact overview
-        elements.calendarBody.querySelectorAll('[data-contact-id]').forEach(el => {
+        // Click on activity cards -> open project or contact overview
+        elements.calendarBody.querySelectorAll('[data-calendar-entry]').forEach(el => {
             el.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const projectId = parseInt(el.dataset.projectId, 10);
                 const contactId = parseInt(el.dataset.contactId, 10);
-                if (contactId) openOverviewModal(contactId);
+                if (Number.isInteger(projectId) && projectId > 0) {
+                    openProjectOverview(projectId);
+                    return;
+                }
+                if (Number.isInteger(contactId) && contactId > 0) {
+                    openOverviewModal(contactId);
+                }
             });
         });
 
@@ -3215,7 +3366,7 @@
         if (state.calendarMode === 'month') {
             elements.calendarBody.querySelectorAll('.cal-month-cell').forEach(cell => {
                 cell.addEventListener('click', (e) => {
-                    if (e.target.closest('[data-contact-id]')) return;
+                    if (e.target.closest('[data-calendar-entry]')) return;
                     const dateStr = cell.dataset.date;
                     if (dateStr) {
                         state.calendarDate = new Date(dateStr + 'T12:00:00');
