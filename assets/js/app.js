@@ -61,6 +61,9 @@
         todos: [],
         todoSearchQuery: '',
         todoStatusFilter: 'open',
+        todoContactFilterId: '',
+        todoProjectFilterId: '',
+        todoFilterOptionsInitialized: false,
         todoModalContext: null
     };
 
@@ -103,6 +106,8 @@
         // To-do view
         todosList: document.getElementById('todosList'),
         searchTodosInput: document.getElementById('searchTodosInput'),
+        todoContactFilter: document.getElementById('todoContactFilter'),
+        todoProjectFilter: document.getElementById('todoProjectFilter'),
         todoStatusFilter: document.getElementById('todoStatusFilter'),
         addTodoBtn: document.getElementById('addTodoBtn'),
 
@@ -823,6 +828,7 @@
             const result = await api.getContacts('', 'name', 'ASC');
             if (result.success) {
                 state.contacts = result.data;
+                populateTodoOwnerFilters();
             }
         } catch (error) {
             console.error('Error loading all contacts:', error);
@@ -1209,6 +1215,7 @@
             const result = await api.getProjects('', 'name', 'ASC');
             if (result.success) {
                 state.allProjects = result.data || [];
+                populateTodoOwnerFilters();
             }
         } catch (error) {
             console.error('Error loading projects for to-do assignment:', error);
@@ -1221,9 +1228,19 @@
         }
 
         try {
+            if (!state.todoFilterOptionsInitialized) {
+                await ensureTodoAssignmentData(true);
+                state.todoFilterOptionsInitialized = true;
+            } else {
+                await ensureTodoAssignmentData();
+            }
+            populateTodoOwnerFilters();
+
             const result = await api.getTodos({
                 status: state.todoStatusFilter,
-                search: state.todoSearchQuery
+                search: state.todoSearchQuery,
+                contact_id: state.todoContactFilterId || '',
+                project_id: state.todoProjectFilterId || ''
             });
 
             if (result.success) {
@@ -1284,6 +1301,39 @@
             }
         } catch (error) {
             console.error('Error loading project to-dos:', error);
+        }
+    }
+
+    function populateTodoOwnerFilters() {
+        if (elements.todoContactFilter) {
+            const contacts = (state.contacts || []).slice().sort((a, b) => {
+                return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
+            });
+
+            let contactOptions = '<option value="">All People</option>';
+            contacts.forEach(contact => {
+                const label = contact.company
+                    ? `${contact.name} (${contact.company})`
+                    : contact.name;
+                contactOptions += `<option value="${contact.id}">${escapeHtml(label)}</option>`;
+            });
+
+            elements.todoContactFilter.innerHTML = contactOptions;
+            elements.todoContactFilter.value = state.todoContactFilterId ? String(state.todoContactFilterId) : '';
+        }
+
+        if (elements.todoProjectFilter) {
+            const projects = (state.allProjects || []).slice().sort((a, b) => {
+                return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
+            });
+
+            let projectOptions = '<option value="">All Projects</option>';
+            projects.forEach(project => {
+                projectOptions += `<option value="${project.id}">${escapeHtml(project.name || `Project #${project.id}`)}</option>`;
+            });
+
+            elements.todoProjectFilter.innerHTML = projectOptions;
+            elements.todoProjectFilter.value = state.todoProjectFilterId ? String(state.todoProjectFilterId) : '';
         }
     }
 
@@ -4187,6 +4237,20 @@
 
         if (elements.searchTodosInput) {
             elements.searchTodosInput.addEventListener('input', debouncedTodoSearch);
+        }
+
+        if (elements.todoContactFilter) {
+            elements.todoContactFilter.addEventListener('change', () => {
+                state.todoContactFilterId = elements.todoContactFilter.value;
+                loadTodos();
+            });
+        }
+
+        if (elements.todoProjectFilter) {
+            elements.todoProjectFilter.addEventListener('change', () => {
+                state.todoProjectFilterId = elements.todoProjectFilter.value;
+                loadTodos();
+            });
         }
 
         if (elements.todoStatusFilter) {

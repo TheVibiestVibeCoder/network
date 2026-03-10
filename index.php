@@ -376,6 +376,12 @@ if ($isAuthenticated) {
                                 </svg>
                                 <input type="text" id="searchTodosInput" placeholder="Search to-dos..." class="search-input">
                             </div>
+                            <select id="todoContactFilter" class="form-select">
+                                <option value="">All People</option>
+                            </select>
+                            <select id="todoProjectFilter" class="form-select">
+                                <option value="">All Projects</option>
+                            </select>
                             <select id="todoStatusFilter" class="form-select">
                                 <option value="open">Open</option>
                                 <option value="completed">Completed</option>

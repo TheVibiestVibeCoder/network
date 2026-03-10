@@ -84,12 +84,17 @@ function handleGet(PDO $db, ?int $id): void
     $conditions = [];
     $params = [];
 
-    if ($contactId !== null && $contactId > 0) {
+    $hasContactFilter = $contactId !== null && $contactId > 0;
+    $hasProjectFilter = $projectId !== null && $projectId > 0;
+
+    if ($hasContactFilter && $hasProjectFilter) {
+        $conditions[] = '(t.contact_id = :contact_id OR t.project_id = :project_id)';
+        $params['contact_id'] = $contactId;
+        $params['project_id'] = $projectId;
+    } elseif ($hasContactFilter) {
         $conditions[] = 't.contact_id = :contact_id';
         $params['contact_id'] = $contactId;
-    }
-
-    if ($projectId !== null && $projectId > 0) {
+    } elseif ($hasProjectFilter) {
         $conditions[] = 't.project_id = :project_id';
         $params['project_id'] = $projectId;
     }
