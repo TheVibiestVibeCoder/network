@@ -4984,6 +4984,26 @@ textarea.form-input {
     transform: translateY(-1px);
 }
 
+/* Dashboard card height tightening (desktop + mobile) */
+#projectsView .projects-dashboard {
+    grid-auto-rows: auto;
+    align-items: start;
+}
+
+#projectsView .dashboard-card {
+    height: auto;
+    min-height: 0;
+}
+
+#projectsView .dashboard-card:not(.dashboard-card--projection) {
+    padding: var(--spacing-4);
+    gap: var(--spacing-3);
+}
+
+#projectsView .dashboard-card-label {
+    margin-top: 1px;
+}
+
 .dashboard-mobile-label {
     display: none;
     align-items: center;
@@ -4994,6 +5014,30 @@ textarea.form-input {
 }
 
 @media (max-width: 768px) {
+    #projectsView .dashboard-wrapper.expanded .projects-dashboard {
+        padding-top: var(--spacing-3);
+        padding-bottom: var(--spacing-3);
+    }
+
+    #projectsView .dashboard-card {
+        padding: var(--spacing-3);
+        gap: var(--spacing-3);
+    }
+
+    #projectsView .dashboard-card-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    #projectsView .dashboard-card-value {
+        font-size: var(--font-size-base);
+    }
+
+    #projectsView .dashboard-proj-scenarios {
+        gap: var(--spacing-4);
+        margin-top: var(--spacing-2);
+    }
+
     #projectsView .dashboard-bar {
         grid-template-columns: minmax(0, 1fr) auto;
         min-height: 42px;
@@ -5019,6 +5063,14 @@ textarea.form-input {
 }
 
 @media (max-width: 480px) {
+    #projectsView .dashboard-card {
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    #projectsView .dashboard-card-value {
+        font-size: var(--font-size-sm);
+    }
+
     #projectsView .dashboard-bar {
         padding: var(--spacing-2);
     }
