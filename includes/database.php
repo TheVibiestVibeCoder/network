@@ -96,6 +96,27 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_created ON notes(contact_id, created_at)");
 
+        // Create activity events table for calendar audit trail
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS activity_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_type VARCHAR(32) NOT NULL,
+                action VARCHAR(32) NOT NULL,
+                content TEXT NOT NULL,
+                contact_id INTEGER,
+                contact_name VARCHAR(255),
+                contact_company VARCHAR(255),
+                project_id INTEGER,
+                project_name VARCHAR(255),
+                project_company VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_created_at ON activity_events(created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_entry_type ON activity_events(entry_type)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_contact_id ON activity_events(contact_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_project_id ON activity_events(project_id)");
+
         // Create tags table
         $db->exec("
             CREATE TABLE IF NOT EXISTS tags (

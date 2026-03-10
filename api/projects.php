@@ -316,6 +316,7 @@ function handlePost(Project $model, string $action): void
     // Create project
     $id = $model->create($sanitized);
     $project = $model->getById($id);
+    logProjectActivityEvent('created', $project, null);
 
     http_response_code(201);
     echo json_encode(['success' => true, 'data' => $project]);
@@ -417,6 +418,7 @@ function handlePut(Project $model, ?int $id): void
     // Update project
     $model->update($id, $sanitized);
     $project = $model->getById($id);
+    logProjectActivityEvent('updated', $project, $existing);
 
     echo json_encode(['success' => true, 'data' => $project]);
 }
@@ -507,6 +509,7 @@ function handleDelete(Project $model, string $action, ?int $id): void
 
     // Delete project
     $model->delete($id);
+    logProjectActivityEvent('deleted', null, $existing);
 
     echo json_encode(['success' => true, 'message' => 'Project deleted']);
 }
@@ -628,4 +631,132 @@ function normalizeNullableInt($value)
     }
 
     return false;
+}
+
+/**
+ * Persist project create/update/delete events for calendar history.
+ */
+function logProjectActivityEvent(string $action, ?array $current, ?array $previous): void
+{
+    try {
+        $db = Database::getInstance();
+
+        $source = $action === 'deleted' ? $previous : $current;
+        if (!is_array($source)) {
+            return;
+        }
+
+        $projectIdRaw = isset($source['id']) ? (int) $source['id'] : 0;
+        $projectId = ($action === 'deleted' || $projectIdRaw <= 0) ? null : $projectIdRaw;
+        $projectName = Auth::sanitizeString((string) ($source['name'] ?? ''), 255) ?? '';
+        $projectCompany = Auth::sanitizeString($source['company'] ?? null, 255);
+        $content = buildProjectActivityContent($action, $current, $previous);
+
+        $stmt = $db->prepare("
+            INSERT INTO activity_events (
+                entry_type,
+                action,
+                content,
+                project_id,
+                project_name,
+                project_company
+            ) VALUES (
+                'project_activity',
+                :action,
+                :content,
+                :project_id,
+                :project_name,
+                :project_company
+            )
+        ");
+
+        $stmt->execute([
+            'action' => $action,
+            'content' => $content,
+            'project_id' => $projectId,
+            'project_name' => $projectName,
+            'project_company' => $projectCompany
+        ]);
+    } catch (Exception $e) {
+        error_log('project activity log failed: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Build readable activity text for project events.
+ */
+function buildProjectActivityContent(string $action, ?array $current, ?array $previous): string
+{
+    if ($action === 'created') {
+        return 'Projekt erstellt';
+    }
+
+    if ($action === 'deleted') {
+        return 'Projekt gelöscht';
+    }
+
+    $changedFields = detectProjectChangedFields($previous, $current);
+    if (empty($changedFields)) {
+        return 'Projekt bearbeitet';
+    }
+
+    $list = implode(', ', array_slice($changedFields, 0, 4));
+    if (count($changedFields) > 4) {
+        $list .= ', ...';
+    }
+
+    return 'Projekt aktualisiert: ' . $list;
+}
+
+/**
+ * Detect meaningful field changes for project updates.
+ */
+function detectProjectChangedFields(?array $before, ?array $after): array
+{
+    if (!is_array($before) || !is_array($after)) {
+        return [];
+    }
+
+    $fields = [
+        'name' => 'Name',
+        'company' => 'Firma',
+        'start_date' => 'Startdatum',
+        'stage' => 'Phase',
+        'success_chance' => 'Erfolgschance',
+        'budget_min' => 'Budget Min',
+        'budget_max' => 'Budget Max',
+        'estimated_completion' => 'Abschlussdatum',
+        'description' => 'Beschreibung'
+    ];
+
+    $changed = [];
+    foreach ($fields as $key => $label) {
+        $old = normalizeProjectComparableValue($before[$key] ?? null);
+        $new = normalizeProjectComparableValue($after[$key] ?? null);
+        if ($old !== $new) {
+            $changed[] = $label;
+        }
+    }
+
+    return $changed;
+}
+
+/**
+ * Normalize values for project change comparison.
+ */
+function normalizeProjectComparableValue($value): string
+{
+    if ($value === null) {
+        return '';
+    }
+
+    if (is_bool($value)) {
+        return $value ? '1' : '0';
+    }
+
+    if (is_numeric($value)) {
+        return (string) $value;
+    }
+
+    return trim((string) $value);
 }

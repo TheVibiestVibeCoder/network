@@ -144,6 +144,7 @@ function handlePost(Contact $model, string $action): void
     // Create contact
     $id = $model->create($input);
     $contact = $model->getById($id);
+    logContactActivityEvent('created', $contact, null);
 
     http_response_code(201);
     echo json_encode(['success' => true, 'data' => $contact]);
@@ -211,6 +212,7 @@ function handlePut(Contact $model, ?int $id): void
     // Update contact
     $model->update($id, $input);
     $contact = $model->getById($id);
+    logContactActivityEvent('updated', $contact, $existing);
 
     echo json_encode(['success' => true, 'data' => $contact]);
 }
@@ -236,6 +238,7 @@ function handleDelete(Contact $model, ?int $id): void
 
     // Delete contact
     $model->delete($id);
+    logContactActivityEvent('deleted', null, $existing);
 
     echo json_encode(['success' => true, 'message' => 'Contact deleted']);
 }
@@ -330,4 +333,131 @@ function handleFixData(Contact $model): void
         'message' => "Fixed {$results['urls_fixed']} URLs, geocoded {$results['geocoded']} contacts, {$results['geocode_failed']} could not be resolved.",
         'data' => $results
     ]);
+}
+
+/**
+ * Persist contact create/update/delete events for calendar history.
+ */
+function logContactActivityEvent(string $action, ?array $current, ?array $previous): void
+{
+    try {
+        $db = Database::getInstance();
+
+        $source = $action === 'deleted' ? $previous : $current;
+        if (!is_array($source)) {
+            return;
+        }
+
+        $contactIdRaw = isset($source['id']) ? (int) $source['id'] : 0;
+        $contactId = ($action === 'deleted' || $contactIdRaw <= 0) ? null : $contactIdRaw;
+        $contactName = Auth::sanitizeString((string) ($source['name'] ?? ''), 255) ?? '';
+        $contactCompany = Auth::sanitizeString($source['company'] ?? null, 255);
+        $content = buildContactActivityContent($action, $current, $previous);
+
+        $stmt = $db->prepare("
+            INSERT INTO activity_events (
+                entry_type,
+                action,
+                content,
+                contact_id,
+                contact_name,
+                contact_company
+            ) VALUES (
+                'contact_activity',
+                :action,
+                :content,
+                :contact_id,
+                :contact_name,
+                :contact_company
+            )
+        ");
+
+        $stmt->execute([
+            'action' => $action,
+            'content' => $content,
+            'contact_id' => $contactId,
+            'contact_name' => $contactName,
+            'contact_company' => $contactCompany
+        ]);
+    } catch (Exception $e) {
+        error_log('contact activity log failed: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Build readable activity text for contact events.
+ */
+function buildContactActivityContent(string $action, ?array $current, ?array $previous): string
+{
+    if ($action === 'created') {
+        return 'Kontakt erstellt';
+    }
+
+    if ($action === 'deleted') {
+        return 'Kontakt gelöscht';
+    }
+
+    $changedFields = detectContactChangedFields($previous, $current);
+    if (empty($changedFields)) {
+        return 'Kontakt bearbeitet';
+    }
+
+    $list = implode(', ', array_slice($changedFields, 0, 4));
+    if (count($changedFields) > 4) {
+        $list .= ', ...';
+    }
+
+    return 'Kontakt aktualisiert: ' . $list;
+}
+
+/**
+ * Detect meaningful field changes for contact updates.
+ */
+function detectContactChangedFields(?array $before, ?array $after): array
+{
+    if (!is_array($before) || !is_array($after)) {
+        return [];
+    }
+
+    $fields = [
+        'name' => 'Name',
+        'company' => 'Firma',
+        'location' => 'Ort',
+        'email' => 'E-Mail',
+        'phone' => 'Telefon',
+        'website' => 'Website',
+        'address' => 'Adresse',
+        'note' => 'Notiz'
+    ];
+
+    $changed = [];
+    foreach ($fields as $key => $label) {
+        $old = normalizeComparableValue($before[$key] ?? null);
+        $new = normalizeComparableValue($after[$key] ?? null);
+        if ($old !== $new) {
+            $changed[] = $label;
+        }
+    }
+
+    return $changed;
+}
+
+/**
+ * Normalize values for change comparison.
+ */
+function normalizeComparableValue($value): string
+{
+    if ($value === null) {
+        return '';
+    }
+
+    if (is_bool($value)) {
+        return $value ? '1' : '0';
+    }
+
+    if (is_numeric($value)) {
+        return (string) $value;
+    }
+
+    return trim((string) $value);
 }

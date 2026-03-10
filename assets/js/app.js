@@ -3089,7 +3089,7 @@
 
     function getCalendarEntryType(entry) {
         const type = entry && entry.entry_type ? String(entry.entry_type) : '';
-        if (type === 'project_note' || type === 'todo') {
+        if (type === 'project_note' || type === 'todo' || type === 'contact_activity' || type === 'project_activity') {
             return type;
         }
         return 'contact_note';
@@ -3099,6 +3099,8 @@
         const type = getCalendarEntryType(entry);
         if (type === 'project_note') return 'project-note';
         if (type === 'todo') return 'todo';
+        if (type === 'contact_activity') return 'contact-activity';
+        if (type === 'project_activity') return 'project-activity';
         return 'contact-note';
     }
 
@@ -3106,6 +3108,8 @@
         const type = getCalendarEntryType(entry);
         if (type === 'project_note') return 'Projekt-Notiz';
         if (type === 'todo') return 'To-do';
+        if (type === 'contact_activity') return 'Kontakt-Update';
+        if (type === 'project_activity') return 'Projekt-Update';
         return 'Kontakt-Notiz';
     }
 
@@ -3116,7 +3120,7 @@
     function getCalendarEntryContext(entry) {
         const type = getCalendarEntryType(entry);
 
-        if (type === 'project_note') {
+        if (type === 'project_note' || type === 'project_activity') {
             return {
                 primary: entry.project_name || 'Projekt',
                 secondary: entry.project_company || ''
@@ -3164,7 +3168,13 @@
         }
 
         if (!text) {
-            text = type === 'todo' ? 'To-do' : 'Notiz';
+            if (type === 'todo') {
+                text = 'To-do';
+            } else if (type === 'contact_activity' || type === 'project_activity') {
+                text = 'Aktivität';
+            } else {
+                text = 'Notiz';
+            }
         }
 
         if (typeof maxLength === 'number' && maxLength > 0 && text.length > maxLength) {
