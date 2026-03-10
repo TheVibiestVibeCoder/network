@@ -456,74 +456,15 @@ textarea.form-input {
     white-space: nowrap;
 }
 
-/* Mobile menu */
-.header-mobile-only {
-    display: none;
-}
-
-.mobile-menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    min-width: 200px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    padding: var(--spacing-2);
-    z-index: 500;
-}
-
-.mobile-menu.open {
-    display: block;
-}
-
-.mobile-menu-item {
-    display: flex;
+.header-logout-btn {
+    display: inline-flex;
     align-items: center;
-    gap: var(--spacing-3);
-    width: 100%;
-    padding: 10px 14px;
-    font-family: var(--font-family);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    text-decoration: none;
+    justify-content: center;
+    gap: var(--spacing-2);
 }
 
-.mobile-menu-item:hover {
-    background-color: var(--color-accent-subtle);
-    color: var(--color-text);
-}
-
-.mobile-menu-item svg {
-    color: var(--color-text-muted);
+.header-logout-btn svg {
     flex-shrink: 0;
-}
-
-.mobile-menu-danger {
-    color: var(--color-danger);
-}
-
-.mobile-menu-danger svg {
-    color: var(--color-danger);
-}
-
-.mobile-menu-danger:hover {
-    background-color: var(--color-danger-subtle);
-    color: var(--color-danger);
-}
-
-.mobile-menu-divider {
-    height: 1px;
-    background-color: var(--color-border);
-    margin: var(--spacing-2) 0;
 }
 
 /* ============================================
@@ -1014,6 +955,15 @@ textarea.form-input {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
+}
+
+.list-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-2);
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .list-filter-toggle {
@@ -3017,21 +2967,21 @@ textarea.form-input {
         justify-content: center;
     }
 
-    /* Mobile menu: hide desktop buttons, show menu trigger */
-    .header-desktop-only {
-        display: none;
-    }
-
-    .header-mobile-only {
-        display: inline-flex;
-    }
-
     .theme-toggle-btn {
         min-width: 38px;
         padding: 8px 10px;
     }
 
     .theme-toggle-label {
+        display: none;
+    }
+
+    .header-logout-btn {
+        min-width: 38px;
+        padding: 8px 10px;
+    }
+
+    .header-logout-btn span {
         display: none;
     }
 
@@ -3081,6 +3031,21 @@ textarea.form-input {
         max-width: none;
         width: 100%;
         flex: 1;
+        min-width: 0;
+    }
+
+    .list-header-actions {
+        gap: var(--spacing-1);
+    }
+
+    .list-header-actions .btn {
+        min-width: 38px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .list-header-actions .btn span {
+        display: none;
     }
 
     .list-filter-toggle {
@@ -3980,6 +3945,7 @@ textarea.form-input {
    ============================================ */
 
 #listView .list-header,
+#todoView .list-header,
 #projectsView > .list-header {
     position: sticky;
     top: 0;
@@ -4384,25 +4350,29 @@ textarea.form-input {
    Alignment + Spacing Polish
    ============================================ */
 
-/* Keep list control rows consistent across contacts/projects */
+/* Keep list control rows consistent across tabs */
 #listView .list-header,
+#todoView .list-header,
 #projectsView > .list-header {
     padding-top: var(--spacing-4);
     padding-bottom: var(--spacing-4);
 }
 
 #listView .list-header-top,
+#todoView .list-header-top,
 #projectsView .list-header-top {
     min-height: 42px;
     align-items: center;
 }
 
 #listView .search-input,
+#todoView .search-input,
 #projectsView .search-input {
     min-height: 40px;
 }
 
 #listView .list-header .btn,
+#todoView .list-header .btn,
 #projectsView .list-header .btn {
     min-height: 40px;
 }
@@ -4495,11 +4465,13 @@ textarea.form-input {
 /* Mobile spacing + alignment */
 @media (max-width: 768px) {
     #listView .list-header,
+    #todoView .list-header,
     #projectsView > .list-header {
         padding: var(--spacing-3);
     }
 
     #listView .list-header-top,
+    #todoView .list-header-top,
     #projectsView .list-header-top {
         min-height: 40px;
     }
