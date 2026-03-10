@@ -4987,7 +4987,7 @@ textarea.form-input {
 /* Dashboard card height tightening (desktop + mobile) */
 #projectsView .projects-dashboard {
     grid-auto-rows: auto;
-    align-items: start;
+    align-items: stretch;
 }
 
 #projectsView .dashboard-card {
