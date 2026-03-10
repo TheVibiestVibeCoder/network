@@ -30,7 +30,16 @@ class Database
             $pdo = new PDO('sqlite:' . DB_PATH);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+            $pdo->setAttribute(PDO::ATTR_TIMEOUT, max(1, (int) ceil(SQLITE_BUSY_TIMEOUT_MS / 1000)));
+
+            // SQLite runtime tuning for concurrent reads and fewer lock errors.
             $pdo->exec('PRAGMA foreign_keys = ON');
+            $pdo->exec('PRAGMA journal_mode = WAL');
+            $pdo->exec('PRAGMA synchronous = NORMAL');
+            $pdo->exec('PRAGMA temp_store = MEMORY');
+            $pdo->exec('PRAGMA busy_timeout = ' . SQLITE_BUSY_TIMEOUT_MS);
+            $pdo->exec('PRAGMA cache_size = -' . SQLITE_CACHE_SIZE_KB);
 
             return $pdo;
         } catch (PDOException $e) {
@@ -85,6 +94,7 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_id ON notes(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_company ON notes(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_notes_contact_created ON notes(contact_id, created_at)");
 
         // Create tags table
         $db->exec("
@@ -124,6 +134,7 @@ class Database
         ");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_success_time ON login_attempts(ip_address, success, attempted_at)");
 
         // Create projects table
         $db->exec("
@@ -162,6 +173,7 @@ class Database
         // Create indexes for project notes
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_project_id ON project_notes(project_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_created_at ON project_notes(created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_notes_project_created ON project_notes(project_id, created_at)");
 
         // Create project_contacts junction table (many-to-many)
         $db->exec("

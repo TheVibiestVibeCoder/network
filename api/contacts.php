@@ -28,7 +28,7 @@ $action = $_GET['action'] ?? '';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 // Require CSRF token for state-changing requests
-if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
     Auth::requireCsrfToken();
 }
 
@@ -89,7 +89,7 @@ function handleGet(Contact $model, string $action, ?int $id): void
     }
 
     // Get all contacts with optional search and sort
-    $search = $_GET['search'] ?? '';
+    $search = Auth::sanitizeString($_GET['search'] ?? '', 255) ?? '';
     $sortBy = $_GET['sort'] ?? 'name';
     $sortOrder = $_GET['order'] ?? 'ASC';
 
@@ -109,9 +109,8 @@ function handlePost(Contact $model, string $action): void
     }
 
     // Get JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    if ($input === null) {
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
@@ -170,9 +169,8 @@ function handlePut(Contact $model, ?int $id): void
     }
 
     // Get JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    if ($input === null) {
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
         return;

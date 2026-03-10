@@ -153,7 +153,7 @@ function handleGet(PDO $db, ?int $id): void
  */
 function handlePost(PDO $db): void
 {
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = Auth::getJsonInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
@@ -281,7 +281,7 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = Auth::getJsonInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);

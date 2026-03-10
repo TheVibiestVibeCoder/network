@@ -14,7 +14,14 @@ class Auth
     {
         if (session_status() === PHP_SESSION_NONE) {
             $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+                || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
+                || (TRUST_PROXY_HEADERS && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
+            // Harden session handling against fixation and cookie downgrade issues.
+            ini_set('session.use_strict_mode', '1');
+            ini_set('session.use_only_cookies', '1');
+            ini_set('session.cookie_httponly', '1');
+            ini_set('session.gc_maxlifetime', (string) SESSION_LIFETIME);
 
             session_name(SESSION_NAME);
             session_set_cookie_params([
@@ -249,14 +256,22 @@ class Auth
      */
     public static function getClientIp(): string
     {
-        // Check for forwarded IP (behind proxy/load balancer)
+        $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+        // By default do not trust proxy headers because they are client-controlled.
+        if (!TRUST_PROXY_HEADERS) {
+            return filter_var($remoteIp, FILTER_VALIDATE_IP) ? $remoteIp : '0.0.0.0';
+        }
+
+        $ip = $remoteIp;
         if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $ip = trim($ips[0]);
+            $ips = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $candidate = trim((string) ($ips[0] ?? ''));
+            if ($candidate !== '') {
+                $ip = $candidate;
+            }
         } elseif (!empty($_SERVER['HTTP_X_REAL_IP'])) {
-            $ip = $_SERVER['HTTP_X_REAL_IP'];
-        } else {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $ip = (string) $_SERVER['HTTP_X_REAL_IP'];
         }
 
         // Validate IP format
@@ -391,12 +406,15 @@ class Auth
 
         // Permissions policy - disable unnecessary browser features
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+        header('Cross-Origin-Opener-Policy: same-origin');
+        header('Cross-Origin-Resource-Policy: same-origin');
 
         // Content Security Policy
-        header("Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org");
+        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org");
 
         // Prevent caching of sensitive pages
-        if (self::isAuthenticated()) {
+        self::startSession();
+        if (!empty($_SESSION['authenticated'])) {
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
         }
@@ -497,5 +515,25 @@ class Auth
             'website' => self::sanitizeUrl($data['website'] ?? null),
             'address' => self::sanitizeString($data['address'] ?? null, 1000),
         ];
+    }
+
+    /**
+     * Parse JSON request body into an array.
+     * Returns null for invalid JSON or non-object/non-array payloads.
+     */
+    public static function getJsonInput(): ?array
+    {
+        $raw = file_get_contents('php://input');
+        if ($raw === false) {
+            return null;
+        }
+
+        $raw = trim($raw);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : null;
     }
 }

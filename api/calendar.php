@@ -32,7 +32,7 @@ try {
     $start = normalizeDateTimeFilter($_GET['start'] ?? null);
     $end = normalizeDateTimeFilter($_GET['end'] ?? null);
     $tagId = isset($_GET['tag_id']) ? (int) $_GET['tag_id'] : null;
-    $search = trim((string) ($_GET['search'] ?? ''));
+    $search = Auth::sanitizeString(trim((string) ($_GET['search'] ?? '')), 255) ?? '';
 
     if ($tagId !== null && $tagId <= 0) {
         $tagId = null;

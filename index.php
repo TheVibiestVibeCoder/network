@@ -33,18 +33,22 @@ $isLockedOut = false;
 $lockoutRemaining = 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
-    $password = $_POST['password'] ?? '';
-
-    $result = Auth::login($password);
-
-    if ($result['success']) {
-        header('Location: index.php');
-        exit;
+    if (!Auth::validateCsrfToken()) {
+        $loginError = 'Invalid session token. Please refresh and try again.';
     } else {
-        $loginError = $result['error'];
-        if (isset($result['locked_until'])) {
-            $isLockedOut = true;
-            $lockoutRemaining = max(0, $result['locked_until'] - time());
+        $password = $_POST['password'] ?? '';
+
+        $result = Auth::login($password);
+
+        if ($result['success']) {
+            header('Location: index.php');
+            exit;
+        } else {
+            $loginError = $result['error'];
+            if (isset($result['locked_until'])) {
+                $isLockedOut = true;
+                $lockoutRemaining = max(0, $result['locked_until'] - time());
+            }
         }
     }
 } else {

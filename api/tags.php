@@ -28,7 +28,7 @@ $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $contactId = isset($_GET['contact_id']) ? (int) $_GET['contact_id'] : null;
 
 // Require CSRF token for state-changing requests
-if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
     Auth::requireCsrfToken();
 }
 
@@ -105,21 +105,45 @@ function handleGet(PDO $db, string $action, ?int $id, ?int $contactId): void
             GROUP BY t.id
             ORDER BY t.name ASC
         ");
-        $tags = $stmt->fetchAll();
+        $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Get contacts for each tag
         $result = [];
+        $tagIndexMap = [];
+        $tagIds = [];
         foreach ($tags as $tag) {
+            $tag['contacts'] = [];
+            $result[] = $tag;
+            $idx = array_key_last($result);
+            if ($idx !== null) {
+                $tagId = (int) ($tag['id'] ?? 0);
+                if ($tagId > 0) {
+                    $tagIndexMap[$tagId] = $idx;
+                    $tagIds[] = $tagId;
+                }
+            }
+        }
+
+        if (!empty($tagIds)) {
+            $placeholders = implode(',', array_fill(0, count($tagIds), '?'));
             $contactStmt = $db->prepare("
-                SELECT c.*
-                FROM contacts c
-                JOIN contact_tags ct ON c.id = ct.contact_id
-                WHERE ct.tag_id = ?
+                SELECT ct.tag_id, c.*
+                FROM contact_tags ct
+                JOIN contacts c ON c.id = ct.contact_id
+                WHERE ct.tag_id IN ($placeholders)
                 ORDER BY c.name ASC
             ");
-            $contactStmt->execute([$tag['id']]);
-            $tag['contacts'] = $contactStmt->fetchAll();
-            $result[] = $tag;
+            $contactStmt->execute($tagIds);
+            $rows = $contactStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as $row) {
+                $tagId = (int) ($row['tag_id'] ?? 0);
+                if ($tagId <= 0 || !isset($tagIndexMap[$tagId])) {
+                    continue;
+                }
+
+                unset($row['tag_id']);
+                $result[$tagIndexMap[$tagId]]['contacts'][] = $row;
+            }
         }
 
         // Get untagged contacts
@@ -152,9 +176,8 @@ function handleGet(PDO $db, string $action, ?int $id, ?int $contactId): void
  */
 function handlePost(PDO $db, string $action): void
 {
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    if ($input === null) {
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
@@ -162,22 +185,37 @@ function handlePost(PDO $db, string $action): void
 
     if ($action === 'assign') {
         // Assign a tag to a contact
-        if (empty($input['contact_id']) || empty($input['tag_id'])) {
+        $contactId = parsePositiveId($input['contact_id'] ?? null);
+        $tagId = parsePositiveId($input['tag_id'] ?? null);
+
+        if ($contactId === null || $tagId === null) {
             http_response_code(400);
             echo json_encode(['error' => 'contact_id and tag_id are required']);
             return;
         }
 
+        if (!recordExists($db, 'contacts', $contactId)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Contact not found']);
+            return;
+        }
+
+        if (!recordExists($db, 'tags', $tagId)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Tag not found']);
+            return;
+        }
+
         // Check if already assigned
         $checkStmt = $db->prepare("SELECT 1 FROM contact_tags WHERE contact_id = ? AND tag_id = ?");
-        $checkStmt->execute([$input['contact_id'], $input['tag_id']]);
+        $checkStmt->execute([$contactId, $tagId]);
         if ($checkStmt->fetch()) {
             echo json_encode(['success' => true, 'message' => 'Tag already assigned']);
             return;
         }
 
         $stmt = $db->prepare("INSERT INTO contact_tags (contact_id, tag_id) VALUES (?, ?)");
-        $stmt->execute([$input['contact_id'], $input['tag_id']]);
+        $stmt->execute([$contactId, $tagId]);
 
         echo json_encode(['success' => true, 'message' => 'Tag assigned']);
         return;
@@ -233,8 +271,8 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
-    if ($input === null) {
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
@@ -291,13 +329,29 @@ function handleDelete(PDO $db, string $action, ?int $id, ?int $contactId): void
 {
     if ($action === 'unassign') {
         // Remove a tag from a contact
-        $input = json_decode(file_get_contents('php://input'), true);
-        $tagId = $input['tag_id'] ?? $id;
-        $cId = $input['contact_id'] ?? $contactId;
+        $input = Auth::getJsonInput();
+        if (!is_array($input)) {
+            $input = [];
+        }
 
-        if (empty($cId) || empty($tagId)) {
+        $tagId = parsePositiveId($input['tag_id'] ?? $id);
+        $cId = parsePositiveId($input['contact_id'] ?? $contactId);
+
+        if ($cId === null || $tagId === null) {
             http_response_code(400);
             echo json_encode(['error' => 'contact_id and tag_id are required']);
+            return;
+        }
+
+        if (!recordExists($db, 'contacts', $cId)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Contact not found']);
+            return;
+        }
+
+        if (!recordExists($db, 'tags', $tagId)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Tag not found']);
             return;
         }
 
@@ -314,9 +368,47 @@ function handleDelete(PDO $db, string $action, ?int $id, ?int $contactId): void
         return;
     }
 
+    if (!recordExists($db, 'tags', $id)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Tag not found']);
+        return;
+    }
+
     // Delete tag entirely
     $stmt = $db->prepare("DELETE FROM tags WHERE id = ?");
     $stmt->execute([$id]);
 
     echo json_encode(['success' => true, 'message' => 'Tag deleted']);
+}
+
+/**
+ * Parse a positive integer ID from mixed input.
+ */
+function parsePositiveId($value): ?int
+{
+    if (is_int($value)) {
+        return $value > 0 ? $value : null;
+    }
+
+    if (is_string($value) && ctype_digit($value)) {
+        $parsed = (int) $value;
+        return $parsed > 0 ? $parsed : null;
+    }
+
+    return null;
+}
+
+/**
+ * Check if a record exists in a supported table.
+ */
+function recordExists(PDO $db, string $table, int $id): bool
+{
+    $allowedTables = ['contacts', 'tags'];
+    if (!in_array($table, $allowedTables, true) || $id <= 0) {
+        return false;
+    }
+
+    $stmt = $db->prepare("SELECT id FROM {$table} WHERE id = :id LIMIT 1");
+    $stmt->execute(['id' => $id]);
+    return (bool) $stmt->fetchColumn();
 }
