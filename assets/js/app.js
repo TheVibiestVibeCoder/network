@@ -1251,10 +1251,7 @@
 
             if (result.success) {
                 state.todos = result.data || [];
-                renderTodoCollection(elements.todosList, state.todos, {
-                    showContext: true,
-                    emptyMessage: 'No to-dos found'
-                });
+                renderGroupedTodosList(elements.todosList, state.todos);
             } else {
                 elements.todosList.innerHTML = '<div class="empty-state">Error loading to-dos</div>';
             }
@@ -1364,6 +1361,109 @@
         }
 
         const html = todos.map(todo => createTodoItemMarkup(todo, { showContext })).join('');
+        container.innerHTML = html;
+    }
+
+    function getTodoGroupMeta(todo) {
+        const hasProject = !!todo.project_id;
+        const hasContact = !!todo.contact_id;
+
+        const projectLabel = todo.project_name || `Project #${todo.project_id}`;
+        const contactLabel = todo.contact_name || `Contact #${todo.contact_id}`;
+
+        if (hasProject && hasContact) {
+            return {
+                key: `project:${todo.project_id}|contact:${todo.contact_id}`,
+                title: projectLabel,
+                subtitle: contactLabel,
+                kind: 'project-contact',
+                projectId: Number(todo.project_id),
+                contactId: Number(todo.contact_id)
+            };
+        }
+
+        if (hasProject) {
+            return {
+                key: `project:${todo.project_id}`,
+                title: projectLabel,
+                subtitle: 'Project',
+                kind: 'project',
+                projectId: Number(todo.project_id),
+                contactId: null
+            };
+        }
+
+        return {
+            key: `contact:${todo.contact_id}`,
+            title: contactLabel,
+            subtitle: 'Contact',
+            kind: 'contact',
+            projectId: null,
+            contactId: Number(todo.contact_id)
+        };
+    }
+
+    function renderGroupedTodosList(container, todos) {
+        if (!container) {
+            return;
+        }
+
+        if (!todos || todos.length === 0) {
+            renderTodoCollection(container, [], {
+                showContext: false,
+                emptyMessage: 'No to-dos found'
+            });
+            return;
+        }
+
+        const groupMap = new Map();
+        todos.forEach(todo => {
+            const meta = getTodoGroupMeta(todo);
+            if (!groupMap.has(meta.key)) {
+                groupMap.set(meta.key, {
+                    meta,
+                    items: []
+                });
+            }
+            groupMap.get(meta.key).items.push(todo);
+        });
+
+        const groups = Array.from(groupMap.values());
+
+        const html = groups.map(group => {
+            const { meta, items } = group;
+
+            const typeLabel = meta.kind === 'project-contact'
+                ? 'Project + Contact'
+                : (meta.kind === 'project' ? 'Project' : 'Contact');
+
+            const headerActions = `
+                <div class="todo-group-actions">
+                    ${meta.projectId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-project="${meta.projectId}">Open Project</button>` : ''}
+                    ${meta.contactId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-contact="${meta.contactId}">Open Contact</button>` : ''}
+                </div>
+            `;
+
+            return `
+                <div class="todo-group">
+                    <div class="todo-group-header">
+                        <div class="todo-group-title-wrap">
+                            <h3 class="todo-group-title">${escapeHtml(meta.title)}</h3>
+                            <p class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</p>
+                        </div>
+                        <div class="todo-group-meta">
+                            <span class="todo-group-type">${escapeHtml(typeLabel)}</span>
+                            <span class="todo-group-count">${items.length}</span>
+                        </div>
+                    </div>
+                    ${headerActions}
+                    <div class="todo-group-items">
+                        ${items.map(todo => createTodoItemMarkup(todo, { showContext: false })).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
         container.innerHTML = html;
     }
 

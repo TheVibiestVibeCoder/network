@@ -763,9 +763,88 @@ textarea.form-input {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-4) var(--spacing-5);
-    display: grid;
-    gap: var(--spacing-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
     align-content: flex-start;
+}
+
+.todo-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.todo-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-3);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.todo-group-title-wrap {
+    min-width: 0;
+}
+
+.todo-group-title {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.todo-group-subtitle {
+    margin: 2px 0 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.todo-group-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-shrink: 0;
+}
+
+.todo-group-type {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+}
+
+.todo-group-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+}
+
+.todo-group-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+}
+
+.todo-group-items {
+    display: grid;
+    gap: var(--spacing-2);
 }
 
 .todo-list {
@@ -2884,6 +2963,20 @@ textarea.form-input {
     .todo-assignment-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
+    }
+
+    .todo-group-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .todo-group-meta {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .todo-group-actions .btn {
+        width: auto;
     }
 
     .search-box {
