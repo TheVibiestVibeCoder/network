@@ -37,7 +37,7 @@
         markers: null,
         mapBaseLayer: null,
         mapLabelLayer: null,
-        theme: 'dark',
+        theme: 'light',
         groupBy: 'company', // 'company' or 'tags'
         allTags: [],
         taggedData: null,
@@ -269,9 +269,9 @@
     function getStoredTheme() {
         try {
             const stored = localStorage.getItem(THEME_STORAGE_KEY);
-            return stored === 'light' || stored === 'dark' ? stored : 'dark';
+            return stored === 'light' || stored === 'dark' ? stored : 'light';
         } catch (e) {
-            return 'dark';
+            return 'light';
         }
     }
 
@@ -286,8 +286,16 @@
         }
 
         return `
-            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8zM1 13h3v-2H1zm10 9h2v-3h-2zm7.04-2.05l1.41-1.41-1.79-1.8-1.41 1.42zM20 13h3v-2h-3zM17.24 4.84l1.79-1.79-1.41-1.41-1.8 1.79zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM4.22 19.78l1.41 1.41 1.8-1.79-1.42-1.41zM11 1h2v3h-2z"/>
+            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"></circle>
+                <line x1="12" y1="1.5" x2="12" y2="4.5"></line>
+                <line x1="12" y1="19.5" x2="12" y2="22.5"></line>
+                <line x1="1.5" y1="12" x2="4.5" y2="12"></line>
+                <line x1="19.5" y1="12" x2="22.5" y2="12"></line>
+                <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"></line>
+                <line x1="17.7" y1="17.7" x2="19.8" y2="19.8"></line>
+                <line x1="17.7" y1="6.3" x2="19.8" y2="4.2"></line>
+                <line x1="4.2" y1="19.8" x2="6.3" y2="17.7"></line>
             </svg>
             <span class="theme-toggle-label">Light Mode</span>
         `;
