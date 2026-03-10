@@ -4984,6 +4984,50 @@ textarea.form-input {
     transform: translateY(-1px);
 }
 
+.dashboard-mobile-label {
+    display: none;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+@media (max-width: 768px) {
+    #projectsView .dashboard-bar {
+        grid-template-columns: minmax(0, 1fr) auto;
+        min-height: 42px;
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    #projectsView .dashboard-mobile-label {
+        display: inline-flex;
+    }
+
+    #projectsView .dashboard-bar-stats {
+        display: none;
+    }
+
+    #projectsView .dashboard-toggle-btn {
+        align-self: center;
+        margin-top: 0;
+    }
+
+    #todoView .todo-controls.list-controls {
+        margin-top: var(--spacing-2);
+    }
+}
+
+@media (max-width: 480px) {
+    #projectsView .dashboard-bar {
+        padding: var(--spacing-2);
+    }
+
+    #projectsView .dashboard-mobile-label {
+        font-size: var(--font-size-xs);
+    }
+}
+
 /* ============================================
    Login + App Entrance Motion
    ============================================ */

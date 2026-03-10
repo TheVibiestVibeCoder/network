@@ -4669,6 +4669,17 @@
             });
         }
 
+        // To-do filter toggle (mobile - collapsible controls)
+        const todoFilterToggle = document.getElementById('todoFilterToggle');
+        const todoFilterControls = document.getElementById('todoFilterControls');
+
+        if (todoFilterToggle && todoFilterControls) {
+            todoFilterToggle.addEventListener('click', () => {
+                todoFilterControls.classList.toggle('open');
+                todoFilterToggle.classList.toggle('active');
+            });
+        }
+
         // Add contact button (desktop)
         elements.addContactBtn.addEventListener('click', () => openContactModal());
 
