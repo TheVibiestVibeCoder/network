@@ -88,7 +88,8 @@ function handleGet(PDO $db, ?int $id): void
     $hasProjectFilter = $projectId !== null && $projectId > 0;
 
     if ($hasContactFilter && $hasProjectFilter) {
-        $conditions[] = '(t.contact_id = :contact_id OR t.project_id = :project_id)';
+        $conditions[] = 't.contact_id = :contact_id';
+        $conditions[] = 't.project_id = :project_id';
         $params['contact_id'] = $contactId;
         $params['project_id'] = $projectId;
     } elseif ($hasContactFilter) {
@@ -97,6 +98,14 @@ function handleGet(PDO $db, ?int $id): void
     } elseif ($hasProjectFilter) {
         $conditions[] = 't.project_id = :project_id';
         $params['project_id'] = $projectId;
+    } else {
+        // Avoid duplicates in global list by only showing master rows.
+        $conditions[] = 't.parent_todo_id IS NULL';
+    }
+
+    if ($hasProjectFilter && !$hasContactFilter) {
+        // Project-only views should show the master project row once.
+        $conditions[] = 't.parent_todo_id IS NULL';
     }
 
     if ($status === 'open') {
@@ -193,19 +202,53 @@ function handlePost(PDO $db): void
         return;
     }
 
-    $stmt = $db->prepare("
-        INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id)
-        VALUES (:title, :description, :due_date, 0, :contact_id, :project_id)
-    ");
-    $stmt->execute([
-        'title' => trim($title),
-        'description' => ($description !== null && trim($description) === '') ? null : $description,
-        'due_date' => $dueDate === false ? null : $dueDate,
-        'contact_id' => $contactId,
-        'project_id' => $projectId
-    ]);
+    $normalizedDescription = ($description !== null && trim($description) === '') ? null : $description;
+    $normalizedDueDate = $dueDate === false ? null : $dueDate;
 
-    $todoId = (int) $db->lastInsertId();
+    $db->beginTransaction();
+    try {
+        $stmt = $db->prepare("
+            INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
+            VALUES (:title, :description, :due_date, 0, :contact_id, :project_id, NULL)
+        ");
+        $stmt->execute([
+            'title' => trim($title),
+            'description' => $normalizedDescription,
+            'due_date' => $normalizedDueDate,
+            'contact_id' => $contactId,
+            'project_id' => $projectId
+        ]);
+
+        $todoId = (int) $db->lastInsertId();
+
+        // If a to-do is assigned to a project, mirror it to all currently assigned contacts.
+        if ($projectId !== null) {
+            $contactIds = getProjectContactIds($db, $projectId);
+            if (!empty($contactIds)) {
+                $childInsert = $db->prepare("
+                    INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
+                    VALUES (:title, :description, :due_date, 0, :contact_id, :project_id, :parent_todo_id)
+                ");
+
+                foreach ($contactIds as $projectContactId) {
+                    $childInsert->execute([
+                        'title' => trim($title),
+                        'description' => $normalizedDescription,
+                        'due_date' => $normalizedDueDate,
+                        'contact_id' => $projectContactId,
+                        'project_id' => $projectId,
+                        'parent_todo_id' => $todoId
+                    ]);
+                }
+            }
+        }
+
+        $db->commit();
+    } catch (Exception $e) {
+        $db->rollBack();
+        throw $e;
+    }
+
     $todo = getTodoById($db, $todoId);
 
     http_response_code(201);
@@ -230,6 +273,14 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
+    $rootTodoId = !empty($existing['parent_todo_id']) ? (int) $existing['parent_todo_id'] : (int) $existing['id'];
+    $rootTodo = getTodoById($db, $rootTodoId);
+    if ($rootTodo === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'To-do not found']);
+        return;
+    }
+
     $input = json_decode(file_get_contents('php://input'), true);
     if (!is_array($input)) {
         http_response_code(400);
@@ -239,7 +290,7 @@ function handlePut(PDO $db, ?int $id): void
 
     $title = array_key_exists('title', $input)
         ? Auth::sanitizeString($input['title'], 255)
-        : $existing['title'];
+        : $rootTodo['title'];
     if ($title === null || trim($title) === '') {
         http_response_code(400);
         echo json_encode(['error' => 'title cannot be empty']);
@@ -248,12 +299,12 @@ function handlePut(PDO $db, ?int $id): void
 
     $description = array_key_exists('description', $input)
         ? Auth::sanitizeString($input['description'], 10000)
-        : $existing['description'];
+        : $rootTodo['description'];
     if ($description !== null && trim((string) $description) === '') {
         $description = null;
     }
 
-    $dueDateInput = array_key_exists('due_date', $input) ? $input['due_date'] : $existing['due_date'];
+    $dueDateInput = array_key_exists('due_date', $input) ? $input['due_date'] : $rootTodo['due_date'];
     $dueDate = normalizeDate($dueDateInput);
     if ($dueDate === false) {
         http_response_code(400);
@@ -263,10 +314,10 @@ function handlePut(PDO $db, ?int $id): void
 
     $isCompleted = array_key_exists('is_completed', $input)
         ? (int) ((bool) $input['is_completed'])
-        : (int) $existing['is_completed'];
+        : (int) $rootTodo['is_completed'];
 
-    $contactIdInput = array_key_exists('contact_id', $input) ? $input['contact_id'] : $existing['contact_id'];
-    $projectIdInput = array_key_exists('project_id', $input) ? $input['project_id'] : $existing['project_id'];
+    $contactIdInput = array_key_exists('contact_id', $input) ? $input['contact_id'] : $rootTodo['contact_id'];
+    $projectIdInput = array_key_exists('project_id', $input) ? $input['project_id'] : $rootTodo['project_id'];
     $contactId = parseNullableId($contactIdInput);
     $projectId = parseNullableId($projectIdInput);
 
@@ -294,29 +345,74 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
-    $stmt = $db->prepare("
-        UPDATE todos
-        SET
-            title = :title,
-            description = :description,
-            due_date = :due_date,
-            is_completed = :is_completed,
-            contact_id = :contact_id,
-            project_id = :project_id,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = :id
-    ");
-    $stmt->execute([
-        'id' => $id,
-        'title' => trim($title),
-        'description' => $description,
-        'due_date' => $dueDate,
-        'is_completed' => $isCompleted,
-        'contact_id' => $contactId,
-        'project_id' => $projectId
-    ]);
+    $db->beginTransaction();
+    try {
+        // Update master row
+        $rootUpdate = $db->prepare("
+            UPDATE todos
+            SET
+                title = :title,
+                description = :description,
+                due_date = :due_date,
+                is_completed = :is_completed,
+                contact_id = :contact_id,
+                project_id = :project_id,
+                parent_todo_id = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ");
 
-    $updated = getTodoById($db, $id);
+        $rootUpdate->execute([
+            'id' => $rootTodoId,
+            'title' => trim($title),
+            'description' => $description,
+            'due_date' => $dueDate,
+            'is_completed' => $isCompleted,
+            'contact_id' => $contactId,
+            'project_id' => $projectId
+        ]);
+
+        // Rebuild child rows to keep project-contact mirroring in sync.
+        $deleteChildren = $db->prepare("DELETE FROM todos WHERE parent_todo_id = :parent_todo_id");
+        $deleteChildren->execute(['parent_todo_id' => $rootTodoId]);
+
+        if ($projectId !== null) {
+            // Project master row should not be pinned to one contact.
+            $clearRootContact = $db->prepare("
+                UPDATE todos
+                SET contact_id = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+            $clearRootContact->execute(['id' => $rootTodoId]);
+
+            $contactIds = getProjectContactIds($db, $projectId);
+            if (!empty($contactIds)) {
+                $childInsert = $db->prepare("
+                    INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
+                    VALUES (:title, :description, :due_date, :is_completed, :contact_id, :project_id, :parent_todo_id)
+                ");
+
+                foreach ($contactIds as $projectContactId) {
+                    $childInsert->execute([
+                        'title' => trim($title),
+                        'description' => $description,
+                        'due_date' => $dueDate,
+                        'is_completed' => $isCompleted,
+                        'contact_id' => $projectContactId,
+                        'project_id' => $projectId,
+                        'parent_todo_id' => $rootTodoId
+                    ]);
+                }
+            }
+        }
+
+        $db->commit();
+    } catch (Exception $e) {
+        $db->rollBack();
+        throw $e;
+    }
+
+    $updated = getTodoById($db, $rootTodoId);
     echo json_encode(['success' => true, 'data' => $updated]);
 }
 
@@ -338,8 +434,10 @@ function handleDelete(PDO $db, ?int $id): void
         return;
     }
 
-    $stmt = $db->prepare('DELETE FROM todos WHERE id = ?');
-    $stmt->execute([$id]);
+    $rootTodoId = !empty($existing['parent_todo_id']) ? (int) $existing['parent_todo_id'] : (int) $existing['id'];
+
+    $stmt = $db->prepare('DELETE FROM todos WHERE id = :root_id OR parent_todo_id = :root_id');
+    $stmt->execute(['root_id' => $rootTodoId]);
 
     echo json_encode(['success' => true, 'message' => 'To-do deleted']);
 }
@@ -430,4 +528,29 @@ function recordExists(PDO $db, string $table, int $id): bool
     $stmt = $db->prepare("SELECT id FROM {$table} WHERE id = ? LIMIT 1");
     $stmt->execute([$id]);
     return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Get all contacts assigned to a project.
+ */
+function getProjectContactIds(PDO $db, int $projectId): array
+{
+    $stmt = $db->prepare("
+        SELECT contact_id
+        FROM project_contacts
+        WHERE project_id = :project_id
+        ORDER BY contact_id ASC
+    ");
+    $stmt->execute(['project_id' => $projectId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $ids = [];
+    foreach ($rows as $row) {
+        $cid = isset($row['contact_id']) ? (int) $row['contact_id'] : 0;
+        if ($cid > 0) {
+            $ids[] = $cid;
+        }
+    }
+
+    return $ids;
 }

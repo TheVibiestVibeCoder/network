@@ -203,17 +203,33 @@ class Database
                 is_completed INTEGER NOT NULL DEFAULT 0,
                 contact_id INTEGER,
                 project_id INTEGER,
+                parent_todo_id INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 CHECK (contact_id IS NOT NULL OR project_id IS NOT NULL),
                 FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (parent_todo_id) REFERENCES todos(id) ON DELETE CASCADE
             )
         ");
+
+        // Lightweight migration for existing databases that don't yet have parent_todo_id
+        $todoColumns = $db->query("PRAGMA table_info(todos)")->fetchAll(PDO::FETCH_ASSOC);
+        $hasParentTodoColumn = false;
+        foreach ($todoColumns as $column) {
+            if (($column['name'] ?? '') === 'parent_todo_id') {
+                $hasParentTodoColumn = true;
+                break;
+            }
+        }
+        if (!$hasParentTodoColumn) {
+            $db->exec("ALTER TABLE todos ADD COLUMN parent_todo_id INTEGER");
+        }
 
         // Create indexes for todos
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_contact_id ON todos(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_parent_todo_id ON todos(parent_todo_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_is_completed ON todos(is_completed)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at)");
