@@ -4680,43 +4680,19 @@
             });
         }
 
-        // Add contact button (desktop)
-        elements.addContactBtn.addEventListener('click', () => openContactModal());
+        // Project controls toggle (mobile - collapsible controls)
+        const projectFilterToggle = document.getElementById('projectFilterToggle');
+        const projectControls = document.getElementById('projectControls');
 
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const mobileMenu = document.getElementById('mobileMenu');
-
-        if (mobileMenuBtn && mobileMenu) {
-            mobileMenuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                mobileMenu.classList.toggle('open');
+        if (projectFilterToggle && projectControls) {
+            projectFilterToggle.addEventListener('click', () => {
+                projectControls.classList.toggle('open');
+                projectFilterToggle.classList.toggle('active');
             });
+        }
 
-            // Close mobile menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!mobileMenu.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
-                    mobileMenu.classList.remove('open');
-                }
-            });
-
-            // Mobile: Add Contact
-            const addContactBtnMobile = document.getElementById('addContactBtnMobile');
-            if (addContactBtnMobile) {
-                addContactBtnMobile.addEventListener('click', () => {
-                    mobileMenu.classList.remove('open');
-                    openContactModal();
-                });
-            }
-
-            // Mobile: Import/Export
-            const importExportBtnMobile = document.getElementById('importExportBtnMobile');
-            if (importExportBtnMobile) {
-                importExportBtnMobile.addEventListener('click', () => {
-                    mobileMenu.classList.remove('open');
-                    openImportExportModal();
-                });
-            }
+        if (elements.addContactBtn) {
+            elements.addContactBtn.addEventListener('click', () => openContactModal());
         }
 
         if (elements.themeToggleBtn) {
