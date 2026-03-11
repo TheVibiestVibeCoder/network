@@ -36,20 +36,7 @@ $action = $_GET['action'] ?? '';
 
 // Require CSRF token for import (state-changing POST)
 if ($action === 'import' && $method === 'POST') {
-    // CSRF token is in the POST form data or header for multipart requests
-    $csrfValid = false;
-    $sessionToken = $_SESSION[CSRF_TOKEN_NAME] ?? '';
-    $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    $postToken = $_POST[CSRF_TOKEN_NAME] ?? '';
-
-    if (!empty($sessionToken)) {
-        if ((!empty($headerToken) && hash_equals($sessionToken, $headerToken)) ||
-            (!empty($postToken) && hash_equals($sessionToken, $postToken))) {
-            $csrfValid = true;
-        }
-    }
-
-    if (!$csrfValid) {
+    if (!Auth::validateCsrfToken()) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Invalid or missing CSRF token']);
@@ -58,6 +45,20 @@ if ($action === 'import' && $method === 'POST') {
 }
 
 try {
+    if ($action === 'import' && $method !== 'POST') {
+        http_response_code(405);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+
+    if (($action === 'export' || $action === 'template') && $method !== 'GET') {
+        http_response_code(405);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+
     switch ($action) {
         case 'export':
             handleExport();
@@ -77,6 +78,7 @@ try {
             echo json_encode(['error' => 'Invalid action. Use: export, import, or template']);
     }
 } catch (Exception $e) {
+    error_log('import-export endpoint error: ' . $e->getMessage());
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'An internal error occurred']);
@@ -206,7 +208,7 @@ function handleImport(): void
 
     // Validate file type
     $allowedExtensions = ['xlsx', 'xls'];
-    if (!in_array($extension, $allowedExtensions)) {
+    if (!in_array($extension, $allowedExtensions, true)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid file type. Please upload an Excel file (.xlsx or .xls)']);
         return;
@@ -316,8 +318,9 @@ function handleImport(): void
         ]);
 
     } catch (Exception $e) {
+        error_log('import contacts failed: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => 'Error processing Excel file: ' . $e->getMessage()]);
+        echo json_encode(['error' => 'Error processing Excel file']);
     }
 }
 

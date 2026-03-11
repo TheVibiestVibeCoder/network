@@ -80,6 +80,12 @@ function handleGet(PDO $db, ?int $id): void
     $projectId = isset($_GET['project_id']) ? (int) $_GET['project_id'] : null;
     $status = $_GET['status'] ?? 'all';
     $search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+    $sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'default';
+
+    $allowedSorts = ['default', 'priority_desc', 'priority_asc'];
+    if (!in_array($sort, $allowedSorts, true)) {
+        $sort = 'default';
+    }
 
     $conditions = [];
     $params = [];
@@ -133,13 +139,44 @@ function handleGet(PDO $db, ?int $id): void
         $sql .= ' WHERE ' . implode(' AND ', $conditions);
     }
 
-    $sql .= "
-        ORDER BY
+    $orderBy = "
+        t.is_completed ASC,
+        CASE WHEN t.due_date IS NULL OR t.due_date = '' THEN 1 ELSE 0 END ASC,
+        t.due_date ASC,
+        t.created_at DESC
+    ";
+
+    if ($sort === 'priority_desc') {
+        $orderBy = "
             t.is_completed ASC,
+            CASE WHEN t.priority IS NULL OR t.priority = '' THEN 1 ELSE 0 END ASC,
+            CASE t.priority
+                WHEN 'high' THEN 3
+                WHEN 'medium' THEN 2
+                WHEN 'low' THEN 1
+                ELSE 0
+            END DESC,
             CASE WHEN t.due_date IS NULL OR t.due_date = '' THEN 1 ELSE 0 END ASC,
             t.due_date ASC,
             t.created_at DESC
-    ";
+        ";
+    } elseif ($sort === 'priority_asc') {
+        $orderBy = "
+            t.is_completed ASC,
+            CASE WHEN t.priority IS NULL OR t.priority = '' THEN 1 ELSE 0 END ASC,
+            CASE t.priority
+                WHEN 'low' THEN 1
+                WHEN 'medium' THEN 2
+                WHEN 'high' THEN 3
+                ELSE 4
+            END ASC,
+            CASE WHEN t.due_date IS NULL OR t.due_date = '' THEN 1 ELSE 0 END ASC,
+            t.due_date ASC,
+            t.created_at DESC
+        ";
+    }
+
+    $sql .= "\n        ORDER BY\n            {$orderBy}\n    ";
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
@@ -153,7 +190,7 @@ function handleGet(PDO $db, ?int $id): void
  */
 function handlePost(PDO $db): void
 {
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = Auth::getJsonInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
@@ -172,6 +209,13 @@ function handlePost(PDO $db): void
     if (($input['due_date'] ?? null) !== null && $dueDate === false) {
         http_response_code(400);
         echo json_encode(['error' => 'due_date must be in YYYY-MM-DD format']);
+        return;
+    }
+
+    $priority = normalizePriority($input['priority'] ?? null);
+    if ($priority === false) {
+        http_response_code(400);
+        echo json_encode(['error' => 'priority must be one of: low, medium, high, or null']);
         return;
     }
 
@@ -208,13 +252,14 @@ function handlePost(PDO $db): void
     $db->beginTransaction();
     try {
         $stmt = $db->prepare("
-            INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
-            VALUES (:title, :description, :due_date, 0, :contact_id, :project_id, NULL)
+            INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
+            VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, NULL)
         ");
         $stmt->execute([
             'title' => trim($title),
             'description' => $normalizedDescription,
             'due_date' => $normalizedDueDate,
+            'priority' => $priority,
             'contact_id' => $contactId,
             'project_id' => $projectId
         ]);
@@ -226,8 +271,8 @@ function handlePost(PDO $db): void
             $contactIds = getProjectContactIds($db, $projectId);
             if (!empty($contactIds)) {
                 $childInsert = $db->prepare("
-                    INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
-                    VALUES (:title, :description, :due_date, 0, :contact_id, :project_id, :parent_todo_id)
+                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
+                    VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, :parent_todo_id)
                 ");
 
                 foreach ($contactIds as $projectContactId) {
@@ -235,6 +280,7 @@ function handlePost(PDO $db): void
                         'title' => trim($title),
                         'description' => $normalizedDescription,
                         'due_date' => $normalizedDueDate,
+                        'priority' => $priority,
                         'contact_id' => $projectContactId,
                         'project_id' => $projectId,
                         'parent_todo_id' => $todoId
@@ -281,7 +327,7 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = Auth::getJsonInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
@@ -309,6 +355,14 @@ function handlePut(PDO $db, ?int $id): void
     if ($dueDate === false) {
         http_response_code(400);
         echo json_encode(['error' => 'due_date must be in YYYY-MM-DD format']);
+        return;
+    }
+
+    $priorityInput = array_key_exists('priority', $input) ? $input['priority'] : $rootTodo['priority'];
+    $priority = normalizePriority($priorityInput);
+    if ($priority === false) {
+        http_response_code(400);
+        echo json_encode(['error' => 'priority must be one of: low, medium, high, or null']);
         return;
     }
 
@@ -354,6 +408,7 @@ function handlePut(PDO $db, ?int $id): void
                 title = :title,
                 description = :description,
                 due_date = :due_date,
+                priority = :priority,
                 is_completed = :is_completed,
                 contact_id = :contact_id,
                 project_id = :project_id,
@@ -367,6 +422,7 @@ function handlePut(PDO $db, ?int $id): void
             'title' => trim($title),
             'description' => $description,
             'due_date' => $dueDate,
+            'priority' => $priority,
             'is_completed' => $isCompleted,
             'contact_id' => $contactId,
             'project_id' => $projectId
@@ -388,8 +444,8 @@ function handlePut(PDO $db, ?int $id): void
             $contactIds = getProjectContactIds($db, $projectId);
             if (!empty($contactIds)) {
                 $childInsert = $db->prepare("
-                    INSERT INTO todos (title, description, due_date, is_completed, contact_id, project_id, parent_todo_id)
-                    VALUES (:title, :description, :due_date, :is_completed, :contact_id, :project_id, :parent_todo_id)
+                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
+                    VALUES (:title, :description, :due_date, :priority, :is_completed, :contact_id, :project_id, :parent_todo_id)
                 ");
 
                 foreach ($contactIds as $projectContactId) {
@@ -397,6 +453,7 @@ function handlePut(PDO $db, ?int $id): void
                         'title' => trim($title),
                         'description' => $description,
                         'due_date' => $dueDate,
+                        'priority' => $priority,
                         'is_completed' => $isCompleted,
                         'contact_id' => $projectContactId,
                         'project_id' => $projectId,
@@ -491,6 +548,29 @@ function normalizeDate($value)
     }
 
     return $date;
+}
+
+/**
+ * Validate and normalize optional to-do priority.
+ * Returns false for invalid values.
+ */
+function normalizePriority($value)
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    if (!is_string($value)) {
+        return false;
+    }
+
+    $priority = strtolower(trim($value));
+    if ($priority === '') {
+        return null;
+    }
+
+    $allowed = ['low', 'medium', 'high'];
+    return in_array($priority, $allowed, true) ? $priority : false;
 }
 
 /**

@@ -47,6 +47,34 @@ function loadEnv(): void
 // Load environment variables
 loadEnv();
 
+/**
+ * Parse an integer environment variable with a safe fallback.
+ */
+function envInt(string $key, int $default): int
+{
+    $raw = $_ENV[$key] ?? null;
+    if ($raw === null || $raw === '') {
+        return $default;
+    }
+
+    $value = filter_var($raw, FILTER_VALIDATE_INT);
+    return $value !== false ? (int) $value : $default;
+}
+
+/**
+ * Parse a boolean environment variable with a safe fallback.
+ */
+function envBool(string $key, bool $default): bool
+{
+    $raw = $_ENV[$key] ?? null;
+    if ($raw === null || $raw === '') {
+        return $default;
+    }
+
+    $value = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    return $value !== null ? $value : $default;
+}
+
 // Application constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'Simple CRM');
 define('APP_PASSWORD', $_ENV['APP_PASSWORD'] ?? 'changeme');
@@ -54,9 +82,14 @@ define('DB_PATH', APP_ROOT . '/data/crm.db');
 
 // Session configuration
 define('SESSION_NAME', 'crm_session');
-define('SESSION_LIFETIME', 86400); // 24 hours
+define('SESSION_LIFETIME', max(300, envInt('SESSION_LIFETIME', 86400))); // 24 hours
+define('TRUST_PROXY_HEADERS', envBool('TRUST_PROXY_HEADERS', false));
 
 // Security configuration
-define('MAX_LOGIN_ATTEMPTS', 10);         // Lock out after this many failed attempts
-define('LOGIN_LOCKOUT_DURATION', 900);    // Lockout duration in seconds (15 minutes)
+define('MAX_LOGIN_ATTEMPTS', max(1, envInt('MAX_LOGIN_ATTEMPTS', 10)));      // Lock out after this many failed attempts
+define('LOGIN_LOCKOUT_DURATION', max(60, envInt('LOGIN_LOCKOUT_DURATION', 900))); // Lockout duration in seconds
 define('CSRF_TOKEN_NAME', 'csrf_token');  // CSRF token parameter/header name
+
+// SQLite performance tuning
+define('SQLITE_BUSY_TIMEOUT_MS', max(1000, envInt('SQLITE_BUSY_TIMEOUT_MS', 5000)));
+define('SQLITE_CACHE_SIZE_KB', max(2048, envInt('SQLITE_CACHE_SIZE_KB', 20000)));

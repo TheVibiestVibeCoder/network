@@ -1,7 +1,7 @@
 <?php
 /**
  * Calendar API Endpoint
- * Returns a unified activity stream (contact notes, project notes, and to-dos).
+ * Returns a unified activity stream (notes, to-dos, and entity activity events).
  */
 
 define('APP_ROOT', dirname(__DIR__));
@@ -32,13 +32,14 @@ try {
     $start = normalizeDateTimeFilter($_GET['start'] ?? null);
     $end = normalizeDateTimeFilter($_GET['end'] ?? null);
     $tagId = isset($_GET['tag_id']) ? (int) $_GET['tag_id'] : null;
-    $search = trim((string) ($_GET['search'] ?? ''));
+    $search = Auth::sanitizeString(trim((string) ($_GET['search'] ?? '')), 255) ?? '';
 
     if ($tagId !== null && $tagId <= 0) {
         $tagId = null;
     }
 
     $entries = array_merge(
+        fetchEntityActivityEntries($db, $start, $end, $search, $tagId),
         fetchContactNoteEntries($db, $start, $end, $search, $tagId),
         fetchProjectNoteEntries($db, $start, $end, $search, $tagId),
         fetchTodoEntries($db, $start, $end, $search, $tagId)
@@ -68,6 +69,91 @@ function normalizeDateTimeFilter($value): ?string
 
     $value = trim($value);
     return $value !== '' ? $value : null;
+}
+
+function fetchEntityActivityEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array
+{
+    $conditions = ["a.entry_type IN ('contact_activity', 'project_activity')"];
+    $params = [];
+
+    if ($start !== null) {
+        $conditions[] = 'a.created_at >= ?';
+        $params[] = $start;
+    }
+
+    if ($end !== null) {
+        $conditions[] = 'a.created_at <= ?';
+        $params[] = $end;
+    }
+
+    if ($search !== '') {
+        $conditions[] = '(
+            a.content LIKE ?
+            OR a.contact_name LIKE ?
+            OR a.contact_company LIKE ?
+            OR a.project_name LIKE ?
+            OR a.project_company LIKE ?
+        )';
+        $searchParam = '%' . $search . '%';
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+        $params[] = $searchParam;
+    }
+
+    if ($tagId !== null) {
+        $conditions[] = '(
+            (a.contact_id IS NOT NULL AND EXISTS (
+                SELECT 1
+                FROM contact_tags ct
+                WHERE ct.contact_id = a.contact_id AND ct.tag_id = ?
+            ))
+            OR
+            (a.project_id IS NOT NULL AND (
+                EXISTS (
+                    SELECT 1
+                    FROM project_tags pt
+                    WHERE pt.project_id = a.project_id AND pt.tag_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_contacts pc
+                    JOIN contact_tags ct ON ct.contact_id = pc.contact_id
+                    WHERE pc.project_id = a.project_id AND ct.tag_id = ?
+                )
+            ))
+        )';
+        $params[] = $tagId;
+        $params[] = $tagId;
+        $params[] = $tagId;
+    }
+
+    $where = 'WHERE ' . implode(' AND ', $conditions);
+    $sql = "
+        SELECT
+            a.id,
+            a.entry_type,
+            a.created_at,
+            a.content,
+            NULL AS title,
+            NULL AS description,
+            NULL AS due_date,
+            NULL AS is_completed,
+            a.contact_id,
+            a.contact_name,
+            a.contact_company,
+            a.project_id,
+            a.project_name,
+            a.project_company,
+            a.action AS activity_action
+        FROM activity_events a
+        {$where}
+    ";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function fetchContactNoteEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array

@@ -28,7 +28,7 @@ $company = $_GET['company'] ?? null;
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 // Require CSRF token for state-changing requests
-if (in_array($method, ['POST', 'DELETE'])) {
+if (in_array($method, ['POST', 'DELETE'], true)) {
     Auth::requireCsrfToken();
 }
 
@@ -62,6 +62,16 @@ try {
  */
 function handleGet(PDO $db, ?int $contactId, ?string $company): void
 {
+    if ($contactId !== null && $contactId <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'contact_id must be a positive integer']);
+        return;
+    }
+
+    if ($company !== null) {
+        $company = Auth::sanitizeString($company, 255);
+    }
+
     if ($contactId === null && $company === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Either contact_id or company is required']);
@@ -127,16 +137,22 @@ function handleGet(PDO $db, ?int $contactId, ?string $company): void
  */
 function handlePost(PDO $db): void
 {
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    if ($input === null) {
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
         return;
     }
 
     // Validate required fields
-    if (empty($input['contact_id'])) {
+    $contactId = null;
+    if (isset($input['contact_id']) && is_int($input['contact_id'])) {
+        $contactId = $input['contact_id'];
+    } elseif (isset($input['contact_id']) && is_string($input['contact_id']) && ctype_digit($input['contact_id'])) {
+        $contactId = (int) $input['contact_id'];
+    }
+
+    if ($contactId === null || $contactId <= 0) {
         http_response_code(400);
         echo json_encode(['error' => 'contact_id is required']);
         return;
@@ -151,7 +167,7 @@ function handlePost(PDO $db): void
 
     // Get contact's company for linking
     $contactStmt = $db->prepare("SELECT company FROM contacts WHERE id = ?");
-    $contactStmt->execute([$input['contact_id']]);
+    $contactStmt->execute([$contactId]);
     $contact = $contactStmt->fetch();
 
     if (!$contact) {
@@ -166,7 +182,7 @@ function handlePost(PDO $db): void
         VALUES (?, ?, ?)
     ");
     $stmt->execute([
-        $input['contact_id'],
+        $contactId,
         $contact['company'] ?? null,
         $input['content']
     ]);

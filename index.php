@@ -33,18 +33,22 @@ $isLockedOut = false;
 $lockoutRemaining = 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
-    $password = $_POST['password'] ?? '';
-
-    $result = Auth::login($password);
-
-    if ($result['success']) {
-        header('Location: index.php');
-        exit;
+    if (!Auth::validateCsrfToken()) {
+        $loginError = 'Invalid session token. Please refresh and try again.';
     } else {
-        $loginError = $result['error'];
-        if (isset($result['locked_until'])) {
-            $isLockedOut = true;
-            $lockoutRemaining = max(0, $result['locked_until'] - time());
+        $password = $_POST['password'] ?? '';
+
+        $result = Auth::login($password);
+
+        if ($result['success']) {
+            header('Location: index.php');
+            exit;
+        } else {
+            $loginError = $result['error'];
+            if (isset($result['locked_until'])) {
+                $isLockedOut = true;
+                $lockoutRemaining = max(0, $result['locked_until'] - time());
+            }
         }
     }
 } else {
@@ -376,6 +380,11 @@ if ($isAuthenticated) {
                                 <option value="open">Open</option>
                                 <option value="completed">Completed</option>
                                 <option value="all">All</option>
+                            </select>
+                            <select id="todoSort" class="form-select" title="Sort to-dos">
+                                <option value="default">Sort: Default</option>
+                                <option value="priority_desc">Sort: Priority (High to Low)</option>
+                                <option value="priority_asc">Sort: Priority (Low to High)</option>
                             </select>
                         </div>
                     </div>
@@ -1179,6 +1188,16 @@ if ($isAuthenticated) {
                             <div class="form-group">
                                 <label for="todoDueDate">Due Date</label>
                                 <input type="date" id="todoDueDate" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="todoPriority">Priority</label>
+                                <select id="todoPriority" class="form-select">
+                                    <option value="">No priority</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
                             </div>
 
                             <div class="todo-assignment-grid">
