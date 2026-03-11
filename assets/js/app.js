@@ -63,6 +63,7 @@
         todoStatusFilter: 'open',
         todoContactFilterId: '',
         todoProjectFilterId: '',
+        todoSortBy: 'default',
         todoFilterOptionsInitialized: false,
         editingTodoId: null,
         todoModalContext: null
@@ -110,6 +111,7 @@
         todoContactFilter: document.getElementById('todoContactFilter'),
         todoProjectFilter: document.getElementById('todoProjectFilter'),
         todoStatusFilter: document.getElementById('todoStatusFilter'),
+        todoSort: document.getElementById('todoSort'),
         addTodoBtn: document.getElementById('addTodoBtn'),
 
         // Tag elements in overview modal
@@ -244,6 +246,7 @@
         todoTitle: document.getElementById('todoTitle'),
         todoDescription: document.getElementById('todoDescription'),
         todoDueDate: document.getElementById('todoDueDate'),
+        todoPriority: document.getElementById('todoPriority'),
         todoAssignType: document.getElementById('todoAssignType'),
         todoAssigneeId: document.getElementById('todoAssigneeId'),
         closeTodoModal: document.getElementById('closeTodoModal'),
@@ -599,6 +602,7 @@
             if (params.project_id) query.set('project_id', params.project_id);
             if (params.status) query.set('status', params.status);
             if (params.search) query.set('search', params.search);
+            if (params.sort) query.set('sort', params.sort);
 
             const url = query.toString() ? `api/todos.php?${query}` : 'api/todos.php';
             const response = await fetch(url);
@@ -1254,7 +1258,8 @@
                 status: state.todoStatusFilter,
                 search: state.todoSearchQuery,
                 contact_id: state.todoContactFilterId || '',
-                project_id: state.todoProjectFilterId || ''
+                project_id: state.todoProjectFilterId || '',
+                sort: state.todoSortBy || 'default'
             });
 
             if (result.success) {
@@ -1506,6 +1511,7 @@
         const showContext = options.showContext === true;
         const isCompleted = Number(todo.is_completed) === 1;
         const dueDate = parseTodoDueDate(todo.due_date);
+        const priorityMeta = getTodoPriorityMeta(todo.priority);
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
@@ -1550,6 +1556,7 @@
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
                         <div class="todo-meta">
+                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label)}</span>` : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
                         </div>
                         ${openButtons}
@@ -1567,6 +1574,27 @@
                 </div>
             </div>
         `;
+    }
+
+    function getTodoPriorityMeta(priorityValue) {
+        if (!priorityValue || typeof priorityValue !== 'string') {
+            return null;
+        }
+
+        const normalized = priorityValue.trim().toLowerCase();
+        if (normalized === 'high') {
+            return { key: 'high', label: 'High Priority' };
+        }
+
+        if (normalized === 'medium') {
+            return { key: 'medium', label: 'Medium Priority' };
+        }
+
+        if (normalized === 'low') {
+            return { key: 'low', label: 'Low Priority' };
+        }
+
+        return null;
     }
 
     function parseTodoDueDate(value) {
@@ -1686,6 +1714,9 @@
             elements.todoTitle.value = todoData.title || '';
             elements.todoDescription.value = todoData.description || '';
             elements.todoDueDate.value = todoData.due_date || '';
+            if (elements.todoPriority) {
+                elements.todoPriority.value = todoData.priority || '';
+            }
         }
 
         elements.todoModal.classList.add('active');
@@ -1731,6 +1762,7 @@
         const title = elements.todoTitle ? elements.todoTitle.value.trim() : '';
         const description = elements.todoDescription ? elements.todoDescription.value.trim() : '';
         const dueDate = elements.todoDueDate ? elements.todoDueDate.value : '';
+        const priority = elements.todoPriority ? elements.todoPriority.value : '';
         const assignType = elements.todoAssignType ? elements.todoAssignType.value : 'contact';
         const assigneeIdRaw = elements.todoAssigneeId ? elements.todoAssigneeId.value : '';
         const assigneeId = parseInt(assigneeIdRaw, 10);
@@ -1749,6 +1781,7 @@
             title,
             description: description || null,
             due_date: dueDate || null,
+            priority: priority || null,
             contact_id: null,
             project_id: null
         };
@@ -4628,6 +4661,13 @@
         if (elements.todoStatusFilter) {
             elements.todoStatusFilter.addEventListener('change', () => {
                 state.todoStatusFilter = elements.todoStatusFilter.value;
+                loadTodos();
+            });
+        }
+
+        if (elements.todoSort) {
+            elements.todoSort.addEventListener('change', () => {
+                state.todoSortBy = elements.todoSort.value || 'default';
                 loadTodos();
             });
         }

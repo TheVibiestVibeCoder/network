@@ -882,6 +882,33 @@ textarea.form-input {
     border-color: rgba(248, 113, 113, 0.35);
 }
 
+.todo-priority {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    border: 1px solid transparent;
+}
+
+.todo-priority--high {
+    color: var(--color-danger);
+    background-color: var(--color-danger-subtle);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+.todo-priority--medium {
+    color: var(--color-warning);
+    background-color: rgba(217, 119, 6, 0.12);
+    border-color: rgba(217, 119, 6, 0.35);
+}
+
+.todo-priority--low {
+    color: var(--color-success);
+    background-color: var(--color-success-subtle);
+    border-color: rgba(74, 222, 128, 0.35);
+}
+
 .todo-context {
     display: inline-flex;
     align-items: center;

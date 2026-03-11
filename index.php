@@ -381,6 +381,11 @@ if ($isAuthenticated) {
                                 <option value="completed">Completed</option>
                                 <option value="all">All</option>
                             </select>
+                            <select id="todoSort" class="form-select" title="Sort to-dos">
+                                <option value="default">Sort: Default</option>
+                                <option value="priority_desc">Sort: Priority (High to Low)</option>
+                                <option value="priority_asc">Sort: Priority (Low to High)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="todos-list" id="todosList">
@@ -1183,6 +1188,16 @@ if ($isAuthenticated) {
                             <div class="form-group">
                                 <label for="todoDueDate">Due Date</label>
                                 <input type="date" id="todoDueDate" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="todoPriority">Priority</label>
+                                <select id="todoPriority" class="form-select">
+                                    <option value="">No priority</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
                             </div>
 
                             <div class="todo-assignment-grid">

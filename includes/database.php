@@ -233,6 +233,7 @@ class Database
                 title VARCHAR(255) NOT NULL,
                 description TEXT,
                 due_date DATE,
+                priority VARCHAR(16),
                 is_completed INTEGER NOT NULL DEFAULT 0,
                 contact_id INTEGER,
                 project_id INTEGER,
@@ -259,10 +260,22 @@ class Database
             $db->exec("ALTER TABLE todos ADD COLUMN parent_todo_id INTEGER");
         }
 
+        $hasPriorityColumn = false;
+        foreach ($todoColumns as $column) {
+            if (($column['name'] ?? '') === 'priority') {
+                $hasPriorityColumn = true;
+                break;
+            }
+        }
+        if (!$hasPriorityColumn) {
+            $db->exec("ALTER TABLE todos ADD COLUMN priority VARCHAR(16)");
+        }
+
         // Create indexes for todos
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_contact_id ON todos(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_parent_todo_id ON todos(parent_todo_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_priority ON todos(priority)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_is_completed ON todos(is_completed)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at)");
