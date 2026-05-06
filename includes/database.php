@@ -78,6 +78,16 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_location ON contacts(location)");
 
+        // Lightweight migrations for contacts table columns added after initial release
+        $contactColumns = $db->query("PRAGMA table_info(contacts)")->fetchAll(PDO::FETCH_ASSOC);
+        $contactColumnNames = array_column($contactColumns, 'name');
+        if (!in_array('website', $contactColumnNames)) {
+            $db->exec("ALTER TABLE contacts ADD COLUMN website VARCHAR(255)");
+        }
+        if (!in_array('address', $contactColumnNames)) {
+            $db->exec("ALTER TABLE contacts ADD COLUMN address TEXT");
+        }
+
         // Create notes table for timeline
         $db->exec("
             CREATE TABLE IF NOT EXISTS notes (
