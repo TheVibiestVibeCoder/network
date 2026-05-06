@@ -109,7 +109,7 @@ function handlePost(Contact $model, string $action): void
     }
 
     // Get JSON input
-    $input = Auth::getJsonInput();
+    $input = getContactRequestInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
@@ -170,7 +170,7 @@ function handlePut(Contact $model, ?int $id): void
     }
 
     // Get JSON input
-    $input = Auth::getJsonInput();
+    $input = getContactRequestInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON input']);
@@ -241,6 +241,45 @@ function handleDelete(Contact $model, ?int $id): void
     logContactActivityEvent('deleted', null, $existing);
 
     echo json_encode(['success' => true, 'message' => 'Contact deleted']);
+}
+
+/**
+ * Decode contact requests sent via the compact transport payload.
+ * Falls back to the legacy flat JSON body for backward compatibility.
+ */
+function getContactRequestInput(): ?array
+{
+    $input = Auth::getJsonInput();
+    if (!is_array($input)) {
+        return null;
+    }
+
+    if (!isset($input['payload']) || !is_string($input['payload'])) {
+        return $input;
+    }
+
+    $decodedPayload = base64_decode(strtr(trim($input['payload']), ' ', '+'), true);
+    if ($decodedPayload === false) {
+        return null;
+    }
+
+    $decoded = json_decode($decodedPayload, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+
+    return [
+        'name' => $decoded['n'] ?? $decoded['name'] ?? null,
+        'company' => $decoded['c'] ?? $decoded['company'] ?? null,
+        'location' => $decoded['l'] ?? $decoded['location'] ?? null,
+        'latitude' => $decoded['lat'] ?? $decoded['latitude'] ?? null,
+        'longitude' => $decoded['lng'] ?? $decoded['longitude'] ?? null,
+        'note' => $decoded['o'] ?? $decoded['note'] ?? null,
+        'email' => $decoded['e'] ?? $decoded['email'] ?? null,
+        'phone' => $decoded['p'] ?? $decoded['phone'] ?? null,
+        'website' => $decoded['w'] ?? $decoded['website'] ?? null,
+        'address' => $decoded['a'] ?? $decoded['address'] ?? null,
+    ];
 }
 
 /**

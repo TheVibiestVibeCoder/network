@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"c:\\\\Users\\\\schwi\\\\network\\\\network\" log --oneline --all)"
+      "Bash(git -C \"c:\\\\Users\\\\schwi\\\\network\\\\network\" log --oneline --all)",
+      "Bash(php -r ' *)"
     ]
   }
 }

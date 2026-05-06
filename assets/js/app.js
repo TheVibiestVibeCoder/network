@@ -263,6 +263,59 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
+    function encodeUtf8Base64(value) {
+        const bytes = new TextEncoder().encode(value);
+        let binary = '';
+        const chunkSize = 0x8000;
+
+        for (let index = 0; index < bytes.length; index += chunkSize) {
+            const chunk = bytes.subarray(index, index + chunkSize);
+            binary += String.fromCharCode(...chunk);
+        }
+
+        return btoa(binary);
+    }
+
+    function buildContactTransportPayload(data) {
+        return {
+            payload: encodeUtf8Base64(JSON.stringify({
+                n: data.name ?? '',
+                c: data.company ?? '',
+                l: data.location ?? '',
+                lat: data.latitude ?? null,
+                lng: data.longitude ?? null,
+                o: data.note ?? '',
+                e: data.email ?? '',
+                p: data.phone ?? '',
+                w: data.website ?? '',
+                a: data.address ?? ''
+            }))
+        };
+    }
+
+    async function parseApiResponse(response, fallbackMessage = 'Request failed') {
+        const responseText = await response.text();
+        const contentType = response.headers.get('content-type') || '';
+
+        if (responseText === '') {
+            return response.ok ? { success: true } : { error: fallbackMessage };
+        }
+
+        if (contentType.includes('application/json')) {
+            try {
+                return JSON.parse(responseText);
+            } catch (error) {
+                throw new Error(`${fallbackMessage}: server returned invalid JSON.`);
+            }
+        }
+
+        if (response.status === 403) {
+            throw new Error(`${fallbackMessage}: the web server blocked this request before the app could process it.`);
+        }
+
+        throw new Error(`${fallbackMessage}: server returned ${response.status}.`);
+    }
+
     // ============================================
     // Theme Functions
     // ============================================
@@ -359,18 +412,18 @@
             const response = await fetch('api/contacts.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-                body: JSON.stringify(data)
+                body: JSON.stringify(buildContactTransportPayload(data))
             });
-            return response.json();
+            return parseApiResponse(response, 'Error creating contact');
         },
 
         async updateContact(id, data) {
             const response = await fetch(`api/contacts.php?id=${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-                body: JSON.stringify(data)
+                body: JSON.stringify(buildContactTransportPayload(data))
             });
-            return response.json();
+            return parseApiResponse(response, 'Error updating contact');
         },
 
         async deleteContact(id) {
@@ -2922,7 +2975,7 @@
             }
         } catch (error) {
             console.error('Error saving contact:', error);
-            alert('Error saving contact');
+            alert(error.message || 'Error saving contact');
         } finally {
             elements.saveBtn.disabled = false;
             elements.saveBtn.textContent = 'Save Contact';
