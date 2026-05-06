@@ -391,25 +391,27 @@
     // API Functions
     // ============================================
 
+    const CONTACT_API_ENDPOINT = 'api/directory.php';
+
     const api = {
         async getContacts(search = '', sort = 'name', order = 'ASC') {
             const params = new URLSearchParams({ search, sort, order });
-            const response = await fetch(`api/contacts.php?${params}`);
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?${params}`);
             return response.json();
         },
 
         async getMapContacts() {
-            const response = await fetch('api/contacts.php?action=map');
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?action=map`);
             return response.json();
         },
 
         async getContact(id) {
-            const response = await fetch(`api/contacts.php?id=${id}`);
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?id=${id}`);
             return response.json();
         },
 
         async createContact(data) {
-            const response = await fetch('api/contacts.php', {
+            const response = await fetch(CONTACT_API_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(buildContactTransportPayload(data))
@@ -418,7 +420,7 @@
         },
 
         async updateContact(id, data) {
-            const response = await fetch(`api/contacts.php?id=${id}`, {
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?id=${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(buildContactTransportPayload(data))
@@ -427,7 +429,7 @@
         },
 
         async deleteContact(id) {
-            const response = await fetch(`api/contacts.php?id=${id}`, {
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?id=${id}`, {
                 method: 'DELETE',
                 headers: { 'X-CSRF-Token': getCsrfToken() }
             });
