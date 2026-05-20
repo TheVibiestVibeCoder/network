@@ -28,7 +28,7 @@ $action = $_GET['action'] ?? '';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 // Require CSRF token for state-changing requests
-if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
     Auth::requireCsrfToken();
 }
 
@@ -47,6 +47,10 @@ try {
 
         case 'PUT':
             handlePut($contactModel, $id);
+            break;
+
+        case 'PATCH':
+            handlePatch($contactModel, $id);
             break;
 
         case 'DELETE':
@@ -241,6 +245,27 @@ function handleDelete(Contact $model, ?int $id): void
     logContactActivityEvent('deleted', null, $existing);
 
     echo json_encode(['success' => true, 'message' => 'Contact deleted']);
+}
+
+/**
+ * Handle PATCH requests (partial update — currently: toggle pin)
+ */
+function handlePatch(Contact $model, ?int $id): void
+{
+    if ($id === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Contact ID is required']);
+        return;
+    }
+
+    $contact = $model->togglePin($id);
+    if ($contact === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Contact not found']);
+        return;
+    }
+
+    echo json_encode(['success' => true, 'data' => $contact]);
 }
 
 /**

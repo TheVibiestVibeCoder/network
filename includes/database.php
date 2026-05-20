@@ -87,6 +87,9 @@ class Database
         if (!in_array('address', $contactColumnNames)) {
             $db->exec("ALTER TABLE contacts ADD COLUMN address TEXT");
         }
+        if (!in_array('pinned', $contactColumnNames)) {
+            $db->exec("ALTER TABLE contacts ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+        }
 
         // Create notes table for timeline
         $db->exec("

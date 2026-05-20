@@ -436,6 +436,14 @@
             return response.json();
         },
 
+        async togglePin(id) {
+            const response = await fetch(`${CONTACT_API_ENDPOINT}?id=${id}`, {
+                method: 'PATCH',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
+        },
+
         // Notes API
         async getNotes(contactId) {
             const response = await fetch(`api/notes.php?contact_id=${contactId}`);
@@ -908,6 +916,20 @@
         }
     }
 
+    function renderPinnedSection(contacts) {
+        let html = `<div class="pinned-section">`;
+        html += `<div class="pinned-header">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+            </svg>
+            <span>Pinned</span>
+            <span class="pinned-count">${contacts.length}</span>
+        </div>`;
+        html += contacts.map(c => createContactCard(c, false)).join('');
+        html += `</div>`;
+        return html;
+    }
+
     function renderContactsListByCompany() {
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
@@ -922,9 +944,17 @@
             return;
         }
 
-        // Group contacts by company
-        const grouped = groupContactsByCompany(state.contacts);
+        const pinnedContacts = state.contacts.filter(c => c.pinned == 1);
+        const unpinnedContacts = state.contacts.filter(c => !c.pinned || c.pinned == 0);
+
         let html = '';
+
+        if (pinnedContacts.length > 0) {
+            html += renderPinnedSection(pinnedContacts);
+        }
+
+        // Group unpinned contacts by company
+        const grouped = groupContactsByCompany(unpinnedContacts);
 
         grouped.forEach(group => {
             if (group.company) {
@@ -1017,19 +1047,34 @@
             return;
         }
 
+        // Collect all pinned contacts (deduplicated by id)
+        const pinnedIds = new Set();
+        const pinnedContacts = [];
+        [...filteredTags.flatMap(t => t.contacts), ...filteredUntagged].forEach(c => {
+            if (c.pinned == 1 && !pinnedIds.has(c.id)) {
+                pinnedIds.add(c.id);
+                pinnedContacts.push(c);
+            }
+        });
+
         let html = '';
 
-        // Render tagged groups, sorting contacts within each tag
+        if (pinnedContacts.length > 0) {
+            html += renderPinnedSection(pinnedContacts);
+        }
+
+        // Render tagged groups, excluding pinned contacts
         filteredTags.forEach(tag => {
-            if (tag.contacts.length > 0) {
-                const sorted = sortContacts(tag.contacts);
+            const unpinned = tag.contacts.filter(c => !pinnedIds.has(c.id));
+            if (unpinned.length > 0) {
+                const sorted = sortContacts(unpinned);
                 html += `<div class="tag-group">`;
                 html += `<div class="tag-header" style="border-left-color: ${tag.color}">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="${tag.color}">
                         <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                     </svg>
                     <span>${escapeHtml(tag.name)}</span>
-                    <span class="tag-count" style="background-color: ${tag.color}">${tag.contacts.length}</span>
+                    <span class="tag-count" style="background-color: ${tag.color}">${unpinned.length}</span>
                     <span class="tag-actions">
                         <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
@@ -1044,17 +1089,18 @@
             }
         });
 
-        // Render untagged contacts
-        if (filteredUntagged.length > 0) {
+        // Render untagged contacts (excluding pinned)
+        const unpinnedUntagged = filteredUntagged.filter(c => !pinnedIds.has(c.id));
+        if (unpinnedUntagged.length > 0) {
             html += `<div class="tag-group untagged-group">`;
             html += `<div class="tag-header tag-header-untagged">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                 </svg>
                 <span>Ohne Tag</span>
-                <span class="tag-count">${filteredUntagged.length}</span>
+                <span class="tag-count">${unpinnedUntagged.length}</span>
             </div>`;
-            html += sortContacts(filteredUntagged).map(contact => createContactCard(contact, true)).join('');
+            html += sortContacts(unpinnedUntagged).map(contact => createContactCard(contact, true)).join('');
             html += `</div>`;
         }
 
@@ -1105,6 +1151,16 @@
                     return;
                 }
                 openCompanyNotesModal(company);
+            });
+        });
+
+        // Pin buttons
+        elements.contactsList.querySelectorAll('.pin-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const id = parseInt(btn.dataset.id, 10);
+                await api.togglePin(id);
+                loadContacts();
             });
         });
 
@@ -1217,8 +1273,10 @@
             ? `<div class="contact-card-flags">${flags.slice(0, 3).map(flag => `<span class="contact-card-flag">${flag}</span>`).join('')}</div>`
             : '';
 
+        const isPinned = contact.pinned == 1;
+
         return `
-            <div class="contact-card${inGroup ? ' in-group' : ''}" data-id="${contact.id}">
+            <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
                     <div class="contact-avatar">
                         ${getInitials(contact.name)}
@@ -1229,6 +1287,11 @@
                         ${flagHtml}
                     </div>
                 </div>
+                <button class="pin-btn${isPinned ? ' pin-btn--active' : ''}" data-id="${contact.id}" title="${isPinned ? 'Unpin contact' : 'Pin contact'}">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+                    </svg>
+                </button>
                 <div class="contact-card-chevron" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                         <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
