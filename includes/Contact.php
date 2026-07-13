@@ -34,7 +34,7 @@ class Contact
             $params['search'] = '%' . $search . '%';
         }
 
-        $sql .= " ORDER BY $sortBy $sortOrder";
+        $sql .= " ORDER BY pinned DESC, $sortBy $sortOrder";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -129,6 +129,24 @@ class Contact
             'website' => $data['website'] ?? null,
             'address' => $data['address'] ?? null,
         ]);
+    }
+
+    /**
+     * Toggle the pinned state of a contact
+     */
+    public function togglePin(int $id): ?array
+    {
+        $contact = $this->getById($id);
+        if ($contact === null) {
+            return null;
+        }
+
+        $newPinned = ($contact['pinned'] ?? 0) ? 0 : 1;
+
+        $stmt = $this->db->prepare("UPDATE contacts SET pinned = :pinned WHERE id = :id");
+        $stmt->execute(['pinned' => $newPinned, 'id' => $id]);
+
+        return $this->getById($id);
     }
 
     /**

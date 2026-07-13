@@ -4174,8 +4174,79 @@ textarea.form-input {
 }
 
 .company-group .contact-card:last-child,
-.tag-group .contact-card:last-child {
+.tag-group .contact-card:last-child,
+.pinned-section .contact-card:last-child {
     margin-bottom: 0;
+}
+
+/* ── Pin button ─────────────────────────────────────────── */
+.pin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.contact-card:hover .pin-btn {
+    opacity: 1;
+}
+
+.pin-btn:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text-secondary);
+}
+
+.pin-btn--active {
+    opacity: 1;
+    color: var(--color-primary, #3b82f6);
+}
+
+.pin-btn--active:hover {
+    color: var(--color-primary, #3b82f6);
+    background: color-mix(in srgb, var(--color-primary, #3b82f6) 12%, transparent);
+}
+
+/* ── Pinned section ─────────────────────────────────────── */
+.pinned-section {
+    margin-bottom: var(--spacing-4);
+}
+
+.pinned-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-primary, #3b82f6);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent);
+    margin-bottom: var(--spacing-1);
+}
+
+.pinned-count {
+    margin-left: auto;
+    background: color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent);
+    color: var(--color-primary, #3b82f6);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 999px;
+}
+
+.contact-card--pinned {
+    border-left: 2px solid var(--color-primary, #3b82f6) !important;
 }
 
 .projects-list {
