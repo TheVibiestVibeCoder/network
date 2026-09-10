@@ -1,0 +1,18 @@
+# PHP upload limits for mod_php hosts. PHP-FPM / CGI setups read .user.ini
+# instead; both are provided so the app behaves the same either way.
+# Guarded so the server does not error out when mod_php is absent.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+</IfModule>

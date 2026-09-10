@@ -76,6 +76,7 @@
     const elements = {
         // Views
         mapView: document.getElementById('mapView'),
+        bookkeepingView: document.getElementById('bookkeepingView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -1319,6 +1320,9 @@
         elements.calendarView.classList.toggle('active', view === 'calendar');
         elements.todoView.classList.toggle('active', view === 'todos');
         elements.projectsView.classList.toggle('active', view === 'projects');
+        if (elements.bookkeepingView) {
+            elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
+        }
 
         // Refresh data for the active view
         if (view === 'map') {
@@ -1336,6 +1340,10 @@
             // Also load contacts for autocomplete in project assignment
             if (!state.contacts || state.contacts.length === 0) {
                 loadAllContacts();
+            }
+        } else if (view === 'bookkeeping') {
+            if (window.Bookkeeping) {
+                window.Bookkeeping.load();
             }
         } else {
             loadContacts();

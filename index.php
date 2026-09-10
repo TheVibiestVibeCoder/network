@@ -105,6 +105,7 @@ if ($isAuthenticated) {
 
     <!-- Application CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/bookkeeping.css">
 </head>
 <body>
     <?php if (!$isAuthenticated): ?>
@@ -200,6 +201,11 @@ if ($isAuthenticated) {
                                 <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
                             </svg>
                         </button>
+                        <button type="button" class="toggle-btn" data-view="bookkeeping" title="Bookkeeping">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M4 3h13l3 3v15H4V3zm2 2v14h12V7.83L16.17 5H6zm2 3h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>
+                            </svg>
+                        </button>
                         <button type="button" class="toggle-btn" data-view="map" title="Map">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
@@ -275,6 +281,87 @@ if ($isAuthenticated) {
                     </div>
                     <div class="calendar-body" id="calendarBody">
                         <!-- Calendar grid rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Bookkeeping View -->
+                <div class="view-panel" id="bookkeepingView">
+                    <div class="bk-toolbar">
+                        <div class="bk-toolbar-left">
+                            <button type="button" class="btn btn-primary" id="bkImportCsvBtn" title="Import a CSV file">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                                </svg>
+                                <span>Import CSV</span>
+                            </button>
+                            <input type="file" id="bkCsvInput" accept=".csv,text/csv" hidden>
+                            <span class="bk-row-count" id="bkRowCount">0 entries</span>
+                        </div>
+                        <div class="bk-selection-bar" id="bkSelectionBar">
+                            <span class="bk-selection-count" id="bkSelectionCount"></span>
+                            <button type="button" class="btn btn-secondary btn-small" id="bkExportSelectedBtn" title="Download all PDFs of the selected rows as a ZIP file">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                </svg>
+                                <span>Export PDFs</span>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-small" id="bkDeleteSelectedBtn">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-small" id="bkClearSelectionBtn">Clear</button>
+                        </div>
+                    </div>
+                    <div class="bk-select-bar">
+                        <div class="bk-select-group">
+                            <label>Select month:</label>
+                            <select id="bkSelectMonth" class="form-select"></select>
+                            <select id="bkSelectYear" class="form-select"></select>
+                            <button type="button" class="btn btn-secondary btn-small" id="bkSelectMonthBtn">Select</button>
+                        </div>
+                        <div class="bk-select-divider"></div>
+                        <div class="bk-select-group">
+                            <label>Select range:</label>
+                            <input type="date" id="bkSelectFrom" class="form-input">
+                            <span class="bk-select-range-sep">&ndash;</span>
+                            <input type="date" id="bkSelectTo" class="form-input">
+                            <button type="button" class="btn btn-secondary btn-small" id="bkSelectRangeBtn">Select</button>
+                        </div>
+                    </div>
+                    <div class="bk-select-bar">
+                        <div class="bk-select-group bk-filter-group">
+                            <label>Filter:</label>
+                            <input type="text" id="bkFilterInput" class="form-input" placeholder="Search all columns...">
+                        </div>
+                        <div class="bk-select-hint">Click a column title to sort by it</div>
+                    </div>
+                    <div class="bk-body">
+                        <div class="bk-table-wrap" id="bkTableWrap">
+                            <div class="bk-table-inner" id="bkTableInner">
+                                <!-- Table rendered by JS -->
+                            </div>
+                            <div class="bk-row-drop-pill" id="bkRowDropPill" aria-hidden="true">Drop PDF here</div>
+                        </div>
+                        <aside class="bk-dropzone" id="bkDropzone">
+                            <div class="bk-dropzone-header">
+                                <h3>PDF Drop Zone <span class="bk-pool-count" id="bkPoolCount">0 files</span></h3>
+                                <p>Store invoices here before the matching bank entry is imported. Drag a file onto a table row to assign it.</p>
+                            </div>
+                            <div class="bk-pool-list" id="bkPoolList">
+                                <!-- Unassigned PDFs rendered by JS -->
+                            </div>
+                            <div class="bk-dropzone-footer">
+                                <input type="file" id="bkPoolInput" accept=".pdf,application/pdf" multiple hidden>
+                                <button type="button" class="btn btn-secondary btn-block" id="bkPoolBrowseBtn">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                        <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                                    </svg>
+                                    Upload PDFs
+                                </button>
+                            </div>
+                        </aside>
                     </div>
                 </div>
 
@@ -1225,6 +1312,131 @@ if ($isAuthenticated) {
             </div>
         </div>
 
+        <!-- Bookkeeping: CSV Import Modal -->
+        <div class="modal" id="bkImportModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Import CSV</h2>
+                    <button type="button" class="modal-close" id="bkImportCloseBtn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="bk-import-meta">
+                        <strong id="bkImportFileName"></strong>
+                        <span id="bkImportRowCount"></span>
+                    </div>
+
+                    <!-- Step 1: choose columns and the date column -->
+                    <div id="bkImportStepColumns">
+                        <div class="bk-import-hint" id="bkImportHint">
+                            Your previous column selection was restored. Columns not yet in the table will be added as new columns; existing data is never changed.
+                        </div>
+                        <div class="form-group">
+                            <label>Columns to import</label>
+                            <div class="bk-import-columns" id="bkImportColumns"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="bkImportDateColumn">Date column (used for chronological order and month grouping)</label>
+                            <select id="bkImportDateColumn" class="form-select"></select>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: preview which rows will be imported -->
+                    <div id="bkImportStepPreview" style="display: none;">
+                        <div class="bk-import-dup-warning" id="bkImportDupWarning" style="display: none;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="flex-shrink:0;">
+                                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                            </svg>
+                            <span id="bkImportDupWarningText">Possible duplicates found. Rows highlighted below look like they might already be in the table.</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Columns to import (click to include/exclude)</label>
+                            <div class="bk-preview-columns" id="bkImportPreviewColumns"></div>
+                        </div>
+                        <div class="bk-import-preview-toolbar">
+                            <label class="bk-import-preview-selectall">
+                                <input type="checkbox" id="bkImportPreviewSelectAll" checked>
+                                <span>Select all</span>
+                            </label>
+                            <span id="bkImportPreviewCount" class="text-muted"></span>
+                        </div>
+                        <div class="bk-import-preview-wrap" id="bkImportPreviewWrap"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="bkImportBackBtn" style="display: none;">Back</button>
+                    <button type="button" class="btn btn-secondary" id="bkImportCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="bkImportConfirmBtn">Preview</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookkeeping: PDF Upload Modal -->
+        <div class="modal" id="bkPdfModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Assign PDF to Row</h2>
+                    <button type="button" class="modal-close" id="bkPdfCloseBtn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>You are assigning a PDF to <strong>this row</strong>:</p>
+                    <div id="bkPdfRowSummary"></div>
+                    <div class="bk-pdf-warning" id="bkPdfWarning" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="flex-shrink:0;">
+                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                        </svg>
+                        <span id="bkPdfWarningText"></span>
+                    </div>
+                    <div class="bk-pdf-upload-controls" id="bkPdfUploadControls">
+                        <input type="file" id="bkPdfFileInput" accept=".pdf,application/pdf" hidden>
+                        <button type="button" class="btn btn-secondary" id="bkPdfBrowseBtn">Choose PDF...</button>
+                        <span class="bk-pdf-file-name" id="bkPdfFileName"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="bkPdfCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="bkPdfUploadBtn" disabled>Upload &amp; Assign</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookkeeping: PDF Preview Modal -->
+        <div class="modal" id="bkPdfPreviewModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content bk-pdf-preview-content">
+                <div class="modal-header">
+                    <h2 id="bkPdfPreviewTitle">PDF</h2>
+                    <button type="button" class="modal-close" id="bkPdfPreviewCloseBtn">&times;</button>
+                </div>
+                <div class="modal-body bk-pdf-preview-body">
+                    <iframe id="bkPdfPreviewFrame" class="bk-pdf-preview-frame" title="PDF preview"></iframe>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" class="btn btn-secondary" id="bkPdfPreviewOpenBtn" target="_blank" rel="noopener">Open in new tab</a>
+                    <button type="button" class="btn btn-primary" id="bkPdfPreviewDoneBtn">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookkeeping: Confirm Modal -->
+        <div class="modal" id="bkConfirmModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2 id="bkConfirmTitle">Confirm</h2>
+                    <button type="button" class="modal-close" id="bkConfirmCloseBtn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="bkConfirmMessage"></div>
+                </div>
+                <div class="modal-footer" id="bkConfirmActions"></div>
+            </div>
+        </div>
+
+        <!-- Bookkeeping: Toast -->
+        <div class="bk-toast" id="bkToast"></div>
+
         <!-- CSRF Token for AJAX requests -->
         <meta name="csrf-token" content="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
 
@@ -1236,6 +1448,7 @@ if ($isAuthenticated) {
 
         <!-- Application JS -->
         <script src="assets/js/app.js"></script>
+        <script src="assets/js/bookkeeping.js"></script>
     <?php endif; ?>
 </body>
 </html>

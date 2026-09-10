@@ -6,6 +6,12 @@
 # Database
 data/*.db
 data/*.sqlite
+data/*.db-wal
+data/*.db-shm
+
+# Uploaded bookkeeping invoices - real financial documents, never commit them.
+# The directory and its .htaccess are recreated automatically on first use.
+data/bookkeeping_pdfs/
 
 # IDE and editor files
 .idea/
