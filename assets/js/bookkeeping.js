@@ -51,9 +51,17 @@
     }
 
     function escapeHtml(value) {
-        const div = document.createElement('div');
-        div.textContent = value == null ? '' : String(value);
-        return div.innerHTML;
+        if (value === null || value === undefined) return '';
+        // Escapes the five characters that can break out of either an HTML text
+        // node or a quoted attribute value. Uploaded file names reach the DOM
+        // through title="..." and data-pdf-name="..." attributes, so " and '
+        // have to be encoded here as well.
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function formatSize(bytes) {

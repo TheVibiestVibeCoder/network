@@ -52,7 +52,7 @@ try {
     attachEntryTags($db, $entries);
 
     echo json_encode(['success' => true, 'data' => $entries]);
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'An internal error occurred']);
 }

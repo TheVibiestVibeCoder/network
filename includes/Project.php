@@ -4,6 +4,18 @@
  * Handles all project-related database operations
  */
 
+// ---------------------------------------------------------------------------
+// Direct web access guard
+// ---------------------------------------------------------------------------
+// This file is library code. It must only ever be loaded through an entry
+// point (index.php or api/*.php), each of which defines APP_ROOT first.
+// nginx ignores .htaccess, so this check - not the deny rules - is the
+// portable backstop that stops the file being requested from a browser.
+if (!defined('APP_ROOT')) {
+    http_response_code(404);
+    exit;
+}
+
 class Project
 {
     private PDO $db;

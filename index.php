@@ -87,10 +87,10 @@ if ($isAuthenticated) {
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
     <!-- Leaflet MarkerCluster CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" integrity="sha384-lPzjPsFQL6te2x+VxmV6q1DpRxpRk0tmnl2cpwAO5y04ESyc752tnEWPKDfl1olr" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" integrity="sha384-5kMSQJ6S4Qj5i09mtMNrWpSi8iXw230pKU76xTmrpezGnNJQzj0NzXjQLLg+jE7k" crossorigin="anonymous">
 
-    <script>
+    <script nonce="<?= htmlspecialchars(Auth::getCspNonce(), ENT_QUOTES, 'UTF-8') ?>">
         (function() {
             try {
                 var storedTheme = localStorage.getItem('crm-theme');
@@ -138,7 +138,7 @@ if ($isAuthenticated) {
                         </div>
                         <button type="submit" class="btn btn-primary btn-block" disabled>Locked</button>
                     </form>
-                    <script>
+                    <script nonce="<?= htmlspecialchars(Auth::getCspNonce(), ENT_QUOTES, 'UTF-8') ?>">
                         (function() {
                             var remaining = <?= (int)$lockoutRemaining ?>;
                             var timer = document.getElementById('lockoutTimer');
@@ -1444,7 +1444,7 @@ if ($isAuthenticated) {
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
         <!-- Leaflet MarkerCluster JS -->
-        <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+        <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
         <script src="assets/js/app.js"></script>

@@ -5,23 +5,82 @@
  * brute force protection, CSRF tokens, and security headers.
  */
 
+// ---------------------------------------------------------------------------
+// Direct web access guard
+// ---------------------------------------------------------------------------
+// This file is library code. It must only ever be loaded through an entry
+// point (index.php or api/*.php), each of which defines APP_ROOT first.
+// nginx ignores .htaccess, so this check - not the deny rules - is the
+// portable backstop that stops the file being requested from a browser.
+if (!defined('APP_ROOT')) {
+    http_response_code(404);
+    exit;
+}
+
 class Auth
 {
+    /** Per-request nonce that whitelists the application's own inline scripts. */
+    private static ?string $cspNonce = null;
+
+    /**
+     * Return the Content-Security-Policy nonce for this request.
+     *
+     * The CSP does not allow 'unsafe-inline' for scripts, so the two inline
+     * <script> blocks in index.php have to carry this nonce to be allowed to
+     * run. It is generated once per request and stays constant for it.
+     */
+    public static function getCspNonce(): string
+    {
+        if (self::$cspNonce === null) {
+            self::$cspNonce = base64_encode(random_bytes(16));
+        }
+
+        return self::$cspNonce;
+    }
+
+    /**
+     * True when the current request reached us over TLS.
+     */
+    public static function isHttps(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+            return true;
+        }
+
+        if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+
+        if (TRUST_PROXY_HEADERS) {
+            if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])
+                && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+                return true;
+            }
+            if (!empty($_SERVER['HTTP_X_FORWARDED_SSL'])
+                && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Start session with secure configuration
      */
     public static function startSession(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
-            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
-                || (TRUST_PROXY_HEADERS && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+            $isHttps = self::isHttps();
 
             // Harden session handling against fixation and cookie downgrade issues.
             ini_set('session.use_strict_mode', '1');
             ini_set('session.use_only_cookies', '1');
             ini_set('session.cookie_httponly', '1');
+            ini_set('session.cookie_samesite', 'Strict');
             ini_set('session.gc_maxlifetime', (string) SESSION_LIFETIME);
+            // Do not let the session id travel in URLs even if the host enables it.
+            ini_set('session.use_trans_sid', '0');
 
             session_name(SESSION_NAME);
             session_set_cookie_params([
@@ -57,6 +116,16 @@ class Auth
             // No login_time set - invalid session
             self::logout();
             return false;
+        }
+
+        // Enforce the idle timeout. last_activity was already being recorded but
+        // never checked, so a stolen session cookie stayed valid for the full
+        // 24 hours regardless of whether anyone was using it.
+        if (isset($_SESSION['last_activity'])) {
+            if (time() - (int) $_SESSION['last_activity'] > SESSION_IDLE_TIMEOUT) {
+                self::logout();
+                return false;
+            }
         }
 
         // Refresh last activity timestamp
@@ -392,6 +461,9 @@ class Auth
      */
     public static function sendSecurityHeaders(): void
     {
+        // Do not advertise the PHP version to scanners.
+        header_remove('X-Powered-By');
+
         // Prevent clickjacking
         header('X-Frame-Options: DENY');
 
@@ -409,8 +481,37 @@ class Auth
         header('Cross-Origin-Opener-Policy: same-origin');
         header('Cross-Origin-Resource-Policy: same-origin');
 
-        // Content Security Policy
-        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org");
+        // HTTP Strict Transport Security.
+        // Only sent over TLS - sending it over plain HTTP is ignored by browsers
+        // and would pin an unreachable scheme if the site were ever HTTP-only.
+        if (self::isHttps()) {
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+        }
+
+        // Content Security Policy.
+        //
+        // script-src deliberately has no 'unsafe-inline': the application's own
+        // two inline blocks in index.php carry the per-request nonce instead, so
+        // injected markup cannot execute even if it reaches the DOM.
+        // 'unsafe-inline' stays for style-src because the UI sets inline styles
+        // (tag colours, map layout); inline CSS is not an execution primitive.
+        $nonce = self::getCspNonce();
+        header(
+            "Content-Security-Policy: "
+            . "default-src 'self'; "
+            . "base-uri 'self'; "
+            . "object-src 'none'; "
+            . "frame-ancestors 'none'; "
+            . "form-action 'self'; "
+            . "frame-src 'self'; "
+            . "worker-src 'self'; "
+            . "manifest-src 'self'; "
+            . "script-src 'self' 'nonce-{$nonce}' https://unpkg.com; "
+            . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
+            . "font-src 'self' https://fonts.gstatic.com; "
+            . "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; "
+            . "connect-src 'self' https://nominatim.openstreetmap.org"
+        );
 
         // Prevent caching of sensitive pages
         self::startSession();

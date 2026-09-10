@@ -4,6 +4,18 @@
  * Handles all contact-related database operations
  */
 
+// ---------------------------------------------------------------------------
+// Direct web access guard
+// ---------------------------------------------------------------------------
+// This file is library code. It must only ever be loaded through an entry
+// point (index.php or api/*.php), each of which defines APP_ROOT first.
+// nginx ignores .htaccess, so this check - not the deny rules - is the
+// portable backstop that stops the file being requested from a browser.
+if (!defined('APP_ROOT')) {
+    http_response_code(404);
+    exit;
+}
+
 class Contact
 {
     private PDO $db;
@@ -212,9 +224,12 @@ class Contact
                     $createdIds[] = (int) $this->db->lastInsertId();
                     $successCount++;
                 } catch (Exception $e) {
+                    // Keep the driver message server-side: it can echo the row
+                    // contents and the SQL back to whoever uploaded the file.
+                    error_log('bulk contact import row ' . ($index + 2) . ' failed: ' . $e->getMessage());
                     $errors[] = [
                         'row' => $index + 2,
-                        'error' => 'Database error: ' . $e->getMessage()
+                        'error' => 'Could not be saved.'
                     ];
                 }
             }

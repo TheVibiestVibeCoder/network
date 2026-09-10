@@ -103,7 +103,7 @@ try {
     } else {
         bkJson(['error' => 'Method not allowed'], 405);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     bkJson(['error' => 'An internal error occurred'], 500);
 }
 
@@ -241,12 +241,45 @@ function bkEnsureSchema(PDO $db): void
     $db->exec("CREATE INDEX IF NOT EXISTS idx_bk_rows_date ON bookkeeping_rows(row_date)");
 
     if (!is_dir(BK_PDF_DIR)) {
-        mkdir(BK_PDF_DIR, 0755, true);
+        mkdir(BK_PDF_DIR, 0700, true);
     }
-    // Block direct web access to stored PDFs (Apache); downloads go through this endpoint.
+
+    // Block direct web access to stored PDFs; downloads go through this
+    // endpoint, which checks the session first. The deny rule covers both
+    // Apache 2.4 and 2.2 and turns the PHP engine off in case a .php file
+    // ever lands here. nginx ignores .htaccess - there the directory has to
+    // be denied in the server block (see SECURITY.md).
     $htaccess = BK_PDF_DIR . '/.htaccess';
-    if (!file_exists($htaccess)) {
-        file_put_contents($htaccess, "Require all denied\n");
+    $htaccessBody = <<<HTA
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+Options -Indexes
+
+HTA;
+
+    if (!is_file($htaccess) || file_get_contents($htaccess) !== $htaccessBody) {
+        file_put_contents($htaccess, $htaccessBody);
     }
 }
 
@@ -472,9 +505,20 @@ function bkDownloadPdf(PDO $db, int $id): void
     header('X-Frame-Options: SAMEORIGIN');
     header("Content-Security-Policy: default-src 'none'; object-src 'self'; plugin-types application/pdf; frame-ancestors 'self'");
 
+    // The file name comes from whatever the uploader called the file. Strip
+    // control characters (a bare CR/LF would let it inject extra response
+    // headers) and offer the UTF-8 form separately per RFC 5987 so that
+    // umlauts survive without ever putting a raw byte in the quoted string.
+    $downloadName = (string) $pdf['original_name'];
+    $downloadName = preg_replace('/[[:cntrl:]]/u', '', $downloadName) ?? 'invoice.pdf';
+    $asciiName = preg_replace('/[^A-Za-z0-9._-]/', '_', $downloadName) ?: 'invoice.pdf';
+
     header('Content-Type: application/pdf');
     header('Content-Length: ' . filesize($path));
-    header('Content-Disposition: inline; filename="' . str_replace('"', '', $pdf['original_name']) . '"');
+    header(
+        'Content-Disposition: inline; filename="' . $asciiName . '"; '
+        . "filename*=UTF-8''" . rawurlencode($downloadName)
+    );
     header('X-Content-Type-Options: nosniff');
     readfile($path);
     exit;

@@ -863,9 +863,12 @@
             html += `<p class="popup-note">${escapeHtml(contact.note)}</p>`;
         }
 
+        // Buttons carry their target in data-* attributes and are handled by a
+        // delegated listener (see bindCspSafeDelegates). Inline onclick= would be
+        // blocked by the Content-Security-Policy.
         html += `<div class="popup-buttons">`;
-        html += `<button class="popup-btn popup-details-btn" onclick="window.CRM.openOverview(${contact.id})">Details</button>`;
-        html += `<button class="popup-btn popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit</button>`;
+        html += `<button type="button" class="popup-btn popup-details-btn" data-crm-action="open-overview" data-contact-id="${contact.id}">Details</button>`;
+        html += `<button type="button" class="popup-btn popup-edit-btn" data-crm-action="edit-contact" data-contact-id="${contact.id}">Edit</button>`;
         html += `</div>`;
         html += `</div>`;
 
@@ -2449,7 +2452,7 @@
         }
 
         const html = projects.map(project => `
-            <div class="project-mini-card" onclick="window.CRM.openProjectOverview(${project.id})">
+            <div class="project-mini-card" data-crm-action="open-project-overview" data-project-id="${project.id}">
                 <div class="project-mini-header">
                     <h4 class="project-mini-name">${escapeHtml(project.name)}</h4>
                     <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(project.stage)}</span>
@@ -4682,15 +4685,31 @@
     }
 
     function escapeHtml(text) {
+        // Keep the original falsy handling so nothing renders differently.
         if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        // Escapes the five characters that can break out of either an HTML text
+        // node or a quoted attribute value. The previous textContent/innerHTML
+        // round-trip left " and ' untouched, which let a stored value such as a
+        // contact name containing a double quote escape from attributes like
+        // title="..." or data-company="..." and inject markup.
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function normalizeUrl(url) {
         if (!url) return url;
         url = url.trim();
+
+        // Refuse script-bearing schemes outright. The server already rejects
+        // them, but this href goes straight into the DOM, so it must not depend
+        // on that. Note "javascript://x%0aalert(1)" satisfies the scheme test
+        // below, which is why the deny list is checked first.
+        if (/^\s*(?:javascript|data|vbscript|file|blob):/i.test(url)) return '';
+
         if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
         return 'https://' + url;
     }
@@ -5319,9 +5338,40 @@
     // Initialization
     // ============================================
 
+    /**
+     * Delegated click handling for markup that is rendered into innerHTML.
+     *
+     * The Content-Security-Policy has no 'unsafe-inline' in script-src, which
+     * means an inline onclick="..." attribute never fires. Elements declare
+     * their intent with data-crm-action instead and are dispatched from here,
+     * so the behaviour is identical while injected markup stays inert.
+     */
+    function bindCspSafeDelegates() {
+        document.addEventListener('click', function (event) {
+            const trigger = event.target.closest('[data-crm-action]');
+            if (!trigger) return;
+
+            const action = trigger.getAttribute('data-crm-action');
+            const contactId = parseInt(trigger.getAttribute('data-contact-id'), 10);
+            const projectId = parseInt(trigger.getAttribute('data-project-id'), 10);
+
+            if (action === 'open-overview' && !isNaN(contactId)) {
+                event.preventDefault();
+                openOverviewModal(contactId);
+            } else if (action === 'edit-contact' && !isNaN(contactId)) {
+                event.preventDefault();
+                editContact(contactId);
+            } else if (action === 'open-project-overview' && !isNaN(projectId)) {
+                event.preventDefault();
+                openProjectOverview(projectId);
+            }
+        });
+    }
+
     function init() {
         applyTheme(getStoredTheme(), false);
 
+        bindCspSafeDelegates();
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();

@@ -77,7 +77,7 @@ try {
             header('Content-Type: application/json');
             echo json_encode(['error' => 'Invalid action. Use: export, import, or template']);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     error_log('import-export endpoint error: ' . $e->getMessage());
     http_response_code(500);
     header('Content-Type: application/json');
@@ -212,6 +212,35 @@ function handleImport(): void
         http_response_code(400);
         echo json_encode(['error' => 'Invalid file type. Please upload an Excel file (.xlsx or .xls)']);
         return;
+    }
+
+    // The extension is attacker-controlled, so confirm the actual content type
+    // as well before handing the file to the spreadsheet parser. xlsx is a zip
+    // container, xls an OLE2 compound document; some tools report the generic
+    // octet-stream, which stays allowed because the parser validates further.
+    $allowedMimeTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/zip',
+        'application/x-zip',
+        'application/octet-stream',
+        'application/CDFV2',
+        'application/vnd.ms-office',
+    ];
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $detectedMime = $finfo->file($file['tmp_name']);
+    if ($detectedMime === false || !in_array($detectedMime, $allowedMimeTypes, true)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid file type. Please upload an Excel file (.xlsx or .xls)']);
+        return;
+    }
+
+    // Never let the parser reach out to the network for DTDs or external
+    // entities embedded in the sheet. LIBXML_NOENT is deliberately NOT set -
+    // despite the name it turns entity substitution on, which is the very
+    // thing an XXE payload needs.
+    if (method_exists(\PhpOffice\PhpSpreadsheet\Settings::class, 'setLibXmlLoaderOptions')) {
+        \PhpOffice\PhpSpreadsheet\Settings::setLibXmlLoaderOptions(LIBXML_NONET);
     }
 
     try {

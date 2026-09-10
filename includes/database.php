@@ -4,6 +4,18 @@
  * Uses SQLite for simplicity - no external database server required
  */
 
+// ---------------------------------------------------------------------------
+// Direct web access guard
+// ---------------------------------------------------------------------------
+// This file is library code. It must only ever be loaded through an entry
+// point (index.php or api/*.php), each of which defines APP_ROOT first.
+// nginx ignores .htaccess, so this check - not the deny rules - is the
+// portable backstop that stops the file being requested from a browser.
+if (!defined('APP_ROOT')) {
+    http_response_code(404);
+    exit;
+}
+
 class Database
 {
     private static ?PDO $instance = null;
@@ -43,7 +55,12 @@ class Database
 
             return $pdo;
         } catch (PDOException $e) {
-            die('Database connection failed: ' . $e->getMessage());
+            // The PDO message contains the absolute path of the SQLite file and
+            // sometimes filesystem details. Log it, show the visitor nothing.
+            error_log('Database connection failed: ' . $e->getMessage());
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+            exit('Service temporarily unavailable.');
         }
     }
 

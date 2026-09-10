@@ -54,7 +54,7 @@ try {
             echo json_encode(['error' => 'Method not allowed']);
             break;
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'An internal error occurred']);
 }
