@@ -251,9 +251,13 @@ function handlePost(PDO $db): void
 
     $db->beginTransaction();
     try {
+        // Attribution is stamped on the parent and mirrored onto every child
+        // row, so a to-do shows the same author wherever it surfaces.
+        $actor = Auth::actor();
+
         $stmt = $db->prepare("
-            INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
-            VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, NULL)
+            INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id, created_by, created_by_name, updated_by, updated_by_name)
+            VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, NULL, :actor_id, :actor_name, :actor_id2, :actor_name2)
         ");
         $stmt->execute([
             'title' => trim($title),
@@ -261,7 +265,11 @@ function handlePost(PDO $db): void
             'due_date' => $normalizedDueDate,
             'priority' => $priority,
             'contact_id' => $contactId,
-            'project_id' => $projectId
+            'project_id' => $projectId,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
+            'actor_id2' => $actor['id'],
+            'actor_name2' => $actor['name']
         ]);
 
         $todoId = (int) $db->lastInsertId();
@@ -271,8 +279,8 @@ function handlePost(PDO $db): void
             $contactIds = getProjectContactIds($db, $projectId);
             if (!empty($contactIds)) {
                 $childInsert = $db->prepare("
-                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
-                    VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, :parent_todo_id)
+                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id, created_by, created_by_name, updated_by, updated_by_name)
+                    VALUES (:title, :description, :due_date, :priority, 0, :contact_id, :project_id, :parent_todo_id, :actor_id, :actor_name, :actor_id2, :actor_name2)
                 ");
 
                 foreach ($contactIds as $projectContactId) {
@@ -283,7 +291,11 @@ function handlePost(PDO $db): void
                         'priority' => $priority,
                         'contact_id' => $projectContactId,
                         'project_id' => $projectId,
-                        'parent_todo_id' => $todoId
+                        'parent_todo_id' => $todoId,
+                        'actor_id' => $actor['id'],
+                        'actor_name' => $actor['name'],
+                        'actor_id2' => $actor['id'],
+                        'actor_name2' => $actor['name'],
                     ]);
                 }
             }
@@ -399,6 +411,10 @@ function handlePut(PDO $db, ?int $id): void
         return;
     }
 
+    // Who is making this change - stamped on the master row and mirrored onto
+    // the rebuilt child rows below.
+    $actor = Auth::actor();
+
     $db->beginTransaction();
     try {
         // Update master row
@@ -413,6 +429,8 @@ function handlePut(PDO $db, ?int $id): void
                 contact_id = :contact_id,
                 project_id = :project_id,
                 parent_todo_id = NULL,
+                updated_by = :actor_id,
+                updated_by_name = :actor_name,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ");
@@ -425,7 +443,9 @@ function handlePut(PDO $db, ?int $id): void
             'priority' => $priority,
             'is_completed' => $isCompleted,
             'contact_id' => $contactId,
-            'project_id' => $projectId
+            'project_id' => $projectId,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name']
         ]);
 
         // Rebuild child rows to keep project-contact mirroring in sync.
@@ -444,8 +464,8 @@ function handlePut(PDO $db, ?int $id): void
             $contactIds = getProjectContactIds($db, $projectId);
             if (!empty($contactIds)) {
                 $childInsert = $db->prepare("
-                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id)
-                    VALUES (:title, :description, :due_date, :priority, :is_completed, :contact_id, :project_id, :parent_todo_id)
+                    INSERT INTO todos (title, description, due_date, priority, is_completed, contact_id, project_id, parent_todo_id, created_by, created_by_name, updated_by, updated_by_name)
+                    VALUES (:title, :description, :due_date, :priority, :is_completed, :contact_id, :project_id, :parent_todo_id, :actor_id, :actor_name, :actor_id2, :actor_name2)
                 ");
 
                 foreach ($contactIds as $projectContactId) {
@@ -457,7 +477,11 @@ function handlePut(PDO $db, ?int $id): void
                         'is_completed' => $isCompleted,
                         'contact_id' => $projectContactId,
                         'project_id' => $projectId,
-                        'parent_todo_id' => $rootTodoId
+                        'parent_todo_id' => $rootTodoId,
+                        'actor_id' => $actor['id'],
+                        'actor_name' => $actor['name'],
+                        'actor_id2' => $actor['id'],
+                        'actor_name2' => $actor['name'],
                     ]);
                 }
             }

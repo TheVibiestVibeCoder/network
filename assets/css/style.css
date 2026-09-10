@@ -2907,6 +2907,11 @@ textarea.form-input {
     border-left: 3px solid var(--color-text-secondary);
 }
 
+/* Account events (invites, role changes) - the team's own audit trail. */
+.cal-day-note--account-activity {
+    border-left: 3px solid var(--color-warning);
+}
+
 .cal-day-note.is-completed {
     opacity: 0.72;
 }
@@ -2974,6 +2979,11 @@ textarea.form-input {
 .cal-day-note-type--project-activity {
     border-color: var(--color-text-secondary);
     color: var(--color-text-secondary);
+}
+
+.cal-day-note-type--account-activity {
+    border-color: var(--color-warning);
+    color: var(--color-warning);
 }
 
 .cal-day-note-extra {
@@ -5292,5 +5302,399 @@ textarea.form-input {
         opacity: 1 !important;
         transform: none !important;
         filter: none !important;
+    }
+}
+
+/* ============================================
+   Multi-user: sign-in extras, header identity,
+   user management, and attribution
+   ============================================ */
+
+/* --- Sign-in screen extras --------------------------------------------- */
+
+.alert-success {
+    background-color: var(--color-success-subtle);
+    border: 1px solid rgba(22, 163, 74, 0.3);
+    color: var(--color-success);
+}
+
+.login-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: left;
+    margin: calc(var(--spacing-1) * -1) 0 var(--spacing-4);
+}
+
+.login-alt {
+    margin-top: var(--spacing-5);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+}
+
+.login-alt a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.login-alt a:hover {
+    color: var(--color-text);
+    border-bottom-color: var(--color-border);
+}
+
+.login-alt-sep {
+    margin: 0 var(--spacing-2);
+    color: var(--color-border);
+}
+
+.login-hint-inline {
+    color: var(--color-text-muted);
+}
+
+.login-form .form-input[readonly] {
+    color: var(--color-text-tertiary);
+    cursor: default;
+}
+
+/* --- Header identity chip ---------------------------------------------- */
+
+.user-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-1) var(--spacing-3) var(--spacing-1) var(--spacing-1);
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    max-width: 220px;
+}
+
+.user-chip-avatar {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Same inverting pair as .btn-primary, so the initials stay legible in
+       both themes - --color-primary is near-white in dark mode. */
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.user-chip-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-chip-role {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    padding: 1px 6px;
+    flex-shrink: 0;
+}
+
+/* --- Invite form -------------------------------------------------------- */
+
+.users-invite {
+    padding-bottom: var(--spacing-5);
+    margin-bottom: var(--spacing-5);
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.users-invite-fields {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr auto auto;
+    gap: var(--spacing-2);
+    align-items: center;
+}
+
+.users-invite-hint {
+    margin-top: var(--spacing-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+/* --- Generated link callout --------------------------------------------- */
+
+.users-link-box {
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-3) var(--spacing-4);
+    margin-bottom: var(--spacing-5);
+}
+
+.users-link-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-2);
+}
+
+.users-link-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.users-link-dismiss {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 var(--spacing-1);
+    transition: color var(--transition-fast);
+}
+
+.users-link-dismiss:hover {
+    color: var(--color-text);
+}
+
+.users-link-note {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    margin: var(--spacing-1) 0 var(--spacing-3);
+}
+
+.users-link-row {
+    display: flex;
+    gap: var(--spacing-2);
+}
+
+.users-link-row .form-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--font-size-xs);
+}
+
+/* --- Account list ------------------------------------------------------- */
+
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.user-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast);
+}
+
+.user-row:hover {
+    border-color: var(--color-border);
+}
+
+.user-row.is-disabled {
+    opacity: 0.6;
+}
+
+.user-row-avatar {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.user-row.is-admin .user-row-avatar {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
+}
+
+.user-row-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-row-name {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.user-row-email {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: var(--radius-full);
+    padding: 2px 7px;
+    white-space: nowrap;
+}
+
+.user-badge-admin {
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary);
+}
+
+.user-badge-pending {
+    background-color: rgba(217, 119, 6, 0.12);
+    color: var(--color-warning);
+}
+
+.user-badge-disabled {
+    background-color: var(--color-surface-3);
+    color: var(--color-text-muted);
+}
+
+.user-badge-you {
+    background-color: var(--color-accent-subtle);
+    color: var(--color-text-secondary);
+}
+
+.user-row-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.user-row-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    flex-shrink: 0;
+}
+
+.user-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast),
+                border-color var(--transition-fast);
+}
+
+.user-action-btn:hover {
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-border-subtle);
+    color: var(--color-text);
+}
+
+.user-action-btn.is-danger:hover {
+    background-color: var(--color-danger-subtle);
+    border-color: rgba(220, 38, 38, 0.25);
+    color: var(--color-danger);
+}
+
+.user-row-role-select {
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-1) var(--spacing-2);
+    min-width: 92px;
+}
+
+.users-empty {
+    text-align: center;
+    padding: var(--spacing-8) var(--spacing-4);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+/* --- Attribution -------------------------------------------------------- */
+/* Deliberately quiet: it should be findable, never the thing you read first. */
+
+.by-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.by-line-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-border);
+    flex-shrink: 0;
+}
+
+.by-line-name {
+    font-weight: 600;
+    color: var(--color-text-tertiary);
+}
+
+.by-line-avatar {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .users-invite-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .user-chip-name,
+    .user-chip-role,
+    .header-btn-label {
+        display: none;
+    }
+
+    .user-chip {
+        padding: var(--spacing-1);
+        max-width: none;
+    }
+
+    .user-row-meta {
+        display: none;
     }
 }

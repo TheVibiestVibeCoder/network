@@ -652,6 +652,10 @@ function logProjectActivityEvent(string $action, ?array $current, ?array $previo
         $projectCompany = Auth::sanitizeString($source['company'] ?? null, 255);
         $content = buildProjectActivityContent($action, $current, $previous);
 
+        // Every timeline entry carries who caused it, so the calendar doubles
+        // as the audit trail once more than one person is working here.
+        $actor = Auth::actor();
+
         $stmt = $db->prepare("
             INSERT INTO activity_events (
                 entry_type,
@@ -659,14 +663,18 @@ function logProjectActivityEvent(string $action, ?array $current, ?array $previo
                 content,
                 project_id,
                 project_name,
-                project_company
+                project_company,
+                actor_id,
+                actor_name
             ) VALUES (
                 'project_activity',
                 :action,
                 :content,
                 :project_id,
                 :project_name,
-                :project_company
+                :project_company,
+                :actor_id,
+                :actor_name
             )
         ");
 
@@ -675,7 +683,9 @@ function logProjectActivityEvent(string $action, ?array $current, ?array $previo
             'content' => $content,
             'project_id' => $projectId,
             'project_name' => $projectName,
-            'project_company' => $projectCompany
+            'project_company' => $projectCompany,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name']
         ]);
     } catch (Exception $e) {
         error_log('project activity log failed: ' . $e->getMessage());

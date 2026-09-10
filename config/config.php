@@ -130,6 +130,31 @@ define('SESSION_LIFETIME', max(300, envInt('SESSION_LIFETIME', 86400))); // 24 h
 define('SESSION_IDLE_TIMEOUT', max(60, envInt('SESSION_IDLE_TIMEOUT', SESSION_LIFETIME)));
 define('TRUST_PROXY_HEADERS', envBool('TRUST_PROXY_HEADERS', false));
 
+// -----------------------------------------------------------------------------
+// Multi-user configuration
+// -----------------------------------------------------------------------------
+// The owner account is the original single password. It always exists, is
+// always an admin, and is never stored in the database - so a broken users
+// table or a deleted admin row can never lock you out of your own CRM.
+// Sign in as the owner by leaving the email field empty.
+define('OWNER_DISPLAY_NAME', trim((string) ($_ENV['OWNER_NAME'] ?? '')) !== '' ? trim((string) $_ENV['OWNER_NAME']) : 'Owner');
+
+// How long an invite / password-reset link stays valid, in seconds.
+define('INVITE_TOKEN_LIFETIME', max(300, envInt('INVITE_TOKEN_LIFETIME', 172800)));   // 48 h
+define('RESET_TOKEN_LIFETIME', max(300, envInt('RESET_TOKEN_LIFETIME', 3600)));       // 1 h
+
+// Minimum length for a user-chosen password.
+define('MIN_PASSWORD_LENGTH', max(8, envInt('MIN_PASSWORD_LENGTH', 10)));
+
+// Outgoing mail. MAIL_FROM must be a bare address on a domain this server is
+// allowed to send for, otherwise the invite mails land in spam or bounce.
+define('MAIL_FROM', trim((string) ($_ENV['MAIL_FROM'] ?? '')));
+define('MAIL_FROM_NAME', trim((string) ($_ENV['MAIL_FROM_NAME'] ?? '')) !== '' ? trim((string) $_ENV['MAIL_FROM_NAME']) : APP_NAME);
+
+// Public base URL, used to build invite links. Auto-detected per request when
+// left empty; set it explicitly if the app sits behind a proxy or subpath.
+define('APP_BASE_URL', rtrim(trim((string) ($_ENV['APP_BASE_URL'] ?? '')), '/'));
+
 // Security configuration
 define('MAX_LOGIN_ATTEMPTS', max(1, envInt('MAX_LOGIN_ATTEMPTS', 10)));      // Lock out after this many failed attempts
 define('LOGIN_LOCKOUT_DURATION', max(60, envInt('LOGIN_LOCKOUT_DURATION', 900))); // Lockout duration in seconds

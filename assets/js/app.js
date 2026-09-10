@@ -2328,6 +2328,7 @@
                 <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -2770,6 +2771,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name)}
                         <span class="note-source">von ${escapeHtml(contactName)}</span>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -3251,7 +3253,8 @@
 
     function getCalendarEntryType(entry) {
         const type = entry && entry.entry_type ? String(entry.entry_type) : '';
-        if (type === 'project_note' || type === 'todo' || type === 'contact_activity' || type === 'project_activity') {
+        if (type === 'project_note' || type === 'todo' || type === 'contact_activity'
+            || type === 'project_activity' || type === 'account_activity') {
             return type;
         }
         return 'contact_note';
@@ -3263,6 +3266,7 @@
         if (type === 'todo') return 'todo';
         if (type === 'contact_activity') return 'contact-activity';
         if (type === 'project_activity') return 'project-activity';
+        if (type === 'account_activity') return 'account-activity';
         return 'contact-note';
     }
 
@@ -3272,6 +3276,7 @@
         if (type === 'todo') return 'To-do';
         if (type === 'contact_activity') return 'Kontakt-Update';
         if (type === 'project_activity') return 'Projekt-Update';
+        if (type === 'account_activity') return 'Konto';
         return 'Kontakt-Notiz';
     }
 
@@ -3281,6 +3286,15 @@
 
     function getCalendarEntryContext(entry) {
         const type = getCalendarEntryType(entry);
+
+        // Account events belong to no contact or project - they are about the
+        // team itself, so the actor is the whole context.
+        if (type === 'account_activity') {
+            return {
+                primary: entry.actor_name || 'Konto',
+                secondary: 'Benutzerverwaltung'
+            };
+        }
 
         if (type === 'project_note' || type === 'project_activity') {
             return {
@@ -3538,6 +3552,7 @@
                             <span class="cal-day-note-name">${name}</span>
                             ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
                             <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
+                            ${byLine(entry.actor_name)}
                             ${todoMeta}
                             ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
                         </div>
@@ -4365,6 +4380,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name)}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4712,6 +4728,19 @@
 
         if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
         return 'https://' + url;
+    }
+
+    /**
+     * A quiet "by <name>" marker for anything a person authored.
+     *
+     * Attribution should be findable, never the first thing you read, so it
+     * renders as small muted text rather than another badge. Returns an empty
+     * string when nothing is recorded, which is the case for everything created
+     * before multi-user existed.
+     */
+    function byLine(name) {
+        if (!name) return '';
+        return `<span class="by-line"><span class="by-line-avatar">${escapeHtml(getInitials(name))}</span><span class="by-line-name">${escapeHtml(name)}</span></span>`;
     }
 
     function getInitials(name) {

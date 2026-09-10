@@ -72,12 +72,21 @@ class Project
     {
         $stmt = $this->db->prepare("
             INSERT INTO projects (name, start_date, description, company, budget_min, budget_max,
-                                success_chance, stage, estimated_completion)
+                                success_chance, stage, estimated_completion,
+                                created_by, created_by_name, updated_by, updated_by_name)
             VALUES (:name, :start_date, :description, :company, :budget_min, :budget_max,
-                    :success_chance, :stage, :estimated_completion)
+                    :success_chance, :stage, :estimated_completion,
+                    :actor_id, :actor_name, :actor_id2, :actor_name2)
         ");
 
+        // Stamped in the model so no endpoint can forget to attribute a write.
+        $actor = Auth::actor();
+
         $stmt->execute([
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
+            'actor_id2' => $actor['id'],
+            'actor_name2' => $actor['name'],
             'name' => $data['name'] ?? '',
             'start_date' => $data['start_date'] ?? date('Y-m-d'),
             'description' => $data['description'] ?? '',
@@ -108,12 +117,18 @@ class Project
                 success_chance = :success_chance,
                 stage = :stage,
                 estimated_completion = :estimated_completion,
+                updated_by = :actor_id,
+                updated_by_name = :actor_name,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ");
 
+        $actor = Auth::actor();
+
         return $stmt->execute([
             'id' => $id,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
             'name' => $data['name'] ?? '',
             'start_date' => $data['start_date'] ?? date('Y-m-d'),
             'description' => $data['description'] ?? '',
@@ -312,12 +327,17 @@ class Project
     public function createNote(int $projectId, string $content): ?array
     {
         $stmt = $this->db->prepare("
-            INSERT INTO project_notes (project_id, content)
-            VALUES (:project_id, :content)
+            INSERT INTO project_notes (project_id, content, author_id, author_name)
+            VALUES (:project_id, :content, :author_id, :author_name)
         ");
+
+        $actor = Auth::actor();
+
         $stmt->execute([
             'project_id' => $projectId,
-            'content' => $content
+            'content' => $content,
+            'author_id' => $actor['id'],
+            'author_name' => $actor['name']
         ]);
 
         $noteId = (int) $this->db->lastInsertId();

@@ -43,6 +43,50 @@ is part of "working correctly", not optional polish.
 5. **Check the error log after the first real use.** Errors are logged, never
    displayed, so a broken deployment fails quietly by design.
 
+## Users and roles
+
+There are two kinds of identity:
+
+- **Owner** - the `APP_PASSWORD` in `.env`. No database row, always an
+  administrator, cannot be deleted or demoted. Sign in by leaving the email
+  field empty. This is the recovery path: whatever happens to the users table,
+  the owner still gets in.
+- **Users** - rows in the `users` table, signing in with email + password.
+  Either `admin` (full access plus user management) or `member` (full CRM
+  access, no user management).
+
+Passwords are never set by an administrator. Inviting someone creates a
+one-time link; they choose their own password through it. Only the SHA-256 of
+that token is stored, so a leaked database yields no working links.
+
+What takes effect immediately, on the target's very next request:
+
+| Action | Effect |
+|---|---|
+| Change a role | New permissions apply without re-login |
+| Disable an account | Existing sessions die, sign-in refused |
+| Delete an account | Sessions die; their tokens are removed |
+| Change a password | Every other session for that account dies |
+
+Deleting a user never deletes their work. Each record carries both the actor's
+id and a snapshot of their name, so the history stays readable after the
+account is gone.
+
+Guards worth knowing about:
+
+- An admin cannot change their own role, disable themselves, or delete
+  themselves - each would strand them mid-action.
+- The sign-in form answers identically for an unknown address, a disabled
+  account and a wrong password, and spends the same time on each, so it cannot
+  be used to discover who has an account.
+- Sign-ins are throttled per IP **and** per identity, so neither a single IP
+  spreading attempts across accounts nor many IPs grinding one account slips
+  under the limit.
+- Password-reset requests are throttled per email (3/hour) and per IP (10/hour).
+
+If mail cannot be sent, nothing breaks: the Users panel always shows the
+generated link so an admin can pass it on by hand.
+
 ## What protects what
 
 | Layer | File | Protects against |
@@ -54,6 +98,9 @@ is part of "working correctly", not optional polish.
 | Login lockout | `login_attempts` table | Password brute force (per IP) |
 | CSP + output escaping | `Auth::sendSecurityHeaders()`, `escapeHtml()` | Stored XSS from contact/company/tag/file names |
 | Upload validation | `api/bookkeeping.php`, `api/import-export.php` | Web shells uploaded as invoices or spreadsheets |
+| Role gate | `Auth::requireAdmin()` | Non-admins reaching `api/users.php` |
+| Hashed one-time tokens | `includes/User.php` | Invite/reset links being reused, or usable from a database leak |
+| Session-to-account binding | `Auth::sessionAccountStillValid()` | A disabled, deleted or password-changed account keeping a live session |
 
 ## nginx
 
@@ -106,9 +153,16 @@ be tricked into executing an uploaded file that is not a `.php` script.
 
 ## Known trade-offs
 
-- **Single shared password, no user accounts.** Everyone with the password has
-  full access, and there is no per-user audit trail. Rotating the password is
-  the only revocation mechanism.
+- **Every member sees all CRM data.** Roles gate user *management*, not records.
+  There is no per-record ownership or sharing model; anyone signed in can read
+  and edit every contact, project and invoice. Attribution records who changed
+  what, but it does not restrict anyone.
+- **The owner password is shared by definition.** Anyone who knows it is an
+  administrator, and there is no audit trail distinguishing two people using
+  it. Give people their own accounts and keep the owner password for recovery.
+- **Mail delivery is best-effort.** `mail()` on shared hosting frequently fails
+  or lands in spam. Set `MAIL_FROM` to an address on a domain the server may
+  send for, and expect to fall back to copying links by hand.
 - **`TRUST_PROXY_HEADERS` defaults to false.** Turn it on *only* behind a proxy
   you control. If it is on without such a proxy, a client can spoof
   `X-Forwarded-For` and sidestep the login lockout entirely.

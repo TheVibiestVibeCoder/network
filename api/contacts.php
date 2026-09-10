@@ -418,6 +418,10 @@ function logContactActivityEvent(string $action, ?array $current, ?array $previo
         $contactCompany = Auth::sanitizeString($source['company'] ?? null, 255);
         $content = buildContactActivityContent($action, $current, $previous);
 
+        // Every timeline entry carries who caused it, so the calendar doubles
+        // as the audit trail once more than one person is working here.
+        $actor = Auth::actor();
+
         $stmt = $db->prepare("
             INSERT INTO activity_events (
                 entry_type,
@@ -425,14 +429,18 @@ function logContactActivityEvent(string $action, ?array $current, ?array $previo
                 content,
                 contact_id,
                 contact_name,
-                contact_company
+                contact_company,
+                actor_id,
+                actor_name
             ) VALUES (
                 'contact_activity',
                 :action,
                 :content,
                 :contact_id,
                 :contact_name,
-                :contact_company
+                :contact_company,
+                :actor_id,
+                :actor_name
             )
         ");
 
@@ -441,7 +449,9 @@ function logContactActivityEvent(string $action, ?array $current, ?array $previo
             'content' => $content,
             'contact_id' => $contactId,
             'contact_name' => $contactName,
-            'contact_company' => $contactCompany
+            'contact_company' => $contactCompany,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name']
         ]);
     } catch (Exception $e) {
         error_log('contact activity log failed: ' . $e->getMessage());

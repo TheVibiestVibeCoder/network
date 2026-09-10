@@ -86,9 +86,15 @@ class Contact
      */
     public function create(array $data): int
     {
+        // Who created this is recorded here rather than at each call site, so
+        // no future endpoint can forget to stamp it.
+        $actor = Auth::actor();
+
         $stmt = $this->db->prepare("
-            INSERT INTO contacts (name, company, location, latitude, longitude, note, email, phone, website, address)
-            VALUES (:name, :company, :location, :latitude, :longitude, :note, :email, :phone, :website, :address)
+            INSERT INTO contacts (name, company, location, latitude, longitude, note, email, phone, website, address,
+                                  created_by, created_by_name, updated_by, updated_by_name)
+            VALUES (:name, :company, :location, :latitude, :longitude, :note, :email, :phone, :website, :address,
+                    :actor_id, :actor_name, :actor_id2, :actor_name2)
         ");
 
         $stmt->execute([
@@ -102,6 +108,10 @@ class Contact
             'phone' => $data['phone'] ?? null,
             'website' => $data['website'] ?? null,
             'address' => $data['address'] ?? null,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
+            'actor_id2' => $actor['id'],
+            'actor_name2' => $actor['name'],
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -124,12 +134,18 @@ class Contact
                 phone = :phone,
                 website = :website,
                 address = :address,
+                updated_by = :actor_id,
+                updated_by_name = :actor_name,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ");
 
+        $actor = Auth::actor();
+
         return $stmt->execute([
             'id' => $id,
+            'actor_id' => $actor['id'],
+            'actor_name' => $actor['name'],
             'name' => $data['name'] ?? '',
             'company' => $data['company'] ?? null,
             'location' => $data['location'] ?? null,
@@ -192,9 +208,13 @@ class Contact
         $this->db->beginTransaction();
 
         try {
+            $actor = Auth::actor();
+
             $stmt = $this->db->prepare("
-                INSERT INTO contacts (name, company, location, latitude, longitude, note, email, phone, website, address)
-                VALUES (:name, :company, :location, :latitude, :longitude, :note, :email, :phone, :website, :address)
+                INSERT INTO contacts (name, company, location, latitude, longitude, note, email, phone, website, address,
+                                      created_by, created_by_name, updated_by, updated_by_name)
+                VALUES (:name, :company, :location, :latitude, :longitude, :note, :email, :phone, :website, :address,
+                        :actor_id, :actor_name, :actor_id2, :actor_name2)
             ");
 
             foreach ($contacts as $index => $data) {
@@ -219,6 +239,10 @@ class Contact
                         'phone' => $data['phone'] ?? null,
                         'website' => $data['website'] ?? null,
                         'address' => $data['address'] ?? null,
+                        'actor_id' => $actor['id'],
+                        'actor_name' => $actor['name'],
+                        'actor_id2' => $actor['id'],
+                        'actor_name2' => $actor['name'],
                     ]);
 
                     $createdIds[] = (int) $this->db->lastInsertId();

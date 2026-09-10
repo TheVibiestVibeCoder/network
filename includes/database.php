@@ -187,6 +187,11 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempted_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_success_time ON login_attempts(ip_address, success, attempted_at)");
 
+        // Sign-ins are throttled per identity as well as per IP, so that an
+        // attacker spread over many addresses cannot grind a single account.
+        self::addColumnIfMissing($db, 'login_attempts', 'identifier', 'VARCHAR(255)');
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier, success, attempted_at)");
+
         // Create projects table
         $db->exec("
             CREATE TABLE IF NOT EXISTS projects (
@@ -301,6 +306,91 @@ class Database
             $db->exec("ALTER TABLE todos ADD COLUMN priority VARCHAR(16)");
         }
 
+        // ---------------------------------------------------------------
+        // Multi-user: accounts, invite/reset tokens, attribution
+        // ---------------------------------------------------------------
+
+        // email is COLLATE NOCASE so that Ada@x.com and ada@x.com are the same
+        // account and the UNIQUE index actually prevents duplicates.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email VARCHAR(255) NOT NULL UNIQUE COLLATE NOCASE,
+                name VARCHAR(255) NOT NULL,
+                password_hash TEXT,
+                role VARCHAR(16) NOT NULL DEFAULT 'member',
+                status VARCHAR(16) NOT NULL DEFAULT 'invited',
+                password_changed_at DATETIME,
+                last_login_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)");
+
+        // Only the SHA-256 of a token is stored. A leaked database therefore
+        // does not hand out working invite or reset links.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS user_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                purpose VARCHAR(16) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_user_tokens_hash ON user_tokens(token_hash)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_user_tokens_user ON user_tokens(user_id)");
+
+        // Throttle table for password-reset requests (per IP and per email), so
+        // the reset endpoint cannot be used to spam somebody's inbox.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS reset_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip_address VARCHAR(45) NOT NULL,
+                email VARCHAR(255) NOT NULL COLLATE NOCASE,
+                requested_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_reset_requests_ip ON reset_requests(ip_address, requested_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_reset_requests_email ON reset_requests(email, requested_at)");
+
+        // ---------------------------------------------------------------
+        // Attribution columns
+        // ---------------------------------------------------------------
+        // Every actor column is stored as a nullable id plus a name snapshot.
+        // The id powers filtering; the snapshot keeps the history readable
+        // after an account is deleted (and the owner login has no row at all).
+        self::addColumnIfMissing($db, 'contacts', 'created_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'contacts', 'created_by_name', 'VARCHAR(255)');
+        self::addColumnIfMissing($db, 'contacts', 'updated_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'contacts', 'updated_by_name', 'VARCHAR(255)');
+
+        self::addColumnIfMissing($db, 'projects', 'created_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'projects', 'created_by_name', 'VARCHAR(255)');
+        self::addColumnIfMissing($db, 'projects', 'updated_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'projects', 'updated_by_name', 'VARCHAR(255)');
+
+        self::addColumnIfMissing($db, 'todos', 'created_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'todos', 'created_by_name', 'VARCHAR(255)');
+        self::addColumnIfMissing($db, 'todos', 'updated_by', 'INTEGER');
+        self::addColumnIfMissing($db, 'todos', 'updated_by_name', 'VARCHAR(255)');
+
+        self::addColumnIfMissing($db, 'notes', 'author_id', 'INTEGER');
+        self::addColumnIfMissing($db, 'notes', 'author_name', 'VARCHAR(255)');
+
+        self::addColumnIfMissing($db, 'project_notes', 'author_id', 'INTEGER');
+        self::addColumnIfMissing($db, 'project_notes', 'author_name', 'VARCHAR(255)');
+
+        self::addColumnIfMissing($db, 'activity_events', 'actor_id', 'INTEGER');
+        self::addColumnIfMissing($db, 'activity_events', 'actor_name', 'VARCHAR(255)');
+
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_actor ON activity_events(actor_id)");
+
         // Create indexes for todos
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_contact_id ON todos(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)");
@@ -309,5 +399,80 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_is_completed ON todos(is_completed)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at)");
+    }
+
+    /**
+     * Add a column to an existing table when it is not there yet.
+     *
+     * SQLite has no "ADD COLUMN IF NOT EXISTS", and this app migrates itself on
+     * every boot, so the check has to be explicit.
+     */
+    private static function addColumnIfMissing(PDO $db, string $table, string $column, string $definition): void
+    {
+        // Table and column names cannot be bound as parameters, so they are
+        // whitelisted by shape. Every caller passes a literal, but this keeps
+        // the method safe if that ever stops being true.
+        foreach ([$table, $column] as $identifier) {
+            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $identifier)) {
+                throw new InvalidArgumentException('Refusing unsafe SQL identifier');
+            }
+        }
+        if (!preg_match('/^[A-Za-z0-9_() ,]+$/', $definition)) {
+            throw new InvalidArgumentException('Refusing unsafe column definition');
+        }
+
+        $existing = $db->query("PRAGMA table_info(" . $table . ")")->fetchAll(PDO::FETCH_ASSOC);
+        if (in_array($column, array_column($existing, 'name'), true)) {
+            return;
+        }
+
+        $db->exec("ALTER TABLE " . $table . " ADD COLUMN " . $column . " " . $definition);
+    }
+
+    /**
+     * Run a write inside a transaction, retrying if SQLite reports the database
+     * as busy.
+     *
+     * With several people in the CRM at once, two writes can land in the same
+     * instant. WAL lets readers continue during a write, but a second *writer*
+     * still has to wait, and once busy_timeout is exhausted SQLite throws.
+     * Retrying with a short backoff turns that rare collision into a slightly
+     * slower save instead of a failed one.
+     *
+     * @template T
+     * @param callable(PDO): T $work
+     * @return T
+     */
+    public static function transactional(callable $work, int $attempts = 4)
+    {
+        $db = self::getInstance();
+
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $db->beginTransaction();
+                $result = $work($db);
+                $db->commit();
+                return $result;
+            } catch (PDOException $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+
+                $busy = stripos($e->getMessage(), 'database is locked') !== false
+                    || stripos($e->getMessage(), 'database table is locked') !== false;
+
+                if (!$busy || $attempt >= $attempts) {
+                    throw $e;
+                }
+
+                // 20ms, 40ms, 80ms - short enough to stay within a request.
+                usleep(20000 * (1 << ($attempt - 1)));
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                throw $e;
+            }
+        }
     }
 }

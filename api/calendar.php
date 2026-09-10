@@ -73,7 +73,7 @@ function normalizeDateTimeFilter($value): ?string
 
 function fetchEntityActivityEntries(PDO $db, ?string $start, ?string $end, string $search, ?int $tagId): array
 {
-    $conditions = ["a.entry_type IN ('contact_activity', 'project_activity')"];
+    $conditions = ["a.entry_type IN ('contact_activity', 'project_activity', 'account_activity')"];
     $params = [];
 
     if ($start !== null) {
@@ -146,6 +146,8 @@ function fetchEntityActivityEntries(PDO $db, ?string $start, ?string $end, strin
             a.project_id,
             a.project_name,
             a.project_company,
+            a.actor_id,
+            a.actor_name,
             a.action AS activity_action
         FROM activity_events a
         {$where}
@@ -205,7 +207,9 @@ function fetchContactNoteEntries(PDO $db, ?string $start, ?string $end, string $
             c.company AS contact_company,
             NULL AS project_id,
             NULL AS project_name,
-            NULL AS project_company
+            NULL AS project_company,
+            n.author_id AS actor_id,
+            n.author_name AS actor_name
         FROM notes n
         JOIN contacts c ON c.id = n.contact_id
         {$where}
@@ -274,7 +278,9 @@ function fetchProjectNoteEntries(PDO $db, ?string $start, ?string $end, string $
             NULL AS contact_company,
             pn.project_id,
             p.name AS project_name,
-            p.company AS project_company
+            p.company AS project_company,
+            pn.author_id AS actor_id,
+            pn.author_name AS actor_name
         FROM project_notes pn
         JOIN projects p ON p.id = pn.project_id
         {$where}
@@ -362,7 +368,9 @@ function fetchTodoEntries(PDO $db, ?string $start, ?string $end, string $search,
             c.company AS contact_company,
             t.project_id,
             p.name AS project_name,
-            p.company AS project_company
+            p.company AS project_company,
+            t.created_by AS actor_id,
+            t.created_by_name AS actor_name
         FROM todos t
         LEFT JOIN contacts c ON c.id = t.contact_id
         LEFT JOIN projects p ON p.id = t.project_id

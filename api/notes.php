@@ -177,14 +177,18 @@ function handlePost(PDO $db): void
     }
 
     // Insert note
+    $actor = Auth::actor();
+
     $stmt = $db->prepare("
-        INSERT INTO notes (contact_id, company, content)
-        VALUES (?, ?, ?)
+        INSERT INTO notes (contact_id, company, content, author_id, author_name)
+        VALUES (?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $contactId,
         $contact['company'] ?? null,
-        $input['content']
+        $input['content'],
+        $actor['id'],
+        $actor['name']
     ]);
 
     $noteId = $db->lastInsertId();
