@@ -511,10 +511,36 @@ function buildPasswordLink(string $token): string
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="user-chip" title="<?= htmlspecialchars(($currentUser['email'] ?? 'Owner login') . ' - ' . ($isAdmin ? 'Administrator' : 'Member')) ?>">
-                        <span class="user-chip-avatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></span>
-                        <span class="user-chip-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
-                        <?php if ($isAdmin): ?><span class="user-chip-role">Admin</span><?php endif; ?>
+                    <div class="user-chip-wrap">
+                        <button type="button" class="user-chip" id="userChip"
+                                title="<?= htmlspecialchars(($currentUser['email'] ?? 'Owner login') . ' - ' . ($isAdmin ? 'Administrator' : 'Member')) ?>"
+                                aria-haspopup="dialog" aria-expanded="false">
+                            <span class="user-chip-avatar" id="userChipAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></span>
+                            <span class="user-chip-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
+                            <?php if ($isAdmin): ?><span class="user-chip-role">Admin</span><?php endif; ?>
+                        </button>
+
+                        <!-- Profile picture popover -->
+                        <div class="profile-pop" id="profilePop" hidden role="dialog" aria-label="Your profile picture">
+                            <div class="profile-pop-head">
+                                <div class="profile-pop-avatar" id="profilePopAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></div>
+                                <div class="profile-pop-info">
+                                    <div class="profile-pop-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></div>
+                                    <div class="profile-pop-sub"><?= htmlspecialchars($currentUser['email'] ?? 'Owner login') ?></div>
+                                </div>
+                            </div>
+                            <div class="profile-pop-actions">
+                                <button type="button" class="btn btn-secondary btn-small btn-block" id="profilePhotoBtn">
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                                        <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+                                    </svg>
+                                    <span id="profilePhotoBtnLabel">Upload photo</span>
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-small btn-block profile-pop-remove" id="profileRemoveBtn" hidden>Remove photo</button>
+                            </div>
+                            <p class="profile-pop-hint">JPEG, PNG, GIF or WebP &middot; up to 5 MB</p>
+                            <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+                        </div>
                     </div>
                     <?php if ($isAdmin): ?>
                     <button type="button" class="btn btn-secondary" id="manageUsersBtn" title="Manage users">
@@ -1047,6 +1073,7 @@ function buildPasswordLink(string $token): string
                         <div class="overview-title-info">
                             <h2 id="overviewName"></h2>
                             <p class="overview-company" id="overviewCompany"></p>
+                            <p class="overview-edited" id="overviewEdited"></p>
                         </div>
                     </div>
                     <button type="button" class="modal-close" id="closeOverviewModal">&times;</button>
@@ -1434,6 +1461,7 @@ function buildPasswordLink(string $token): string
                         <div class="overview-title-info">
                             <h2 id="projectOverviewName">Project Name</h2>
                             <p class="overview-company" id="projectOverviewCompany"></p>
+                            <p class="overview-edited" id="projectOverviewEdited"></p>
                         </div>
                     </div>
                     <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
@@ -1615,6 +1643,7 @@ function buildPasswordLink(string $token): string
                         </div>
                     </div>
                     <div class="modal-footer">
+                        <p class="overview-edited modal-footer-edited" id="todoEdited"></p>
                         <button type="button" class="btn btn-secondary" id="cancelTodoBtn">Cancel</button>
                         <button type="submit" class="btn btn-primary" id="saveTodoBtn">Create To-Do</button>
                     </div>
@@ -1827,6 +1856,7 @@ function buildPasswordLink(string $token): string
         <!-- Application JS -->
         <script src="assets/js/app.js"></script>
         <script src="assets/js/bookkeeping.js"></script>
+        <script src="assets/js/profile.js"></script>
         <?php if ($isAdmin): ?>
         <script src="assets/js/users.js"></script>
         <?php endif; ?>

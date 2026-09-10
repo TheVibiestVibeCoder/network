@@ -327,6 +327,10 @@ class Database
             )
         ");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)");
+
+        // Profile picture: the stored filename inside data/avatars, or NULL.
+        // The file itself lives outside anything the web server will serve.
+        self::addColumnIfMissing($db, 'users', 'avatar', 'VARCHAR(255)');
         $db->exec("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)");
 
         // Only the SHA-256 of a token is stored. A leaked database therefore
@@ -345,6 +349,16 @@ class Database
         ");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_user_tokens_hash ON user_tokens(token_hash)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_user_tokens_user ON user_tokens(user_id)");
+
+        // Instance-wide settings. The owner login has no users row, so its
+        // profile picture is keyed in here rather than on an account.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key VARCHAR(64) PRIMARY KEY,
+                value TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
 
         // Throttle table for password-reset requests (per IP and per email), so
         // the reset endpoint cannot be used to spam somebody's inbox.

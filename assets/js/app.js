@@ -146,6 +146,7 @@
         overviewAvatar: document.getElementById('overviewAvatar'),
         overviewName: document.getElementById('overviewName'),
         overviewCompany: document.getElementById('overviewCompany'),
+        overviewEdited: document.getElementById('overviewEdited'),
         overviewDetails: document.getElementById('overviewDetails'),
         contactProjects: document.getElementById('contactProjects'),
         contactTodosList: document.getElementById('contactTodosList'),
@@ -216,6 +217,7 @@
         projectOverviewModal: document.getElementById('projectOverviewModal'),
         projectOverviewName: document.getElementById('projectOverviewName'),
         projectOverviewCompany: document.getElementById('projectOverviewCompany'),
+        projectOverviewEdited: document.getElementById('projectOverviewEdited'),
         projectOverviewStartDate: document.getElementById('projectOverviewStartDate'),
         projectOverviewStage: document.getElementById('projectOverviewStage'),
         projectOverviewBudget: document.getElementById('projectOverviewBudget'),
@@ -243,6 +245,7 @@
         // To-do modal
         todoModal: document.getElementById('todoModal'),
         todoModalTitle: document.getElementById('todoModalTitle'),
+        todoEdited: document.getElementById('todoEdited'),
         todoForm: document.getElementById('todoForm'),
         todoTitle: document.getElementById('todoTitle'),
         todoDescription: document.getElementById('todoDescription'),
@@ -1846,6 +1849,10 @@
             if (elements.todoPriority) {
                 elements.todoPriority.value = todoData.priority || '';
             }
+            setEditedLine(elements.todoEdited, todoData);
+        } else {
+            // A to-do being created has nobody to attribute yet.
+            setEditedLine(elements.todoEdited, null);
         }
 
         elements.todoModal.classList.add('active');
@@ -2153,6 +2160,7 @@
             elements.overviewName.textContent = contact.name;
             elements.overviewCompany.textContent = contact.company || '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
+            setEditedLine(elements.overviewEdited, contact);
 
             // Populate details
             renderOverviewDetails(contact);
@@ -2328,7 +2336,7 @@
                 <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
-                        ${byLine(note.author_name)}
+                        ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -2771,7 +2779,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
-                        ${byLine(note.author_name)}
+                        ${byLine(note.author_name, note.author_id)}
                         <span class="note-source">von ${escapeHtml(contactName)}</span>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -3552,7 +3560,7 @@
                             <span class="cal-day-note-name">${name}</span>
                             ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
                             <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
-                            ${byLine(entry.actor_name)}
+                            ${byLine(entry.actor_name, entry.actor_id)}
                             ${todoMeta}
                             ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
                         </div>
@@ -4250,6 +4258,7 @@
     function renderProjectOverview(project, contacts, tags, notes = [], todos = []) {
         elements.projectOverviewName.textContent = project.name;
         elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
+        setEditedLine(elements.projectOverviewEdited, project);
 
         // Format dates as absolute dates
         elements.projectOverviewStartDate.textContent = project.start_date
@@ -4380,7 +4389,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
-                        ${byLine(note.author_name)}
+                        ${byLine(note.author_name, note.author_id)}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4738,9 +4747,54 @@
      * string when nothing is recorded, which is the case for everything created
      * before multi-user existed.
      */
-    function byLine(name) {
+    function byLine(name, actorId) {
         if (!name) return '';
-        return `<span class="by-line"><span class="by-line-avatar">${escapeHtml(getInitials(name))}</span><span class="by-line-name">${escapeHtml(name)}</span></span>`;
+
+        // The face comes from the directory profile.js loads once per page.
+        // Falls back to initials when the person has no picture, or when the
+        // directory has not arrived yet.
+        const url = window.CRMPeople ? window.CRMPeople.avatarFor(actorId, name) : null;
+        const inner = url
+            ? `<img src="${escapeHtml(url)}" alt="">`
+            : escapeHtml(getInitials(name));
+
+        // The data-* attributes let profile.js repaint these in place after
+        // somebody changes their picture, without a reload.
+        return `<span class="by-line"><span class="by-line-avatar${url ? ' has-photo' : ''}" data-actor-id="${actorId === null || actorId === undefined ? '' : escapeHtml(actorId)}" data-actor-name="${escapeHtml(name)}">${inner}</span><span class="by-line-name">${escapeHtml(name)}</span></span>`;
+    }
+
+    /**
+     * A muted "Last edited by ..." line for a record's detail view.
+     *
+     * Falls back to the creator when nothing has been edited yet, and renders
+     * nothing at all for records written before attribution existed.
+     */
+    /**
+     * Write a "last edited by" line into a slot, or hide it when the record
+     * predates attribution.
+     */
+    function setEditedLine(node, record) {
+        if (!node) return;
+
+        const html = lastEditedLine(record);
+        node.innerHTML = html;
+        node.style.display = html ? '' : 'none';
+    }
+
+    function lastEditedLine(record) {
+        if (!record) return '';
+
+        const edited = record.updated_by_name || null;
+        const created = record.created_by_name || null;
+        const name = edited || created;
+        if (!name) return '';
+
+        const actorId = edited ? record.updated_by : record.created_by;
+        const label = edited ? 'Last edited by' : 'Created by';
+        const when = record.updated_at || record.created_at;
+        const stamp = when ? formatDate(new Date(when.replace(' ', 'T') + 'Z')) : '';
+
+        return `<span class="edited-by">${label} ${byLine(name, actorId)}${stamp ? `<span class="edited-by-when">${escapeHtml(stamp)}</span>` : ''}</span>`;
     }
 
     function getInitials(name) {

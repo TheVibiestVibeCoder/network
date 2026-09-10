@@ -98,9 +98,28 @@ generated link so an admin can pass it on by hand.
 | Login lockout | `login_attempts` table | Password brute force (per IP) |
 | CSP + output escaping | `Auth::sendSecurityHeaders()`, `escapeHtml()` | Stored XSS from contact/company/tag/file names |
 | Upload validation | `api/bookkeeping.php`, `api/import-export.php` | Web shells uploaded as invoices or spreadsheets |
+| Image re-encoding | `api/profile.php` | Polyglot files, EXIF leakage and decompression bombs in profile pictures |
 | Role gate | `Auth::requireAdmin()` | Non-admins reaching `api/users.php` |
 | Hashed one-time tokens | `includes/User.php` | Invite/reset links being reused, or usable from a database leak |
 | Session-to-account binding | `Auth::sessionAccountStillValid()` | A disabled, deleted or password-changed account keeping a live session |
+
+## Profile pictures
+
+An uploaded picture is never stored as it arrived. It is decoded, re-drawn onto
+a fresh 256x256 canvas and written back out as PNG, so what lands on disk is
+pixels this server drew - EXIF, trailing payloads and polyglot files do not
+survive the round trip. Before decoding, the declared MIME type, the real image
+header and the pixel count all have to agree.
+
+Files live in `data/avatars/` under a generated name, denied to the web server,
+and are served only through `api/profile.php` after a session check.
+
+The upload endpoint takes no "whose picture" parameter: the target is always the
+caller's own identity, so it cannot be aimed at another account.
+
+Profile pictures need the PHP **GD** extension. Without it the upload returns a
+clear message and everything else keeps working - people just keep their
+initials.
 
 ## nginx
 
@@ -150,6 +169,9 @@ server {
 
 `try_files $uri =404;` in the PHP location is important: without it, nginx can
 be tricked into executing an uploaded file that is not a `.php` script.
+
+The `^/(data|includes|config|vendor)/` rule already covers the invoice store and
+`data/avatars/`, so uploaded files stay reachable only through their endpoints.
 
 ## Known trade-offs
 

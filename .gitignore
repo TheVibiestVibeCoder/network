@@ -13,6 +13,9 @@ data/*.db-shm
 # The directory and its .htaccess are recreated automatically on first use.
 data/bookkeeping_pdfs/
 
+# Uploaded profile pictures - personal data, same story.
+data/avatars/
+
 # IDE and editor files
 .idea/
 .vscode/

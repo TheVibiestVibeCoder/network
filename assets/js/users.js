@@ -164,9 +164,16 @@
                    ${ICON_DELETE}
                </button>`;
 
+        // Reuse the directory profile.js already loaded rather than shipping
+        // avatar URLs a second time through the users endpoint.
+        const photo = window.CRMPeople ? window.CRMPeople.avatarFor(user.id, user.name) : null;
+        const avatar = photo
+            ? `<div class="user-row-avatar has-photo"><img src="${escapeHtml(photo)}" alt=""></div>`
+            : `<div class="user-row-avatar">${escapeHtml(getInitials(user.name))}</div>`;
+
         return `
             <div class="${classes.join(' ')}">
-                <div class="user-row-avatar">${escapeHtml(getInitials(user.name))}</div>
+                ${avatar}
                 <div class="user-row-info">
                     <div class="user-row-name">
                         <span>${escapeHtml(user.name)}</span>
@@ -355,10 +362,20 @@
     // Wiring
     // ------------------------------------------------------------------
 
-    function openPanel() {
+    async function openPanel() {
         if (!els.modal) return;
         els.modal.classList.add('active');
         hideLink();
+
+        // Refresh faces first so the list paints with current pictures.
+        if (window.CRMPeople) {
+            try {
+                await window.CRMPeople.reload();
+            } catch (e) {
+                // Falling back to initials is fine.
+            }
+        }
+
         load();
     }
 
