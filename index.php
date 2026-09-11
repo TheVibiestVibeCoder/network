@@ -667,12 +667,6 @@ function buildPasswordLink(string $token): string
             -->
             <aside class="sidebar" id="sidebar" aria-label="Main navigation">
                 <div class="sidebar-brand">
-                    <span class="brand-mark" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/>
-                            <path d="M8.3 7.1 15.6 7.6M16.6 10.1 11.5 16M7.3 8.3 9.3 15.6"/>
-                        </svg>
-                    </span>
                     <span class="brand-name"><?= htmlspecialchars(APP_NAME) ?></span>
                 </div>
 
@@ -802,7 +796,7 @@ function buildPasswordLink(string $token): string
                         </div>
 
                         <!-- At a glance: filled in by workload.js for whoever is shown -->
-                        <div class="workload-stats" id="workloadStats" hidden></div>
+                        <section class="kpi-band kpi-band--home" id="workloadStats" aria-label="At a glance" hidden></section>
 
                         <div class="workload-body" id="workloadBody"></div>
                     </div>
@@ -1144,105 +1138,21 @@ function buildPasswordLink(string $token): string
                         </div>
                     </div>
 
-                    <!-- Dashboard -->
-                    <div class="dashboard-wrapper collapsed" id="dashboardWrapper">
-                        <!-- Collapsed bar (always visible) -->
-                        <div class="dashboard-bar" id="dashboardBar">
-                            <div class="dashboard-mobile-label">Project Dashboard</div>
-                            <div class="dashboard-bar-stats" id="dashboardBarStats">
-                                <div class="dashboard-bar-stat">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
-                                    <span class="dashboard-bar-stat-value" id="dashBarProjects">—</span>
-                                    <span>Projects</span>
-                                </div>
-                                <div class="dashboard-bar-stat">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/></svg>
-                                    <span class="dashboard-bar-stat-value" id="dashBarPotential">—</span>
-                                    <span>Pipeline value</span>
-                                </div>
-                                <div class="dashboard-bar-stat">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
-                                    <span class="dashboard-bar-stat-value" id="dashBarChance">—</span>
-                                    <span>Avg. Chance</span>
-                                </div>
-                                <div class="dashboard-bar-stat">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-                                    <span class="dashboard-bar-stat-value" id="dashBarProjection">—</span>
-                                    <span>Projected</span>
-                                </div>
-                            </div>
-                            <button class="dashboard-toggle-btn" id="dashboardToggleBtn" title="Toggle dashboard">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <!-- Expanded card grid -->
-                        <div class="projects-dashboard" id="projectsDashboard">
-                            <div class="dashboard-card">
-                                <div class="dashboard-card-icon">
-                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
-                                    </svg>
-                                </div>
-                                <div class="dashboard-card-body">
-                                    <div class="dashboard-card-value" id="dashTotalProjects">—</div>
-                                    <div class="dashboard-card-label">Total Projects</div>
-                                </div>
-                            </div>
-                            <div class="dashboard-card">
-                                <div class="dashboard-card-icon">
-                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/>
-                                    </svg>
-                                </div>
-                                <div class="dashboard-card-body">
-                                    <div class="dashboard-card-value" id="dashTotalPotential">—</div>
-                                    <div class="dashboard-card-label">Total Potential</div>
-                                    <div class="dashboard-card-sub" id="dashPotentialSub"></div>
-                                </div>
-                            </div>
-                            <div class="dashboard-card">
-                                <div class="dashboard-card-icon">
-                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/>
-                                    </svg>
-                                </div>
-                                <div class="dashboard-card-body">
-                                    <div class="dashboard-card-value" id="dashSuccessChance">—</div>
-                                    <div class="dashboard-card-label">Avg. Success Chance</div>
-                                </div>
-                            </div>
-                            <!-- Revenue Projection — spans full width -->
-                            <div class="dashboard-card dashboard-card--projection">
-                                <div class="dashboard-card-icon dashboard-card-icon--success">
-                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/>
-                                    </svg>
-                                </div>
-                                <div class="dashboard-card-body">
-                                    <div class="dashboard-card-label">Revenue Projection</div>
-                                    <div class="dashboard-proj-scenarios">
-                                        <div class="dashboard-proj-scenario">
-                                            <span class="dashboard-proj-scenario-label">Conservative</span>
-                                            <span class="dashboard-card-value" id="dashProjConservative">—</span>
-                                        </div>
-                                        <div class="dashboard-proj-scenario dashboard-proj-scenario--main">
-                                            <span class="dashboard-proj-scenario-label">Realistic</span>
-                                            <span class="dashboard-card-value" id="dashProjRealistic">—</span>
-                                        </div>
-                                        <div class="dashboard-proj-scenario">
-                                            <span class="dashboard-proj-scenario-label">Optimistic</span>
-                                            <span class="dashboard-card-value" id="dashProjOptimistic">—</span>
-                                        </div>
-                                    </div>
-                                    <div class="dashboard-card-sub" id="dashProjSub">
-                                        Stage-aware probability bands - timeline-adjusted - open projects only
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!--
+                        Pipeline summary: three small charts drawn by app.js from
+                        the projects on screen. The chevron opens the breakdown.
+                    -->
+                    <section class="kpi-band kpi-band--projects" id="projectsSummary" aria-label="Pipeline summary" hidden>
+                        <div class="kpi-grid" id="projectsKpis"></div>
+                        <button type="button" class="kpi-toggle" id="projectsBreakdownToggle"
+                                aria-expanded="false" aria-controls="projectsBreakdown"
+                                aria-label="Show breakdown" title="Show breakdown">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="kpi-detail" id="projectsBreakdown" hidden></div>
+                    </section>
 
                     <div class="list-header">
                         <div class="list-header-top">
@@ -2241,6 +2151,7 @@ function buildPasswordLink(string $token): string
         <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
+        <script src="assets/js/charts.js"></script>
         <script src="assets/js/app.js"></script>
         <script src="assets/js/bookkeeping.js"></script>
         <script src="assets/js/profile.js"></script>

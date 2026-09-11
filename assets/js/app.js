@@ -3973,10 +3973,6 @@
             return n.toFixed(0);
         }
 
-        function formatCurrency(n) {
-            return `${formatBudget(Math.round(n))} EUR`;
-        }
-
         let sumMinPotential = 0;
         let sumMaxPotential = 0;
         let projectsWithBudget = 0;
@@ -3992,11 +3988,40 @@
         let projExcluded = 0;
         const openProjects = projects.filter(p => p.stage !== 'Complete').length;
 
+        // For the charts: the same sums, split by stage and by the month a
+        // project is expected to finish. They add up to the totals above.
+        const byStage = {};
+        PIPELINE_STAGES.forEach(([name]) => {
+            byStage[name] = { count: 0, low: 0, high: 0, noBudget: 0 };
+        });
+        const byMonth = new Array(PROJECTION_MONTHS).fill(0);
+        let projectedLater = 0;
+        let openPipelineMax = 0;
+
+        function addToMonth(dateValue, amount) {
+            const date = parseDate(dateValue);
+            if (date === null) {
+                projectedLater += amount;
+                return;
+            }
+            const offset = (date.getFullYear() - today.getFullYear()) * 12
+                + (date.getMonth() - today.getMonth());
+            if (offset >= PROJECTION_MONTHS) {
+                projectedLater += amount;
+            } else {
+                // Past its date but still open: it is due now.
+                byMonth[Math.max(0, offset)] += amount;
+            }
+        }
+
         projects.forEach((project) => {
             const budget = parseProjectBudget(project);
             const isOpen = project.stage !== 'Complete';
+            const stageRow = byStage[project.stage] || byStage.Other;
+            stageRow.count++;
 
             if (!budget || budget.isUndetermined) {
+                stageRow.noBudget++;
                 if (isOpen) {
                     projExcluded++;
                 }
@@ -4010,15 +4035,21 @@
             if (isGuaranteedMax) {
                 sumMinPotential += budget.high;
                 sumMaxPotential += budget.high;
+                stageRow.low += budget.high;
+                stageRow.high += budget.high;
                 guaranteedAtMax++;
             } else {
                 sumMinPotential += budget.low;
                 sumMaxPotential += budget.high;
+                stageRow.low += budget.low;
+                stageRow.high += budget.high;
             }
 
             if (!isOpen) {
                 return;
             }
+
+            openPipelineMax += budget.high;
 
             const mode = budget.low + ((budget.high - budget.low) * chance.prob);
             const expectedBudget = (budget.low + budget.high + mode) / 3;
@@ -4031,6 +4062,7 @@
                 projConservative += budget.high;
                 projRealistic += budget.high;
                 projOptimistic += budget.high;
+                addToMonth(project.estimated_completion, budget.high);
             } else {
                 const pLow = clamp(chance.prob - chance.spread, 0, 1);
                 const pHigh = clamp(chance.prob + chance.spread, 0, 1);
@@ -4038,92 +4070,220 @@
                 projConservative += budget.low * pLow;
                 projRealistic += expectedBudget * chance.prob;
                 projOptimistic += budget.high * pHigh;
+                addToMonth(project.estimated_completion, expectedBudget * chance.prob);
             }
 
             projIncluded++;
         });
 
-        const projectsUndetermined = total - projectsWithBudget;
         const avgChance = weightedChanceWeight > 0
             ? Math.round(weightedChanceSum / weightedChanceWeight)
             : null;
 
-        const chanceText = avgChance !== null ? `${avgChance}%` : 'N/A';
+        renderProjectsSummary({
+            total,
+            today,
+            byStage,
+            byMonth,
+            projectedLater,
+            sumMinPotential,
+            sumMaxPotential,
+            projectsWithBudget,
+            guaranteedAtMax,
+            avgChance,
+            projConservative,
+            projRealistic,
+            projOptimistic,
+            projIncluded,
+            projExcluded,
+            openProjects,
+            openPipelineMax,
+            money: (n) => formatBudget(Math.round(n))
+        });
+    }
 
-        let potentialText;
-        if (projectsWithBudget === 0 || (sumMinPotential === 0 && sumMaxPotential === 0)) {
-            potentialText = 'Undetermined';
-        } else if (sumMinPotential !== sumMaxPotential) {
-            potentialText = `${formatBudget(sumMinPotential)} - ${formatBudget(sumMaxPotential)} EUR`;
-        } else {
-            potentialText = `${formatBudget(sumMaxPotential)} EUR`;
+    // Stage order and chart tone, shared by the band and the breakdown.
+    const PIPELINE_STAGES = [
+        ['In Progress', 'progress'],
+        ['Proposal', 'proposal'],
+        ['Negotiation', 'negotiation'],
+        ['Lead', 'lead'],
+        ['Complete', 'complete'],
+        ['Other', 'none']
+    ];
+
+    // The projection chart looks this many months ahead, this month included.
+    const PROJECTION_MONTHS = 6;
+
+    /**
+     * The pipeline band: what it is worth and where that value sits, what
+     * is likely to land and when, and how sure the pipeline is. The
+     * breakdown behind the chevron has the per-stage figures and the
+     * projection range. Everything is computed by updateProjectsDashboard()
+     * from the projects on screen, so the band always agrees with the list.
+     */
+    function renderProjectsSummary(s) {
+        const band = document.getElementById('projectsSummary');
+        const grid = document.getElementById('projectsKpis');
+        const detail = document.getElementById('projectsBreakdown');
+        const C = window.CRMCharts;
+
+        if (!band || !grid || !detail || !C) {
+            return;
         }
 
-        // Update expanded card view
-        document.getElementById('dashTotalProjects').textContent = total;
-        document.getElementById('dashTotalPotential').textContent = potentialText;
-        document.getElementById('dashSuccessChance').textContent = chanceText;
-
-        const potentialSub = document.getElementById('dashPotentialSub');
-        if (potentialSub) {
-            if (projectsWithBudget === 0) {
-                potentialSub.textContent = 'No budget data available';
-            } else {
-                const parts = [`${projectsWithBudget} of ${total} projects with budget`];
-                if (projectsUndetermined > 0) {
-                    parts.push(`${projectsUndetermined} undetermined`);
-                }
-                if (guaranteedAtMax > 0) {
-                    parts.push(`${guaranteedAtMax} at 100% counted with max budget`);
-                }
-                potentialSub.textContent = parts.join(' - ');
-            }
+        // Nothing to sum up: no band rather than a band of zeros.
+        if (s.total === 0) {
+            band.hidden = true;
+            return;
         }
+        band.hidden = false;
 
-        // Update compact bar stats
-        const dashBarProjects = document.getElementById('dashBarProjects');
-        const dashBarPotential = document.getElementById('dashBarPotential');
-        const dashBarChance = document.getElementById('dashBarChance');
-        if (dashBarProjects) dashBarProjects.textContent = total;
-        if (dashBarPotential) dashBarPotential.textContent = potentialText;
-        if (dashBarChance) dashBarChance.textContent = chanceText;
+        const money = s.money;
+        const range = (low, high) => (low === high ? money(high) : `${money(low)}–${money(high)}`);
 
-        const hasProjection = projIncluded > 0 && projOptimistic > 0;
-        const projConText = hasProjection ? formatCurrency(projConservative) : '--';
-        const projRelText = hasProjection ? formatCurrency(projRealistic) : '--';
-        const projOptText = hasProjection ? formatCurrency(projOptimistic) : '--';
+        const stages = PIPELINE_STAGES
+            .map(([name, tone]) => ({ name, tone, ...s.byStage[name] }))
+            .filter(row => row.count > 0);
+        stages.forEach(row => { row.mid = (row.low + row.high) / 2; });
 
-        let projSubText;
-        if (projIncluded === 0) {
-            projSubText = 'No open projects with usable budget data';
-        } else {
-            const projParts = [`${projIncluded} of ${openProjects} open projects included`];
-            if (projExcluded > 0) {
-                projParts.push(`${projExcluded} missing budget data`);
-            }
-            if (guaranteedAtMax > 0) {
-                projParts.push(`100% projects fixed at max budget`);
-            }
-            projSubText = projParts.join(' - ');
-        }
+        const valued = stages.filter(row => row.mid > 0);
+        const midTotal = valued.reduce((sum, row) => sum + row.mid, 0);
+        const hasBudget = s.projectsWithBudget > 0 && s.sumMaxPotential > 0;
+        const hasProjection = s.projIncluded > 0 && s.projOptimistic > 0;
 
-        ['dashProjConservative', 'dashProjRealistic', 'dashProjOptimistic', 'dashProjSub'].forEach((id, idx) => {
-            const el = document.getElementById(id);
-            if (!el) {
-                return;
-            }
-
-            if (idx === 0) el.textContent = projConText;
-            if (idx === 1) el.textContent = projRelText;
-            if (idx === 2) el.textContent = projOptText;
-            if (idx === 3) el.textContent = projSubText;
+        // 1 - Pipeline value, split by stage
+        const pipeline = C.tile({
+            label: 'Pipeline value',
+            meta: `${s.total} ${s.total === 1 ? 'project' : 'projects'}`,
+            value: hasBudget ? range(s.sumMinPotential, s.sumMaxPotential).replace('–', ' – ') : '—',
+            unit: hasBudget ? 'EUR' : '',
+            chart: C.stack(
+                valued.map(row => ({
+                    tone: row.tone,
+                    value: row.mid,
+                    title: `${row.name}: ${range(row.low, row.high)} EUR`
+                })),
+                'Pipeline value by stage: ' + (valued.length
+                    ? valued.map(row => `${row.name} ${C.percent(row.mid, midTotal)}`).join(', ')
+                    : 'no budgets yet')
+            ),
+            foot: valued.length
+                ? C.legend(valued.map(row => ({ tone: row.tone, label: row.name, text: C.percent(row.mid, midTotal) })))
+                : C.note('No budgets entered yet')
         });
 
-        const dashBarProjection = document.getElementById('dashBarProjection');
-        if (dashBarProjection) {
-            dashBarProjection.textContent = hasProjection ? `~${formatCurrency(projRealistic)}` : '--';
+        // 2 - Projected revenue, by the month it should land
+        const months = s.byMonth.map((amount, i) => {
+            const date = new Date(s.today.getFullYear(), s.today.getMonth() + i, 1);
+            const name = date.toLocaleDateString('en-US', { month: 'short' });
+            return {
+                label: name,
+                short: name.charAt(0),
+                value: amount,
+                text: money(amount),
+                title: `${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}: ~${money(amount)} EUR`
+            };
+        });
+        if (s.projectedLater > 0) {
+            months.push({
+                label: 'Later',
+                short: '+',
+                value: s.projectedLater,
+                text: money(s.projectedLater),
+                title: `Later, or no completion date: ~${money(s.projectedLater)} EUR`
+            });
         }
+
+        const projected = C.tile({
+            label: 'Projected',
+            value: hasProjection ? `~${money(s.projRealistic)}` : '—',
+            unit: hasProjection ? 'EUR' : '',
+            chart: hasProjection
+                ? C.columns(months, 'Projected revenue by expected completion: '
+                    + months.map(col => `${col.label} ${col.value > 0 ? '~' + col.text + ' EUR' : 'none'}`).join(', '))
+                : '',
+            foot: hasProjection ? '' : C.note('No open projects with a budget')
+        });
+
+        // 3 - How sure the open pipeline is, weighted by value
+        const chance = C.tile({
+            label: 'Avg. chance',
+            value: s.avgChance !== null ? `${s.avgChance}%` : '—',
+            chart: C.meter(s.avgChance !== null ? s.avgChance / 100 : 0,
+                s.avgChance !== null ? `Average chance ${s.avgChance} percent` : 'No average chance yet'),
+            foot: C.note(s.avgChance !== null ? 'Weighted by value' : 'No open projects with a budget')
+        });
+
+        grid.innerHTML = pipeline + projected + chance;
+
+        // ---- Breakdown ----------------------------------------------------
+        const maxHigh = Math.max(0, ...stages.map(row => row.high));
+        const esc = C.esc;
+
+        const stageRows = stages.map(row => `
+            <tr>
+                <th scope="row"><span class="kc-dot kc-tone-${row.tone}" aria-hidden="true"></span>${esc(row.name)}</th>
+                <td class="kb-bar-cell">
+                    <span class="kb-bar kc-tone-${row.tone}" aria-hidden="true">
+                        <span class="kb-bar-high" style="--f:${C.fixed(C.fraction(row.high, maxHigh))}"></span>
+                        <span class="kb-bar-low" style="--f:${C.fixed(C.fraction(row.low, maxHigh))}"></span>
+                    </span>
+                </td>
+                <td class="kb-num">${row.count}</td>
+                <td class="kb-num">${row.high > 0 ? esc(range(row.low, row.high)) : '—'}</td>
+            </tr>`).join('');
+
+        const undetermined = s.total - s.projectsWithBudget;
+        const budgetNote = [`${s.projectsWithBudget} of ${s.total} projects with a budget`];
+        if (undetermined > 0) budgetNote.push(`${undetermined} without`);
+        if (s.guaranteedAtMax > 0) budgetNote.push(`${s.guaranteedAtMax} at 100% counted at their maximum`);
+
+        let projection;
+        if (hasProjection) {
+            const scale = Math.max(s.openPipelineMax, s.projOptimistic, 1);
+            const a = C.fraction(s.projConservative, scale);
+            const b = C.fraction(s.projOptimistic, scale);
+            const m = C.fraction(s.projRealistic, scale);
+
+            const projectionNote = [`${s.projIncluded} of ${s.openProjects} open projects included`];
+            if (s.projExcluded > 0) projectionNote.push(`${s.projExcluded} missing a budget`);
+
+            projection = `
+                <div class="kb-scenarios">
+                    <div class="kb-scenario"><span>Conservative</span><b>${esc(money(s.projConservative))}</b></div>
+                    <div class="kb-scenario is-main"><span>Realistic</span><b>~${esc(money(s.projRealistic))}</b></div>
+                    <div class="kb-scenario"><span>Optimistic</span><b>${esc(money(s.projOptimistic))}</b></div>
+                </div>
+                <div class="kb-range" role="img"
+                     aria-label="${esc(`Likely between ${money(s.projConservative)} and ${money(s.projOptimistic)} EUR, most likely about ${money(s.projRealistic)} EUR, of ${money(s.openPipelineMax)} EUR open pipeline`)}">
+                    <span class="kb-range-band" style="--a:${C.fixed(a)};--b:${C.fixed(b)}"></span>
+                    <span class="kb-range-mark" style="--m:${C.fixed(m)}"></span>
+                </div>
+                <div class="kb-axis"><span>0</span><span>${esc(money(s.openPipelineMax))} EUR open pipeline</span></div>
+                <p class="kb-note">${esc(projectionNote.join(' · '))}</p>
+                <p class="kb-note">Stage-aware probability bands, adjusted for timeline. Open projects only.</p>`;
+        } else {
+            projection = `<p class="kb-note">No open projects with usable budget data.</p>`;
+        }
+
+        detail.innerHTML = `
+            <div class="kb-block">
+                <h3 class="kb-title">By stage</h3>
+                <table class="kb-table">
+                    <thead>
+                        <tr><th scope="col">Stage</th><th scope="col"><span class="kb-sr">Value range</span></th><th scope="col" class="kb-num">Projects</th><th scope="col" class="kb-num">EUR</th></tr>
+                    </thead>
+                    <tbody>${stageRows}</tbody>
+                </table>
+                <p class="kb-note">${esc(budgetNote.join(' · '))}</p>
+            </div>
+            <div class="kb-block">
+                <h3 class="kb-title">Projection</h3>
+                ${projection}
+            </div>`;
     }
+
     async function loadProjects() {
         try {
             const result = await api.getProjects(
@@ -5577,33 +5737,18 @@
             elements.projectForm.addEventListener('submit', saveProject);
         }
 
-        // Dashboard collapse/expand toggle
-        const dashboardBar = document.getElementById('dashboardBar');
-        const dashboardToggleBtn = document.getElementById('dashboardToggleBtn');
-        if (dashboardBar) {
-            const wrapper = document.getElementById('dashboardWrapper');
-            if (wrapper) {
-                const isExpanded = wrapper.classList.contains('expanded');
-                dashboardBar.setAttribute('aria-expanded', String(isExpanded));
-                if (dashboardToggleBtn) {
-                    dashboardToggleBtn.setAttribute('aria-expanded', String(isExpanded));
-                }
-            }
+        // Pipeline band: the chevron opens and closes the breakdown
+        const breakdownToggle = document.getElementById('projectsBreakdownToggle');
+        const breakdown = document.getElementById('projectsBreakdown');
+        if (breakdownToggle && breakdown) {
+            breakdownToggle.addEventListener('click', () => {
+                const opening = breakdown.hidden;
+                breakdown.hidden = !opening;
 
-            dashboardBar.addEventListener('click', () => {
-                const wrapperEl = document.getElementById('dashboardWrapper');
-                if (!wrapperEl) {
-                    return;
-                }
-
-                const isExpanding = wrapperEl.classList.contains('collapsed');
-                wrapperEl.classList.toggle('collapsed', !isExpanding);
-                wrapperEl.classList.toggle('expanded', isExpanding);
-
-                dashboardBar.setAttribute('aria-expanded', String(isExpanding));
-                if (dashboardToggleBtn) {
-                    dashboardToggleBtn.setAttribute('aria-expanded', String(isExpanding));
-                }
+                const label = opening ? 'Hide breakdown' : 'Show breakdown';
+                breakdownToggle.setAttribute('aria-expanded', String(opening));
+                breakdownToggle.setAttribute('aria-label', label);
+                breakdownToggle.title = label;
             });
         }
 

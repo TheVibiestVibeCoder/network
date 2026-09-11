@@ -400,23 +400,13 @@ h1, h2, h3, h4 {
     overflow-x: hidden;
 }
 
+/* The name alone, as a wordmark, starting on the same line as the icons. */
 .sidebar-brand {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 2px 10px 20px;
+    padding: 6px 12px 22px;
     min-width: 0;
-}
-
-.brand-mark {
-    width: 30px;
-    height: 30px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    background: var(--c-primary);
-    color: var(--c-on-primary);
-    border-radius: 9px;
 }
 
 .brand-name {
@@ -1481,139 +1471,734 @@ input[type="checkbox"] {
    10. Projects
    -------------------------------------------------------------------------- */
 
-/* ---- Summary band ------------------------------------------------------- */
-/* The four numbers that matter across the whole pipeline, on a quiet mist
-   band - the one tinted surface on the page. Expands for the breakdown. */
+/* ---- Summary bands (Home and Projects) ---------------------------------- */
+/* One quiet mist band per page, three tiles in it. Every tile reads the same
+   way, top to bottom: what it is, the number, a small chart, its key. The
+   charts reuse the colours the lists already use - stage colours, priority
+   colours, the accent - so a colour means the same thing everywhere.
 
-#projectsView .dashboard-wrapper {
-    margin: 0 0 8px;
-    padding: 0;
+   The band lays itself out by its own width (container queries), not the
+   window's: three across when there is room, otherwise the first tile on a
+   row of its own and the other two side by side. */
+
+.kpi-band {
+    --kpi-pad-x: 24px;
+    --kpi-pad-y: 20px;
+    --kpi-rule: rgba(17, 45, 78, 0.10);
+    --kc-track: rgba(17, 45, 78, 0.09);
+    --kc-quiet: rgba(17, 45, 78, 0.22);
+    --kc-plot: 46px;
+    position: relative;
+    container: kpiband / inline-size;
+    margin: 0 0 24px;
+    padding: var(--kpi-pad-y) var(--kpi-pad-x);
     background: var(--c-tint);
-    border: 0;
     border-radius: var(--r-xl);
-    overflow: hidden;
 }
 
-#projectsView .dashboard-bar {
-    display: flex;
-    align-items: stretch;
-    gap: 0;
-    min-height: 0;
-    padding: 20px 12px 20px 24px;
-    background: transparent;
-    border: 0;
-    cursor: default;
+:root[data-theme="dark"] .kpi-band {
+    --kpi-rule: rgba(219, 226, 239, 0.12);
+    --kc-track: rgba(219, 226, 239, 0.10);
+    --kc-quiet: rgba(219, 226, 239, 0.26);
 }
 
-#projectsView .dashboard-mobile-label {
-    display: none;
+.kpi-band--projects {
+    margin-bottom: 8px;
 }
 
-#projectsView .dashboard-bar-stats {
-    flex: 1;
+.kpi-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    min-width: 0;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
-#projectsView .dashboard-bar-stat {
+.kpi {
+    container: kpi / inline-size;
     display: flex;
-    flex-direction: column-reverse;
-    justify-content: flex-end;
-    gap: 4px;
+    flex-direction: column;
     min-width: 0;
-    padding: 0 16px 0 0;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    color: var(--c-ink-2);
+    padding: 0 22px;
+    border-left: 1px solid var(--kpi-rule);
+}
+
+.kpi:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.kpi:last-child {
+    padding-right: 0;
+}
+
+/* Room for the chevron in the corner it sits in. */
+.kpi-band--projects .kpi:last-child .kpi-head {
+    padding-right: 34px;
+}
+
+.kpi-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
     font-size: var(--t-sm);
     font-weight: 500;
+    line-height: 20px;
+    color: var(--c-ink-2);
+    white-space: nowrap;
 }
 
-#projectsView .dashboard-bar-stat + .dashboard-bar-stat {
-    padding-left: 20px;
-    border-left: 1px solid rgba(17, 45, 78, 0.10);
+.kpi-label {
+    flex-shrink: 0;
 }
 
-:root[data-theme="dark"] #projectsView .dashboard-bar-stat + .dashboard-bar-stat {
-    border-left-color: rgba(219, 226, 239, 0.12);
+.kpi-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 400;
 }
 
-#projectsView .dashboard-bar-stat svg {
+.kpi-meta::before {
+    content: "\00B7";
+    margin-right: 6px;
+}
+
+.kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+.kpi-number {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--t-2xl);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-unit {
+    flex-shrink: 0;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-2);
+}
+
+/* "2 overdue": the one thing on the band allowed to raise its voice. White
+   ground, so the red stays legible on the mist. */
+.kpi-flag {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    padding: 2px 9px 2px 8px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--c-danger);
+    background: var(--c-surface);
+    border-radius: 999px;
+}
+
+.kpi-flag::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.kpi-chart {
+    margin-top: 12px;
+}
+
+.kpi-chart:empty {
     display: none;
 }
 
-#projectsView .dashboard-bar-stat-value {
-    font-size: var(--t-2xl);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    color: var(--c-ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.kpi-foot {
+    margin-top: 10px;
 }
 
-#projectsView .dashboard-toggle-btn {
-    align-self: center;
-    width: 36px;
-    height: 36px;
+/* ---- The charts --------------------------------------------------------- */
+
+/* A split bar: one whole, parts in proportion. The 2px gaps let the band
+   show through, so neighbouring colours never smear into each other. */
+.kc-stack {
+    display: flex;
+    gap: 2px;
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.kc-stack.is-empty {
+    background: var(--kc-track);
+}
+
+.kc-seg {
+    flex: 1 1 0;
+    min-width: 4px;
+    background: var(--kc);
+}
+
+/* A meter: one share of a whole. */
+.kc-meter {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--kc-track);
+    overflow: hidden;
+}
+
+.kc-meter-fill {
+    display: block;
+    width: calc(var(--f, 0) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--c-accent);
+}
+
+/* Columns over time. Empty periods keep a short stub so the rhythm of the
+   days or months stays readable; figures sit on the bars they belong to. */
+.kc-cols {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+}
+
+.kc-col {
+    --kc: var(--c-accent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+}
+
+.kc-col-plot {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    height: var(--kc-plot);
+}
+
+.kc-col-num {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 13px;
+    color: var(--c-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.kc-col-num:empty {
+    display: none;
+}
+
+.kc-col-bar {
+    width: 100%;
+    max-width: 30px;
+    height: max(3px, calc(var(--h, 0) * (var(--kc-plot) - 16px)));
+    border-radius: 5px 5px 2px 2px;
+    background: var(--kc);
+}
+
+.kc-col.is-zero .kc-col-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--kc-track);
+}
+
+/* Today: the one navy column, and its label in full ink. */
+.kc-col.is-current .kc-col-bar {
+    background: var(--c-primary);
+}
+
+/* Labels are centred on their column and may run a little past it ("Today"
+   on a narrow day); below 200px the initials take over before they touch. */
+.kc-col-label {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 14px;
+    color: var(--c-ink-2);
+    white-space: nowrap;
+}
+
+.kc-col.is-current .kc-col-label {
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.kc-short {
+    display: none;
+}
+
+/* The key under a chart. */
+.kc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-xs);
+    line-height: 18px;
+    color: var(--c-ink-2);
+}
+
+.kc-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.kc-legend b {
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.kc-dot {
+    display: inline-block;
     flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--kc);
+}
+
+.kc-note {
+    margin: 0;
+    font-size: var(--t-xs);
+    line-height: 18px;
+    color: var(--c-ink-2);
+}
+
+/* Tones, after .kc-col so a tone on a column wins over its default. */
+.kc-tone-progress    { --kc: var(--stage-progress); }
+.kc-tone-proposal    { --kc: var(--stage-proposal); }
+.kc-tone-negotiation { --kc: var(--stage-negotiation); }
+.kc-tone-lead        { --kc: var(--stage-lead); }
+.kc-tone-complete    { --kc: var(--stage-complete); }
+.kc-tone-high        { --kc: var(--c-danger); }
+.kc-tone-medium      { --kc: var(--c-warning); }
+.kc-tone-low         { --kc: var(--c-ink-4); }
+.kc-tone-none        { --kc: var(--kc-quiet); }
+.kc-tone-late        { --kc: var(--c-danger); }
+.kc-tone-accent      { --kc: var(--c-accent); }
+
+/* ---- The breakdown behind the chevron (Projects) ------------------------ */
+
+.kpi-toggle {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
     display: grid;
     place-items: center;
+    padding: 0;
     border: 0;
     border-radius: var(--r-md);
     background: transparent;
     color: var(--c-ink-2);
     cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease);
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 
-#projectsView .dashboard-toggle-btn:hover {
+.kpi-toggle:hover {
     background: rgba(17, 45, 78, 0.07);
+    color: var(--c-ink);
 }
 
-:root[data-theme="dark"] #projectsView .dashboard-toggle-btn:hover {
+:root[data-theme="dark"] .kpi-toggle:hover {
     background: rgba(219, 226, 239, 0.08);
 }
 
-/* The expanded breakdown sits inside the band as white tiles. */
-#projectsView .projects-dashboard {
-    padding: 0 20px 20px;
-    gap: 12px;
-    background: transparent;
-    border: 0;
+.kpi-toggle svg {
+    transition: transform var(--dur-2) var(--ease);
 }
 
-#projectsView .dashboard-card {
-    background: var(--c-surface);
-    border: 0;
-    border-radius: var(--r-lg);
-    box-shadow: var(--e-1);
-    padding: 16px;
+.kpi-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
 }
 
-#projectsView .dashboard-card-icon {
-    background: var(--c-tint-2);
-    color: var(--c-ink-2);
-    border-radius: var(--r-md);
+.kpi-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 36px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--kpi-rule);
 }
 
-#projectsView .dashboard-card-value {
-    font-size: var(--t-xl);
+.kb-block {
+    min-width: 0;
+}
+
+.kb-title {
+    margin: 0 0 10px;
+    font-size: var(--t-sm);
     font-weight: 600;
     color: var(--c-ink);
-    letter-spacing: -0.02em;
 }
 
-#projectsView .dashboard-card-label {
+.kb-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: var(--t-sm);
-    color: var(--c-ink-3);
-    text-transform: none;
-    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.kb-table th,
+.kb-table td {
+    padding: 6px 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    vertical-align: middle;
+    font-weight: 400;
+    color: var(--c-ink);
+}
+
+.kb-table thead th {
+    padding: 0 0 4px;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-2);
+}
+
+.kb-table tbody th {
+    padding-right: 16px;
+    white-space: nowrap;
+}
+
+.kb-table tbody th .kc-dot {
+    margin-right: 8px;
+    vertical-align: 1px;
+}
+
+.kb-table .kb-bar-cell {
+    width: 100%;
+}
+
+.kb-table .kb-num {
+    padding-left: 16px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.kb-table tbody td.kb-num:nth-last-child(2) {
+    color: var(--c-ink-2);
+}
+
+.kb-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* Per stage: the solid part is the sum of the minimum budgets, the pale
+   part runs on to the sum of the maximums - the range, drawn. */
+.kb-bar {
+    position: relative;
+    display: block;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--kc-track);
+}
+
+.kb-bar-high,
+.kb-bar-low {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--f, 0) * 100%);
+    border-radius: inherit;
+    background: var(--kc);
+}
+
+.kb-bar-high {
+    opacity: 0.38;
+}
+
+.kb-scenarios {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.kb-scenario {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.kb-scenario span {
+    font-size: var(--t-xs);
+    color: var(--c-ink-2);
+}
+
+.kb-scenario b {
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.kb-scenario.is-main b {
+    color: var(--c-ink);
+}
+
+/* The likely range on the scale of the open pipeline, with the realistic
+   figure as a mark inside it. */
+.kb-range {
+    position: relative;
+    height: 10px;
+    margin: 18px 0 8px;
+    border-radius: 999px;
+    background: var(--kc-track);
+}
+
+.kb-range-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--a, 0) * 100%);
+    width: calc((var(--b, 0) - var(--a, 0)) * 100%);
+    min-width: 4px;
+    border-radius: 999px;
+    background: var(--c-accent);
+    opacity: 0.45;
+}
+
+.kb-range-mark {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    left: calc(var(--m, 0) * 100%);
+    width: 3px;
+    margin-left: -1.5px;
+    border-radius: 2px;
+    background: var(--c-primary);
+}
+
+.kb-axis {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-2);
+}
+
+.kb-note {
+    margin: 10px 0 0;
+    font-size: var(--t-xs);
+    line-height: 18px;
+    color: var(--c-ink-2);
+}
+
+.kb-note + .kb-note {
+    margin-top: 2px;
+}
+
+/* ---- Sizes -------------------------------------------------------------- */
+
+/* A narrow band: the first tile gets a row to itself, the other two share
+   the next one; the breakdown stacks. */
+@container kpiband (max-width: 720px) {
+    .kpi-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        row-gap: 16px;
+    }
+
+    .kpi:first-child {
+        grid-column: 1 / -1;
+        padding: 0 0 16px;
+        border-bottom: 1px solid var(--kpi-rule);
+    }
+
+    .kpi:nth-child(2) {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .kpi-band--projects .kpi:last-child .kpi-head {
+        padding-right: 0;
+    }
+
+    .kpi-band--projects .kpi:first-child .kpi-head {
+        padding-right: 34px;
+    }
+
+    .kpi-detail {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+    }
+
+    /* A column chart with a whole row to itself: the number sits to its
+       left instead of leaving a wide empty strip above it. */
+    .kpi--split {
+        display: grid;
+        grid-template-columns: minmax(120px, 26%) minmax(0, 1fr);
+        grid-template-areas:
+            "head  chart"
+            "value chart";
+        grid-template-rows: auto 1fr;
+        column-gap: 28px;
+    }
+
+    .kpi--split .kpi-head { grid-area: head; }
+
+    .kpi--split .kpi-value {
+        grid-area: value;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        row-gap: 6px;
+    }
+
+    .kpi--split .kpi-chart {
+        grid-area: chart;
+        align-self: end;
+        margin-top: 0;
+    }
+}
+
+/* A phone-narrow band: stacking three tiles would make a tall block, so the
+   tiles line up in a strip that snaps tile by tile, the next one peeking in
+   at the edge. The band stays about as low as a single tile, and every
+   chart keeps a full tile's width for its labels. */
+@container kpiband (max-width: 540px) {
+    .kpi-grid {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 86%;
+        row-gap: 0;
+        margin: 0 calc(-1 * var(--kpi-pad-x));
+        padding: 0 var(--kpi-pad-x);
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x mandatory;
+        scroll-padding-inline: var(--kpi-pad-x);
+        scrollbar-width: none;
+    }
+
+    .kpi-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .kpi {
+        scroll-snap-align: start;
+    }
+
+    /* In the strip every tile is stacked again. */
+    .kpi--split {
+        display: flex;
+    }
+
+    .kpi--split .kpi-chart {
+        margin-top: 12px;
+    }
+
+    .kpi:first-child {
+        grid-column: auto;
+        padding: 0 18px 0 0;
+        border-bottom: 0;
+    }
+
+    .kpi:nth-child(2) {
+        padding-left: 18px;
+        border-left: 1px solid var(--kpi-rule);
+    }
+
+    .kpi-band--projects .kpi:first-child .kpi-head {
+        padding-right: 0;
+    }
+
+    /* The strip moves under the top corner, so the chevron becomes a small
+       handle centred under the tiles instead. (A container query cannot
+       style the band itself, so the room is made inside it.) */
+    .kpi-band--projects .kpi-grid,
+    .kpi-band--projects .kpi-detail {
+        margin-bottom: 28px;
+    }
+
+    .kpi-band--projects .kpi-toggle {
+        top: auto;
+        right: auto;
+        bottom: 8px;
+        left: 50%;
+        width: 44px;
+        height: 28px;
+        transform: translateX(-50%);
+    }
+}
+
+/* A tight tile: a smaller number and no figures over the columns. */
+@container kpi (max-width: 250px) {
+    .kpi-number {
+        font-size: var(--t-xl);
+    }
+
+    .kc-col-num {
+        display: none;
+    }
+}
+
+/* Tighter still: initials for the months and days. */
+@container kpi (max-width: 200px) {
+    .kc-long {
+        display: none;
+    }
+
+    .kc-short {
+        display: inline;
+    }
+
+    .kc-cols {
+        gap: 4px;
+    }
+}
+
+@media (max-width: 768px) {
+    .kpi-band {
+        --kpi-pad-x: 18px;
+        --kpi-pad-y: 16px;
+        --kc-plot: 40px;
+        margin-bottom: 20px;
+    }
+
+    .kpi-band--projects {
+        margin-bottom: 4px;
+    }
+
+    .kpi {
+        padding: 0 18px;
+    }
+
+    .kpi-toggle {
+        top: 10px;
+        right: 10px;
+    }
 }
 
 /* ---- Toolbar ------------------------------------------------------------ */
@@ -2028,53 +2613,6 @@ input[type="checkbox"] {
     min-width: 180px;
 }
 
-/* At-a-glance tiles on the mist band. */
-.workload-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0;
-    margin: 0 0 28px;
-    padding: 20px 24px;
-    background: var(--c-tint);
-    border-radius: var(--r-xl);
-}
-
-.workload-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    padding: 0 16px;
-    border-left: 1px solid rgba(17, 45, 78, 0.10);
-}
-
-:root[data-theme="dark"] .workload-stat {
-    border-left-color: rgba(219, 226, 239, 0.12);
-}
-
-.workload-stat:first-child {
-    padding-left: 0;
-    border-left: 0;
-}
-
-.workload-stat-value {
-    font-size: var(--t-2xl);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    color: var(--c-ink);
-}
-
-.workload-stat-value.is-alert {
-    color: var(--c-danger);
-}
-
-.workload-stat-label {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-2);
-}
-
 /* Sections */
 #workloadView .workload-section {
     margin: 0 0 24px;
@@ -2261,21 +2799,6 @@ input[type="checkbox"] {
    signal enough, and a bar inside an inset list reads as a rendering fault. */
 #listView .contact-card--pinned {
     border-left: 0 !important;
-}
-
-/* ---- Projects band: numbers first, labels under, left-aligned ----------- */
-
-#projectsView .dashboard-bar-stat {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    text-align: left;
-}
-
-#projectsView .dashboard-bar-stat > span:not(.dashboard-bar-stat-value) {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-2);
 }
 
 /* ---- Project cards ------------------------------------------------------ */
@@ -2534,16 +3057,6 @@ input[type="checkbox"] {
     font-size: var(--t-sm);
 }
 
-/* The collapse animates padding, so the breakdown only gets its bottom
-   padding once it is actually open - otherwise the band carries dead space. */
-#projectsView .dashboard-wrapper .projects-dashboard {
-    padding: 0 20px;
-}
-
-#projectsView .dashboard-wrapper.expanded .projects-dashboard {
-    padding: 4px 20px 20px;
-}
-
 
 /* --------------------------------------------------------------------------
    15. Screen sizes
@@ -2581,8 +3094,7 @@ input[type="checkbox"] {
     }
 
     .sidebar-brand {
-        justify-content: center;
-        padding: 0 0 18px;
+        display: none;
     }
 
     .brand-name,
@@ -2659,11 +3171,6 @@ input[type="checkbox"] {
     .sidebar .profile-pop {
         left: calc(100% + 10px);
         bottom: 0;
-    }
-
-    #projectsView .dashboard-bar-stat-value,
-    .workload-stat-value {
-        font-size: var(--t-xl);
     }
 }
 
@@ -2859,44 +3366,6 @@ input[type="checkbox"] {
     .view-panel .list-controls .form-select {
         min-width: 0;
         flex: 1 1 140px;
-    }
-
-    /* ---- Bands: two by two ---- */
-
-    #projectsView .dashboard-bar {
-        padding: 16px 8px 16px 18px;
-    }
-
-    #projectsView .dashboard-bar-stats,
-    .workload-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        row-gap: 16px;
-    }
-
-    .workload-stats {
-        padding: 18px;
-        margin-bottom: 22px;
-    }
-
-    #projectsView .dashboard-bar-stat,
-    .workload-stat {
-        padding: 0 12px;
-    }
-
-    #projectsView .dashboard-bar-stat:nth-child(odd),
-    .workload-stat:nth-child(odd) {
-        padding-left: 0;
-        border-left: 0;
-    }
-
-    #projectsView .dashboard-bar-stat + .dashboard-bar-stat:nth-child(odd) {
-        padding-left: 0;
-        border-left: 0;
-    }
-
-    #projectsView .dashboard-bar-stat-value,
-    .workload-stat-value {
-        font-size: var(--t-xl);
     }
 
     /* ---- Lists ---- */
@@ -4238,22 +4707,6 @@ textarea.form-input:focus {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
-}
-
-/* The brand mark above the name, drawn here so every sign-in screen - sign
-   in, choose a password, forgot password - gets it without markup. */
-.login-box h1::before {
-    content: "";
-    display: block;
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 18px;
-    border-radius: 14px;
-    background: var(--c-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F9F7F7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='2.5'/%3E%3Ccircle cx='18' cy='8' r='2.5'/%3E%3Ccircle cx='10' cy='18' r='2.5'/%3E%3Cpath d='M8.3 7.1 15.6 7.6M16.6 10.1 11.5 16M7.3 8.3 9.3 15.6'/%3E%3C/svg%3E") center / 24px no-repeat;
-}
-
-:root[data-theme="dark"] .login-box h1::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23112D4E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='2.5'/%3E%3Ccircle cx='18' cy='8' r='2.5'/%3E%3Ccircle cx='10' cy='18' r='2.5'/%3E%3Cpath d='M8.3 7.1 15.6 7.6M16.6 10.1 11.5 16M7.3 8.3 9.3 15.6'/%3E%3C/svg%3E");
 }
 
 .login-box h1 {
