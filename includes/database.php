@@ -405,6 +405,26 @@ class Database
 
         $db->exec("CREATE INDEX IF NOT EXISTS idx_activity_events_actor ON activity_events(actor_id)");
 
+        // ---------------------------------------------------------------
+        // Assignment
+        // ---------------------------------------------------------------
+        // Who is responsible for a record, as opposed to who last touched it.
+        //
+        //   NULL = nobody is assigned
+        //   0    = the owner identity, which has no users row (see User.php)
+        //   N    = users.id
+        //
+        // Zero is safe as the owner sentinel because SQLite AUTOINCREMENT ids
+        // start at 1, so it can never collide with a real account.
+        //
+        // assigned_to_name is a display snapshot like the attribution columns,
+        // so a list still reads correctly without joining users on every row.
+        foreach (['contacts', 'projects', 'todos'] as $table) {
+            self::addColumnIfMissing($db, $table, 'assigned_to', 'INTEGER');
+            self::addColumnIfMissing($db, $table, 'assigned_to_name', 'VARCHAR(255)');
+            $db->exec("CREATE INDEX IF NOT EXISTS idx_" . $table . "_assigned_to ON " . $table . "(assigned_to)");
+        }
+
         // Create indexes for todos
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_contact_id ON todos(contact_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)");

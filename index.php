@@ -478,6 +478,12 @@ function buildPasswordLink(string $token): string
                 <div class="header-center">
                     <!-- View Toggle -->
                     <div class="view-toggle">
+                        <button type="button" class="toggle-btn" data-view="workload" title="My Work">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                            <span class="toggle-badge" id="workloadBadge" hidden>0</span>
+                        </button>
                         <button type="button" class="toggle-btn active" data-view="projects" title="Projects">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
@@ -567,6 +573,27 @@ function buildPasswordLink(string $token): string
 
             <!-- Main Content -->
             <main class="app-main">
+                <!-- My Work: everything assigned to one person -->
+                <div class="view-panel" id="workloadView">
+                    <div class="workload-wrap">
+                        <div class="workload-head">
+                            <div class="workload-person">
+                                <span class="workload-person-face" id="workloadFace"></span>
+                                <div class="workload-person-text">
+                                    <h2 class="workload-title" id="workloadTitle">My Work</h2>
+                                    <p class="workload-subtitle" id="workloadSummary">Nothing assigned yet</p>
+                                </div>
+                            </div>
+                            <div class="workload-switch">
+                                <label for="workloadWho" class="workload-switch-label">Showing</label>
+                                <select id="workloadWho" class="form-select"></select>
+                            </div>
+                        </div>
+
+                        <div class="workload-body" id="workloadBody"></div>
+                    </div>
+                </div>
+
                 <!-- Map View -->
                 <div class="view-panel" id="mapView">
                     <div id="map"></div>
@@ -1079,6 +1106,9 @@ function buildPasswordLink(string $token): string
                     <button type="button" class="modal-close" id="closeOverviewModal">&times;</button>
                 </div>
                 <div class="modal-body overview-body">
+                    <!-- Who is responsible for this contact -->
+                    <div id="overviewAssignee"></div>
+
                     <!-- Contact Details Section -->
                     <div class="overview-section">
                         <h3 class="overview-section-title">Contact Information</h3>
@@ -1467,6 +1497,9 @@ function buildPasswordLink(string $token): string
                     <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
                 </div>
                 <div class="modal-body overview-body">
+                    <!-- Who is responsible for this project -->
+                    <div id="projectOverviewAssignee"></div>
+
                     <!-- Project Details Section -->
                     <div class="overview-section">
                         <h3 class="overview-section-title">Project Information</h3>
@@ -1613,6 +1646,13 @@ function buildPasswordLink(string $token): string
                             <div class="form-group">
                                 <label for="todoDueDate">Due Date</label>
                                 <input type="date" id="todoDueDate" class="form-input">
+                            </div>
+
+                            <!-- Only rendered once the to-do exists, since an
+                                 assignment needs a record to attach to. -->
+                            <div class="form-group" id="todoAssigneeGroup" hidden>
+                                <label>Assigned to</label>
+                                <div id="todoAssignee"></div>
                             </div>
 
                             <div class="form-group">
@@ -1857,6 +1897,7 @@ function buildPasswordLink(string $token): string
         <script src="assets/js/app.js"></script>
         <script src="assets/js/bookkeeping.js"></script>
         <script src="assets/js/profile.js"></script>
+        <script src="assets/js/workload.js"></script>
         <?php if ($isAdmin): ?>
         <script src="assets/js/users.js"></script>
         <?php endif; ?>

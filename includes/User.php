@@ -175,11 +175,29 @@ class User
         return $stmt->execute(['id' => $id, 'status' => $status]);
     }
 
+    /**
+     * Delete an account and release whatever was assigned to it.
+     *
+     * Attribution ("who made this") keeps its name snapshot, because that is
+     * history. Assignment ("who is responsible now") is cleared instead: work
+     * parked on a deleted colleague would silently belong to nobody, and
+     * showing it as unassigned is how it gets picked up again.
+     */
     public function delete(int $id): bool
     {
-        $stmt = $this->db->prepare("DELETE FROM users WHERE id = :id");
+        return Database::transactional(function (PDO $db) use ($id) {
+            foreach (['contacts', 'projects', 'todos'] as $table) {
+                $release = $db->prepare(
+                    "UPDATE " . $table . " SET assigned_to = NULL, assigned_to_name = NULL
+                     WHERE assigned_to = :id"
+                );
+                $release->execute(['id' => $id]);
+            }
 
-        return $stmt->execute(['id' => $id]);
+            $stmt = $db->prepare("DELETE FROM users WHERE id = :id");
+
+            return $stmt->execute(['id' => $id]);
+        });
     }
 
     public function recordLogin(int $id): void

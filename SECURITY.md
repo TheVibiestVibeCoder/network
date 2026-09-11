@@ -87,6 +87,32 @@ Guards worth knowing about:
 If mail cannot be sent, nothing breaks: the Users panel always shows the
 generated link so an admin can pass it on by hand.
 
+## Assignment and My Work
+
+Any contact, project or to-do can be made somebody's responsibility, and
+**My Work** is the per-person view of what that adds up to.
+
+Assigning is open to every signed-in user, not just administrators: handing a
+job to a colleague is ordinary teamwork. What is not open is inventing an
+assignee - the server checks that the target is a real, active account (or the
+owner) rather than trusting the value the browser sent, so work cannot be
+parked on a disabled account or a person who does not exist.
+
+Assignment is separate from attribution, and the two behave differently when an
+account is deleted:
+
+- **Attribution** ("who wrote this") keeps its name snapshot. It is history.
+- **Assignment** ("who is responsible now") is cleared. Work left pointing at a
+  deleted colleague would silently belong to nobody; showing it as unassigned
+  is how it gets picked up again.
+
+Every assignment change is written to the shared timeline alongside other
+edits, so a reassignment is as visible as any other change.
+
+My Work can be pointed at any colleague, or at the unassigned bucket. That is a
+re-sorting of records everyone can already read in the ordinary views, not a new
+level of access - see the trade-off note below about all members seeing all data.
+
 ## What protects what
 
 | Layer | File | Protects against |
@@ -100,6 +126,8 @@ generated link so an admin can pass it on by hand.
 | Upload validation | `api/bookkeeping.php`, `api/import-export.php` | Web shells uploaded as invoices or spreadsheets |
 | Image re-encoding | `api/profile.php` | Polyglot files, EXIF leakage and decompression bombs in profile pictures |
 | Role gate | `Auth::requireAdmin()` | Non-admins reaching `api/users.php` |
+| Type whitelist | `api/assign.php` | A caller choosing which table an assignment writes to |
+| Assignee check | `resolveAssignee()` | Work being parked on a disabled or non-existent account |
 | Hashed one-time tokens | `includes/User.php` | Invite/reset links being reused, or usable from a database leak |
 | Session-to-account binding | `Auth::sessionAccountStillValid()` | A disabled, deleted or password-changed account keeping a live session |
 

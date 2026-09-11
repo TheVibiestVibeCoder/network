@@ -39,6 +39,12 @@
     --color-danger-subtle: rgba(220, 38, 38, 0.1);
     --color-success: #16a34a;
     --color-success-subtle: rgba(22, 163, 74, 0.12);
+
+    /* Foreground for text sitting ON a semantic fill. These flip with the
+       theme: the semantic colours are dark here and light in dark mode, so a
+       fixed white would become unreadable on the dark-mode variants. */
+    --color-on-danger: #ffffff;
+    --color-on-success: #ffffff;
     --color-warning: #d97706;
 
     /* Typography */
@@ -115,6 +121,8 @@
     --color-danger-subtle: rgba(255, 107, 107, 0.15);
     --color-success: #4fd58a;
     --color-success-subtle: rgba(79, 213, 138, 0.14);
+    --color-on-danger: #2a0a0a;
+    --color-on-success: #06301c;
     --color-warning: #f7b955;
 
     /* Shadows */
@@ -5873,5 +5881,520 @@ button.user-chip:focus-visible {
 
     .modal-footer-edited {
         display: none;
+    }
+}
+
+/* ============================================
+   Assignment + My Work
+   ============================================ */
+
+/* --- The face on a card ------------------------------------------------- */
+/* Small and quiet. It answers "whose is this?" at a glance without competing
+   with the name of the thing itself. */
+
+.assignee-chip {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    color: var(--color-text-tertiary);
+    font-size: 9px;
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.assignee-chip img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.contact-card .assignee-chip {
+    margin-right: var(--spacing-1);
+}
+
+.project-card-head-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-shrink: 0;
+}
+
+.todo-meta .assignee-chip {
+    width: 20px;
+    height: 20px;
+    font-size: 8px;
+}
+
+/* --- The picker in a detail view ---------------------------------------- */
+
+.assignee-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) var(--spacing-4);
+    margin-bottom: var(--spacing-5);
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+}
+
+.assignee-bar-face {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.assignee-bar-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Nobody assigned: drop back to a neutral outline so the row does not look
+   like it is telling you something it isn't. */
+.assignee-bar-face.is-empty {
+    background-color: transparent;
+    border: 1px dashed var(--color-border);
+    color: var(--color-text-muted);
+}
+
+.assignee-bar-body {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    flex: 1;
+    min-width: 0;
+}
+
+.assignee-bar-label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.assignee-select {
+    flex: 1;
+    min-width: 0;
+    max-width: 260px;
+}
+
+.assignee-select:disabled {
+    opacity: 0.6;
+}
+
+/* The to-do dialog already labels the field, so the bar loses its own label
+   and its frame there. */
+#todoAssigneeGroup .assignee-bar {
+    margin-bottom: 0;
+    padding: 0;
+    background: none;
+    border: none;
+}
+
+#todoAssigneeGroup .assignee-bar-label {
+    display: none;
+}
+
+#todoAssigneeGroup .assignee-select {
+    max-width: none;
+}
+
+/* --- Nav badge ---------------------------------------------------------- */
+
+.toggle-btn {
+    position: relative;
+}
+
+.toggle-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-danger);
+    color: var(--color-on-danger);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    border-radius: var(--radius-full);
+    pointer-events: none;
+}
+
+/* --- My Work ------------------------------------------------------------ */
+
+.workload-wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: var(--spacing-6) var(--spacing-4) var(--spacing-10);
+}
+
+.workload-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-6);
+}
+
+.workload-person {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    min-width: 0;
+}
+
+.workload-person-face {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background-color: var(--color-text);
+    color: var(--color-bg);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.workload-person-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.workload-person-face.is-empty {
+    background-color: var(--color-surface-3);
+    color: var(--color-text-tertiary);
+}
+
+.workload-person-text {
+    min-width: 0;
+}
+
+.workload-title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.workload-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    margin: 2px 0 0;
+}
+
+.workload-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.workload-switch-label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.workload-switch .form-select {
+    min-width: 150px;
+}
+
+/* --- Sections ----------------------------------------------------------- */
+
+.workload-section {
+    margin-bottom: var(--spacing-6);
+}
+
+.workload-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-3);
+}
+
+.workload-section-title {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.workload-count {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-3);
+    border-radius: var(--radius-full);
+    padding: 1px 7px;
+}
+
+.workload-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+/* Completed work folds away behind a disclosure. */
+details.workload-done > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+details.workload-done > summary::-webkit-details-marker {
+    display: none;
+}
+
+details.workload-done > summary::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--color-text-muted);
+    border-bottom: 1.5px solid var(--color-text-muted);
+    transform: rotate(45deg);
+    margin-left: auto;
+    margin-bottom: 3px;
+    transition: transform var(--transition-fast);
+}
+
+details.workload-done[open] > summary::after {
+    transform: rotate(-135deg);
+    margin-bottom: -1px;
+}
+
+/* --- Rows --------------------------------------------------------------- */
+
+.workload-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    width: 100%;
+    padding: var(--spacing-3);
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.workload-row:hover {
+    border-color: var(--color-border);
+    background-color: var(--color-surface-hover);
+}
+
+.workload-row.is-done {
+    opacity: 0.55;
+}
+
+.workload-row.is-done .workload-row-title {
+    text-decoration: line-through;
+}
+
+.workload-row-mark {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-text-tertiary);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.workload-row-mark.is-done {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: var(--color-on-success);
+}
+
+.workload-row-mark.is-icon,
+.workload-row-mark.is-initials {
+    border-style: solid;
+    border-color: var(--color-border-subtle);
+    background-color: var(--color-surface-3);
+}
+
+.workload-row-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.workload-row-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.workload-row-context {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.workload-row-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    flex-shrink: 0;
+}
+
+.workload-due {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+}
+
+.workload-due.is-overdue {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.workload-chip {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius-full);
+    padding: 2px 7px;
+}
+
+.workload-chip--high {
+    background-color: var(--color-danger-subtle);
+    color: var(--color-danger);
+}
+
+.workload-chip--medium {
+    background-color: rgba(217, 119, 6, 0.12);
+    color: var(--color-warning);
+}
+
+.workload-chip--low {
+    background-color: var(--color-surface-3);
+    color: var(--color-text-muted);
+}
+
+/* --- Empty + loading ---------------------------------------------------- */
+
+.workload-empty {
+    text-align: center;
+    padding: var(--spacing-10) var(--spacing-4);
+}
+
+.workload-empty-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto var(--spacing-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-surface-3);
+    color: var(--color-text-muted);
+    border-radius: var(--radius-full);
+}
+
+.workload-empty-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0 0 var(--spacing-1);
+}
+
+.workload-empty-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    margin: 0;
+}
+
+.workload-empty-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin: var(--spacing-4) 0 0;
+}
+
+.workload-empty-line {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    padding: var(--spacing-2) 0;
+    margin: 0;
+}
+
+.workload-loading {
+    text-align: center;
+    padding: var(--spacing-10);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+    .workload-wrap {
+        padding: var(--spacing-4) var(--spacing-3) var(--spacing-8);
+    }
+
+    .workload-head {
+        align-items: flex-start;
+    }
+
+    .workload-switch {
+        width: 100%;
+    }
+
+    .workload-switch .form-select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .assignee-bar-body {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-1);
+    }
+
+    .assignee-select {
+        max-width: none;
     }
 }

@@ -308,9 +308,32 @@
         init();
     }
 
-    // Consumed by app.js (attribution by-lines) and users.js (the admin list).
+    /**
+     * Everyone who can be assigned work, in display order.
+     *
+     * The owner is first because it is the account that always exists; the
+     * rest follow alphabetically as the endpoint returned them.
+     */
+    function list() {
+        return Array.from(state.people.values());
+    }
+
+    /**
+     * The signed-in identity, as the assignment picker needs it: the owner has
+     * no numeric id, so it is addressed by the string 'owner'.
+     */
+    function meKey() {
+        if (!state.me) return null;
+        return state.me.is_owner ? 'owner' : String(state.me.id);
+    }
+
+    // Consumed by app.js (by-lines, assignment) and users.js (the admin list).
     window.CRMPeople = {
         avatarFor: avatarFor,
+        list: list,
+        me: () => state.me,
+        meKey: meKey,
+        ready: () => state.people.size > 0,
         reload: loadDirectory,
         refresh: refreshRenderedFaces
     };
