@@ -385,10 +385,14 @@ function buildPasswordLink(string $token): string
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars(APP_NAME) ?></title>
 
-    <!-- Inter Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!--
+        General Sans, served from this server rather than a font CDN: no
+        third party learns who opens the CRM, and the page does not wait on
+        anyone else's servers. The two weights used above the fold are
+        preloaded; the rest arrive as they are needed.
+    -->
+    <link rel="preload" href="assets/fonts/GeneralSans-500.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/GeneralSans-600.woff2" as="font" type="font/woff2" crossorigin>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -413,6 +417,9 @@ function buildPasswordLink(string $token): string
     <!-- Application CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/bookkeeping.css">
+    <!-- The design system. Loaded last: its tokens and components are the
+         final word over the two stylesheets above. -->
+    <link rel="stylesheet" href="assets/css/design.css">
 </head>
 <body>
     <?php if (!$isAuthenticated): ?>
@@ -652,62 +659,98 @@ function buildPasswordLink(string $token): string
     <?php else: ?>
         <!-- Main Application -->
         <div class="app-container">
-            <!-- Header -->
-            <header class="app-header">
-                <div class="header-left">
-                    <h1 class="app-title"><?= htmlspecialchars(APP_NAME) ?></h1>
-                    <span class="contact-count"><?= $contactCount ?> contact<?= $contactCount !== 1 ? 's' : '' ?></span>
+            <!--
+                Sidebar: the primary navigation on desktop, an icon rail on
+                tablets, and a slide-in drawer on phones (opened from "More" in
+                the tab bar). Every .toggle-btn[data-view] is wired to
+                switchView() by app.js, wherever it sits in the page.
+            -->
+            <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+                <div class="sidebar-brand">
+                    <span class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/>
+                            <path d="M8.3 7.1 15.6 7.6M16.6 10.1 11.5 16M7.3 8.3 9.3 15.6"/>
+                        </svg>
+                    </span>
+                    <span class="brand-name"><?= htmlspecialchars(APP_NAME) ?></span>
                 </div>
-                <div class="header-center">
-                    <!-- View Toggle -->
-                    <div class="view-toggle">
-                        <button type="button" class="toggle-btn active" data-view="workload" title="My Work">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                            </svg>
-                            <span class="toggle-badge" id="workloadBadge" hidden>0</span>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="projects" title="Projects">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="todos" title="To-Dos">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="list" title="Contacts">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M20 0H4v2h16V0zM4 24h16v-2H4v2zM20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 2.75c1.24 0 2.25 1.01 2.25 2.25s-1.01 2.25-2.25 2.25S9.75 10.24 9.75 9 10.76 6.75 12 6.75zM17 17H7v-1.5c0-1.67 3.33-2.5 5-2.5s5 .83 5 2.5V17z"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="calendar" title="Kalender">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="bookkeeping" title="Bookkeeping">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M4 3h13l3 3v15H4V3zm2 2v14h12V7.83L16.17 5H6zm2 3h8v2H8V8zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/>
-                            </svg>
-                        </button>
-                        <button type="button" class="toggle-btn" data-view="map" title="Map">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
-                            </svg>
-                        </button>
-                    </div>
+
+                <nav class="sidebar-nav">
+                    <button type="button" class="toggle-btn nav-item active" data-view="workload" title="Home">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/>
+                        </svg>
+                        <span class="nav-label">Home</span>
+                        <span class="toggle-badge nav-count nav-count--alert" id="workloadBadge" data-workload-badge hidden>0</span>
+                    </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="projects" title="Projects">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M3 12.5h18"/>
+                        </svg>
+                        <span class="nav-label">Projects</span>
+                    </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="todos" title="To-dos">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/>
+                        </svg>
+                        <span class="nav-label">To-dos</span>
+                    </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="list" title="Contacts">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/>
+                        </svg>
+                        <span class="nav-label">Contacts</span>
+                        <span class="nav-count contact-count" data-contact-count><?= (int) $contactCount ?></span>
+                    </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="calendar" title="Calendar">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
+                        </svg>
+                        <span class="nav-label">Calendar</span>
+                    </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="bookkeeping" title="Bookkeeping">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/>
+                        </svg>
+                        <span class="nav-label">Bookkeeping</span>
+                    </button>
+                </nav>
+
+                <!-- The team, one click away from each person's workload -->
+                <div class="sidebar-team" id="sidebarTeamWrap" hidden>
+                    <div class="sidebar-heading">Team</div>
+                    <div class="team-list" id="sidebarTeam"></div>
                 </div>
-                <div class="header-right">
+
+                <div class="sidebar-foot">
+                    <?php if ($isAdmin): ?>
+                    <button type="button" class="nav-item nav-item--quiet" id="manageUsersBtn" title="Manage users">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.2 0 2.3.3 3.2.8"/><circle cx="17.5" cy="17" r="2.5"/><path d="M17.5 13v1.5M17.5 19.5V21M21.5 17H20M15 17h-1.5"/>
+                        </svg>
+                        <span class="nav-label header-btn-label">Users</span>
+                    </button>
+                    <?php endif; ?>
+                    <button type="button" class="nav-item nav-item--quiet theme-toggle-btn" id="themeToggleBtn" aria-label="Switch to dark mode" title="Switch to dark mode">
+                        <span class="nav-label theme-toggle-label">Dark mode</span>
+                    </button>
+
                     <div class="user-chip-wrap">
                         <button type="button" class="user-chip" id="userChip"
                                 title="<?= htmlspecialchars(($currentUser['email'] ?? 'Owner login') . ' - ' . ($isAdmin ? 'Administrator' : 'Member')) ?>"
                                 aria-haspopup="dialog" aria-expanded="false">
                             <span class="user-chip-avatar" id="userChipAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></span>
-                            <span class="user-chip-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
-                            <?php if ($isAdmin): ?><span class="user-chip-role">Admin</span><?php endif; ?>
+                            <span class="user-chip-text">
+                                <span class="user-chip-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
+                                <span class="user-chip-role"><?= $isAdmin ? 'Admin' : 'Member' ?></span>
+                            </span>
                         </button>
+                        <a href="index.php?action=logout" class="user-chip-logout header-logout-btn" title="Sign out" aria-label="Sign out">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M14.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3.5"/><path d="m10 16.5-4.5-4.5L10 7.5"/><path d="M5.5 12H15"/>
+                            </svg>
+                        </a>
 
                         <!-- Profile picture popover -->
                         <div class="profile-pop" id="profilePop" hidden role="dialog" aria-label="Your profile picture">
@@ -720,8 +763,8 @@ function buildPasswordLink(string $token): string
                             </div>
                             <div class="profile-pop-actions">
                                 <button type="button" class="btn btn-secondary btn-small btn-block" id="profilePhotoBtn">
-                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-                                        <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.2"/>
                                     </svg>
                                     <span id="profilePhotoBtnLabel">Upload photo</span>
                                 </button>
@@ -731,29 +774,11 @@ function buildPasswordLink(string $token): string
                             <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
                         </div>
                     </div>
-                    <?php if ($isAdmin): ?>
-                    <button type="button" class="btn btn-secondary" id="manageUsersBtn" title="Manage users">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                        </svg>
-                        <span class="header-btn-label">Users</span>
-                    </button>
-                    <?php endif; ?>
-                    <button type="button" class="btn btn-secondary theme-toggle-btn" id="themeToggleBtn" aria-label="Switch to light mode" title="Switch to light mode">
-                        <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8zM1 13h3v-2H1zm10 9h2v-3h-2zm7.04-2.05l1.41-1.41-1.79-1.8-1.41 1.42zM20 13h3v-2h-3zM17.24 4.84l1.79-1.79-1.41-1.41-1.8 1.79zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM4.22 19.78l1.41 1.41 1.8-1.79-1.42-1.41zM11 1h2v3h-2z"/>
-                        </svg>
-                        <span class="theme-toggle-label">Light Mode</span>
-                    </button>
-                    <a href="index.php?action=logout" class="btn btn-secondary header-logout-btn">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
-                        </svg>
-                        <span>Logout</span>
-                    </a>
                 </div>
-            </header>
+            </aside>
+            <div class="sidebar-scrim" id="sidebarScrim" hidden></div>
 
+            <div class="app-body">
             <!-- Main Content -->
             <main class="app-main">
                 <!-- My Work: everything assigned to one person -->
@@ -776,17 +801,21 @@ function buildPasswordLink(string $token): string
                             </div>
                         </div>
 
+                        <!-- At a glance: filled in by workload.js for whoever is shown -->
+                        <div class="workload-stats" id="workloadStats" hidden></div>
+
                         <div class="workload-body" id="workloadBody"></div>
                     </div>
                 </div>
 
-                <!-- Map View -->
-                <div class="view-panel" id="mapView">
-                    <div id="map"></div>
-                </div>
-
                 <!-- Calendar View -->
                 <div class="view-panel" id="calendarView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Calendar</h1>
+                        </div>
+                    </div>
+
                     <div class="calendar-toolbar">
                         <div class="calendar-toolbar-left">
                             <button type="button" class="btn btn-icon" id="calPrev" title="Zurück">
@@ -835,6 +864,12 @@ function buildPasswordLink(string $token): string
 
                 <!-- Bookkeeping View -->
                 <div class="view-panel" id="bookkeepingView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Bookkeeping</h1>
+                        </div>
+                    </div>
+
                     <!-- One toolbar. The date tools that used to occupy a bar of
                          their own are behind the Select button: they tick rows by
                          month or range, which is an occasional job, not something
@@ -954,6 +989,29 @@ function buildPasswordLink(string $token): string
 
                 <!-- List View -->
                 <div class="view-panel" id="listView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Contacts</h1>
+                            <p class="view-sub"><span data-contact-count><?= (int) $contactCount ?></span> people</p>
+                        </div>
+                        <!-- The map is a way of looking at contacts, not a place of
+                             its own, so it lives here as a second mode. -->
+                        <div class="segmented" role="tablist" aria-label="Show contacts as">
+                            <button type="button" class="segmented-btn active" data-contacts-mode="list" role="tab" aria-selected="true">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+                                    <path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>
+                                </svg>
+                                <span>List</span>
+                            </button>
+                            <button type="button" class="segmented-btn" data-contacts-mode="map" id="contactsMapBtn" role="tab" aria-selected="false">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="m9 4.5-5.5 2v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>
+                                </svg>
+                                <span>Map</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="list-header">
                         <div class="list-header-top">
                             <div class="search-box">
@@ -1017,10 +1075,21 @@ function buildPasswordLink(string $token): string
                     <div class="contacts-list" id="contactsList">
                         <!-- Contacts will be loaded here -->
                     </div>
+
+                    <!-- Map mode. Kept as #mapView so the existing map code finds it. -->
+                    <div class="contacts-map" id="mapView" hidden>
+                        <div id="map"></div>
+                    </div>
                 </div>
 
                 <!-- To-Do View -->
                 <div class="view-panel" id="todoView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">To-dos</h1>
+                        </div>
+                    </div>
+
                     <div class="list-header">
                         <div class="list-header-top">
                             <div class="search-box">
@@ -1069,6 +1138,12 @@ function buildPasswordLink(string $token): string
 
                 <!-- Projects View -->
                 <div class="view-panel" id="projectsView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Projects</h1>
+                        </div>
+                    </div>
+
                     <!-- Dashboard -->
                     <div class="dashboard-wrapper collapsed" id="dashboardWrapper">
                         <!-- Collapsed bar (always visible) -->
@@ -1083,6 +1158,7 @@ function buildPasswordLink(string $token): string
                                 <div class="dashboard-bar-stat">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/></svg>
                                     <span class="dashboard-bar-stat-value" id="dashBarPotential">—</span>
+                                    <span>Pipeline value</span>
                                 </div>
                                 <div class="dashboard-bar-stat">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
@@ -1218,6 +1294,47 @@ function buildPasswordLink(string $token): string
                     </div>
                 </div>
             </main>
+            </div>
+
+            <!--
+                Phone tab bar: the four places people go most, plus "More",
+                which slides the sidebar in as a drawer for everything else.
+                "More" is deliberately not a .toggle-btn - it opens the drawer
+                rather than switching to a view.
+            -->
+            <nav class="tabbar" aria-label="Main navigation">
+                <button type="button" class="toggle-btn tab-item active" data-view="workload">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/>
+                    </svg>
+                    <span>Home</span>
+                    <span class="toggle-badge tab-badge" data-workload-badge hidden>0</span>
+                </button>
+                <button type="button" class="toggle-btn tab-item" data-view="projects">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M3 12.5h18"/>
+                    </svg>
+                    <span>Projects</span>
+                </button>
+                <button type="button" class="toggle-btn tab-item" data-view="todos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/>
+                    </svg>
+                    <span>To-dos</span>
+                </button>
+                <button type="button" class="toggle-btn tab-item" data-view="list">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/>
+                    </svg>
+                    <span>Contacts</span>
+                </button>
+                <button type="button" class="tab-item" id="tabbarMoreBtn" aria-controls="sidebar" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="5.5" cy="12" r="1.25"/><circle cx="12" cy="12" r="1.25"/><circle cx="18.5" cy="12" r="1.25"/>
+                    </svg>
+                    <span>More</span>
+                </button>
+            </nav>
         </div>
 
         <!-- Contact Modal -->
@@ -1498,9 +1615,10 @@ function buildPasswordLink(string $token): string
                         </h3>
                         <p class="section-description">Upload an Excel file to bulk import contacts</p>
 
-                        <!-- Excel Format Instructions -->
-                        <div class="import-instructions">
-                            <h4>Excel File Format</h4>
+                        <!-- Excel format reference: needed once, so folded away. The drop
+                             zone below is what most visits are for. -->
+                        <details class="import-instructions">
+                            <summary>What should the Excel file look like?</summary>
                             <p>Your Excel file should have these columns in the <strong>first row</strong> (header row):</p>
                             <div class="column-list">
                                 <div class="column-item required">
@@ -1551,7 +1669,7 @@ function buildPasswordLink(string $token): string
                                 </svg>
                                 Download Template
                             </button>
-                        </div>
+                        </details>
 
                         <!-- File Upload Area -->
                         <div class="file-upload-area" id="fileUploadArea">
@@ -1896,14 +2014,14 @@ function buildPasswordLink(string $token): string
 
                             <div class="todo-assignment-grid">
                                 <div class="form-group">
-                                    <label for="todoAssignType">Assign To *</label>
+                                    <label for="todoAssignType">Belongs to *</label>
                                     <select id="todoAssignType" class="form-select" required>
                                         <option value="contact">Contact</option>
                                         <option value="project">Project</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="todoAssigneeId">Assignee *</label>
+                                    <label for="todoAssigneeId">Contact or project *</label>
                                     <select id="todoAssigneeId" class="form-select" required>
                                         <option value="">Select...</option>
                                     </select>

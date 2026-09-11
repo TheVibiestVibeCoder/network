@@ -269,6 +269,14 @@ The `^/(data|includes|config|vendor)/` rule already covers the invoice store and
 - **`style-src` keeps `'unsafe-inline'`.** The UI sets inline styles for tag
   colours and map layout. Inline CSS is not a script execution primitive, and
   tag colours are validated as hex server-side.
+- **Two outside hosts, both for the map.** Leaflet and its cluster plugin load
+  from `unpkg.com`, pinned to exact versions with Subresource Integrity, so a
+  changed file is refused rather than run. Map tiles are plain images from
+  `tile.openstreetmap.org`, the only outside image host the CSP allows; each
+  tile request tells OpenStreetMap roughly which area is on screen, and their
+  usage policy expects light traffic with the attribution kept visible. Fonts
+  (General Sans, `assets/fonts/`) are served from this site, so no font CDN
+  sees your visitors.
 
 ## Reporting
 

@@ -16,6 +16,12 @@
 # -----------------------------------------------------------------------------
 Options -Indexes -MultiViews
 
+# Self-hosted fonts. Older Apache builds do not know .woff2 and would serve it
+# as application/octet-stream.
+<IfModule mod_mime.c>
+    AddType font/woff2 .woff2
+</IfModule>
+
 # -----------------------------------------------------------------------------
 # 2. Force HTTPS
 # -----------------------------------------------------------------------------

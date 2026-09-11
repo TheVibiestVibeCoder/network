@@ -1497,9 +1497,12 @@ class Auth
             . "worker-src 'self'; "
             . "manifest-src 'self'; "
             . "script-src 'self' 'nonce-{$nonce}' https://unpkg.com; "
-            . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
-            . "font-src 'self' https://fonts.gstatic.com; "
-            . "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; "
+            . "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+            // Fonts are self-hosted (assets/fonts), so no font CDN is trusted.
+            . "font-src 'self'; "
+            // Map tiles come from tile.openstreetmap.org itself. A wildcard
+            // like *.tile.openstreetmap.org would not match the bare host.
+            . "img-src 'self' data: blob: https://tile.openstreetmap.org; "
             . "connect-src 'self' https://nominatim.openstreetmap.org"
         );
 

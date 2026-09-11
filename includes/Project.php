@@ -64,12 +64,20 @@ class Project
     /**
      * Pipeline order for the stage column, as a SQL CASE expression.
      *
-     * Kept next to STAGE_RANK in app.js - both have to agree, or a list sorted
-     * on the server would reshuffle the moment the client re-sorts it.
+     * Public so that every list of projects - the Projects view and the home
+     * page alike - sorts by this one expression and can never drift apart.
+     *
+     * @param string $column The stage column, qualified if the query joins.
      */
-    private static function stageRankSql(): string
+    public static function stageRankSql(string $column = 'stage'): string
     {
-        return "CASE stage
+        // $column is always a literal from a caller in this codebase; it is
+        // still shape-checked because it is concatenated into SQL.
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_.]*$/', $column)) {
+            $column = 'stage';
+        }
+
+        return "CASE " . $column . "
                     WHEN 'In Progress' THEN 1
                     WHEN 'Proposal'    THEN 2
                     WHEN 'Negotiation' THEN 3

@@ -10,7 +10,9 @@
     // Custom Map Marker Icon
     // ============================================
 
-    const markerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0zm0 20a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="%23ffffff" stroke="%23000" stroke-width="1"/><circle cx="14" cy="14" r="4" fill="%23000"/></svg>`;
+    // A navy pin with a white ring and a blue centre - the clusters' colours,
+    // so a lone contact and a group of them read as the same kind of thing.
+    const markerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40"><path d="M14 1C6.8 1 1 6.8 1 14c0 9.8 13 25 13 25s13-15.2 13-25C27 6.8 21.2 1 14 1z" fill="%23112D4E" stroke="%23ffffff" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="%23ffffff"/><circle cx="14" cy="14" r="2.6" fill="%233F72AF"/></svg>`;
 
     const customIcon = L.icon({
         iconUrl: 'data:image/svg+xml,' + encodeURIComponent(markerSvg.replace(/%23/g, '#')),
@@ -344,28 +346,24 @@
     }
 
     function getThemeToggleMarkup(theme) {
+        // Outline icons in the same 1.75 stroke as the rest of the navigation,
+        // and a nav-item shaped label so the toggle sits in the sidebar like
+        // any other entry. The label names where the button takes you.
         if (theme === 'light') {
             return `
-                <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M9.37 5.51A7 7 0 0 0 17.49 13.63 7 7 0 1 1 9.37 5.51z"/>
+                <svg class="nav-icon theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 14.2A8 8 0 1 1 9.8 4a6.4 6.4 0 0 0 10.2 10.2z"/>
                 </svg>
-                <span class="theme-toggle-label">Dark Mode</span>
+                <span class="nav-label theme-toggle-label">Dark mode</span>
             `;
         }
 
         return `
-            <svg class="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="4"></circle>
-                <line x1="12" y1="1.5" x2="12" y2="4.5"></line>
-                <line x1="12" y1="19.5" x2="12" y2="22.5"></line>
-                <line x1="1.5" y1="12" x2="4.5" y2="12"></line>
-                <line x1="19.5" y1="12" x2="22.5" y2="12"></line>
-                <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"></line>
-                <line x1="17.7" y1="17.7" x2="19.8" y2="19.8"></line>
-                <line x1="17.7" y1="6.3" x2="19.8" y2="4.2"></line>
-                <line x1="4.2" y1="19.8" x2="6.3" y2="17.7"></line>
+            <svg class="nav-icon theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>
             </svg>
-            <span class="theme-toggle-label">Light Mode</span>
+            <span class="nav-label theme-toggle-label">Light mode</span>
         `;
     }
 
@@ -720,14 +718,21 @@
     // Map Functions
     // ============================================
 
+    /**
+     * Put the base map on the page.
+     *
+     * The tiles come from OpenStreetMap. The app used CARTO's basemaps before,
+     * but CARTO now stamps "API KEY REQUIRED" across every tile served without
+     * a key. OSM needs no key for light use like this, as long as it is
+     * credited - which the attribution in the corner does.
+     *
+     * There is one layer for both themes: the colours are set by a CSS filter
+     * on the tile pane (see .contacts-map in design.css), so switching theme
+     * costs no tile reload at all.
+     */
     function updateMapTheme() {
         if (!state.map) {
             return;
-        }
-
-        if (state.mapBaseLayer) {
-            state.map.removeLayer(state.mapBaseLayer);
-            state.mapBaseLayer = null;
         }
 
         if (state.mapLabelLayer) {
@@ -735,32 +740,13 @@
             state.mapLabelLayer = null;
         }
 
-        if (state.theme === 'light') {
-            state.mapBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 20
+        if (!state.mapBaseLayer) {
+            state.mapBaseLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
             });
-
-            state.mapLabelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 20,
-                pane: 'shadowPane'
-            });
-        } else {
-            state.mapBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 20
-            });
-
-            state.mapLabelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 20,
-                pane: 'shadowPane'
-            });
+            state.mapBaseLayer.addTo(state.map);
         }
-
-        state.mapBaseLayer.addTo(state.map);
-        state.mapLabelLayer.addTo(state.map);
     }
 
     function initMap() {
@@ -770,7 +756,8 @@
             center: [30, 0],
             zoom: 2,
             zoomControl: true,
-            attributionControl: false,
+            // OpenStreetMap asks to be credited wherever its tiles are shown.
+            attributionControl: true,
             scrollWheelZoom: true,
             doubleClickZoom: true,
             touchZoom: true,
@@ -785,6 +772,10 @@
 
         // Add zoom control to bottom right for better mobile UX
         state.map.zoomControl.setPosition('bottomright');
+
+        // Credit the map data, without Leaflet's own flag-and-link prefix.
+        state.map.attributionControl.setPrefix(false);
+        state.map.attributionControl.setPosition('bottomleft');
 
         // Initialize marker cluster group with smooth zoom animation
         state.markers = L.markerClusterGroup({
@@ -849,11 +840,13 @@
             }
         });
 
-        // Fit map to markers if there are any
+        // Fit map to markers if there are any. Measure first: fitting into a
+        // stale (e.g. zero) size picks a nonsense zoom level.
         if (state.mapContacts.length > 0) {
             const bounds = state.markers.getBounds();
             if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] });
+                state.map.invalidateSize();
+                state.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
             }
         }
     }
@@ -1089,7 +1082,7 @@
                         <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                     </svg>
                     <span>${escapeHtml(tag.name)}</span>
-                    <span class="tag-count" style="background-color: ${tag.color}">${unpinned.length}</span>
+                    <span class="tag-count">${unpinned.length}</span>
                     <span class="tag-actions">
                         <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
@@ -1278,28 +1271,20 @@
         const fallbackText = inGroup ? 'No location set' : 'No company set';
         const subtitleText = (!inGroup && company) ? company : (location || fallbackText);
 
-        const flags = [];
-        if (contact.email) flags.push('Email');
-        if (contact.phone) flags.push('Phone');
-        if (contact.website) flags.push('Web');
-        if (contact.note) flags.push('Note');
-
-        const flagHtml = flags.length > 0
-            ? `<div class="contact-card-flags">${flags.slice(0, 3).map(flag => `<span class="contact-card-flag">${flag}</span>`).join('')}</div>`
-            : '';
-
+        // The "Email / Phone / Web" pills that used to sit here said only that a
+        // field was filled in, not what was in it. The row shows who and where;
+        // the contact details themselves are one click away.
         const isPinned = contact.pinned == 1;
 
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
                     <div class="contact-avatar">
-                        ${getInitials(contact.name)}
+                        ${escapeHtml(getInitials(contact.name))}
                     </div>
                     <div class="contact-card-content">
                         <h3 class="contact-card-name">${escapeHtml(contact.name)}</h3>
                         <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
-                        ${flagHtml}
                     </div>
                 </div>
                 ${assigneeChip(contact)}
@@ -1324,7 +1309,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'map'];
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1339,6 +1324,9 @@
             // Private mode or blocked storage: just open the home tab.
         }
 
+        // The map used to be a tab of its own; it is now a mode of Contacts.
+        if (stored === 'map') return 'list';
+
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
 
@@ -1351,8 +1339,16 @@
     }
 
     function switchView(view) {
+        // Anything still asking for the old map tab gets Contacts in map mode.
+        if (view === 'map') {
+            switchView('list');
+            setContactsMode('map');
+            return;
+        }
+
         state.currentView = view;
         storeView(view);
+        closeSidebarDrawer();
 
         // Update toggle buttons
         elements.toggleBtns.forEach(btn => {
@@ -1363,7 +1359,6 @@
         if (elements.workloadView) {
             elements.workloadView.classList.toggle('active', view === 'workload');
         }
-        elements.mapView.classList.toggle('active', view === 'map');
         elements.listView.classList.toggle('active', view === 'list');
         elements.calendarView.classList.toggle('active', view === 'calendar');
         elements.todoView.classList.toggle('active', view === 'todos');
@@ -1377,14 +1372,6 @@
             if (window.CRMWorkload) {
                 window.CRMWorkload.load();
             }
-        } else if (view === 'map') {
-            // Force map to recalculate size after becoming visible. Guarded
-            // because this now also runs on load, when the map may be the
-            // remembered tab and initMap() has not finished wiring it up.
-            setTimeout(() => {
-                if (state.map) state.map.invalidateSize();
-            }, 100);
-            loadMapMarkers();
         } else if (view === 'calendar') {
             loadCalendarNotes();
         } else if (view === 'todos') {
@@ -1400,8 +1387,101 @@
                 window.Bookkeeping.load();
             }
         } else {
+            // Contacts always opens as the list; the map is one tap away.
+            setContactsMode('list');
+        }
+    }
+
+    /**
+     * Contacts can be looked at as a list or on the map.
+     *
+     * The map is a way of seeing the same people, not a separate place, so it
+     * lives inside the Contacts view with a switch to go back - rather than as
+     * a tab of its own that you have to remember is there.
+     */
+    function setContactsMode(mode) {
+        const isMap = mode === 'map';
+        state.contactsMode = isMap ? 'map' : 'list';
+
+        if (elements.listView) {
+            elements.listView.classList.toggle('is-map', isMap);
+        }
+        if (elements.mapView) {
+            elements.mapView.hidden = !isMap;
+        }
+        if (elements.contactsList) {
+            elements.contactsList.hidden = isMap;
+        }
+
+        document.querySelectorAll('[data-contacts-mode]').forEach(btn => {
+            const active = btn.getAttribute('data-contacts-mode') === state.contactsMode;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        if (isMap) {
+            // Leaflet caches its container size, and it was measured while
+            // hidden - as zero. Re-measure now, synchronously: the markers can
+            // arrive before any timer fires, and fitting them into a zero-sized
+            // map zooms all the way in.
+            if (state.map) state.map.invalidateSize();
+            loadMapMarkers();
+        } else {
             loadContacts();
         }
+    }
+
+    // ------------------------------------------------------------
+    // Phone drawer
+    // ------------------------------------------------------------
+
+    function openSidebarDrawer() {
+        const sidebar = document.getElementById('sidebar');
+        const scrim = document.getElementById('sidebarScrim');
+        const more = document.getElementById('tabbarMoreBtn');
+        if (!sidebar) return;
+
+        sidebar.classList.add('is-open');
+        if (scrim) scrim.hidden = false;
+        if (more) more.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('drawer-open');
+    }
+
+    function closeSidebarDrawer() {
+        const sidebar = document.getElementById('sidebar');
+        const scrim = document.getElementById('sidebarScrim');
+        const more = document.getElementById('tabbarMoreBtn');
+        if (!sidebar || !sidebar.classList.contains('is-open')) return;
+
+        sidebar.classList.remove('is-open');
+        if (scrim) scrim.hidden = true;
+        if (more) more.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('drawer-open');
+    }
+
+    function bindShell() {
+        const more = document.getElementById('tabbarMoreBtn');
+        if (more) {
+            more.addEventListener('click', () => {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('is-open')) {
+                    closeSidebarDrawer();
+                } else {
+                    openSidebarDrawer();
+                }
+            });
+        }
+
+        const scrim = document.getElementById('sidebarScrim');
+        if (scrim) scrim.addEventListener('click', closeSidebarDrawer);
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeSidebarDrawer();
+        });
+
+        document.querySelectorAll('[data-contacts-mode]').forEach(btn => {
+            btn.addEventListener('click', () => setContactsMode(btn.getAttribute('data-contacts-mode')));
+        });
     }
 
     /**
@@ -2139,6 +2219,21 @@
                 if (Number.isInteger(projectId)) {
                     openProjectOverview(projectId);
                 }
+                return;
+            }
+
+            // Anywhere else on a to-do row opens it: the row is the way in,
+            // as a contact row or a project card is. The check, buttons and
+            // links inside the row keep their own meaning.
+            if (e.target.closest('button, a, input, label, select, textarea')) {
+                return;
+            }
+            const row = e.target.closest('.todo-item[data-todo-id]');
+            if (row) {
+                const todoId = parseInt(row.dataset.todoId, 10);
+                if (Number.isInteger(todoId)) {
+                    await openTodoEditModal(todoId);
+                }
             }
         });
     }
@@ -2597,7 +2692,7 @@
         let html = '';
         tags.forEach(tag => {
             html += `
-                <span class="tag" style="background-color: ${tag.color}20; color: ${tag.color}; border-color: ${tag.color}">
+                <span class="tag" style="--tag-color: ${escapeHtml(tag.color)}">
                     ${escapeHtml(tag.name)}
                     <button class="tag-remove" data-tag-id="${tag.id}" title="Tag entfernen">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
@@ -3617,7 +3712,7 @@
                 const navAttrs = getCalendarEntryNavigationAttrs(entry);
                 const tags = getCalendarEntryTags(entry);
                 const tagBadges = tags.map(tag =>
-                    `<span class="cal-day-tag" style="background:${tag.color}20;color:${tag.color};border-color:${tag.color}">${escapeHtml(tag.name)}</span>`
+                    `<span class="cal-day-tag" style="--tag-color: ${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`
                 ).join('');
                 const todoMeta = getCalendarEntryType(entry) === 'todo'
                     ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Erledigt' : 'Offen'}${entry.due_date ? ` - Faellig ${escapeHtml(entry.due_date)}` : ''}</span>`
@@ -4081,18 +4176,57 @@
             return;
         }
 
-        const html = visible.map(project => createProjectCard(project)).join('');
-        elements.projectsList.innerHTML = html;
+        elements.projectsList.innerHTML = state.projectSortField === 'stage'
+            ? renderProjectsByStage(visible)
+            : `<div class="project-grid">${visible.map(createProjectCard).join('')}</div>`;
 
-        // Add click event listeners to project cards
+        // Cards open on click, and on Enter / Space for keyboard users.
         elements.projectsList.querySelectorAll('.project-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const projectId = parseInt(card.dataset.id, 10);
-                openProjectOverview(projectId);
+            const open = () => openProjectOverview(parseInt(card.dataset.id, 10));
+            card.addEventListener('click', open);
+            card.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    open();
+                }
             });
         });
 
         triggerProjectDeckAnimation();
+    }
+
+    /**
+     * Projects under a heading per stage, in pipeline order.
+     *
+     * The server already returns them sorted by stage rank (In Progress first,
+     * Complete last - or reversed), so grouping consecutive runs keeps that
+     * order exactly; there is no second ordering here to drift out of step.
+     */
+    function renderProjectsByStage(projects) {
+        const groups = [];
+        projects.forEach(project => {
+            const stage = project.stage || 'Lead';
+            const last = groups[groups.length - 1];
+            if (last && last.stage === stage) {
+                last.items.push(project);
+            } else {
+                groups.push({ stage, items: [project] });
+            }
+        });
+
+        return groups.map(group => {
+            const stageClass = group.stage.toLowerCase().replace(/ /g, '-');
+            return `
+                <section class="project-group">
+                    <header class="project-group-head">
+                        <span class="stage-dot stage-${escapeHtml(stageClass)}" aria-hidden="true"></span>
+                        <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
+                        <span class="project-group-count">${group.items.length}</span>
+                    </header>
+                    <div class="project-grid">${group.items.map(createProjectCard).join('')}</div>
+                </section>
+            `;
+        }).join('');
     }
 
     function triggerProjectDeckAnimation() {
@@ -4120,116 +4254,91 @@
         });
     }
 
+    /**
+     * "€18–24k" for a budget range, "€26k" for a fixed one, '' when unknown.
+     *
+     * A card only has room for the order of magnitude; the exact figures are
+     * one click away in the project's detail view.
+     */
+    function formatProjectValue(project) {
+        const toNumber = (value) => (value === null || value === '' || value === undefined)
+            ? null
+            : parseFloat(value);
+
+        const min = toNumber(project.budget_min);
+        const max = toNumber(project.budget_max);
+
+        const compact = (n) => {
+            if (n >= 1000000) return (Math.round(n / 100000) / 10).toString().replace(/\.0$/, '') + 'M';
+            if (n >= 1000) return Math.round(n / 1000) + 'k';
+            return String(Math.round(n));
+        };
+
+        if (min === null && max === null) return '';
+        if ((min || 0) === 0 && (max || 0) === 0) return '';
+        if (min !== null && max !== null && min !== max) return `€${compact(min)}–${compact(max)}`;
+
+        return `€${compact(max !== null ? max : min)}`;
+    }
+
+    /**
+     * One project, as a card: what it is, for whom, who has it, and where it
+     * stands. Dates, exact budgets and the rest live in the detail view - the
+     * card is for recognising and prioritising, not for reading.
+     */
     function createProjectCard(project) {
-        // Format date as absolute date (e.g., "Jan 15, 2024")
-        const formatCardDate = (value) => value
-            ? new Date(value).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            })
-            : null;
-
-        const startDate = formatCardDate(project.start_date);
-        const endDate = formatCardDate(project.estimated_completion);
-
-        // Both ends of the timeline on one chip. A project with no finish date
-        // yet reads as open-ended rather than showing a bare start date, and one
-        // with neither falls back to the old "N/A".
-        let dateRange;
-        if (startDate && endDate) {
-            dateRange = `${startDate} - ${endDate}`;
-        } else if (startDate) {
-            dateRange = `${startDate} - open`;
-        } else if (endDate) {
-            dateRange = `Due ${endDate}`;
-        } else {
-            dateRange = 'N/A';
-        }
-
-        const bMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
-        const bMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
-
-        const formatAmount = (value) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
-
-        let budget;
-        if (bMin === null && bMax === null) {
-            budget = 'N/A';
-        } else if (bMin === 0 && bMax === 0) {
-            budget = 'Undetermined';
-        } else if (bMin !== null && bMax !== null) {
-            budget = bMin === bMax
-                ? `${formatAmount(bMin)} EUR`
-                : `${formatAmount(bMin)} - ${formatAmount(bMax)} EUR`;
-        } else if (bMin !== null) {
-            budget = `${formatAmount(bMin)} EUR`;
-        } else {
-            budget = `${formatAmount(bMax)} EUR`;
-        }
-
-        const chanceRaw = project.success_chance !== null && project.success_chance !== '' ? parseFloat(project.success_chance) : null;
-        const chanceValue = Number.isFinite(chanceRaw) ? Math.max(0, Math.min(100, chanceRaw)) : null;
-        const successChance = chanceValue !== null ? `${Math.round(chanceValue)}%` : 'N/A';
-
-        const descriptionText = (project.description || '').trim();
-        const summary = descriptionText
-            ? `${escapeHtml(descriptionText).substring(0, 140)}${descriptionText.length > 140 ? '...' : ''}`
-            : 'No description yet';
-
         const stageLabel = project.stage || 'Lead';
         const stageClass = stageLabel.toLowerCase().replace(/ /g, '-');
 
-        const progressMarkup = chanceValue !== null ? `
-            <div class="project-card-progress">
-                <div class="project-card-progress-track">
-                    <div class="project-card-progress-fill" style="width: ${chanceValue}%;"></div>
-                </div>
-                <span class="project-card-progress-label">${Math.round(chanceValue)}% confidence</span>
-            </div>
-        ` : `
-            <div class="project-card-progress project-card-progress--empty">
-                <span class="project-card-progress-label">Success chance not set</span>
-            </div>
-        `;
+        const value = formatProjectValue(project);
+
+        const chanceRaw = project.success_chance !== null && project.success_chance !== ''
+            ? parseFloat(project.success_chance)
+            : null;
+        const chance = Number.isFinite(chanceRaw) ? Math.round(Math.max(0, Math.min(100, chanceRaw))) : null;
+
+        // The full text is escaped and handed to CSS, which clamps it to two
+        // lines. Truncating in JS after escaping could cut an entity in half.
+        const description = (project.description || '').trim();
+
+        const facts = [];
+
+        // When it is meant to be done - the one date worth seeing at a glance.
+        // Late and still open reads in the danger colour.
+        if (project.estimated_completion && stageClass !== 'complete') {
+            const due = new Date(project.estimated_completion + 'T00:00:00');
+            if (!isNaN(due.getTime())) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const late = due < today;
+                const label = due.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+                facts.push(`<span class="project-fact project-fact--due${late ? ' is-late' : ''}" title="${late ? 'Past its planned finish' : 'Planned finish'}">${escapeHtml(label)}</span>`);
+            }
+        }
+
+        if (value) {
+            facts.push(`<span class="project-fact">${escapeHtml(value)}</span>`);
+        }
+        if (chance !== null && stageClass !== 'complete') {
+            facts.push(`<span class="project-fact project-fact--chance" style="--chance:${chance}" title="${chance}% likely">${chance}%</span>`);
+        }
 
         return `
-            <div class="project-card" data-id="${project.id}">
+            <article class="project-card" data-id="${project.id}" tabindex="0" role="button"
+                     aria-label="${escapeHtml(project.name)}">
                 <div class="project-card-head">
                     <div class="project-card-title-wrap">
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
-                        <p class="project-card-company${project.company ? '' : ' is-empty'}">${project.company ? escapeHtml(project.company) : '&nbsp;'}</p>
+                        ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                     </div>
-                    <div class="project-card-head-right">
-                        ${assigneeChip(project)}
-                        <span class="project-stage-badge stage-${stageClass}">${escapeHtml(stageLabel)}</span>
-                    </div>
+                    ${assigneeChip(project)}
                 </div>
-                <div class="project-card-metrics">
-                    <span class="project-metric-chip">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-                        </svg>
-                        <span>${dateRange}</span>
-                    </span>
-                    <span class="project-metric-chip">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/>
-                        </svg>
-                        <span>${budget}</span>
-                    </span>
-                    <span class="project-metric-chip">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                        </svg>
-                        <span>${successChance} chance</span>
-                    </span>
+                ${description ? `<p class="project-card-description">${escapeHtml(description)}</p>` : ''}
+                <div class="project-card-foot">
+                    <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
+                    ${facts.length ? `<span class="project-card-facts">${facts.join('')}</span>` : ''}
                 </div>
-                ${progressMarkup}
-                <p class="project-card-description">${summary}</p>
-                <div class="project-card-footer">
-                    <span class="project-card-cta">Open details</span>
-                </div>
-            </div>
+            </article>
         `;
     }
 
@@ -4432,7 +4541,7 @@
         }
 
         const html = tags.map(tag => `
-            <span class="tag" style="background-color: ${tag.color}20; color: ${tag.color};">
+            <span class="tag" style="--tag-color: ${escapeHtml(tag.color)}">
                 ${escapeHtml(tag.name)}
                 <button class="tag-remove" data-remove-tag="${tag.id}" title="Remove tag">&times;</button>
             </span>
@@ -4449,7 +4558,7 @@
 
         const html = contacts.map(contact => `
             <div class="project-contact-item">
-                <div class="contact-avatar">${getInitials(contact.name)}</div>
+                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
                     ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
@@ -4742,7 +4851,7 @@
         // Use data-contact-id attributes instead of inline onclick (avoids pointer-event issues)
         const html = filtered.map(contact => `
             <div class="contact-suggestion" data-contact-id="${contact.id}">
-                <div class="contact-avatar">${getInitials(contact.name)}</div>
+                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
                     ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
@@ -4803,7 +4912,7 @@
     // ============================================
 
     function refreshData() {
-        if (state.currentView === 'map') {
+        if (state.currentView === 'list' && state.contactsMode === 'map') {
             loadMapMarkers();
         } else if (state.currentView === 'calendar') {
             loadCalendarNotes();
@@ -4819,11 +4928,12 @@
         // This is a simple approach; could be optimized with an API call
         api.getContacts().then(result => {
             if (result.success) {
+                // The count shows in more than one place (the nav and the
+                // Contacts header), and each supplies its own wording.
                 const count = result.data.length;
-                const countElement = document.querySelector('.contact-count');
-                if (countElement) {
-                    countElement.textContent = `${count} contact${count !== 1 ? 's' : ''}`;
-                }
+                document.querySelectorAll('[data-contact-count]').forEach(node => {
+                    node.textContent = String(count);
+                });
             }
         });
     }
@@ -5281,6 +5391,16 @@
 
         // Add tag button
         elements.addTagBtn.addEventListener('click', async () => {
+            const query = elements.newTagInput.value.trim();
+            if (query) {
+                await createAndAssignTag(query);
+            }
+        });
+
+        // Enter adds the tag too, as it already does on projects.
+        elements.newTagInput.addEventListener('keydown', async (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
             const query = elements.newTagInput.value.trim();
             if (query) {
                 await createAndAssignTag(query);
@@ -5834,6 +5954,7 @@
 
         bindCspSafeDelegates();
         bindAssignmentControls();
+        bindShell();
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();
@@ -5858,6 +5979,7 @@
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
         openBookkeepingRow: openBookkeepingRow,
+        switchView: switchView,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,

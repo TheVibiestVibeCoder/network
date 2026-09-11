@@ -105,6 +105,13 @@
 
             state.me = result.me || null;
             applyMyAvatar(state.me ? state.me.avatar_url : null);
+
+            // Faces already on screen may have been drawn with initials while
+            // this was loading - bring them up to date.
+            refreshRenderedFaces();
+
+            // Other modules (the sidebar team list) paint from this directory.
+            window.dispatchEvent(new CustomEvent('crm:people'));
         } catch (e) {
             // A missing directory just means initials everywhere - not an error
             // worth interrupting anyone over.
@@ -215,7 +222,10 @@
      * so the change is visible without a reload.
      */
     function refreshRenderedFaces() {
-        document.querySelectorAll('.by-line-avatar[data-actor-name]').forEach(node => {
+        // Attribution faces and assignee faces carry the same data-actor-*
+        // attributes; both are repainted, so a list drawn before the directory
+        // arrived catches up instead of keeping its initials.
+        document.querySelectorAll('.by-line-avatar[data-actor-name], .assignee-chip[data-actor-name]').forEach(node => {
             const url = avatarFor(node.getAttribute('data-actor-id'), node.getAttribute('data-actor-name'));
             const existing = node.querySelector('img');
 

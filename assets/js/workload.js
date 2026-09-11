@@ -102,7 +102,7 @@
         if (days <= 7) return { text: `In ${days} days`, overdue: false };
 
         return {
-            text: due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             overdue: false
         };
     }
@@ -116,7 +116,7 @@
         const date = new Date(value + 'T00:00:00');
         if (isNaN(date.getTime())) return String(value);
 
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     // ------------------------------------------------------------------
@@ -132,6 +132,7 @@
         const doneTodos = todos.filter(t => Number(t.is_completed) === 1);
 
         renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
+        renderStats(openTodos, projects);
 
         if (openTodos.length === 0 && doneTodos.length === 0
             && projects.length === 0 && contacts.length === 0 && bookkeeping.length === 0) {
@@ -173,6 +174,48 @@
         els.body.innerHTML = html;
     }
 
+    /**
+     * Four numbers across the top: what is open, what is late, what is due
+     * this week, and how many projects are on this plate.
+     *
+     * Computed from the rows already loaded, so the tiles can never disagree
+     * with the list underneath them.
+     */
+    function renderStats(openTodos, projects) {
+        const stats = $('workloadStats');
+        if (!stats) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+
+        let overdue = 0;
+        let thisWeek = 0;
+        openTodos.forEach(todo => {
+            if (!todo.due_date) return;
+            const due = new Date(todo.due_date + 'T00:00:00');
+            if (isNaN(due.getTime())) return;
+            if (due < today) overdue++;
+            else if (due <= weekEnd) thisWeek++;
+        });
+
+        const tile = (value, label, alert) => `
+            <div class="workload-stat">
+                <span class="workload-stat-value${alert ? ' is-alert' : ''}">${value}</span>
+                <span class="workload-stat-label">${escapeHtml(label)}</span>
+            </div>
+        `;
+
+        stats.innerHTML =
+            tile(openTodos.length, openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', false) +
+            tile(overdue, 'Overdue', overdue > 0) +
+            tile(thisWeek, 'Due this week', false) +
+            tile(projects.length, projects.length === 1 ? 'Project' : 'Projects', false);
+
+        stats.hidden = false;
+    }
+
     function renderHead(openCount, projectCount, contactCount, bookkeepingCount) {
         const person = state.person || {};
         const isMe = state.who === 'me';
@@ -211,7 +254,12 @@
         if (projectCount) bits.push(projectCount + (projectCount === 1 ? ' project' : ' projects'));
         if (contactCount) bits.push(contactCount + (contactCount === 1 ? ' contact' : ' contacts'));
 
-        els.summary.textContent = bits.length ? bits.join(' · ') : 'Nothing assigned yet';
+        // The tiles below carry the counts now, so the line under the name
+        // orients instead: which day it is, or whose plate you are looking at.
+        const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+        els.summary.textContent = person.unassigned
+            ? 'Work nobody has picked up yet'
+            : (isMe ? today : (bits.length ? bits.join(' · ') : 'Nothing assigned yet'));
     }
 
     function section(title, count, rows, emptyText) {
@@ -540,18 +588,98 @@
      * assigned to you, which is the one count worth interrupting someone for.
      */
     async function refreshBadge() {
-        if (!els.badge) return;
+        // The count appears on the sidebar entry and on the phone tab bar.
+        const badges = document.querySelectorAll('[data-workload-badge]');
+        if (!badges.length) return;
+
+        const paint = (text, hidden) => badges.forEach(badge => {
+            badge.textContent = text;
+            badge.hidden = hidden;
+        });
 
         try {
             const result = await api('?action=workload&user=me');
             const counts = result.counts || {};
             const open = (counts.todos_open || 0) + (counts.bookkeeping || 0);
 
-            els.badge.textContent = open > 99 ? '99+' : String(open);
-            els.badge.hidden = open === 0;
+            paint(open > 99 ? '99+' : String(open), open === 0);
         } catch (e) {
-            els.badge.hidden = true;
+            paint('0', true);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The team, in the sidebar
+    // ------------------------------------------------------------------
+
+    /**
+     * List everyone in the sidebar, each one click from their workload.
+     *
+     * The same people the "Showing" switch offers, surfaced where they are
+     * always visible - so "what is Anna working on?" is one click, not a
+     * dropdown hunt. Hidden entirely until there is somebody besides you.
+     */
+    function renderTeam() {
+        const wrap = $('sidebarTeamWrap');
+        const list = $('sidebarTeam');
+        if (!wrap || !list || !window.CRMPeople) return;
+
+        const people = window.CRMPeople.list();
+        const meKey = window.CRMPeople.meKey();
+        const others = people.filter(person => {
+            const key = person.id === null ? 'owner' : String(person.id);
+            return key !== meKey;
+        });
+
+        if (!others.length) {
+            wrap.hidden = true;
+            return;
+        }
+
+        list.innerHTML = others.map(person => {
+            const key = person.id === null ? 'owner' : String(person.id);
+            const face = person.avatar_url
+                ? `<span class="team-face has-photo"><img src="${escapeHtml(person.avatar_url)}" alt=""></span>`
+                : `<span class="team-face">${escapeHtml(getInitials(person.name))}</span>`;
+
+            return `
+                <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="Open ${escapeHtml(person.name)}'s work">
+                    ${face}
+                    <span class="team-name">${escapeHtml(person.name)}</span>
+                    ${countBadge(key)}
+                </button>
+            `;
+        }).join('');
+
+        wrap.hidden = false;
+    }
+
+    /**
+     * A small count of open items for one person, or nothing.
+     */
+    function countBadge(key) {
+        const bucket = state.counts[key === 'owner' ? '0' : key];
+        if (!bucket) return '';
+
+        const total = (bucket.todos || 0) + (bucket.projects || 0)
+            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
+
+        return total ? `<span class="team-count">${total}</span>` : '';
+    }
+
+    async function refreshTeam() {
+        await loadCounts();
+        renderTeam();
+    }
+
+    /**
+     * Open one teammate's workload from the sidebar.
+     */
+    function openPerson(key) {
+        if (window.CRM && window.CRM.switchView) {
+            window.CRM.switchView('workload');
+        }
+        load(key);
     }
 
     // ------------------------------------------------------------------
@@ -575,9 +703,23 @@
         els.summary = $('workloadSummary');
         els.face = $('workloadFace');
         els.who = $('workloadWho');
-        els.badge = $('workloadBadge');
 
         els.who.addEventListener('change', () => load(els.who.value));
+
+        const team = $('sidebarTeam');
+        if (team) {
+            team.addEventListener('click', (event) => {
+                const item = event.target.closest('[data-team-person]');
+                if (item) openPerson(item.getAttribute('data-team-person'));
+            });
+        }
+
+        // profile.js announces whenever it has (re)loaded the directory, which
+        // is when names and faces for the team list are known.
+        window.addEventListener('crm:people', refreshTeam);
+        if (window.CRMPeople && window.CRMPeople.ready()) {
+            refreshTeam();
+        }
 
         // Checking a to-do off, before the rule that opens records: the mark
         // sits inside a row, and clicking it means only this.
