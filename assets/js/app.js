@@ -24,7 +24,7 @@
     // ============================================
 
     const state = {
-        currentView: 'projects',
+        currentView: 'workload',
         contacts: [],
         mapContacts: [],
         sortField: 'name',
@@ -51,9 +51,10 @@
         // Project state
         projects: [],
         allProjects: [],
-        projectSortField: 'name',
+        projectSortField: 'stage',
         projectSortOrder: 'ASC',
         projectSearchQuery: '',
+        hideCompletedProjects: true,
         editingProjectId: null,
         viewingProjectId: null,
         viewingProject: null,
@@ -192,6 +193,8 @@
         projectsList: document.getElementById('projectsList'),
         searchProjectsInput: document.getElementById('searchProjectsInput'),
         projectSortField: document.getElementById('projectSortField'),
+        hideCompletedProjects: document.getElementById('hideCompletedProjects'),
+        hiddenCompletedCount: document.getElementById('hiddenCompletedCount'),
         projectSortOrderBtn: document.getElementById('projectSortOrderBtn'),
         projectSortOrderIcon: document.getElementById('projectSortOrderIcon'),
         addProjectBtn: document.getElementById('addProjectBtn'),
@@ -1318,8 +1321,38 @@
     // View Toggle Functions
     // ============================================
 
+    // Every tab that can be opened. Used to vet what comes back out of
+    // storage, so a stale or hand-edited value cannot leave the app with no
+    // panel showing at all.
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'map'];
+    const HOME_VIEW = 'workload';
+    const VIEW_STORAGE_KEY = 'crm.currentView';
+
+    /**
+     * The tab to open on load: the one last used on this device, else home.
+     */
+    function readStoredView() {
+        let stored = null;
+        try {
+            stored = localStorage.getItem(VIEW_STORAGE_KEY);
+        } catch (e) {
+            // Private mode or blocked storage: just open the home tab.
+        }
+
+        return VIEWS.includes(stored) ? stored : HOME_VIEW;
+    }
+
+    function storeView(view) {
+        try {
+            localStorage.setItem(VIEW_STORAGE_KEY, view);
+        } catch (e) {
+            // Not remembering the tab is not worth failing over.
+        }
+    }
+
     function switchView(view) {
         state.currentView = view;
+        storeView(view);
 
         // Update toggle buttons
         elements.toggleBtns.forEach(btn => {
@@ -1345,9 +1378,11 @@
                 window.CRMWorkload.load();
             }
         } else if (view === 'map') {
-            // Force map to recalculate size after becoming visible
+            // Force map to recalculate size after becoming visible. Guarded
+            // because this now also runs on load, when the map may be the
+            // remembered tab and initMap() has not finished wiring it up.
             setTimeout(() => {
-                state.map.invalidateSize();
+                if (state.map) state.map.invalidateSize();
             }, 100);
             loadMapMarkers();
         } else if (view === 'calendar') {
@@ -1366,6 +1401,21 @@
             }
         } else {
             loadContacts();
+        }
+    }
+
+    /**
+     * Open the Bookkeeping tab on one row.
+     *
+     * The home page lists bookkeeping rows somebody has been handed, and those
+     * rows live in a table of their own - so following one means switching tab
+     * first and then letting that view find the row.
+     */
+    function openBookkeepingRow(rowId) {
+        switchView('bookkeeping');
+
+        if (window.Bookkeeping && window.Bookkeeping.focusRow) {
+            window.Bookkeeping.focusRow(rowId);
         }
     }
 
@@ -3999,13 +4049,39 @@
         }
     }
 
+    /**
+     * A project nobody is working on any more.
+     */
+    function isCompletedProject(project) {
+        return (project.stage || '') === 'Complete';
+    }
+
     function renderProjects(projects) {
-        if (!projects || projects.length === 0) {
-            elements.projectsList.innerHTML = '<div class="empty-state">No projects found</div>';
+        const all = projects || [];
+
+        // Completed work is history: it is hidden by default so the list shows
+        // what still needs attention. The count of what is being hidden stays
+        // visible, so the list never looks mysteriously short.
+        const hiddenCount = state.hideCompletedProjects
+            ? all.filter(isCompletedProject).length
+            : 0;
+        const visible = state.hideCompletedProjects
+            ? all.filter(p => !isCompletedProject(p))
+            : all;
+
+        if (elements.hiddenCompletedCount) {
+            elements.hiddenCompletedCount.textContent = hiddenCount > 0 ? `${hiddenCount} hidden` : '';
+            elements.hiddenCompletedCount.hidden = hiddenCount === 0;
+        }
+
+        if (visible.length === 0) {
+            elements.projectsList.innerHTML = hiddenCount > 0
+                ? `<div class="empty-state">Every project here is completed. Untick "Hide completed" to see ${hiddenCount} of them.</div>`
+                : '<div class="empty-state">No projects found</div>';
             return;
         }
 
-        const html = projects.map(project => createProjectCard(project)).join('');
+        const html = visible.map(project => createProjectCard(project)).join('');
         elements.projectsList.innerHTML = html;
 
         // Add click event listeners to project cards
@@ -4046,11 +4122,30 @@
 
     function createProjectCard(project) {
         // Format date as absolute date (e.g., "Jan 15, 2024")
-        const startDate = project.start_date ? new Date(project.start_date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        }) : 'N/A';
+        const formatCardDate = (value) => value
+            ? new Date(value).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            })
+            : null;
+
+        const startDate = formatCardDate(project.start_date);
+        const endDate = formatCardDate(project.estimated_completion);
+
+        // Both ends of the timeline on one chip. A project with no finish date
+        // yet reads as open-ended rather than showing a bare start date, and one
+        // with neither falls back to the old "N/A".
+        let dateRange;
+        if (startDate && endDate) {
+            dateRange = `${startDate} - ${endDate}`;
+        } else if (startDate) {
+            dateRange = `${startDate} - open`;
+        } else if (endDate) {
+            dateRange = `Due ${endDate}`;
+        } else {
+            dateRange = 'N/A';
+        }
 
         const bMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
         const bMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
@@ -4114,11 +4209,11 @@
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
                         </svg>
-                        <span>${startDate}</span>
+                        <span>${dateRange}</span>
                     </span>
                     <span class="project-metric-chip">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                            <path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/>
                         </svg>
                         <span>${budget}</span>
                     </span>
@@ -5299,9 +5394,36 @@
 
         // Project sort field
         if (elements.projectSortField) {
+            elements.projectSortField.value = state.projectSortField;
             elements.projectSortField.addEventListener('change', () => {
                 state.projectSortField = elements.projectSortField.value;
                 loadProjects();
+            });
+        }
+
+        // Hide completed projects. The choice is per browser, so the default
+        // (hidden) applies until this particular device says otherwise.
+        if (elements.hideCompletedProjects) {
+            let stored = null;
+            try {
+                stored = localStorage.getItem('crm.hideCompletedProjects');
+            } catch (e) {
+                // Private mode or blocked storage: fall back to the default.
+            }
+
+            if (stored !== null) {
+                state.hideCompletedProjects = stored === '1';
+            }
+            elements.hideCompletedProjects.checked = state.hideCompletedProjects;
+
+            elements.hideCompletedProjects.addEventListener('change', () => {
+                state.hideCompletedProjects = elements.hideCompletedProjects.checked;
+                try {
+                    localStorage.setItem('crm.hideCompletedProjects', state.hideCompletedProjects ? '1' : '0');
+                } catch (e) {
+                    // Not being able to remember the choice is not worth failing over.
+                }
+                renderProjects(state.projects);
             });
         }
 
@@ -5722,19 +5844,12 @@
             populateCalendarTagFilter();
         });
 
-        // Load initial data based on current view
-        if (state.currentView === 'projects') {
-            loadProjects();
-            loadAllContacts();
-        } else if (state.currentView === 'todos') {
-            loadTodos();
-        } else if (state.currentView === 'map') {
-            loadMapMarkers();
-        } else if (state.currentView === 'calendar') {
-            loadCalendarNotes();
-        } else {
-            loadContacts();
-        }
+        // Open the tab this device was last on, falling back to home. Going
+        // through switchView rather than repeating the per-view loading here
+        // means the two can never disagree about what a tab needs - the copy
+        // that used to live in this function knew nothing about My Work or
+        // Bookkeeping, so those two never loaded their data on a fresh open.
+        switchView(readStoredView());
     }
 
     // Expose functions globally for map popup buttons and onclick handlers
@@ -5742,6 +5857,7 @@
         editContact: editContact,
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
+        openBookkeepingRow: openBookkeepingRow,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,

@@ -2,8 +2,8 @@
  * My Work
  *
  * One screen answering one question: what is on my plate? To-dos first, because
- * they are the things with deadlines, then the projects and contacts somebody
- * made you responsible for.
+ * they are the things with deadlines, then bookkeeping rows still waiting on an
+ * invoice, then the projects and contacts somebody made you responsible for.
  *
  * It defaults to the signed-in user and can be pointed at any colleague, or at
  * "Unassigned" to see what nobody has picked up. It is a different arrangement
@@ -18,11 +18,14 @@
         who: 'me',
         data: null,
         person: null,
-        counts: {},   // assignee key -> { todos, projects, contacts }
-        loaded: false
+        counts: {},   // assignee key -> { todos, projects, contacts, bookkeeping }
+        loaded: false,
+        doneOpen: false,  // whether the "Completed" fold is expanded
+        busy: new Set()   // to-do ids with a check-off request in flight
     };
 
     const els = {};
+    let initialized = false;
 
     // ------------------------------------------------------------------
     // Utilities
@@ -104,6 +107,18 @@
         };
     }
 
+    /**
+     * A plain date, for things that have one without having a deadline.
+     */
+    function formatDate(value) {
+        if (!value) return '';
+
+        const date = new Date(value + 'T00:00:00');
+        if (isNaN(date.getTime())) return String(value);
+
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
@@ -112,13 +127,14 @@
         if (!els.body || !state.data) return;
 
         const { todos, projects, contacts } = state.data;
+        const bookkeeping = state.data.bookkeeping || [];
         const openTodos = todos.filter(t => Number(t.is_completed) === 0);
         const doneTodos = todos.filter(t => Number(t.is_completed) === 1);
 
-        renderHead(openTodos.length, projects.length, contacts.length);
+        renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
 
         if (openTodos.length === 0 && doneTodos.length === 0
-            && projects.length === 0 && contacts.length === 0) {
+            && projects.length === 0 && contacts.length === 0 && bookkeeping.length === 0) {
             els.body.innerHTML = emptyState();
             return;
         }
@@ -127,6 +143,11 @@
 
         html += section('To-dos', openTodos.length, openTodos.map(todoRow).join(''),
             'Nothing open right now.');
+
+        if (bookkeeping.length) {
+            html += section('Bookkeeping', bookkeeping.length,
+                bookkeeping.map(bookkeepingRow).join(''), '');
+        }
 
         if (projects.length) {
             html += section('Projects', projects.length, projects.map(projectRow).join(''), '');
@@ -139,7 +160,7 @@
         // Completed work is kept, but folded away - it is reference, not a task.
         if (doneTodos.length) {
             html += `
-                <details class="workload-section workload-done">
+                <details class="workload-section workload-done"${state.doneOpen ? ' open' : ''}>
                     <summary class="workload-section-head">
                         <span class="workload-section-title">Completed</span>
                         <span class="workload-count">${doneTodos.length}</span>
@@ -152,7 +173,7 @@
         els.body.innerHTML = html;
     }
 
-    function renderHead(openCount, projectCount, contactCount) {
+    function renderHead(openCount, projectCount, contactCount, bookkeepingCount) {
         const person = state.person || {};
         const isMe = state.who === 'me';
         const name = person.unassigned ? 'Unassigned' : (person.name || '');
@@ -186,6 +207,7 @@
 
         const bits = [];
         if (openCount) bits.push(openCount + (openCount === 1 ? ' open to-do' : ' open to-dos'));
+        if (bookkeepingCount) bits.push(bookkeepingCount + (bookkeepingCount === 1 ? ' bookkeeping row' : ' bookkeeping rows'));
         if (projectCount) bits.push(projectCount + (projectCount === 1 ? ' project' : ' projects'));
         if (contactCount) bits.push(contactCount + (contactCount === 1 ? ' contact' : ' contacts'));
 
@@ -219,18 +241,60 @@
             ? `<span class="workload-chip workload-chip--${priority}">${priority}</span>`
             : '';
 
+        const title = escapeHtml(todo.title || '');
+        // The control is a checkbox, so it is named after the to-do; the
+        // tooltip is where the action goes.
+        const checkName = title || 'To-do';
+        const checkHint = done ? 'Mark as open' : 'Mark as done';
+        const busy = state.busy.has(Number(todo.id));
+
+        // Two controls, not one: the mark checks the to-do off, the rest of the
+        // row still opens whatever the to-do hangs off.
         return `
-            <button type="button" class="workload-row${done ? ' is-done' : ''}"
-                    data-workload-open="todo" data-id="${todo.id}"
-                    data-contact-id="${todo.contact_id || ''}" data-project-id="${todo.project_id || ''}">
-                <span class="workload-row-mark${done ? ' is-done' : ''}">${done ? ICON_CHECK : ''}</span>
+            <div class="workload-row${done ? ' is-done' : ''}">
+                <button type="button" class="workload-row-mark workload-check${done ? ' is-done' : ''}"
+                        data-workload-toggle="${todo.id}" role="checkbox"
+                        aria-checked="${done ? 'true' : 'false'}"
+                        aria-label="${checkName}" title="${checkHint}"${busy ? ' disabled' : ''}>
+                    ${done ? ICON_CHECK : `<span class="workload-check-hint">${ICON_CHECK}</span>`}
+                </button>
+                <button type="button" class="workload-row-main"
+                        data-workload-open="todo" data-id="${todo.id}"
+                        data-contact-id="${todo.contact_id || ''}" data-project-id="${todo.project_id || ''}">
+                    <span class="workload-row-body">
+                        <span class="workload-row-title">${title}</span>
+                        ${context ? `<span class="workload-row-context">${context}</span>` : ''}
+                    </span>
+                    <span class="workload-row-meta">
+                        ${priorityChip}
+                        ${due.text ? `<span class="workload-due${due.overdue ? ' is-overdue' : ''}">${escapeHtml(due.text)}</span>` : ''}
+                    </span>
+                </button>
+            </div>
+        `;
+    }
+
+    /**
+     * A bookkeeping row somebody has been handed: a bank entry still missing
+     * its PDF. There is no tick box because there is nothing to tick -
+     * attaching the invoice is what finishes it, and that happens in the
+     * Bookkeeping tab, which is where the row leads.
+     */
+    function bookkeepingRow(entry) {
+        // A bank entry's date is when the money moved, not a deadline, so it
+        // is printed plainly rather than run through the "3 days overdue"
+        // phrasing the to-dos use.
+        const date = formatDate(entry.row_date);
+
+        return `
+            <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}">
+                <span class="workload-row-mark is-icon">${ICON_RECEIPT}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(todo.title || '')}</span>
-                    ${context ? `<span class="workload-row-context">${context}</span>` : ''}
+                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}</span>
+                    <span class="workload-row-context">${entry.no_pdf_needed ? 'Marked as needing no PDF' : 'PDF missing'}</span>
                 </span>
                 <span class="workload-row-meta">
-                    ${priorityChip}
-                    ${due.text ? `<span class="workload-due${due.overdue ? ' is-overdue' : ''}">${escapeHtml(due.text)}</span>` : ''}
+                    ${date ? `<span class="workload-due">${escapeHtml(date)}</span>` : ''}
                 </span>
             </button>
         `;
@@ -291,6 +355,7 @@
 
     const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
     const ICON_PROJECT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>';
+    const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v20l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5V2l-1.5 1.5zM17 19H7V5h10v14zM8 13h8v2H8v-2zm0-4h8v2H8V9z"/></svg>';
     const ICON_INBOX = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19v10z"/></svg>';
 
     // ------------------------------------------------------------------
@@ -331,7 +396,8 @@
         const bucket = state.counts[key === 'owner' ? '0' : key];
         if (!bucket) return '';
 
-        const total = (bucket.todos || 0) + (bucket.projects || 0) + (bucket.contacts || 0);
+        const total = (bucket.todos || 0) + (bucket.projects || 0)
+            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
         return total ? ` (${total})` : '';
     }
 
@@ -345,11 +411,106 @@
     }
 
     // ------------------------------------------------------------------
+    // Checking to-dos off
+    // ------------------------------------------------------------------
+
+    function showToast(message, isError) {
+        const toast = $('bkToast');
+        if (!toast) return;
+
+        toast.textContent = message;
+        toast.classList.toggle('bk-toast-error', !!isError);
+        toast.classList.add('visible');
+        clearTimeout(showToast._timer);
+        showToast._timer = setTimeout(() => toast.classList.remove('visible'), 3000);
+    }
+
+    /**
+     * Check a to-do off, or put it back.
+     *
+     * The row is moved the moment it is clicked, because waiting on the network
+     * to see a tick appear feels broken; if the write fails the row moves back
+     * and says so. Only master rows reach this view, so the id stays valid even
+     * though the server rebuilds a project to-do's per-contact copies.
+     */
+    async function setCompletion(todoId, completed) {
+        if (!state.data || state.busy.has(todoId)) return;
+
+        const todo = state.data.todos.find(t => Number(t.id) === todoId);
+        if (!todo) return;
+
+        const previous = Number(todo.is_completed) === 1;
+        if (previous === completed) return;
+
+        // Re-rendering replaces the mark that was just clicked, so keyboard
+        // users get their place back rather than being dropped to the top.
+        const hadFocus = document.activeElement
+            && document.activeElement.getAttribute
+            && document.activeElement.getAttribute('data-workload-toggle') === String(todoId);
+
+        const repaint = () => {
+            render();
+            if (!hadFocus) return;
+            const mark = els.body.querySelector('[data-workload-toggle="' + todoId + '"]');
+            if (mark && !mark.disabled) mark.focus();
+        };
+
+        todo.is_completed = completed ? 1 : 0;
+        // A to-do checked off disappears into the fold, so open it: the row
+        // should still be somewhere the person can see, and undo.
+        if (completed) state.doneOpen = true;
+        state.busy.add(todoId);
+        repaint();
+
+        let error = null;
+        try {
+            const response = await fetch('api/todos.php?id=' + encodeURIComponent(todoId), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ is_completed: completed ? 1 : 0 })
+            });
+
+            const text = await response.text();
+            let payload;
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch (e) {
+                payload = {};
+            }
+
+            if (!response.ok || !payload.success) {
+                error = payload.error || 'Could not update this to-do.';
+            }
+        } catch (e) {
+            error = 'Could not reach the server.';
+        }
+
+        state.busy.delete(todoId);
+
+        if (error) {
+            todo.is_completed = previous ? 1 : 0;
+            repaint();
+            showToast(error, true);
+            return;
+        }
+
+        repaint();
+
+        // The nav badge and the per-person counts both count open to-dos.
+        refreshBadge();
+        loadCounts().then(populateSwitcher);
+    }
+
+    // ------------------------------------------------------------------
     // Loading
     // ------------------------------------------------------------------
 
     async function load(who) {
         if (who) state.who = who;
+
+        // No-op once it has run; here for the case where this is the first
+        // view shown and app.js asks for it before this file has initialized.
+        init();
         if (!els.body) return;
 
         els.body.innerHTML = '<div class="workload-loading">Loading...</div>';
@@ -383,7 +544,8 @@
 
         try {
             const result = await api('?action=workload&user=me');
-            const open = result.counts ? result.counts.todos_open : 0;
+            const counts = result.counts || {};
+            const open = (counts.todos_open || 0) + (counts.bookkeeping || 0);
 
             els.badge.textContent = open > 99 ? '99+' : String(open);
             els.badge.hidden = open === 0;
@@ -397,8 +559,17 @@
     // ------------------------------------------------------------------
 
     function init() {
+        // Guarded so it can be called from load() as well as on DOMContentLoaded.
+        // app.js opens the starting view from its own DOMContentLoaded handler,
+        // which is registered first and therefore runs before this file's - so
+        // load() can arrive before the elements below have been looked up, and
+        // the listeners here must not be attached twice when it does.
+        if (initialized) return;
+
         els.body = $('workloadBody');
         if (!els.body) return;
+
+        initialized = true;
 
         els.title = $('workloadTitle');
         els.summary = $('workloadSummary');
@@ -408,8 +579,30 @@
 
         els.who.addEventListener('change', () => load(els.who.value));
 
+        // Checking a to-do off, before the rule that opens records: the mark
+        // sits inside a row, and clicking it means only this.
+        els.body.addEventListener('click', function (event) {
+            const check = event.target.closest('[data-workload-toggle]');
+            if (!check) return;
+
+            event.stopPropagation();
+            const todoId = Number(check.getAttribute('data-workload-toggle'));
+            if (todoId) setCompletion(todoId, check.getAttribute('aria-checked') !== 'true');
+        });
+
+        // Remember whether "Completed" is folded open, so a re-render does not
+        // slam it shut under someone reading it. Toggle does not bubble.
+        els.body.addEventListener('toggle', function (event) {
+            const details = event.target;
+            if (details && details.classList && details.classList.contains('workload-done')) {
+                state.doneOpen = details.open;
+            }
+        }, true);
+
         // Rows open the record they stand for, using the handles app.js exposes.
         els.body.addEventListener('click', function (event) {
+            if (event.target.closest('[data-workload-toggle]')) return;
+
             const row = event.target.closest('[data-workload-open]');
             if (!row) return;
 
@@ -421,6 +614,8 @@
                 window.CRM.openOverview(id);
             } else if (kind === 'project') {
                 window.CRM.openProjectOverview(id);
+            } else if (kind === 'bookkeeping') {
+                window.CRM.openBookkeepingRow(id);
             } else if (kind === 'todo') {
                 // A to-do has no page of its own, so open whatever it hangs off.
                 const projectId = Number(row.getAttribute('data-project-id'));

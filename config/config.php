@@ -155,6 +155,35 @@ define('MAIL_FROM_NAME', trim((string) ($_ENV['MAIL_FROM_NAME'] ?? '')) !== '' ?
 // left empty; set it explicitly if the app sits behind a proxy or subpath.
 define('APP_BASE_URL', rtrim(trim((string) ($_ENV['APP_BASE_URL'] ?? '')), '/'));
 
+// -----------------------------------------------------------------------------
+// Two-factor sign-in
+// -----------------------------------------------------------------------------
+// A password alone does not open a session for a user account: a one-time code
+// goes to their registered address and has to come back. The owner login is
+// deliberately exempt - it has no registered address, and it is the recovery
+// path that has to keep working when everything else does not.
+define('TWO_FACTOR_ENABLED', envBool('TWO_FACTOR_ENABLED', true));
+define('LOGIN_CODE_LIFETIME', max(60, envInt('LOGIN_CODE_LIFETIME', 600)));       // 10 min
+define('LOGIN_CODE_MAX_ATTEMPTS', max(1, envInt('LOGIN_CODE_MAX_ATTEMPTS', 5)));
+// Codes an account may request per hour, so the sign-in form cannot be turned
+// into a way to flood somebody's inbox.
+define('LOGIN_CODE_MAX_PER_HOUR', max(1, envInt('LOGIN_CODE_MAX_PER_HOUR', 10)));
+
+// -----------------------------------------------------------------------------
+// "Remember this device"
+// -----------------------------------------------------------------------------
+// An opt-in cookie that restores the session without password or code. It is a
+// second key to the account, so it is off by default, expires on its own, and
+// dies with the password it was issued against.
+define('REMEMBER_ME_ENABLED', envBool('REMEMBER_ME_ENABLED', true));
+define('REMEMBER_ME_LIFETIME', max(3600, envInt('REMEMBER_ME_LIFETIME', 2592000))); // 30 days
+define('REMEMBER_COOKIE_NAME', 'crm_remember');
+// How long the just-replaced validator stays acceptable after a rotation. One
+// page load fires several requests at once, and they all carry the cookie the
+// browser had before any of them returned - without this window the ones that
+// arrive second look exactly like a replayed cookie.
+define('REMEMBER_ROTATION_GRACE', max(5, envInt('REMEMBER_ROTATION_GRACE', 60)));
+
 // Security configuration
 define('MAX_LOGIN_ATTEMPTS', max(1, envInt('MAX_LOGIN_ATTEMPTS', 10)));      // Lock out after this many failed attempts
 define('LOGIN_LOCKOUT_DURATION', max(60, envInt('LOGIN_LOCKOUT_DURATION', 900))); // Lockout duration in seconds

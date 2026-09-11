@@ -11,6 +11,19 @@
     --bk-drop-blue: #60a5fa;
 }
 
+#bookkeepingView {
+    /* One height for every control in the toolbar and the Select popover, so
+       buttons, the search field, the selects and the date inputs all line up.
+       The base .form-input and .form-select disagree by 4px and date inputs
+       add 2px more of their own, so it is pinned rather than left to padding. */
+    --bk-control-height: 30px;
+    /* Status tints. Deliberately faint: a row's state should be scannable in
+       peripheral vision without the table turning into a traffic light. */
+    --bk-tint-missing: color-mix(in srgb, var(--color-danger) 5%, transparent);
+    --bk-edge-missing: color-mix(in srgb, var(--color-danger) 55%, transparent);
+    --bk-tint-excluded: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+
 #bookkeepingView.active {
     display: flex;
     flex-direction: column;
@@ -70,97 +83,251 @@
     background: var(--color-surface-3);
 }
 
-/* Toolbar */
+/* ==========================================================================
+   Toolbar
+   One bar: what this is on the left, what you can do on the right. The
+   date-selection tools live in a popover behind the Select button rather
+   than in a bar of their own - they tick rows by month or range, which is an
+   occasional job that was costing a permanent 44px strip.
+   ========================================================================== */
 
-.bk-toolbar {
+.bk-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--spacing-3);
-    padding: var(--spacing-3) var(--spacing-4);
-    border-bottom: 1px solid var(--color-border);
+    gap: var(--spacing-4);
+    padding: 0 var(--spacing-4);
+    height: 52px;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--color-border-subtle);
     background: var(--color-surface);
-    flex-wrap: wrap;
 }
 
-.bk-toolbar-left {
+.bk-bar-lead {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-3);
+    align-items: baseline;
+    gap: var(--spacing-2);
+    min-width: 0;
+}
+
+.bk-bar-title {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    margin: 0;
 }
 
 .bk-row-count {
     font-size: var(--font-size-sm);
     color: var(--color-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.bk-selection-bar {
-    display: none;
-    align-items: center;
-    gap: var(--spacing-2);
-    flex-wrap: wrap;
-}
-
-.bk-selection-count {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    margin-right: var(--spacing-2);
-}
-
-/* Select-by-date tools */
-
-.bk-select-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-4);
-    padding: var(--spacing-2) var(--spacing-4);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface);
-    flex-wrap: wrap;
-}
-
-.bk-select-group {
+.bk-bar-tools {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
 }
 
-.bk-select-group label {
+/* --- Buttons ------------------------------------------------------------ */
+
+.bk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--bk-control-height);
+    padding: 0 11px;
+    font-family: inherit;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
     font-weight: 500;
+    color: var(--color-text);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
     white-space: nowrap;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.bk-select-bar select.form-select {
-    width: auto;
-    min-width: 110px;
+.bk-btn:hover {
+    background: var(--color-surface-hover);
 }
 
-.bk-select-bar input.form-input[type="date"] {
-    width: auto;
+/* A press that follows the finger. 1px is enough to feel; more looks broken. */
+.bk-btn:active {
+    transform: translateY(1px);
 }
 
-.bk-select-range-sep {
-    color: var(--color-text-muted);
+.bk-btn:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 2px;
 }
 
-.bk-select-divider {
-    width: 1px;
-    align-self: stretch;
-    background: var(--color-border);
+.bk-btn svg {
+    flex-shrink: 0;
+    opacity: 0.7;
 }
 
-.bk-filter-group {
-    flex: 1;
-    min-width: 200px;
+/* Inverted against the page rather than painted a fixed colour, which is how
+   .btn-primary elsewhere stays legible in both themes - the dark palette's
+   --color-primary is a near-white, so light-on-primary would vanish. */
+.bk-btn-primary {
+    color: var(--color-bg);
+    background: var(--color-text);
+    border-color: transparent;
 }
 
-.bk-select-hint {
+.bk-btn-primary:hover {
+    background: var(--color-text-secondary);
+}
+
+.bk-btn-primary svg {
+    opacity: 0.9;
+}
+
+.bk-btn-small {
+    height: 26px;
+    padding: 0 9px;
     font-size: var(--font-size-xs);
+}
+
+.bk-btn-block {
+    width: 100%;
+}
+
+.bk-btn-chevron {
+    opacity: 0.45 !important;
+    margin-left: -1px;
+    transition: transform var(--transition-fast);
+}
+
+.bk-menu-wrap.is-open .bk-btn-chevron {
+    transform: rotate(180deg);
+}
+
+/* --- Search ------------------------------------------------------------- */
+
+.bk-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.bk-search-icon {
+    position: absolute;
+    left: 9px;
     color: var(--color-text-muted);
-    white-space: nowrap;
+    pointer-events: none;
+}
+
+.bk-search-input {
+    width: 200px;
+    height: var(--bk-control-height);
+    padding: 0 10px 0 28px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: width var(--transition-base), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.bk-search-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.bk-search-input:hover {
+    border-color: var(--color-text-muted);
+}
+
+/* Grows into the room the toolbar has spare, so a long search term stays
+   readable without the field taking that width when it is empty. */
+.bk-search-input:focus {
+    outline: none;
+    width: 280px;
+    border-color: var(--color-text-tertiary);
+    background: var(--color-surface-2);
+}
+
+/* --- Select popover ----------------------------------------------------- */
+
+.bk-menu-wrap {
+    position: relative;
+}
+
+.bk-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    width: 268px;
+    padding: var(--spacing-3);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    transform-origin: top right;
+    animation: bk-menu-in var(--transition-fast) ease-out;
+}
+
+@keyframes bk-menu-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-menu { animation: none; }
+}
+
+.bk-menu-title {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--spacing-3);
+}
+
+.bk-menu-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.bk-menu-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+
+.bk-menu-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.bk-menu-row .form-select,
+.bk-menu-row .form-input {
+    flex: 1;
+    min-width: 0;
+    height: var(--bk-control-height);
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.bk-menu-dash {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.bk-menu-sep {
+    height: 1px;
+    background: var(--color-border-subtle);
+    margin: var(--spacing-3) 0;
 }
 
 /* Column toggles inside the import preview */
@@ -198,22 +365,20 @@
     opacity: 1;
 }
 
-.bk-filter-group input.form-input {
-    width: 100%;
-    max-width: 320px;
-}
 
-/* Sortable column headers */
+/* ==========================================================================
+   Table
+   ========================================================================== */
 
 .bk-sortable-th {
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
+    transition: color var(--transition-fast);
 }
 
 .bk-sortable-th:hover {
     color: var(--color-text);
-    background: var(--color-surface-hover);
 }
 
 .bk-sortable-th.bk-sort-active {
@@ -221,41 +386,45 @@
 }
 
 .bk-sort-arrow {
-    margin-left: var(--spacing-2);
+    margin-left: 5px;
     vertical-align: middle;
+    opacity: 0.65;
 }
 
 /* Layout: table + drop zone side bar */
 
 .bk-body {
+    position: relative;
     flex: 1;
     display: flex;
     min-height: 0;
+    gap: var(--spacing-4);
+    padding: var(--spacing-4);
+    background: var(--color-bg);
 }
 
 .bk-table-wrap {
     position: relative;
     flex: 1;
+    min-width: 0;
     overflow: auto;
-    padding: var(--spacing-4);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 }
-
-/* Table */
 
 .bk-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     font-size: var(--font-size-sm);
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    color: var(--color-text);
 }
 
 .bk-table th,
 .bk-table td {
-    padding: var(--spacing-2) var(--spacing-3);
+    padding: 9px var(--spacing-3);
     text-align: left;
     border-bottom: 1px solid var(--color-border-subtle);
     white-space: nowrap;
@@ -265,155 +434,463 @@
     vertical-align: middle;
 }
 
+.bk-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
 .bk-table thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
-    background: var(--color-surface-3);
-    color: var(--color-text-secondary);
+    z-index: 3;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
     font-size: var(--font-size-xs);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .bk-col-check {
     width: 34px;
     text-align: center !important;
+    padding-right: 0 !important;
 }
 
-.bk-col-actions {
-    width: 1%;
+
+/* The menu column: dots, and the face of whoever the row is waiting on. Sized
+   for both so the imported columns do not shift when a row gets assigned. */
+.bk-col-menu {
+    width: 58px;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
 }
 
-/* Month separator */
-
-.bk-month-row td {
-    background: var(--color-surface-3);
-    color: var(--color-text);
-    font-weight: 700;
-    font-size: var(--font-size-sm);
-    padding: var(--spacing-2) var(--spacing-3);
-    border-top: 2px solid var(--color-border);
-    position: sticky;
-    letter-spacing: 0.02em;
+/* Money is read by comparing digits down a column, so it is right-aligned and
+   set in tabular figures - otherwise the decimal points wander. */
+.bk-table th.bk-col-amount,
+.bk-table td.bk-col-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
-/* Row status colors */
-
-.bk-row-ok td {
-    background: var(--color-success-subtle);
-}
-
-.bk-row-missing td {
-    background: var(--color-danger-subtle);
-}
-
-.bk-row-selected td {
-    box-shadow: inset 0 0 0 100vmax var(--color-accent-subtle);
-}
+/* ==========================================================================
+   Rows
+   ========================================================================== */
 
 .bk-row {
-    position: relative;
+    transition: background-color var(--transition-fast);
+}
+
+.bk-row td {
+    background: transparent;
+}
+
+.bk-row:hover td {
+    background: var(--color-surface-hover);
+}
+
+/* Only the actionable state is tinted, and barely. A row that is finished
+   needs no colour; a row still missing its invoice gets a faint wash and a
+   hairline down its leading edge, which is enough to find while scrolling. */
+.bk-row-missing td {
+    background: var(--bk-tint-missing);
+}
+
+.bk-row-missing td:first-child {
+    box-shadow: inset 2px 0 0 var(--bk-edge-missing);
+}
+
+.bk-row-missing:hover td {
+    background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+}
+
+/* Excluded rows: still listed, visibly not counted. Struck-through amounts and
+   a hatched leading edge say "this is deliberate" rather than "this is broken",
+   and the whole row is dimmed so the eye skips it when reading the column. */
+.bk-row-excluded td {
+    background: var(--bk-tint-excluded);
+    color: var(--color-text-muted);
+}
+
+.bk-row-excluded:hover td {
+    background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.bk-row-excluded td:first-child {
+    box-shadow: inset 2px 0 0 var(--color-warning);
+}
+
+/* The figure that is no longer being added up is the one to strike. */
+.bk-row-excluded td.bk-col-amount {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    opacity: 0.75;
+}
+
+/* Status colours would keep shouting from a row that no longer counts. */
+.bk-row-excluded .bk-amount-pos,
+.bk-row-excluded .bk-amount-neg,
+.bk-row-excluded .bk-badge-missing {
+    color: var(--color-text-muted);
+}
+
+.bk-row-excluded .bk-badge-missing::before {
+    background: var(--color-text-muted);
+    opacity: 0.55;
+}
+
+
+.bk-row-selected td,
+.bk-row-selected:hover td {
+    background: var(--color-primary-subtle);
+}
+
+.bk-row-selected td:first-child {
+    box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
 /* Outline draws one continuous line around the row's full bounding box,
-   unlike a per-cell box-shadow which would look like separate boxes. */
+   which a per-cell border cannot do once cells scroll horizontally. */
 .bk-row.bk-drop-target {
-    outline: 2px solid var(--bk-drop-blue);
+    outline: 2px dashed var(--bk-drop-blue);
     outline-offset: -2px;
 }
 
 .bk-row.bk-drop-target > td {
-    opacity: 0.35;
+    background: rgba(37, 99, 235, 0.08);
 }
 
-/* Floating pill shown above the row currently being dragged over. Positioned
-   in JS (top/left in px, relative to the position:relative table wrap) so it
-   always tracks the row's real rendered position. */
+/* Floating pill shown above the row currently being dragged over. */
 .bk-row-drop-pill {
-    display: none;
     position: absolute;
-    /* Centred directly on the target row. */
+    z-index: 20;
     transform: translate(-50%, -50%);
-    padding: 5px 14px;
+    padding: 5px 11px;
     border-radius: var(--radius-full);
     background: var(--bk-drop-blue);
     color: #fff;
-    font-weight: 700;
-    font-size: var(--font-size-sm);
-    letter-spacing: 0.02em;
-    white-space: nowrap;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    box-shadow: var(--shadow-md);
     pointer-events: none;
-    z-index: 10;
-    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
 }
 
 .bk-row-drop-pill.visible {
-    display: block;
+    opacity: 1;
 }
 
-/* PDF cell */
+/* ==========================================================================
+   Month separator
+   A section header, not a row: it names the month and shows what it adds up
+   to. Sticky under the column headers so the figures stay with the rows.
+   ========================================================================== */
+
+/* Not sticky vertically, deliberately. Sticky table cells are constrained by
+   the table rather than by their tbody, so every month header would pin at the
+   same offset and pile up instead of pushing the previous one off. The month
+   sits at the head of its own block, which is where it is looked for anyway. */
+.bk-month-row td {
+    z-index: 2;
+    padding: 7px var(--spacing-3);
+    background: var(--color-surface-3);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    /* The sums can be wider than one column; without this the table's shared
+       cell clipping cut the Net figure clean off. */
+    max-width: none;
+    overflow: visible;
+    white-space: normal;
+}
+
+@supports (backdrop-filter: blur(12px)) {
+    .bk-month-row td {
+        background: color-mix(in srgb, var(--color-surface-3) 82%, transparent);
+        backdrop-filter: saturate(180%) blur(12px);
+    }
+}
+
+/* Pinned to the left edge of the scroll container, so the month's figures
+   stay readable while the (wide) bank columns scroll underneath. Right-aligning
+   them inside the full-width cell put Net past the edge, where it could only be
+   reached by scrolling away from the rows it describes. */
+.bk-month-line {
+    position: sticky;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-5);
+    width: fit-content;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.bk-month-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.bk-month-stat-label {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* The month's one figure, and the button that opens its workings. */
+
+.bk-month-total {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 3px 8px;
+    margin: -3px -2px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.bk-month-total:hover,
+.bk-month-total.is-open {
+    background: var(--color-surface-2);
+    border-color: var(--color-border);
+}
+
+.bk-month-total:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 1px;
+}
+
+.bk-month-chevron {
+    align-self: center;
+    opacity: 0.4;
+    transition: transform var(--transition-fast);
+}
+
+.bk-month-total.is-open .bk-month-chevron {
+    transform: rotate(180deg);
+}
+
+/* A month with entries left out says so on the line itself, so a total can
+   never look like it simply disagrees with the rows above it. */
+.bk-month-excluded-dot {
+    align-self: center;
+    width: 5px;
+    height: 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-warning);
+}
+
+/* ==========================================================================
+   Month breakdown popover
+   Appended to <body>, because the scrolling table clips its own cells.
+   ========================================================================== */
+
+.bk-breakdown {
+    position: fixed;
+    z-index: 60;
+    width: 250px;
+    padding: var(--spacing-3);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    font-size: var(--font-size-sm);
+    animation: bk-menu-in var(--transition-fast) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-breakdown { animation: none; }
+}
+
+.bk-breakdown-title {
+    margin: 0 0 var(--spacing-3);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+}
+
+.bk-breakdown-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    min-height: 26px;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.bk-breakdown-row + .bk-breakdown-row {
+    margin-top: 2px;
+}
+
+.bk-breakdown-row--strong {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.bk-breakdown-sep {
+    height: 1px;
+    background: var(--color-border-subtle);
+    margin: var(--spacing-2) 0;
+}
+
+/* The tax box. It lives in the breakdown popover now, so it is styled on its
+   own class rather than inheriting anything from the table. */
+.bk-month-tax-input {
+    width: 104px;
+    height: 26px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.bk-month-tax-input:hover {
+    border-color: var(--color-text-muted);
+}
+
+.bk-month-tax-input:focus {
+    outline: none;
+    border-color: var(--color-text-tertiary);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.bk-month-tax-input::placeholder {
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
+.bk-breakdown-note {
+    margin: var(--spacing-3) 0 0;
+    padding-top: var(--spacing-2);
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    color: var(--color-warning);
+}
+
+/* ==========================================================================
+   PDF cell
+   ========================================================================== */
 
 .bk-pdf-chip {
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-1);
-    max-width: 260px;
+    gap: 5px;
+    max-width: 100%;
 }
 
 .bk-pdf-chip a {
-    color: var(--color-text);
-    font-weight: 500;
-    text-decoration: underline;
-    text-decoration-color: var(--color-text-muted);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    border-bottom: 1px solid transparent;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.bk-pdf-chip a:hover {
+    color: var(--color-text);
+    border-bottom-color: var(--color-border);
 }
 
 .bk-pdf-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    padding: 0;
     border: none;
-    background: none;
-    color: var(--color-text-tertiary);
-    font-size: 1rem;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 14px;
     line-height: 1;
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: var(--radius-sm);
+    opacity: 0;
+    transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Destructive controls stay out of sight until the row is under the pointer,
+   so a dense table is not covered in little crosses. */
+.bk-row:hover .bk-pdf-remove,
+.bk-pdf-remove:focus-visible {
+    opacity: 1;
 }
 
 .bk-pdf-remove:hover {
-    color: var(--color-danger);
     background: var(--color-danger-subtle);
+    color: var(--color-danger);
 }
 
+/* Status as a dot plus a word, rather than a saturated pill repeated down
+   the whole page. */
 .bk-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
 }
 
-.bk-badge-nopdf {
-    background: var(--color-success-subtle);
-    color: var(--color-success);
-    border: 1px solid var(--color-success);
+.bk-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
 }
 
 .bk-badge-missing {
-    background: var(--color-danger-subtle);
     color: var(--color-danger);
-    border: 1px solid var(--color-danger);
 }
 
-/* Row action icons */
-
-.bk-row-actions {
-    display: flex;
-    gap: var(--spacing-1);
-    justify-content: flex-end;
+.bk-badge-missing::before {
+    background: var(--color-danger);
 }
+
+.bk-badge-nopdf {
+    color: var(--color-text-muted);
+}
+
+.bk-badge-nopdf::before {
+    background: var(--color-text-muted);
+    opacity: 0.55;
+}
+
+/* ==========================================================================
+   Icon buttons
+   Row actions moved into the row menu; what is left of these is the delete
+   button on a pooled PDF.
+   ========================================================================== */
 
 .bk-icon-btn {
     display: inline-flex;
@@ -421,13 +898,15 @@
     justify-content: center;
     width: 26px;
     height: 26px;
+    padding: 0;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--color-text-tertiary);
+    color: var(--color-text-muted);
     cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
+    transition: background-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
 }
+
 
 .bk-icon-btn:hover {
     background: var(--color-accent-subtle);
@@ -439,95 +918,497 @@
     color: var(--color-danger);
 }
 
-.bk-icon-btn-active {
-    color: var(--color-success);
-}
 
-/* Empty state */
+/* ==========================================================================
+   Row menu
+   The three dots between the tick box and the first column, the assignee's
+   face beside them, and the popover they open (on <body>, because the
+   scrolling table clips its own cells).
+   ========================================================================== */
 
-.bk-empty {
-    padding: var(--spacing-10);
-    text-align: center;
-    color: var(--color-text-tertiary);
-}
-
-/* Drop zone */
-
-.bk-dropzone {
-    width: 280px;
-    flex-shrink: 0;
+.bk-row-menu-cell {
     display: flex;
-    flex-direction: column;
-    border-left: 1px solid var(--color-border);
-    background: var(--color-surface);
-    transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    align-items: center;
+    gap: 4px;
 }
 
-.bk-dropzone-hover {
+.bk-row-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    /* Every action a row has is behind this button, so unlike the old icon
+       strip it never disappears completely - it only steps back. */
+    opacity: 0.4;
+    transition: background-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.bk-row:hover .bk-row-menu-btn,
+.bk-row-menu-btn:focus-visible,
+.bk-row-menu-btn.is-open {
+    opacity: 1;
+}
+
+.bk-row-menu-btn:hover,
+.bk-row-menu-btn.is-open {
     background: var(--color-accent-subtle);
-    box-shadow: inset 0 0 0 2px var(--color-accent);
-}
-
-.bk-dropzone-header {
-    padding: var(--spacing-3) var(--spacing-4);
-    border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.bk-dropzone-header h3 {
-    margin: 0;
-    font-size: var(--font-size-base);
     color: var(--color-text);
 }
 
-.bk-dropzone-header p {
-    margin: var(--spacing-1) 0 0;
+/* The face of the person the row is waiting on. */
+.bk-assignee {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+}
+
+.bk-assignee img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bk-assignee.has-photo {
+    border-color: transparent;
+}
+
+.bk-rowmenu {
+    position: fixed;
+    z-index: 60;
+    width: 252px;
+    max-width: calc(100vw - 16px);
+    padding: var(--spacing-2);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    font-size: var(--font-size-sm);
+    animation: bk-menu-in var(--transition-fast) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-rowmenu { animation: none; }
+}
+
+.bk-rowmenu-sep {
+    height: 1px;
+    background: var(--color-border-subtle);
+    margin: var(--spacing-2) 0;
+}
+
+.bk-rowmenu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: 100%;
+    padding: 7px var(--spacing-2);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.bk-rowmenu-item:hover,
+.bk-rowmenu-item:focus-visible {
+    background: var(--color-accent-subtle);
+}
+
+.bk-rowmenu-item-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+
+/* The label takes the slack so the value and the arrow stay pinned right. */
+.bk-rowmenu-item-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* What the submenu is currently set to, read on the way into it. */
+.bk-rowmenu-item-value {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-muted);
+}
+
+.bk-rowmenu-item-arrow {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+
+/* The entry whose submenu is showing stays lit while you are in it. */
+.bk-rowmenu-item.is-open,
+.bk-rowmenu-item.is-open:hover {
+    background: var(--color-primary-subtle);
+}
+
+/* --- The submenu -------------------------------------------------------- */
+
+.bk-rowmenu-sub {
+    width: 236px;
+}
+
+.bk-rowmenu-subhead {
+    margin: 0;
+    padding: var(--spacing-2) var(--spacing-2) 6px;
     font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+}
+
+.bk-rowmenu-option .bk-rowmenu-item-icon {
+    width: 22px;
+}
+
+/* Only the current one carries a tick, but the space for it is always there,
+   so the names line up whether or not anything is set. */
+.bk-rowmenu-item-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    flex-shrink: 0;
+    color: inherit;
+}
+
+.bk-rowmenu-option.is-current {
+    font-weight: 600;
+}
+
+/* Taking a row back off somebody is the undoing action in this list, and is
+   marked like the other one in the menu. Its icon carries the colour too. */
+.bk-rowmenu-option.is-nobody {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-option.is-nobody .bk-rowmenu-item-icon {
+    color: inherit;
+}
+
+.bk-rowmenu-option.is-nobody:hover,
+.bk-rowmenu-option.is-nobody:focus-visible {
+    background: var(--color-danger-subtle);
+}
+
+.bk-rowmenu-subnote {
+    margin: var(--spacing-2) 0 0;
+    padding: var(--spacing-2) var(--spacing-2) var(--spacing-1);
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
+/* A face in a menu: the same object as the one on the row, one size up. */
+.bk-menu-face {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.bk-menu-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bk-menu-face.has-photo {
+    border-color: transparent;
+}
+
+.bk-menu-face.is-none {
+    background: transparent;
+    border-color: transparent;
+    color: inherit;
+}
+
+.bk-rowmenu-item.is-active .bk-rowmenu-item-icon {
+    color: var(--color-success);
+}
+
+.bk-rowmenu-item.is-danger {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-item.is-danger .bk-rowmenu-item-icon {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-item.is-danger:hover,
+.bk-rowmenu-item.is-danger:focus-visible {
+    background: var(--color-danger-subtle);
+}
+
+/* Arriving from the home page: say which row was meant, then get out of the
+   way. Long enough to find with the eye, short enough not to linger. */
+.bk-row-flash td {
+    animation: bk-row-flash 2.2s ease-out;
+}
+
+@keyframes bk-row-flash {
+    0%, 55% { background: var(--color-primary-subtle); }
+    100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-row-flash td { animation: none; box-shadow: inset 0 0 0 9999px var(--color-primary-subtle); }
+}
+
+/* ==========================================================================
+   Contextual selection bar
+   Floats over the table while rows are ticked. updateToolbar() sets an inline
+   display of flex or none, which outranks the display:none below - that rule
+   is only here so the bar starts hidden before any selection has happened.
+   ========================================================================== */
+
+.bk-selection-bar {
+    display: none;
+    position: absolute;
+    left: 50%;
+    bottom: var(--spacing-5);
+    z-index: 30;
+    transform: translateX(-50%);
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: 7px 8px 7px var(--spacing-4);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+    animation: bk-sel-in var(--transition-base) ease-out;
+}
+
+@supports (backdrop-filter: blur(20px)) {
+    .bk-selection-bar {
+        background: color-mix(in srgb, var(--color-surface-2) 80%, transparent);
+        backdrop-filter: saturate(180%) blur(20px);
+    }
+}
+
+@keyframes bk-sel-in {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to   { opacity: 1; transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-selection-bar { animation: none; }
+}
+
+.bk-selection-count {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.bk-selection-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--color-border);
+}
+
+.bk-sel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 11px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.bk-sel-btn svg {
+    opacity: 0.75;
+}
+
+.bk-sel-btn:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-text);
+}
+
+.bk-sel-btn-danger:hover {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+}
+
+.bk-sel-btn-plain {
+    color: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   Empty state
+   ========================================================================== */
+
+.bk-empty {
+    padding: var(--spacing-10) var(--spacing-4);
+    text-align: center;
     color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+}
+
+.bk-empty strong {
+    display: block;
+    margin-bottom: var(--spacing-1);
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+}
+
+/* ==========================================================================
+   Drop zone
+   ========================================================================== */
+
+.bk-dropzone {
+    display: flex;
+    flex-direction: column;
+    width: 260px;
+    flex: 0 0 260px;
+    padding: var(--spacing-3);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.bk-dropzone-hover {
+    border-color: var(--bk-drop-blue);
+    border-style: dashed;
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.bk-dropzone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-2);
+    margin-bottom: 6px;
+}
+
+.bk-dropzone-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
 }
 
 .bk-pool-count {
     font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
     font-weight: 500;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.bk-dropzone-hint {
+    margin: 0 0 var(--spacing-3);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    color: var(--color-text-muted);
 }
 
 .bk-pool-list {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: var(--spacing-2);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-2);
+    gap: 4px;
+    margin: 0 calc(var(--spacing-2) * -1);
+    padding: 0 var(--spacing-2);
 }
 
 .bk-pool-empty {
-    padding: var(--spacing-4);
-    font-size: var(--font-size-sm);
-    color: var(--color-text-muted);
+    margin: auto 0;
+    padding: var(--spacing-6) var(--spacing-2);
     text-align: center;
-    border: 2px dashed var(--color-border);
-    border-radius: var(--radius-md);
-    margin: var(--spacing-2);
+    font-size: var(--font-size-xs);
+    line-height: 1.6;
+    color: var(--color-text-muted);
 }
 
 .bk-pool-item {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    padding: var(--spacing-2) var(--spacing-3);
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
+    padding: 7px 8px;
     border-radius: var(--radius-md);
+    background: transparent;
     cursor: grab;
+    transition: background-color var(--transition-fast);
+}
+
+.bk-pool-item:hover {
+    background: var(--color-surface-hover);
 }
 
 .bk-pool-item.dragging {
-    opacity: 0.5;
+    opacity: 0.4;
+    cursor: grabbing;
 }
 
 .bk-pool-item-icon {
-    color: var(--color-text-tertiary);
     flex-shrink: 0;
+    color: var(--color-text-muted);
 }
 
 .bk-pool-item-info {
@@ -535,25 +1416,36 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    gap: 1px;
 }
 
 .bk-pool-item-name {
     font-size: var(--font-size-sm);
-    font-weight: 500;
     color: var(--color-text);
-    white-space: nowrap;
+    text-decoration: none;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bk-pool-item-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .bk-pool-item-size {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
-.bk-dropzone-footer {
-    padding: var(--spacing-3);
-    border-top: 1px solid var(--color-border-subtle);
+.bk-pool-item .bk-icon-btn {
+    opacity: 0;
+}
+
+.bk-pool-item:hover .bk-icon-btn,
+.bk-pool-item .bk-icon-btn:focus-visible {
+    opacity: 1;
 }
 
 /* Import modal */
@@ -817,18 +1709,107 @@
     color: #fff;
 }
 
-/* Responsive */
+/* Scrollbars, kept quiet. The table is wide by nature - a bank export has a
+   lot of columns - so its scrollbar is on screen permanently and should not
+   draw the eye the way the platform default does. */
+.bk-table-wrap,
+.bk-pool-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+}
 
-@media (max-width: 900px) {
-    .bk-body {
-        flex-direction: column;
+.bk-table-wrap::-webkit-scrollbar,
+.bk-pool-list::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.bk-table-wrap::-webkit-scrollbar-track,
+.bk-pool-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.bk-table-wrap::-webkit-scrollbar-thumb,
+.bk-pool-list::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: var(--radius-full);
+}
+
+.bk-table-wrap::-webkit-scrollbar-thumb:hover,
+.bk-pool-list::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+    background-clip: content-box;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+    .bk-search-input {
+        width: 150px;
     }
 
+    .bk-search-input:focus {
+        width: 220px;
+    }
+}
+
+@media (max-width: 900px) {
+    .bk-bar {
+        height: auto;
+        padding: var(--spacing-2) var(--spacing-3);
+        flex-wrap: wrap;
+        gap: var(--spacing-2);
+    }
+
+    .bk-bar-tools {
+        width: 100%;
+    }
+
+    .bk-search {
+        flex: 1;
+    }
+
+    .bk-search-input,
+    .bk-search-input:focus {
+        width: 100%;
+    }
+
+    .bk-body {
+        flex-direction: column;
+        padding: var(--spacing-3);
+        gap: var(--spacing-3);
+    }
+
+    /* The drop zone goes under the table rather than beside it, and stops
+       growing past a third of the height so the entries stay the subject. */
     .bk-dropzone {
         width: 100%;
-        max-height: 40%;
-        border-left: none;
-        border-top: 1px solid var(--color-border);
+        flex: 0 0 auto;
+        max-height: 34%;
         order: 2;
+    }
+
+    .bk-breakdown {
+        width: 230px;
+    }
+
+    /* Touch has no hover, so the row controls that reveal on hover would
+       otherwise be unreachable. */
+    .bk-row-menu-btn,
+    .bk-pdf-remove,
+    .bk-pool-item .bk-icon-btn {
+        opacity: 1;
+    }
+}
+
+@media (hover: none) {
+    .bk-row-menu-btn,
+    .bk-pdf-remove,
+    .bk-pool-item .bk-icon-btn {
+        opacity: 1;
     }
 }

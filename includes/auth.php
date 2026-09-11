@@ -105,45 +105,64 @@ class Auth
     {
         self::startSession();
 
+        // Every failure below ends the session and then falls through to the
+        // remember-me cookie, which is the whole point of that cookie: a
+        // session that has merely aged out should not cost a password.
+        // Explicitly signing out is different - logout() deletes the token
+        // first, so there is nothing left here to be let back in by.
         if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
-            return false;
+            return self::attemptRememberLogin();
         }
 
         // Enforce server-side session timeout
-        if (isset($_SESSION['login_time'])) {
-            $elapsed = time() - $_SESSION['login_time'];
-            if ($elapsed > SESSION_LIFETIME) {
-                self::logout();
-                return false;
-            }
-        } else {
+        if (!isset($_SESSION['login_time'])) {
             // No login_time set - invalid session
-            self::logout();
-            return false;
+            self::endSession();
+            return self::attemptRememberLogin();
+        }
+
+        if (time() - $_SESSION['login_time'] > SESSION_LIFETIME) {
+            self::endSession();
+            return self::attemptRememberLogin();
         }
 
         // Enforce the idle timeout. last_activity was already being recorded but
         // never checked, so a stolen session cookie stayed valid for the full
         // 24 hours regardless of whether anyone was using it.
-        if (isset($_SESSION['last_activity'])) {
-            if (time() - (int) $_SESSION['last_activity'] > SESSION_IDLE_TIMEOUT) {
-                self::logout();
-                return false;
-            }
+        if (isset($_SESSION['last_activity'])
+            && time() - (int) $_SESSION['last_activity'] > SESSION_IDLE_TIMEOUT) {
+            self::endSession();
+            return self::attemptRememberLogin();
         }
 
         // A session is only as valid as the account behind it. Disabling or
         // deleting a user, or that user changing their password, has to take
         // effect on their next request - not whenever their cookie expires.
+        //
+        // Falling through to the cookie is safe here: a remember token carries
+        // the same status and password checks, so a disabled account or a
+        // changed password fails both and the token is dropped on the way out.
         if (!self::sessionAccountStillValid()) {
-            self::logout();
-            return false;
+            self::endSession();
+            return self::attemptRememberLogin();
         }
 
         // Refresh last activity timestamp
         $_SESSION['last_activity'] = time();
 
         return true;
+    }
+
+    /**
+     * Empty the session without destroying it or touching any cookie.
+     *
+     * Used for sessions that expired rather than sessions that were signed out
+     * of: the session must stay open so that establishSession() can regenerate
+     * its id if the remember-me cookie immediately reopens it.
+     */
+    private static function endSession(): void
+    {
+        $_SESSION = [];
     }
 
     /**
@@ -301,7 +320,7 @@ class Auth
      *
      * @return array{success: bool, error?: string, remaining_attempts?: int, locked_until?: int}
      */
-    public static function login(string $email, string $password): array
+    public static function login(string $email, string $password, bool $remember = false): array
     {
         self::startSession();
 
@@ -342,19 +361,20 @@ class Auth
         }
 
         if ($authenticated !== null) {
+            // The password was right, so this IP is no longer suspect even if
+            // the second factor is still outstanding.
             self::recordLoginAttempt($ip, true, $identity);
             self::clearFailedAttempts($ip);
             self::clearFailedAttempts($identity);
 
-            self::establishSession($authenticated, $ip);
-
-            if ($authenticated['id'] !== null) {
-                try {
-                    (new User())->recordLogin((int) $authenticated['id']);
-                } catch (Throwable $e) {
-                    // A failed bookkeeping update must not block the sign-in.
-                }
+            // The owner has no registered address to send a code to, and is the
+            // recovery path that must keep working when mail does not. It stays
+            // single-factor by design; every account with an inbox does not.
+            if (self::twoFactorRequiredFor($authenticated)) {
+                return self::beginTwoFactor($authenticated, $ip, $remember);
             }
+
+            self::completeLogin($authenticated, $ip, $remember);
 
             return ['success' => true];
         }
@@ -531,12 +551,644 @@ class Auth
         return true;
     }
 
+    // -------------------------------------------------------------------------
+    // Two-factor sign-in
+    // -------------------------------------------------------------------------
+
+    /**
+     * Does this identity have to pass a one-time code?
+     *
+     * Only accounts with an inbox can. The owner login has no registered
+     * address and is the documented way back in when everything else is
+     * broken, so it is exempt - see TWO_FACTOR_ENABLED in config.php.
+     */
+    private static function twoFactorRequiredFor(array $identity): bool
+    {
+        if (!TWO_FACTOR_ENABLED) {
+            return false;
+        }
+        if (!empty($identity['is_owner']) || $identity['id'] === null) {
+            return false;
+        }
+
+        return filter_var((string) $identity['email'], FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * Finish a sign-in: open the session, and optionally the remember cookie.
+     */
+    private static function completeLogin(array $identity, string $ip, bool $remember): void
+    {
+        self::establishSession($identity, $ip);
+
+        if ($remember && $identity['id'] !== null) {
+            self::issueRememberToken((int) $identity['id']);
+        }
+
+        if ($identity['id'] !== null) {
+            try {
+                (new User())->recordLogin((int) $identity['id']);
+            } catch (Throwable $e) {
+                // A failed bookkeeping update must not block the sign-in.
+            }
+        }
+    }
+
+    /**
+     * Open a two-factor challenge and mail the code out.
+     *
+     * The session gets only the challenge id. Everything that decides who is
+     * being signed in lives in the row, so nothing a client can reach names the
+     * account - editing the cookie can at most point at a challenge that is not
+     * yours, and that challenge still needs its own code.
+     *
+     * @return array{success: bool, challenge?: string, error?: string, delivered?: bool, debug_code?: string}
+     */
+    private static function beginTwoFactor(array $identity, string $ip, bool $remember): array
+    {
+        $userId = (int) $identity['id'];
+
+        if (!self::codeRequestAllowed($userId)) {
+            return [
+                'success' => false,
+                'error' => 'Too many sign-in codes requested. Please try again later.',
+            ];
+        }
+
+        // Six digits, uniformly drawn. random_int is the CSPRNG - mt_rand would
+        // make the code predictable from a couple of observed ones.
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $challengeId = bin2hex(random_bytes(32));
+
+        try {
+            $db = Database::getInstance();
+
+            // One live challenge per account. Without this, a second sign-in
+            // attempt would leave the first code valid, so two codes would open
+            // the same door and only one of them was ever read by its owner.
+            $stmt = $db->prepare("DELETE FROM login_challenges WHERE user_id = :uid AND consumed_at IS NULL");
+            $stmt->execute(['uid' => $userId]);
+
+            $stmt = $db->prepare("
+                INSERT INTO login_challenges (challenge_id, user_id, code_hash, remember, ip_address, expires_at)
+                VALUES (:cid, :uid, :hash, :remember, :ip, :expires)
+            ");
+            $stmt->execute([
+                'cid' => $challengeId,
+                'uid' => $userId,
+                // password_hash, not a bare SHA: the code is only a million
+                // wide, so the stored form has to be slow to try offline.
+                'hash' => password_hash($code, PASSWORD_DEFAULT),
+                'remember' => $remember ? 1 : 0,
+                'ip' => $ip,
+                // gmdate to match SQLite's CURRENT_TIMESTAMP, which is UTC.
+                'expires' => gmdate('Y-m-d H:i:s', time() + LOGIN_CODE_LIFETIME),
+            ]);
+        } catch (Throwable $e) {
+            error_log('two-factor challenge could not be created: ' . $e->getMessage());
+            return ['success' => false, 'error' => 'Could not start sign-in. Please try again.'];
+        }
+
+        $_SESSION['pending_challenge'] = $challengeId;
+
+        $delivered = Mailer::sendLoginCode(
+            (string) $identity['email'],
+            (string) $identity['name'],
+            $code,
+            LOGIN_CODE_LIFETIME
+        );
+
+        $result = [
+            'success' => false,
+            'challenge' => $challengeId,
+            'delivered' => $delivered,
+        ];
+
+        // Local development has no working MTA, so an undeliverable code would
+        // mean nobody can sign in to their own test instance. Showing it is
+        // only ever acceptable because the request came from this machine; on
+        // any other host the code goes to the log and nowhere else.
+        if (!$delivered) {
+            error_log('two-factor code for user ' . $userId . ' could not be mailed');
+            if (self::isLocalRequest()) {
+                $result['debug_code'] = $code;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * True when this request came from the machine the app runs on.
+     *
+     * Used for one thing only: deciding whether an undeliverable sign-in code
+     * may be shown on screen. It deliberately looks at the real socket peer and
+     * never at a proxy header, which a client controls.
+     */
+    public static function isLocalRequest(): bool
+    {
+        $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+
+        return in_array($remote, ['127.0.0.1', '::1'], true);
+    }
+
+    /**
+     * Cap how many codes one account can trigger per hour.
+     */
+    private static function codeRequestAllowed(int $userId): bool
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT COUNT(*) FROM login_challenges
+                WHERE user_id = :uid AND created_at > datetime('now', '-1 hour')
+            ");
+            $stmt->execute(['uid' => $userId]);
+
+            return (int) $stmt->fetchColumn() < LOGIN_CODE_MAX_PER_HOUR;
+        } catch (Throwable $e) {
+            error_log('code throttle check failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * The challenge this session is part-way through, or null.
+     *
+     * @return array|null The challenge row joined to its account.
+     */
+    public static function pendingChallenge(): ?array
+    {
+        self::startSession();
+
+        $challengeId = (string) ($_SESSION['pending_challenge'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/', $challengeId)) {
+            return null;
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT c.*, u.email, u.name, u.role, u.status
+                FROM login_challenges c
+                JOIN users u ON u.id = c.user_id
+                WHERE c.challenge_id = :cid
+            ");
+            $stmt->execute(['cid' => $challengeId]);
+            $row = $stmt->fetch();
+        } catch (Throwable $e) {
+            return null;
+        }
+
+        if (!$row || $row['consumed_at'] !== null) {
+            return null;
+        }
+        if (strtotime((string) $row['expires_at'] . ' UTC') < time()) {
+            return null;
+        }
+        if ($row['status'] !== User::STATUS_ACTIVE) {
+            return null;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Check a submitted code and, if it matches, sign the account in.
+     *
+     * @return array{success: bool, error?: string, remaining?: int}
+     */
+    public static function verifyTwoFactor(string $submitted): array
+    {
+        self::startSession();
+
+        $row = self::pendingChallenge();
+        if ($row === null) {
+            return ['success' => false, 'error' => 'This sign-in has expired. Please start again.'];
+        }
+
+        $submitted = preg_replace('/\D/', '', $submitted) ?? '';
+        $ip = self::getClientIp();
+
+        // Count the attempt before checking it, so a client that abandons the
+        // request mid-flight cannot get a free guess.
+        try {
+            $db = Database::getInstance();
+            $db->prepare("UPDATE login_challenges SET attempts = attempts + 1 WHERE id = :id")
+               ->execute(['id' => (int) $row['id']]);
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'Could not verify the code. Please try again.'];
+        }
+
+        $attempts = (int) $row['attempts'] + 1;
+
+        if ($attempts > LOGIN_CODE_MAX_ATTEMPTS) {
+            self::discardChallenge((int) $row['id']);
+            self::recordLoginAttempt($ip, false, (string) $row['email']);
+
+            return ['success' => false, 'error' => 'Too many incorrect codes. Please sign in again.'];
+        }
+
+        if ($submitted === '' || !password_verify($submitted, (string) $row['code_hash'])) {
+            self::recordLoginAttempt($ip, false, (string) $row['email']);
+            $remaining = max(0, LOGIN_CODE_MAX_ATTEMPTS - $attempts);
+
+            return [
+                'success' => false,
+                'error' => $remaining > 0
+                    ? "Incorrect code. $remaining attempt(s) remaining."
+                    : 'Incorrect code. Please sign in again.',
+                'remaining' => $remaining,
+            ];
+        }
+
+        // Spend the challenge before opening the session: the UPDATE only
+        // matches while consumed_at is still null, so two requests carrying the
+        // same code cannot both get through.
+        try {
+            $db = Database::getInstance();
+            $claim = $db->prepare("
+                UPDATE login_challenges SET consumed_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND consumed_at IS NULL
+            ");
+            $claim->execute(['id' => (int) $row['id']]);
+
+            if ($claim->rowCount() !== 1) {
+                return ['success' => false, 'error' => 'This code has already been used.'];
+            }
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'Could not verify the code. Please try again.'];
+        }
+
+        unset($_SESSION['pending_challenge']);
+        self::clearFailedAttempts((string) $row['email']);
+
+        self::completeLogin([
+            'id' => (int) $row['user_id'],
+            'name' => (string) $row['name'],
+            'email' => (string) $row['email'],
+            'role' => User::normalizeRole($row['role']),
+            'is_owner' => false,
+        ], $ip, (int) $row['remember'] === 1);
+
+        return ['success' => true];
+    }
+
+    /**
+     * Send a fresh code for the challenge in flight, keeping its remember flag.
+     *
+     * @return array{success: bool, error?: string, delivered?: bool, debug_code?: string}
+     */
+    public static function resendTwoFactor(): array
+    {
+        $row = self::pendingChallenge();
+        if ($row === null) {
+            return ['success' => false, 'error' => 'This sign-in has expired. Please start again.'];
+        }
+
+        // beginTwoFactor drops the outstanding challenge for this account, so
+        // the code just replaced stops working the moment the new one is sent.
+        $result = self::beginTwoFactor([
+            'id' => (int) $row['user_id'],
+            'name' => (string) $row['name'],
+            'email' => (string) $row['email'],
+            'role' => User::normalizeRole($row['role']),
+            'is_owner' => false,
+        ], self::getClientIp(), (int) $row['remember'] === 1);
+
+        if (isset($result['challenge'])) {
+            return [
+                'success' => true,
+                'delivered' => $result['delivered'] ?? false,
+                'debug_code' => $result['debug_code'] ?? null,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Drop a challenge and the session's pointer to it.
+     */
+    private static function discardChallenge(int $id): void
+    {
+        try {
+            Database::getInstance()
+                ->prepare("DELETE FROM login_challenges WHERE id = :id")
+                ->execute(['id' => $id]);
+        } catch (Throwable $e) {
+            // Nothing to do: it expires on its own.
+        }
+
+        unset($_SESSION['pending_challenge']);
+    }
+
+    /**
+     * Abandon whatever sign-in is in flight, e.g. "use a different account".
+     */
+    public static function cancelTwoFactor(): void
+    {
+        self::startSession();
+
+        $row = self::pendingChallenge();
+        if ($row !== null) {
+            self::discardChallenge((int) $row['id']);
+        }
+
+        unset($_SESSION['pending_challenge']);
+    }
+
+    /**
+     * Clear out spent and expired challenges.
+     */
+    public static function pruneChallenges(): void
+    {
+        try {
+            Database::getInstance()->exec(
+                "DELETE FROM login_challenges
+                 WHERE expires_at < datetime('now') OR consumed_at IS NOT NULL"
+            );
+        } catch (Throwable $e) {
+            // Housekeeping only.
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // "Remember this device"
+    // -------------------------------------------------------------------------
+    //
+    // The cookie is "<selector>:<validator>". The selector is the lookup key and
+    // is stored in the clear; the validator is stored only as a SHA-256 hash.
+    // Looking a token up therefore costs one indexed read, and a dump of the
+    // table still contains nothing that can be presented as a cookie.
+    //
+    // SHA-256 rather than password_hash here on purpose: the validator is 32
+    // bytes from the CSPRNG, so it has nothing to brute force and does not need
+    // a slow hash - unlike the six-digit sign-in code, which does.
+
+    /**
+     * Issue a remember-me cookie for an account.
+     */
+    private static function issueRememberToken(int $userId): void
+    {
+        if (!REMEMBER_ME_ENABLED) {
+            return;
+        }
+
+        $selector = bin2hex(random_bytes(16));
+        $validator = bin2hex(random_bytes(32));
+        $expiresAt = time() + REMEMBER_ME_LIFETIME;
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                INSERT INTO remember_tokens (selector, validator_hash, user_id, pw_stamp, expires_at)
+                VALUES (:selector, :hash, :uid, :stamp, :expires)
+            ");
+            $stmt->execute([
+                'selector' => $selector,
+                'hash' => hash('sha256', $validator),
+                'uid' => $userId,
+                // Pins the token to the password it was issued under, so a
+                // password change retires every device without a second query.
+                'stamp' => self::readPasswordStamp($userId),
+                'expires' => gmdate('Y-m-d H:i:s', $expiresAt),
+            ]);
+        } catch (Throwable $e) {
+            error_log('could not issue remember token: ' . $e->getMessage());
+            return;
+        }
+
+        self::setRememberCookie($selector . ':' . $validator, $expiresAt);
+    }
+
+    /**
+     * Write (or clear, with an expiry in the past) the remember-me cookie.
+     */
+    private static function setRememberCookie(string $value, int $expiresAt): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        setcookie(REMEMBER_COOKIE_NAME, $value, [
+            'expires' => $expiresAt,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Strict',
+            'secure' => self::isHttps(),
+        ]);
+    }
+
+    /**
+     * Try to restore a session from the remember-me cookie.
+     *
+     * Called when there is no live session. A token that verifies is rotated on
+     * the spot, so a cookie is only ever good for one restore.
+     */
+    public static function attemptRememberLogin(): bool
+    {
+        if (!REMEMBER_ME_ENABLED || empty($_COOKIE[REMEMBER_COOKIE_NAME])) {
+            return false;
+        }
+
+        $raw = (string) $_COOKIE[REMEMBER_COOKIE_NAME];
+        if (substr_count($raw, ':') !== 1) {
+            self::clearRememberCookie();
+            return false;
+        }
+
+        [$selector, $validator] = explode(':', $raw, 2);
+        if (!preg_match('/^[a-f0-9]{32}$/', $selector) || !preg_match('/^[a-f0-9]{64}$/', $validator)) {
+            self::clearRememberCookie();
+            return false;
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT t.*, u.name, u.email, u.role, u.status, u.password_changed_at
+                FROM remember_tokens t
+                JOIN users u ON u.id = t.user_id
+                WHERE t.selector = :selector
+            ");
+            $stmt->execute(['selector' => $selector]);
+            $row = $stmt->fetch();
+        } catch (Throwable $e) {
+            return false;
+        }
+
+        if (!$row) {
+            self::clearRememberCookie();
+            return false;
+        }
+
+        $presented = hash('sha256', $validator);
+        $current = hash_equals((string) $row['validator_hash'], $presented);
+
+        // The validator this one replaced, if that happened moments ago. A page
+        // load fires several requests together, all carrying the cookie the
+        // browser held before any of them came back: the first rotates, and the
+        // rest legitimately present the value it just superseded.
+        $withinGrace = !$current
+            && $row['previous_hash'] !== null
+            && $row['rotated_at'] !== null
+            && hash_equals((string) $row['previous_hash'], $presented)
+            && (time() - strtotime((string) $row['rotated_at'] . ' UTC')) <= REMEMBER_ROTATION_GRACE;
+
+        // Neither the current validator nor a freshly retired one: somebody is
+        // presenting a copy of this cookie. The real owner's token is gone
+        // either way, so drop every token this account holds and make them sign
+        // in again - that is the point of splitting the cookie in two.
+        if (!$current && !$withinGrace) {
+            error_log('remember token reuse detected for user ' . (int) $row['user_id']);
+            self::revokeRememberTokensFor((int) $row['user_id']);
+            self::clearRememberCookie();
+            return false;
+        }
+
+        $invalid = strtotime((string) $row['expires_at'] . ' UTC') < time()
+            || $row['status'] !== User::STATUS_ACTIVE
+            || (string) ($row['pw_stamp'] ?? '') !== (string) ($row['password_changed_at'] ?? '');
+
+        if ($invalid) {
+            self::deleteRememberToken($selector);
+            self::clearRememberCookie();
+            return false;
+        }
+
+        // Rotate, but only for the request that presented the live validator.
+        // One inside the grace window is a straggler from a rotation that has
+        // already happened: it signs in, and leaves both the row and the cookie
+        // to the request that won.
+        $newValidator = null;
+        $rotated = false;
+        $expiresAt = time() + REMEMBER_ME_LIFETIME;
+
+        if ($current) {
+            $newValidator = bin2hex(random_bytes(32));
+
+            try {
+                $stmt = $db->prepare("
+                    UPDATE remember_tokens
+                    SET validator_hash = :hash,
+                        previous_hash = :previous,
+                        rotated_at = CURRENT_TIMESTAMP,
+                        expires_at = :expires,
+                        last_used_at = CURRENT_TIMESTAMP
+                    WHERE id = :id AND validator_hash = :old
+                ");
+                $stmt->execute([
+                    'hash' => hash('sha256', $newValidator),
+                    'previous' => (string) $row['validator_hash'],
+                    'expires' => gmdate('Y-m-d H:i:s', $expiresAt),
+                    'id' => (int) $row['id'],
+                    'old' => (string) $row['validator_hash'],
+                ]);
+
+                // Lost the race by a hair to another request holding the same
+                // live validator. It has already sent the new cookie, so this
+                // one signs in and leaves the cookie alone.
+                $rotated = $stmt->rowCount() === 1;
+            } catch (Throwable $e) {
+                return false;
+            }
+        }
+
+        self::startSession();
+        self::establishSession([
+            'id' => (int) $row['user_id'],
+            'name' => (string) $row['name'],
+            'email' => (string) $row['email'],
+            'role' => User::normalizeRole($row['role']),
+            'is_owner' => false,
+        ], self::getClientIp());
+
+        // Mark the session as opened by cookie rather than by password. Nothing
+        // gates on it yet; it is what a future "confirm your password to change
+        // your password" check would read.
+        $_SESSION['via_remember'] = true;
+
+        if ($rotated && $newValidator !== null) {
+            self::setRememberCookie($selector . ':' . $newValidator, $expiresAt);
+        }
+
+        try {
+            (new User())->recordLogin((int) $row['user_id']);
+        } catch (Throwable $e) {
+            // Bookkeeping only.
+        }
+
+        return true;
+    }
+
+    private static function clearRememberCookie(): void
+    {
+        if (!empty($_COOKIE[REMEMBER_COOKIE_NAME])) {
+            unset($_COOKIE[REMEMBER_COOKIE_NAME]);
+        }
+
+        self::setRememberCookie('', time() - 42000);
+    }
+
+    private static function deleteRememberToken(string $selector): void
+    {
+        try {
+            Database::getInstance()
+                ->prepare("DELETE FROM remember_tokens WHERE selector = :selector")
+                ->execute(['selector' => $selector]);
+        } catch (Throwable $e) {
+            // Expires on its own.
+        }
+    }
+
+    /**
+     * Drop every remembered device for an account.
+     *
+     * Called on a password change, and when a token looks copied.
+     */
+    public static function revokeRememberTokensFor(int $userId): void
+    {
+        try {
+            Database::getInstance()
+                ->prepare("DELETE FROM remember_tokens WHERE user_id = :uid")
+                ->execute(['uid' => $userId]);
+        } catch (Throwable $e) {
+            error_log('could not revoke remember tokens for user ' . $userId);
+        }
+    }
+
+    /**
+     * Clear out expired tokens.
+     */
+    public static function pruneRememberTokens(): void
+    {
+        try {
+            Database::getInstance()->exec(
+                "DELETE FROM remember_tokens WHERE expires_at < datetime('now')"
+            );
+        } catch (Throwable $e) {
+            // Housekeeping only.
+        }
+    }
+
     /**
      * Log out the current user
      */
     public static function logout(): void
     {
         self::startSession();
+
+        // Signing out has to retire this device too, otherwise the next request
+        // would be let straight back in by the cookie.
+        if (!empty($_COOKIE[REMEMBER_COOKIE_NAME])) {
+            $raw = (string) $_COOKIE[REMEMBER_COOKIE_NAME];
+            $selector = substr($raw, 0, (int) (strpos($raw, ':') ?: 0));
+            if (preg_match('/^[a-f0-9]{32}$/', $selector)) {
+                self::deleteRememberToken($selector);
+            }
+            self::clearRememberCookie();
+        }
 
         $_SESSION = [];
 

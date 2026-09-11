@@ -544,6 +544,15 @@ textarea.form-input {
     overflow: hidden;
 }
 
+/* My Work is one long column that routinely outgrows the viewport. The panel
+   is absolutely positioned inside an .app-main that hides its overflow, so
+   without this the bottom of the list is simply unreachable. */
+#workloadView.active {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
 /* ============================================
    Map View
    ============================================ */
@@ -1987,6 +1996,39 @@ textarea.form-input {
     align-items: center;
     gap: var(--spacing-4);
     margin-top: var(--spacing-3);
+}
+
+/* Inline filter toggle in a list header, e.g. "Hide completed" on projects. */
+.filter-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.filter-check input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.filter-check:hover {
+    color: var(--color-text);
+}
+
+.filter-check-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
 }
 
 .group-toggle {
@@ -5351,18 +5393,103 @@ textarea.form-input {
     border-bottom-color: var(--color-border);
 }
 
-.login-alt-sep {
-    margin: 0 var(--spacing-2);
-    color: var(--color-border);
-}
-
-.login-hint-inline {
-    color: var(--color-text-muted);
-}
-
 .login-form .form-input[readonly] {
     color: var(--color-text-tertiary);
     cursor: default;
+}
+
+/* --- Two-factor + remember me ------------------------------------------ */
+
+.login-remember {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin: calc(var(--spacing-1) * -1) 0 var(--spacing-4);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.login-remember input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--color-primary, var(--color-text));
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* The code is six glyphs read off a phone and typed back - tracking them
+   apart makes a mistyped digit visible before the form is submitted. */
+.login-code-input {
+    text-align: center;
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.4em;
+    text-indent: 0.4em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The tracking is for six digits, not for the hint - spaced-out prose is
+   harder to read, not easier. */
+.login-code-input::placeholder {
+    letter-spacing: normal;
+    text-indent: 0;
+    font-size: var(--font-size-base);
+}
+
+.login-resend {
+    margin-top: calc(var(--spacing-1) * -1);
+    text-align: center;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    padding: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.btn-link:hover {
+    color: var(--color-text);
+}
+
+.alert-warning {
+    background-color: color-mix(in srgb, var(--color-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+    color: var(--color-warning);
+}
+
+/* Local-instance fallback that prints the sign-in code. Deliberately styled as
+   a warning, not as a normal part of the flow - it should look out of place. */
+.login-devcode {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    text-align: left;
+}
+
+.login-devcode span {
+    font-size: var(--font-size-xs);
+    opacity: 0.9;
+}
+
+.login-devcode code {
+    align-self: center;
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md, 6px);
+    background: var(--color-surface, rgba(0, 0, 0, 0.06));
+    color: var(--color-text);
 }
 
 /* --- Header identity chip ---------------------------------------------- */
@@ -6044,6 +6171,13 @@ button.user-chip:focus-visible {
     pointer-events: none;
 }
 
+/* The badge is toggled with the hidden attribute, whose display:none comes
+   from the UA stylesheet - which the display:flex above outranks. Without
+   this the badge never hides, so an empty My Work still wore a red "0". */
+.toggle-badge[hidden] {
+    display: none;
+}
+
 /* --- My Work ------------------------------------------------------------ */
 
 .workload-wrap {
@@ -6249,6 +6383,93 @@ details.workload-done[open] > summary::after {
     border-style: solid;
     border-color: var(--color-border-subtle);
     background-color: var(--color-surface-3);
+}
+
+/* A to-do row is a wrapper around two controls, not one big button itself.
+   Its vertical padding moves onto the control inside, so the full height of
+   the row opens the record instead of only the line of text. */
+div.workload-row {
+    cursor: default;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* On a to-do the mark is a control: click it to check the to-do off. */
+.workload-check {
+    position: relative;
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+    transition: border-color var(--transition-fast),
+                background-color var(--transition-fast),
+                color var(--transition-fast);
+}
+
+/* A 26px circle is a small thing to hit with a thumb, so the target reaches
+   past the drawn edge without moving anything. */
+.workload-check::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+.workload-check:hover {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+/* A checked mark keeps its filled look on hover - only the tick must stay
+   readable against it, which the rule above would otherwise recolour. */
+.workload-check.is-done:hover {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: var(--color-on-success);
+    opacity: 0.85;
+}
+
+.workload-check:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 2px;
+}
+
+.workload-check:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+/* An empty circle says little, so a faint tick appears under the pointer. */
+.workload-check-hint {
+    display: flex;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.workload-row:hover .workload-check-hint,
+.workload-check:focus-visible .workload-check-hint {
+    opacity: 0.5;
+}
+
+/* The rest of the row keeps opening the record the to-do hangs off. */
+.workload-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.workload-row-main:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
 }
 
 .workload-row-body {

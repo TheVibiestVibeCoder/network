@@ -16,6 +16,11 @@ data/bookkeeping_pdfs/
 # Uploaded profile pictures - personal data, same story.
 data/avatars/
 
+# Local development helpers and test credentials - never commit them.
+# dev/ holds seeded accounts whose passwords are written down in plain text;
+# they are only safe on a machine that is not reachable from anywhere else.
+dev/
+
 # IDE and editor files
 .idea/
 .vscode/
