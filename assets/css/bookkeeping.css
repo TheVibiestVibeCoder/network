@@ -459,8 +459,13 @@
     padding-right: 0 !important;
 }
 
-.bk-col-actions {
-    width: 1%;
+
+/* The menu column: dots, and the face of whoever the row is waiting on. Sized
+   for both so the imported columns do not shift when a row gets assigned. */
+.bk-col-menu {
+    width: 58px;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
 }
 
 /* Money is read by comparing digits down a column, so it is right-aligned and
@@ -537,15 +542,6 @@
     opacity: 0.55;
 }
 
-.bk-icon-btn-excluded {
-    color: var(--color-warning);
-}
-
-/* An excluded row keeps its toggle visible, so the way back is always on
-   screen rather than only on hover. */
-.bk-table .bk-icon-btn.bk-icon-btn-excluded {
-    opacity: 1;
-}
 
 .bk-row-selected td,
 .bk-row-selected:hover td {
@@ -891,15 +887,10 @@
 }
 
 /* ==========================================================================
-   Row action icons
+   Icon buttons
+   Row actions moved into the row menu; what is left of these is the delete
+   button on a pooled PDF.
    ========================================================================== */
-
-.bk-row-actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    justify-content: flex-end;
-}
 
 .bk-icon-btn {
     display: inline-flex;
@@ -916,16 +907,6 @@
     transition: background-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
 }
 
-/* Same reasoning as the remove cross: quiet until the row is hovered. */
-.bk-table .bk-icon-btn {
-    opacity: 0;
-}
-
-.bk-row:hover .bk-icon-btn,
-.bk-table .bk-icon-btn:focus-visible,
-.bk-table .bk-icon-btn.bk-icon-btn-active {
-    opacity: 1;
-}
 
 .bk-icon-btn:hover {
     background: var(--color-accent-subtle);
@@ -937,8 +918,288 @@
     color: var(--color-danger);
 }
 
-.bk-icon-btn-active {
+
+/* ==========================================================================
+   Row menu
+   The three dots between the tick box and the first column, the assignee's
+   face beside them, and the popover they open (on <body>, because the
+   scrolling table clips its own cells).
+   ========================================================================== */
+
+.bk-row-menu-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bk-row-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    /* Every action a row has is behind this button, so unlike the old icon
+       strip it never disappears completely - it only steps back. */
+    opacity: 0.4;
+    transition: background-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.bk-row:hover .bk-row-menu-btn,
+.bk-row-menu-btn:focus-visible,
+.bk-row-menu-btn.is-open {
+    opacity: 1;
+}
+
+.bk-row-menu-btn:hover,
+.bk-row-menu-btn.is-open {
+    background: var(--color-accent-subtle);
+    color: var(--color-text);
+}
+
+/* The face of the person the row is waiting on. */
+.bk-assignee {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+}
+
+.bk-assignee img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bk-assignee.has-photo {
+    border-color: transparent;
+}
+
+.bk-rowmenu {
+    position: fixed;
+    z-index: 60;
+    width: 252px;
+    max-width: calc(100vw - 16px);
+    padding: var(--spacing-2);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    font-size: var(--font-size-sm);
+    animation: bk-menu-in var(--transition-fast) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-rowmenu { animation: none; }
+}
+
+.bk-rowmenu-sep {
+    height: 1px;
+    background: var(--color-border-subtle);
+    margin: var(--spacing-2) 0;
+}
+
+.bk-rowmenu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    width: 100%;
+    padding: 7px var(--spacing-2);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.bk-rowmenu-item:hover,
+.bk-rowmenu-item:focus-visible {
+    background: var(--color-accent-subtle);
+}
+
+.bk-rowmenu-item-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+
+/* The label takes the slack so the value and the arrow stay pinned right. */
+.bk-rowmenu-item-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* What the submenu is currently set to, read on the way into it. */
+.bk-rowmenu-item-value {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-muted);
+}
+
+.bk-rowmenu-item-arrow {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+}
+
+/* The entry whose submenu is showing stays lit while you are in it. */
+.bk-rowmenu-item.is-open,
+.bk-rowmenu-item.is-open:hover {
+    background: var(--color-primary-subtle);
+}
+
+/* --- The submenu -------------------------------------------------------- */
+
+.bk-rowmenu-sub {
+    width: 236px;
+}
+
+.bk-rowmenu-subhead {
+    margin: 0;
+    padding: var(--spacing-2) var(--spacing-2) 6px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+}
+
+.bk-rowmenu-option .bk-rowmenu-item-icon {
+    width: 22px;
+}
+
+/* Only the current one carries a tick, but the space for it is always there,
+   so the names line up whether or not anything is set. */
+.bk-rowmenu-item-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    flex-shrink: 0;
+    color: inherit;
+}
+
+.bk-rowmenu-option.is-current {
+    font-weight: 600;
+}
+
+/* Taking a row back off somebody is the undoing action in this list, and is
+   marked like the other one in the menu. Its icon carries the colour too. */
+.bk-rowmenu-option.is-nobody {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-option.is-nobody .bk-rowmenu-item-icon {
+    color: inherit;
+}
+
+.bk-rowmenu-option.is-nobody:hover,
+.bk-rowmenu-option.is-nobody:focus-visible {
+    background: var(--color-danger-subtle);
+}
+
+.bk-rowmenu-subnote {
+    margin: var(--spacing-2) 0 0;
+    padding: var(--spacing-2) var(--spacing-2) var(--spacing-1);
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
+/* A face in a menu: the same object as the one on the row, one size up. */
+.bk-menu-face {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border-subtle);
+    color: var(--color-text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.bk-menu-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bk-menu-face.has-photo {
+    border-color: transparent;
+}
+
+.bk-menu-face.is-none {
+    background: transparent;
+    border-color: transparent;
+    color: inherit;
+}
+
+.bk-rowmenu-item.is-active .bk-rowmenu-item-icon {
     color: var(--color-success);
+}
+
+.bk-rowmenu-item.is-danger {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-item.is-danger .bk-rowmenu-item-icon {
+    color: var(--color-danger);
+}
+
+.bk-rowmenu-item.is-danger:hover,
+.bk-rowmenu-item.is-danger:focus-visible {
+    background: var(--color-danger-subtle);
+}
+
+/* Arriving from the home page: say which row was meant, then get out of the
+   way. Long enough to find with the eye, short enough not to linger. */
+.bk-row-flash td {
+    animation: bk-row-flash 2.2s ease-out;
+}
+
+@keyframes bk-row-flash {
+    0%, 55% { background: var(--color-primary-subtle); }
+    100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-row-flash td { animation: none; box-shadow: inset 0 0 0 9999px var(--color-primary-subtle); }
 }
 
 /* ==========================================================================
@@ -1538,7 +1799,7 @@
 
     /* Touch has no hover, so the row controls that reveal on hover would
        otherwise be unreachable. */
-    .bk-table .bk-icon-btn,
+    .bk-row-menu-btn,
     .bk-pdf-remove,
     .bk-pool-item .bk-icon-btn {
         opacity: 1;
@@ -1546,7 +1807,7 @@
 }
 
 @media (hover: none) {
-    .bk-table .bk-icon-btn,
+    .bk-row-menu-btn,
     .bk-pdf-remove,
     .bk-pool-item .bk-icon-btn {
         opacity: 1;

@@ -84,6 +84,14 @@
             .replace(/'/g, '&#39;');
     }
 
+    function getInitials(name) {
+        if (!name) return '?';
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
     function formatSize(bytes) {
         if (!bytes) return '';
         if (bytes < 1024) return bytes + ' B';
@@ -205,11 +213,20 @@
     // server's remembered column selection) can await it instead of racing
     // against a fetch that may not have resolved yet.
     let loadPromise = null;
+    let loading = false;
 
     function load() {
         init();
+        loading = true;
         loadPromise = (async () => {
             try {
+                // Rows can carry an assignee, and drawing that face needs the
+                // people directory - load it first so the first paint is not
+                // initials that turn into photos a moment later.
+                if (window.CRMPeople && !window.CRMPeople.ready()) {
+                    await window.CRMPeople.reload();
+                }
+
                 const result = await apiJson('table');
                 state.columns = result.data.columns;
                 state.rows = result.data.rows;
@@ -228,9 +245,24 @@
                 render();
             } catch (error) {
                 showToast('Failed to load bookkeeping data: ' + error.message, true);
+            } finally {
+                loading = false;
             }
         })();
         return loadPromise;
+    }
+
+    /**
+     * The table, fetching it only when nobody else already is.
+     *
+     * For arriving at the view, where two things ask for the table at the same
+     * moment: switching tab triggers a load, and the home page following one of
+     * its rows into the table triggers another right behind it. Anything that
+     * has just *changed* something wants load() itself - a fetch that started
+     * before the write would answer with the table as it was.
+     */
+    function loadIfIdle() {
+        return loading ? loadPromise : load();
     }
 
     function render() {
@@ -864,6 +896,9 @@
     function renderTable() {
         const wrap = els.tableInner;
 
+        // Anchored to a button that is about to be replaced.
+        closeRowMenu();
+
         if (state.rows.length === 0) {
             wrap.innerHTML = `
                 <div class="bk-empty">
@@ -887,7 +922,7 @@
         // Month separators stay visible for any chronological sort, not just
         // the implicit default one.
         const groupByMonth = isDateSortColumn(state.sortColumn);
-        const colCount = state.columns.length + 3; // checkbox + columns + pdf + actions
+        const colCount = state.columns.length + 3; // checkbox + menu + columns + pdf
 
         // With the default (implicit) date sort, highlight the date column's
         // own header so the active sort is always visible on a real column.
@@ -913,6 +948,7 @@
 
         let html = '<table class="bk-table"><thead><tr>';
         html += `<th class="bk-col-check"><input type="checkbox" id="bkSelectAll" title="Select all" ${displayRows.length > 0 && displayRows.every(r => state.selection.has(r.id)) ? 'checked' : ''}></th>`;
+        html += '<th class="bk-col-menu"></th>';
         state.columns.forEach(col => {
             const active = col.name === activeSortCol;
             const amount = isAmountCol(col.name) ? ' bk-col-amount' : '';
@@ -928,7 +964,7 @@
                      title="Sort by PDF status">
                 <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}
             </th>`;
-        html += '<th class="bk-col-actions"></th></tr></thead><tbody>';
+        html += '</tr></thead><tbody>';
 
         let previousMonth = null;
         displayRows.forEach(row => {
@@ -944,6 +980,7 @@
             const selected = state.selection.has(row.id);
             html += `<tr class="bk-row ${ok ? 'bk-row-ok' : 'bk-row-missing'} ${selected ? 'bk-row-selected' : ''} ${row.excluded ? 'bk-row-excluded' : ''}" data-row-id="${row.id}">`;
             html += `<td class="bk-col-check"><input type="checkbox" class="bk-row-check" data-row-id="${row.id}" ${selected ? 'checked' : ''}></td>`;
+            html += `<td class="bk-col-menu">${rowMenuCell(row)}</td>`;
             state.columns.forEach(col => {
                 const value = row.data[col.name] ?? '';
                 const classes = [amountClass(value, col.name)];
@@ -966,29 +1003,6 @@
             }
             html += '</td>';
 
-            // Actions cell
-            html += '<td class="bk-col-actions"><div class="bk-row-actions">';
-            html += `
-                <button type="button" class="bk-icon-btn ${row.excluded ? 'bk-icon-btn-excluded' : ''}" data-action="toggle-excluded" data-row-id="${row.id}" title="${row.excluded ? 'Include in the month totals again' : 'Exclude from the month totals'}">
-                    ${row.excluded
-                        ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>'
-                        : '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.8 11.8 0 0 0 23 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2.7 3.42 1.29 4.83l2.53 2.53A11.77 11.77 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.52 0 2.98-.29 4.32-.82l3.02 3.02 1.41-1.41L2.7 3.42zM7.53 11.07A4.6 4.6 0 0 0 7.5 12a4.5 4.5 0 0 0 6.44 4.06l-1.5-1.5A3 3 0 0 1 9 12l-.02-.2-1.45-1.45z"/></svg>'}
-                </button>`;
-            if (!row.pdf) {
-                html += `
-                    <button type="button" class="bk-icon-btn" data-action="upload" data-row-id="${row.id}" title="Upload PDF for this row">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
-                    </button>`;
-                html += `
-                    <button type="button" class="bk-icon-btn ${row.no_pdf_needed ? 'bk-icon-btn-active' : ''}" data-action="toggle-nopdf" data-row-id="${row.id}" title="${row.no_pdf_needed ? 'Mark as: PDF required' : 'Mark as: no PDF needed'}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3.5" y1="20.5" x2="20.5" y2="3.5"/></svg>
-                    </button>`;
-            }
-            html += `
-                <button type="button" class="bk-icon-btn bk-icon-btn-danger" data-action="delete-row" data-row-id="${row.id}" title="Delete row">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>`;
-            html += '</div></td>';
             html += '</tr>';
         });
 
@@ -1017,6 +1031,449 @@
                 </button>
             </div>
         `).join('');
+    }
+
+    // ------------------------------------------------------------------
+    // Row menu
+    //
+    // Every per-row action lives behind the three dots between the tick box
+    // and the first column. A row has half a dozen things you can do to it and
+    // the table has hundreds of rows, so as a strip of icons that was a wall of
+    // buttons on every line - and one more each time an action was added.
+    // ------------------------------------------------------------------
+
+    const ICON_DOTS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
+    const ICON_UPLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>';
+    const ICON_NOPDF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3.5" y1="20.5" x2="20.5" y2="3.5"/></svg>';
+    const ICON_EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>';
+    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.8 11.8 0 0 0 23 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2.7 3.42 1.29 4.83l2.53 2.53A11.77 11.77 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.52 0 2.98-.29 4.32-.82l3.02 3.02 1.41-1.41L2.7 3.42zM7.53 11.07A4.6 4.6 0 0 0 7.5 12a4.5 4.5 0 0 0 6.44 4.06l-1.5-1.5A3 3 0 0 1 9 12l-.02-.2-1.45-1.45z"/></svg>';
+    const ICON_CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M9.3 6.7 14.6 12l-5.3 5.3 1.4 1.4L17.4 12l-6.7-6.7z"/></svg>';
+    const ICON_TICK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    const ICON_PERSON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+    const ICON_NOBODY = '<span class="bk-menu-face is-none"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1"/></svg></span>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+
+    /**
+     * The dots, plus the face of whoever this row is waiting on.
+     */
+    function rowMenuCell(row) {
+        return `
+            <div class="bk-row-menu-cell">
+                <button type="button" class="bk-row-menu-btn" data-action="row-menu" data-row-id="${row.id}"
+                        aria-haspopup="menu" aria-expanded="false" title="Row actions" aria-label="Row actions">
+                    ${ICON_DOTS}
+                </button>
+                ${assigneeFace(row)}
+            </div>`;
+    }
+
+    /**
+     * The small face that says a row is somebody's job. Nothing is drawn for an
+     * unassigned row - that is almost every row, and a placeholder on each one
+     * would be noise rather than information.
+     */
+    function assigneeFace(row) {
+        const name = row.assigned_to_name;
+        if (!name) return '';
+
+        const url = window.CRMPeople ? window.CRMPeople.avatarFor(assigneeKey(row), name) : null;
+        const inner = url
+            ? `<img src="${escapeHtml(url)}" alt="">`
+            : escapeHtml(getInitials(name));
+
+        return `<span class="bk-assignee${url ? ' has-photo' : ''}" title="Waiting on ${escapeHtml(name)}">${inner}</span>`;
+    }
+
+    /** The owner is id 0 in the database but 'owner' to the people directory. */
+    function assigneeKey(row) {
+        const raw = row.assigned_to;
+        if (raw === null || raw === undefined || raw === '') return '';
+        return Number(raw) === 0 ? 'owner' : String(Number(raw));
+    }
+
+    function rowMenuContent(row) {
+        // A row that already has its PDF has nothing to hand over, so it is
+        // only offered the entry when there is an assignment to undo.
+        const canAssign = !row.pdf || row.assigned_to_name;
+
+        // No heading repeating the row: the menu opens against the row it
+        // belongs to, which already says what it is.
+        let html = '';
+
+        if (canAssign) {
+            html += menuItem('assign', ICON_PERSON, 'Waiting on', row.id, '', {
+                submenu: true,
+                value: row.assigned_to_name || 'Nobody'
+            });
+            html += '<div class="bk-rowmenu-sep"></div>';
+        }
+
+        if (!row.pdf) {
+            html += menuItem('upload', ICON_UPLOAD, 'Upload PDF', row.id);
+            html += menuItem('toggle-nopdf', ICON_NOPDF,
+                row.no_pdf_needed ? 'Mark as: PDF required' : 'Mark as: no PDF needed', row.id,
+                row.no_pdf_needed ? 'is-active' : '');
+        } else {
+            html += menuItem('remove-pdf', ICON_TRASH, 'Remove PDF', row.id);
+        }
+
+        html += menuItem('toggle-excluded', row.excluded ? ICON_EYE : ICON_EYE_OFF,
+            row.excluded ? 'Include in month totals' : 'Exclude from month totals', row.id,
+            row.excluded ? 'is-active' : '');
+
+        html += '<div class="bk-rowmenu-sep"></div>';
+        html += menuItem('delete-row', ICON_TRASH, 'Delete row', row.id, 'is-danger');
+
+        return html;
+    }
+
+    /**
+     * One line of the menu. `options.submenu` turns it into the kind of entry
+     * that opens a second panel beside this one, with the current value shown
+     * on the way to it - the arrangement the system menus use.
+     */
+    function menuItem(action, icon, label, rowId, extraClass, options) {
+        const opts = options || {};
+        const trail = opts.submenu
+            ? `<span class="bk-rowmenu-item-value">${escapeHtml(opts.value || '')}</span>`
+              + `<span class="bk-rowmenu-item-arrow">${ICON_CHEVRON}</span>`
+            : '';
+
+        return `
+            <button type="button" class="bk-rowmenu-item${extraClass ? ' ' + extraClass : ''}" role="menuitem"
+                    ${opts.submenu ? 'aria-haspopup="menu" aria-expanded="false" data-submenu="1"' : ''}
+                    data-action="${action}" data-row-id="${rowId}">
+                <span class="bk-rowmenu-item-icon">${icon}</span>
+                <span class="bk-rowmenu-item-label">${escapeHtml(label)}</span>
+                ${trail}
+            </button>`;
+    }
+
+    /**
+     * The people list, as a menu of its own.
+     *
+     * Everyone who can be assigned work, plus the way back to nobody, with a
+     * tick against whoever has the row now - the same shape as the system
+     * submenus, so there is nothing new to learn about how it behaves.
+     */
+    function assignSubmenuContent(row) {
+        const people = window.CRMPeople ? window.CRMPeople.list() : [];
+        const current = assigneeKey(row);
+
+        let html = '<p class="bk-rowmenu-subhead">Waiting on</p>';
+
+        html += assignOption(row, '', 'Nobody', ICON_NOBODY, current === '', 'is-nobody');
+
+        people.forEach(person => {
+            const key = person.id === null ? 'owner' : String(person.id);
+            html += assignOption(row, key, person.name, personFace(key, person.name), key === current);
+        });
+
+        // Somebody whose account has since been removed still has to appear,
+        // or the row's own assignee would be missing from the list of who has
+        // it - and there would be no tick anywhere to explain the face on the
+        // row.
+        if (current && !people.some(p => (p.id === null ? 'owner' : String(p.id)) === current)) {
+            const name = row.assigned_to_name || 'Unknown';
+            html += assignOption(row, current, name, personFace(current, name), true);
+        }
+
+        html += '<p class="bk-rowmenu-subnote">They see the row on their home page until a PDF is attached.</p>';
+
+        return html;
+    }
+
+    function assignOption(row, value, name, icon, isCurrent, extraClass) {
+        return `
+            <button type="button" class="bk-rowmenu-item bk-rowmenu-option${isCurrent ? ' is-current' : ''}${extraClass ? ' ' + extraClass : ''}"
+                    role="menuitemradio" aria-checked="${isCurrent ? 'true' : 'false'}"
+                    data-assign-value="${escapeHtml(value)}" data-row-id="${row.id}">
+                <span class="bk-rowmenu-item-icon">${icon}</span>
+                <span class="bk-rowmenu-item-label">${escapeHtml(name)}</span>
+                <span class="bk-rowmenu-item-tick">${isCurrent ? ICON_TICK : ''}</span>
+            </button>`;
+    }
+
+    /** A person's photo at menu size, or their initials when there is none. */
+    function personFace(key, name) {
+        const url = window.CRMPeople ? window.CRMPeople.avatarFor(key, name) : null;
+
+        return url
+            ? `<span class="bk-menu-face has-photo"><img src="${escapeHtml(url)}" alt=""></span>`
+            : `<span class="bk-menu-face">${escapeHtml(getInitials(name))}</span>`;
+    }
+
+    /**
+     * Anchored to <body> in viewport coordinates, like the month breakdown:
+     * inside the scrolling table its own cell would clip it.
+     */
+    function openRowMenu(button) {
+        closeRowMenu();
+
+        const rowId = parseInt(button.dataset.rowId, 10);
+        const row = state.rows.find(r => r.id === rowId);
+        if (!row) return;
+
+        const panel = document.createElement('div');
+        panel.className = 'bk-rowmenu';
+        panel.id = 'bkRowMenu';
+        panel.setAttribute('role', 'menu');
+        panel.setAttribute('aria-label', 'Row actions');
+        panel.dataset.rowId = String(rowId);
+        panel.innerHTML = rowMenuContent(row);
+        document.body.appendChild(panel);
+
+        const r = button.getBoundingClientRect();
+        const width = panel.offsetWidth;
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
+        const below = r.bottom + 6;
+        const fitsBelow = below + panel.offsetHeight < window.innerHeight - 8;
+        panel.style.left = `${left}px`;
+        panel.style.top = fitsBelow ? `${below}px` : `${Math.max(8, r.top - panel.offsetHeight - 6)}px`;
+
+        button.setAttribute('aria-expanded', 'true');
+        button.classList.add('is-open');
+
+        panel.addEventListener('click', event => {
+            const item = event.target.closest('.bk-rowmenu-item');
+            if (!item) return;
+
+            if (item.dataset.submenu) {
+                if (item.classList.contains('is-open')) {
+                    closeRowSubmenu();
+                } else {
+                    openAssignSubmenu(item, row);
+                }
+                return;
+            }
+
+            runRowMenuAction(item.dataset.action, parseInt(item.dataset.rowId, 10));
+        });
+
+        // Pointing at an entry is how a menu like this is read: the submenu
+        // follows the pointer, and moving on to a plain entry puts it away -
+        // but only after a beat, because the way over to the submenu passes
+        // over the entries below the one that opened it.
+        panel.addEventListener('mouseover', event => {
+            const item = event.target.closest('.bk-rowmenu-item');
+            if (!item) return;
+
+            if (item.dataset.submenu) {
+                cancelSubmenuClose();
+                if (!item.classList.contains('is-open')) openAssignSubmenu(item, row);
+            } else {
+                scheduleSubmenuClose();
+            }
+        });
+
+        const first = panel.querySelector('.bk-rowmenu-item');
+        if (first) first.focus();
+    }
+
+    let submenuCloseTimer = null;
+
+    function scheduleSubmenuClose() {
+        clearTimeout(submenuCloseTimer);
+        submenuCloseTimer = setTimeout(closeRowSubmenu, 180);
+    }
+
+    function cancelSubmenuClose() {
+        clearTimeout(submenuCloseTimer);
+    }
+
+    /**
+     * The people list, opened beside the menu rather than inside it.
+     *
+     * Placed to the right of the parent panel and flipped to its left when
+     * there is no room, which is the one thing a submenu has to get right.
+     */
+    function openAssignSubmenu(item, row) {
+        closeRowSubmenu();
+
+        const panel = document.getElementById('bkRowMenu');
+        if (!panel) return;
+
+        const sub = document.createElement('div');
+        sub.className = 'bk-rowmenu bk-rowmenu-sub';
+        sub.id = 'bkRowSubmenu';
+        sub.setAttribute('role', 'menu');
+        sub.setAttribute('aria-label', 'Waiting on');
+        sub.innerHTML = assignSubmenuContent(row);
+        document.body.appendChild(sub);
+
+        const menuRect = panel.getBoundingClientRect();
+        const itemRect = item.getBoundingClientRect();
+
+        let left = menuRect.right + 4;
+        if (left + sub.offsetWidth > window.innerWidth - 8) {
+            left = Math.max(8, menuRect.left - sub.offsetWidth - 4);
+        }
+
+        let top = itemRect.top - 6;
+        if (top + sub.offsetHeight > window.innerHeight - 8) {
+            top = Math.max(8, window.innerHeight - sub.offsetHeight - 8);
+        }
+
+        sub.style.left = `${left}px`;
+        sub.style.top = `${top}px`;
+
+        item.classList.add('is-open');
+        item.setAttribute('aria-expanded', 'true');
+
+        sub.addEventListener('click', event => {
+            const option = event.target.closest('[data-assign-value]');
+            if (!option) return;
+
+            const id = parseInt(option.dataset.rowId, 10);
+            const value = option.dataset.assignValue;
+            closeRowMenu();
+            assignRow(id, value);
+        });
+
+        // Once the pointer is in here, nothing in the parent menu closes it.
+        sub.addEventListener('mouseover', cancelSubmenuClose);
+    }
+
+    function closeRowSubmenu() {
+        cancelSubmenuClose();
+
+        const sub = document.getElementById('bkRowSubmenu');
+        if (!sub) return;
+
+        const parent = document.querySelector('.bk-rowmenu-item.is-open');
+        const returnFocus = sub.contains(document.activeElement);
+        sub.remove();
+
+        if (parent) {
+            parent.classList.remove('is-open');
+            parent.setAttribute('aria-expanded', 'false');
+            if (returnFocus) parent.focus();
+        }
+    }
+
+    function closeRowMenu() {
+        closeRowSubmenu();
+
+        const panel = document.getElementById('bkRowMenu');
+        if (!panel) return;
+
+        // Whoever arrived here with the keyboard gets put back on the dots
+        // rather than dropped at the top of the document.
+        const returnFocus = panel.contains(document.activeElement);
+        panel.remove();
+
+        els.tableWrap.querySelectorAll('.bk-row-menu-btn.is-open').forEach(btn => {
+            btn.classList.remove('is-open');
+            btn.setAttribute('aria-expanded', 'false');
+            if (returnFocus && btn.isConnected) btn.focus();
+        });
+    }
+
+    /**
+     * Each of these either opens a dialog of its own or reloads the table, so
+     * the menu is out of the way first either way.
+     */
+    function runRowMenuAction(action, rowId) {
+        closeRowMenu();
+
+        switch (action) {
+            case 'upload':
+                openPdfModal(rowId);
+                break;
+            case 'toggle-nopdf':
+                toggleNoPdf(rowId);
+                break;
+            case 'toggle-excluded':
+                confirmToggleExcluded(rowId);
+                break;
+            case 'remove-pdf':
+                confirmRemovePdf(rowId);
+                break;
+            case 'delete-row':
+                confirmDeleteRows([rowId]);
+                break;
+        }
+    }
+
+    /**
+     * Hand a row to somebody, or take it back.
+     *
+     * The server re-checks that the target is a real, active account, and
+     * refuses a row that already has its PDF - there would be nothing for the
+     * assignee to do, and the row would never appear on their home page.
+     */
+    async function assignRow(rowId, value) {
+        const row = state.rows.find(r => r.id === rowId);
+        if (!row) return;
+
+        try {
+            const response = await fetch('api/assign.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({
+                    type: 'bookkeeping',
+                    id: rowId,
+                    assigned_to: value === '' ? null : value
+                })
+            });
+
+            const text = await response.text();
+            let payload;
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch (e) {
+                throw new Error('The server returned an unexpected response.');
+            }
+
+            if (!response.ok || payload.error) {
+                throw new Error(payload.error || 'Could not change the assignment.');
+            }
+
+            row.assigned_to = payload.data ? payload.data.assigned_to : null;
+            row.assigned_to_name = payload.data ? payload.data.assigned_to_name : null;
+            render();
+
+            showToast(row.assigned_to_name
+                ? `Row is now waiting on ${row.assigned_to_name}`
+                : 'Row is no longer assigned');
+
+            // The home tab counts what is on people's plates.
+            if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /**
+     * Open the table on one particular row and light it up briefly.
+     *
+     * Used by the home page, where an assigned row is listed as work to do and
+     * clicking it should land on the row itself rather than on the top of a
+     * table with a thousand lines in it.
+     */
+    async function focusRow(rowId) {
+        await loadIfIdle();
+
+        const id = Number(rowId);
+        if (!state.rows.some(r => r.id === id)) {
+            showToast('That bookkeeping row no longer exists.', true);
+            return;
+        }
+
+        // A filter left over from earlier can hide the very row we were asked
+        // to show, so clear it rather than land on an empty table.
+        if (!getDisplayRows().some(r => r.id === id)) {
+            state.filterQuery = '';
+            if (els.filterInput) els.filterInput.value = '';
+            render();
+        }
+
+        const tr = els.tableInner.querySelector(`tr.bk-row[data-row-id="${id}"]`);
+        if (!tr) return;
+
+        tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        tr.classList.add('bk-row-flash');
+        setTimeout(() => tr.classList.remove('bk-row-flash'), 2200);
     }
 
     function updateToolbar() {
@@ -1523,9 +1980,9 @@
 
         els.pdfUploadBtn.disabled = true;
         try {
-            await postForm('upload-pdf', formData);
+            const result = await postForm('upload-pdf', formData);
             closePdfModal();
-            showToast(`PDF "${file.name}" assigned`);
+            showToast(pdfAssignedMessage(file.name, result));
             await load();
         } catch (error) {
             els.pdfUploadBtn.disabled = false;
@@ -1771,8 +2228,8 @@
                 label: 'Assign',
                 className: 'btn-primary',
                 handler: async () => {
-                    await postJson('assign-pdf', { pdf_id: pdf.id, row_id: row.id });
-                    showToast(`"${pdf.name}" assigned`);
+                    const result = await postJson('assign-pdf', { pdf_id: pdf.id, row_id: row.id });
+                    showToast(pdfAssignedMessage(pdf.name, result));
                     await load();
                 }
             }]
@@ -1814,12 +2271,26 @@
                     const formData = new FormData();
                     formData.append('row_id', String(rowId));
                     formData.append('pdf', file);
-                    await postForm('upload-pdf', formData);
-                    showToast(`"${file.name}" assigned`);
+                    const result = await postForm('upload-pdf', formData);
+                    showToast(pdfAssignedMessage(file.name, result));
                     await load();
                 }
             }]
         });
+    }
+
+    /**
+     * The message for a PDF that has just landed on a row.
+     *
+     * An invoice is the thing the assignment was waiting for, so the server
+     * clears it as the file arrives - which is worth a word, or the face
+     * quietly vanishing from the row looks like a bug.
+     */
+    function pdfAssignedMessage(name, result) {
+        const base = `"${name}" assigned`;
+        return result && result.unassigned
+            ? `${base} - no longer waiting on ${result.unassigned}`
+            : base;
     }
 
     /** Returns an error string if the file exceeds the server's upload limit. */
@@ -2048,6 +2519,11 @@
             if (event.key === 'Escape' && document.getElementById('bkMonthBreakdown')) {
                 closeMonthBreakdown();
             }
+            if (event.key === 'Escape' && document.getElementById('bkRowSubmenu')) {
+                closeRowSubmenu();
+            } else if (event.key === 'Escape' && document.getElementById('bkRowMenu')) {
+                closeRowMenu();
+            }
         });
 
         // Dismiss the breakdown on any click that is not in it or on the
@@ -2059,9 +2535,25 @@
             closeMonthBreakdown();
         });
 
+        document.addEventListener('click', event => {
+            if (!document.getElementById('bkRowMenu')) return;
+            if (event.target.closest?.('#bkRowMenu')) return;
+            if (event.target.closest?.('#bkRowSubmenu')) return;
+            // The dots themselves toggle the menu; leave that to the handler
+            // on the table, or this would close what that is about to open.
+            if (event.target.closest?.('.bk-row-menu-btn')) return;
+            closeRowMenu();
+        });
+
         // Reposition would be wrong once its anchor has moved, so it just closes.
-        els.tableWrap.addEventListener('scroll', () => closeMonthBreakdown(), { passive: true });
-        window.addEventListener('resize', () => closeMonthBreakdown());
+        els.tableWrap.addEventListener('scroll', () => {
+            closeMonthBreakdown();
+            closeRowMenu();
+        }, { passive: true });
+        window.addEventListener('resize', () => {
+            closeMonthBreakdown();
+            closeRowMenu();
+        });
 
         els.tableWrap.addEventListener('click', event => {
             const monthTotal = event.target.closest('.bk-month-total');
@@ -2125,22 +2617,21 @@
             if (!actionBtn) return;
             const rowId = parseInt(actionBtn.dataset.rowId, 10);
             switch (actionBtn.dataset.action) {
+                case 'row-menu':
+                    // Clicking the dots of the open menu closes it, so the
+                    // same button is the way in and the way out.
+                    if (actionBtn.classList.contains('is-open')) {
+                        closeRowMenu();
+                    } else {
+                        openRowMenu(actionBtn);
+                    }
+                    break;
                 case 'preview-pdf':
                     event.preventDefault();
                     openPdfPreview(parseInt(actionBtn.dataset.pdfId, 10), actionBtn.dataset.pdfName);
                     break;
-                case 'upload':
-                    openPdfModal(rowId);
-                    break;
-                case 'toggle-nopdf':
-                    toggleNoPdf(rowId);
-                    break;
-                case 'toggle-excluded':
-                    confirmToggleExcluded(rowId);
-                    break;
-                case 'delete-row':
-                    confirmDeleteRows([rowId]);
-                    break;
+                // The cross on the PDF chip - every other row action reaches
+                // its handler through the row menu instead.
                 case 'remove-pdf':
                     confirmRemovePdf(rowId);
                     break;
@@ -2366,5 +2857,5 @@
         }
     }
 
-    window.Bookkeeping = { load };
+    window.Bookkeeping = { load, focusRow };
 })();

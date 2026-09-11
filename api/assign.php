@@ -40,6 +40,11 @@ const ASSIGNABLE = [
     'contact' => ['table' => 'contacts', 'label' => 'Kontakt', 'title' => 'name'],
     'project' => ['table' => 'projects', 'label' => 'Projekt', 'title' => 'name'],
     'todo'    => ['table' => 'todos',    'label' => 'To-do',   'title' => 'title'],
+    // A bookkeeping row has no name of its own - the date is the only single
+    // column every import is guaranteed to have - so that is what it is called
+    // in the log. The readable summary is built from the row's own columns
+    // where it is shown, in the workload below.
+    'bookkeeping' => ['table' => 'bookkeeping_rows', 'label' => 'Buchhaltung', 'title' => 'row_date'],
 ];
 
 /** Sentinel for the owner identity, which has no users row. */
@@ -113,6 +118,13 @@ function handleAssign(): void
 
     if (!$record) {
         respond(['error' => ucfirst($type) . ' not found.'], 404);
+    }
+
+    // A bookkeeping row whose invoice is already filed is finished work. It
+    // would be accepted here and then never show up on the home page, which
+    // reads as the assignment having silently failed - so say so instead.
+    if ($type === 'bookkeeping' && $assignee['id'] !== null && bookkeepingRowHasPdf($db, $id)) {
+        respond(['error' => 'That row already has its invoice, so there is nothing to hand over.'], 409);
     }
 
     $update = $db->prepare(
@@ -244,6 +256,13 @@ function handleWorkload(string $who): void
         "ORDER BY name COLLATE NOCASE ASC"
     );
 
+    // "Unassigned" deliberately does not list bookkeeping rows: almost every
+    // row ever imported is unassigned, and burying three real contacts under a
+    // thousand bank lines would make that view useless.
+    $bookkeeping = ($isUnassigned || !bookkeepingAssignable($db))
+        ? []
+        : fetchBookkeeping($db, $target['id']);
+
     $openTodos = 0;
     foreach ($todos as $todo) {
         if ((int) $todo['is_completed'] === 0) {
@@ -258,14 +277,107 @@ function handleWorkload(string $who): void
             'todos' => $todos,
             'projects' => $projects,
             'contacts' => $contacts,
+            'bookkeeping' => $bookkeeping,
         ],
         'counts' => [
             'todos_open' => $openTodos,
             'todos_total' => count($todos),
             'projects' => count($projects),
             'contacts' => count($contacts),
+            'bookkeeping' => count($bookkeeping),
         ],
     ]);
+}
+
+/**
+ * Does this bookkeeping row already have its invoice attached?
+ */
+function bookkeepingRowHasPdf(PDO $db, int $rowId): bool
+{
+    $stmt = $db->prepare("SELECT id FROM bookkeeping_pdfs WHERE row_id = :row_id LIMIT 1");
+    $stmt->execute(['row_id' => $rowId]);
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Is there a bookkeeping table with an assignee column to read?
+ *
+ * The bookkeeping tables are created by their own endpoint the first time that
+ * view is opened, so on an instance where nobody has been there yet they do not
+ * exist at all. pragma_table_info answers with an empty set for a missing table
+ * rather than raising, which is exactly the check needed here - the home page
+ * must not fall over because a feature has never been used.
+ */
+function bookkeepingAssignable(PDO $db): bool
+{
+    static $available = null;
+    if ($available !== null) {
+        return $available;
+    }
+
+    try {
+        $stmt = $db->query("SELECT name FROM pragma_table_info('bookkeeping_rows')");
+        $columns = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        $available = in_array('assigned_to', $columns, true);
+    } catch (Throwable $e) {
+        $available = false;
+    }
+
+    return $available;
+}
+
+/**
+ * The bookkeeping rows on one person's plate, each with a readable label.
+ *
+ * A row is a bag of imported CSV columns, so the label is built the same way
+ * the bookkeeping table builds its own row summaries: the first few non-empty
+ * values in column order. Rows that already have their invoice are left out -
+ * attaching one clears the assignment anyway, and an older row that kept both
+ * is finished work either way.
+ */
+function fetchBookkeeping(PDO $db, ?int $assignee): array
+{
+    $columns = $db->query("SELECT name FROM bookkeeping_columns ORDER BY position, id")
+        ->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $db->prepare("
+        SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.excluded,
+               r.assigned_to, r.assigned_to_name
+        FROM bookkeeping_rows r
+        LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
+        WHERE r.assigned_to = :assignee AND p.id IS NULL
+        ORDER BY (r.row_date IS NULL), r.row_date DESC, r.id DESC
+    ");
+    $stmt->execute(['assignee' => $assignee]);
+
+    $rows = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $data = json_decode((string) $row['data'], true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $parts = [];
+        foreach ($columns as $column) {
+            $value = trim((string) ($data[$column] ?? ''));
+            if ($value !== '' && count($parts) < 3) {
+                $parts[] = $value;
+            }
+        }
+
+        $rows[] = [
+            'id' => (int) $row['id'],
+            'row_date' => $row['row_date'],
+            'summary' => $parts ? implode(' · ', $parts) : ('Row #' . (int) $row['id']),
+            'no_pdf_needed' => (int) $row['no_pdf_needed'] === 1,
+            'excluded' => (int) $row['excluded'] === 1,
+            'assigned_to' => $row['assigned_to'] === null ? null : (int) $row['assigned_to'],
+            'assigned_to_name' => $row['assigned_to_name'],
+        ];
+    }
+
+    return $rows;
 }
 
 /**
@@ -290,15 +402,28 @@ function handleSummary(): void
     $db = Database::getInstance();
     $counts = [];
 
-    foreach (['todos' => 'todos', 'projects' => 'projects', 'contacts' => 'contacts'] as $key => $table) {
-        $extra = $table === 'todos' ? ' AND parent_todo_id IS NULL AND is_completed = 0' : '';
+    $tables = ['todos' => 'todos', 'projects' => 'projects', 'contacts' => 'contacts'];
+    if (bookkeepingAssignable($db)) {
+        $tables['bookkeeping'] = 'bookkeeping_rows';
+    }
+
+    foreach ($tables as $key => $table) {
+        $extra = '';
+        if ($table === 'todos') {
+            $extra = ' AND parent_todo_id IS NULL AND is_completed = 0';
+        } elseif ($table === 'bookkeeping_rows') {
+            // Same rule as the workload list: a row with its invoice attached
+            // is no longer work, whatever its assignee column still says.
+            $extra = ' AND id NOT IN (SELECT row_id FROM bookkeeping_pdfs WHERE row_id IS NOT NULL)';
+        }
+
         $sql = "SELECT assigned_to, COUNT(*) AS total FROM " . $table
              . " WHERE assigned_to IS NOT NULL" . $extra . " GROUP BY assigned_to";
 
         foreach ($db->query($sql) as $row) {
             $bucket = (string) (int) $row['assigned_to'];
             if (!isset($counts[$bucket])) {
-                $counts[$bucket] = ['todos' => 0, 'projects' => 0, 'contacts' => 0];
+                $counts[$bucket] = ['todos' => 0, 'projects' => 0, 'contacts' => 0, 'bookkeeping' => 0];
             }
             $counts[$bucket][$key] = (int) $row['total'];
         }
@@ -373,6 +498,13 @@ function logAssignment(string $type, string $label, string $title, array $record
 {
     $before = $record['assigned_to'] === null ? null : (int) $record['assigned_to'];
     if ($before === $assignee['id']) {
+        return;
+    }
+
+    // The timeline is a per-contact and per-project thing. A bookkeeping row
+    // belongs to neither, and an entry that links to nothing is only noise in
+    // the feed, so that one change is not logged.
+    if ($type === 'bookkeeping') {
         return;
     }
 

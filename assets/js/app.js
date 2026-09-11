@@ -1404,6 +1404,21 @@
         }
     }
 
+    /**
+     * Open the Bookkeeping tab on one row.
+     *
+     * The home page lists bookkeeping rows somebody has been handed, and those
+     * rows live in a table of their own - so following one means switching tab
+     * first and then letting that view find the row.
+     */
+    function openBookkeepingRow(rowId) {
+        switchView('bookkeeping');
+
+        if (window.Bookkeeping && window.Bookkeeping.focusRow) {
+            window.Bookkeeping.focusRow(rowId);
+        }
+    }
+
     // ============================================
     // To-Do Functions
     // ============================================
@@ -5842,6 +5857,7 @@
         editContact: editContact,
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
+        openBookkeepingRow: openBookkeepingRow,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,

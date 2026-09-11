@@ -257,6 +257,16 @@ function bkEnsureSchema(PDO $db): void
         $db->exec("ALTER TABLE bookkeeping_rows ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0");
     }
 
+    // Also added later: a row can be handed to a colleague, which puts it on
+    // their home page until the invoice arrives. The name is stored next to
+    // the id so a deleted account still leaves a readable trace, exactly as
+    // contacts, projects and to-dos do it.
+    if (!in_array('assigned_to', $rowColumns, true)) {
+        $db->exec("ALTER TABLE bookkeeping_rows ADD COLUMN assigned_to INTEGER");
+        $db->exec("ALTER TABLE bookkeeping_rows ADD COLUMN assigned_to_name VARCHAR(255)");
+    }
+    $db->exec("CREATE INDEX IF NOT EXISTS idx_bk_rows_assigned ON bookkeeping_rows(assigned_to)");
+
     if (!is_dir(BK_PDF_DIR)) {
         mkdir(BK_PDF_DIR, 0700, true);
     }
@@ -514,6 +524,7 @@ function bkGetTable(PDO $db): void
 
     $rows = $db->query("
         SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.excluded, r.import_batch,
+               r.assigned_to, r.assigned_to_name,
                p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size
         FROM bookkeeping_rows r
         LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
@@ -528,6 +539,8 @@ function bkGetTable(PDO $db): void
             'data' => json_decode($row['data'], true) ?: [],
             'no_pdf_needed' => (int) $row['no_pdf_needed'] === 1,
             'excluded' => (int) $row['excluded'] === 1,
+            'assigned_to' => $row['assigned_to'] === null ? null : (int) $row['assigned_to'],
+            'assigned_to_name' => $row['assigned_to_name'],
             'pdf' => $row['pdf_id'] !== null ? [
                 'id' => (int) $row['pdf_id'],
                 'name' => $row['pdf_name'],
@@ -792,7 +805,9 @@ function bkUploadPdf(PDO $db): void
     }
 
     $pdf = bkStorePdf($db, $file, $rowId);
-    bkJson(['success' => true, 'pdf' => $pdf]);
+    $wasAssigned = bkClearAssignment($db, $rowId);
+
+    bkJson(['success' => true, 'pdf' => $pdf, 'unassigned' => $wasAssigned]);
 }
 
 function bkUploadPool(PDO $db): void
@@ -861,7 +876,38 @@ function bkAssignPdf(PDO $db): void
     $stmt = $db->prepare("UPDATE bookkeeping_pdfs SET row_id = :row_id WHERE id = :id");
     $stmt->execute(['row_id' => $rowId, 'id' => $pdfId]);
 
-    bkJson(['success' => true]);
+    $wasAssigned = bkClearAssignment($db, $rowId);
+
+    bkJson(['success' => true, 'unassigned' => $wasAssigned]);
+}
+
+/**
+ * Drop a row's assignment, and say whose it was.
+ *
+ * Called wherever a row gains its invoice: the job the assignment stood for is
+ * done at that moment, and leaving it on someone's home page would only make
+ * them go and look at a row that needs nothing.
+ *
+ * @return string|null The name it was assigned to, or null if it was free.
+ */
+function bkClearAssignment(PDO $db, int $rowId): ?string
+{
+    $stmt = $db->prepare("SELECT assigned_to_name FROM bookkeeping_rows WHERE id = :id");
+    $stmt->execute(['id' => $rowId]);
+    $name = $stmt->fetchColumn();
+
+    if ($name === false || $name === null) {
+        return null;
+    }
+
+    $clear = $db->prepare("
+        UPDATE bookkeeping_rows
+        SET assigned_to = NULL, assigned_to_name = NULL
+        WHERE id = :id
+    ");
+    $clear->execute(['id' => $rowId]);
+
+    return (string) $name;
 }
 
 function bkUnassignPdf(PDO $db): void

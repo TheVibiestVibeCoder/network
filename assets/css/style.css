@@ -6385,6 +6385,93 @@ details.workload-done[open] > summary::after {
     background-color: var(--color-surface-3);
 }
 
+/* A to-do row is a wrapper around two controls, not one big button itself.
+   Its vertical padding moves onto the control inside, so the full height of
+   the row opens the record instead of only the line of text. */
+div.workload-row {
+    cursor: default;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* On a to-do the mark is a control: click it to check the to-do off. */
+.workload-check {
+    position: relative;
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+    transition: border-color var(--transition-fast),
+                background-color var(--transition-fast),
+                color var(--transition-fast);
+}
+
+/* A 26px circle is a small thing to hit with a thumb, so the target reaches
+   past the drawn edge without moving anything. */
+.workload-check::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+.workload-check:hover {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+/* A checked mark keeps its filled look on hover - only the tick must stay
+   readable against it, which the rule above would otherwise recolour. */
+.workload-check.is-done:hover {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: var(--color-on-success);
+    opacity: 0.85;
+}
+
+.workload-check:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 2px;
+}
+
+.workload-check:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+/* An empty circle says little, so a faint tick appears under the pointer. */
+.workload-check-hint {
+    display: flex;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.workload-row:hover .workload-check-hint,
+.workload-check:focus-visible .workload-check-hint {
+    opacity: 0.5;
+}
+
+/* The rest of the row keeps opening the record the to-do hangs off. */
+.workload-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3) 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.workload-row-main:focus-visible {
+    outline: 2px solid var(--color-text-tertiary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
 .workload-row-body {
     flex: 1;
     min-width: 0;
