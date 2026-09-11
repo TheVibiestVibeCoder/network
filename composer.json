@@ -3,12 +3,17 @@
     "description": "Simple CRM with map visualization",
     "type": "project",
     "require": {
-        "php": ">=7.4",
-        "phpoffice/phpspreadsheet": "1.25.2"
+        "php": ">=8.0",
+        "phpoffice/phpspreadsheet": "^1.30.6"
     },
     "autoload": {
         "psr-4": {
             "SimpleCRM\\": "includes/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.0.0"
         }
     }
 }

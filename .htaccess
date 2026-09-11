@@ -1,0 +1,178 @@
+# =============================================================================
+#  Simple CRM - Web server hardening
+# =============================================================================
+#  This file is the first line of defence for a deployment that sits on a
+#  public domain. It blocks direct web access to everything that is not meant
+#  to be fetched by a browser (secrets, the SQLite database, PHP includes,
+#  the git metadata, dependency manifests) and forces HTTPS.
+#
+#  NOTE: .htaccess is honoured by Apache and LiteSpeed. nginx ignores it
+#  entirely, which is why every protected PHP file additionally refuses to run
+#  when it is requested directly (see includes/bootstrap_guard.php).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Never list directory contents
+# -----------------------------------------------------------------------------
+Options -Indexes -MultiViews
+
+# -----------------------------------------------------------------------------
+# 2. Force HTTPS
+# -----------------------------------------------------------------------------
+#  The three conditions cover both direct TLS termination and the common
+#  reverse-proxy setups. If your host terminates TLS but sets none of these
+#  markers you would get a redirect loop - in that case comment out this block.
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{HTTP:X-Forwarded-SSL} !=on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# 3. Block every dotfile (.env, .git/*, .user.ini, .htaccess, ...)
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Any path segment that starts with a dot is off limits.
+    RewriteRule (^|/)\. - [F,L]
+</IfModule>
+
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# -----------------------------------------------------------------------------
+# 4. Block sensitive file types anywhere in the tree
+# -----------------------------------------------------------------------------
+#  - db / sqlite (+ the WAL and SHM sidecars) : the entire CRM dataset
+#  - env / ini / log / bak / sql / lock / json / md / dist / yml : secrets,
+#    dependency manifests, backups and notes
+# -----------------------------------------------------------------------------
+<FilesMatch "\.(?:env|db|db-wal|db-shm|sqlite|sqlite3|sql|log|bak|backup|old|orig|save|swp|swo|ini|lock|dist|yml|yaml|md|sh|bat|ps1)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# composer.json is the one JSON we must name explicitly (the API returns
+# application/json responses from .php files, so a blanket *.json block is safe
+# here but kept narrow on purpose).
+<FilesMatch "^(?:composer\.(?:json|lock)|package(?:-lock)?\.json|README\.md|check\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# -----------------------------------------------------------------------------
+# 5. Block whole directories that must never be served
+# -----------------------------------------------------------------------------
+#  data/     - SQLite database + uploaded invoice PDFs
+#  includes/ - PHP classes, included by the entry points only
+#  config/   - configuration loader
+#  vendor/   - third party code
+#  .git/     - full source history
+#  Each of these also ships its own .htaccess for servers where only per
+#  directory overrides are enabled.
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:data|includes|config|vendor)(?:/|$) - [F,L]
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# 6. Security response headers
+# -----------------------------------------------------------------------------
+#  The application also sets these from PHP (includes/auth.php) so that they
+#  apply on hosts without mod_headers. Setting them here too means static
+#  assets are covered as well.
+# -----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+    # HSTS - only meaningful over TLS, and only sent there.
+    # <If> is Apache 2.4 only, so it is gated behind a 2.4-only module.
+    <IfModule mod_authz_core.c>
+        <If "%{HTTPS} == 'on' || %{HTTP:X-Forwarded-Proto} == 'https'">
+            Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        </If>
+    </IfModule>
+
+    # Do not advertise the PHP version.
+    Header always unset X-Powered-By
+    Header always unset X-AspNet-Version
+</IfModule>
+
+# Do not advertise the server signature.
+ServerSignature Off
+
+# -----------------------------------------------------------------------------
+# 7. PHP hardening + upload limits
+# -----------------------------------------------------------------------------
+#  PHP upload limits for mod_php hosts. PHP-FPM / CGI setups read .user.ini
+#  instead; both are provided so the app behaves the same either way.
+#  Guarded so the server does not error out when mod_php is absent.
+# -----------------------------------------------------------------------------
+<IfModule mod_php.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+    php_flag display_errors off
+    php_flag display_startup_errors off
+    php_flag session.cookie_httponly on
+    php_value session.use_strict_mode 1
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+    php_flag display_errors off
+    php_flag display_startup_errors off
+    php_flag session.cookie_httponly on
+    php_value session.use_strict_mode 1
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 25M
+    php_value post_max_size 30M
+    php_value max_file_uploads 40
+    php_flag display_errors off
+    php_flag display_startup_errors off
+    php_flag session.cookie_httponly on
+    php_value session.use_strict_mode 1
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# 8. Only ever execute .php - never serve PHP source, never execute anything
+#    that merely looks like PHP (e.g. invoice.pdf.php or shell.php.jpg).
+# -----------------------------------------------------------------------------
+<FilesMatch "\.ph(?:p[0-9]?|tml|ar|ps)\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

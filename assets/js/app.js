@@ -75,7 +75,9 @@
 
     const elements = {
         // Views
+        workloadView: document.getElementById('workloadView'),
         mapView: document.getElementById('mapView'),
+        bookkeepingView: document.getElementById('bookkeepingView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -145,6 +147,8 @@
         overviewAvatar: document.getElementById('overviewAvatar'),
         overviewName: document.getElementById('overviewName'),
         overviewCompany: document.getElementById('overviewCompany'),
+        overviewEdited: document.getElementById('overviewEdited'),
+        overviewAssignee: document.getElementById('overviewAssignee'),
         overviewDetails: document.getElementById('overviewDetails'),
         contactProjects: document.getElementById('contactProjects'),
         contactTodosList: document.getElementById('contactTodosList'),
@@ -215,6 +219,8 @@
         projectOverviewModal: document.getElementById('projectOverviewModal'),
         projectOverviewName: document.getElementById('projectOverviewName'),
         projectOverviewCompany: document.getElementById('projectOverviewCompany'),
+        projectOverviewEdited: document.getElementById('projectOverviewEdited'),
+        projectOverviewAssignee: document.getElementById('projectOverviewAssignee'),
         projectOverviewStartDate: document.getElementById('projectOverviewStartDate'),
         projectOverviewStage: document.getElementById('projectOverviewStage'),
         projectOverviewBudget: document.getElementById('projectOverviewBudget'),
@@ -242,6 +248,9 @@
         // To-do modal
         todoModal: document.getElementById('todoModal'),
         todoModalTitle: document.getElementById('todoModalTitle'),
+        todoEdited: document.getElementById('todoEdited'),
+        todoAssignee: document.getElementById('todoAssignee'),
+        todoAssigneeGroup: document.getElementById('todoAssigneeGroup'),
         todoForm: document.getElementById('todoForm'),
         todoTitle: document.getElementById('todoTitle'),
         todoDescription: document.getElementById('todoDescription'),
@@ -862,9 +871,12 @@
             html += `<p class="popup-note">${escapeHtml(contact.note)}</p>`;
         }
 
+        // Buttons carry their target in data-* attributes and are handled by a
+        // delegated listener (see bindCspSafeDelegates). Inline onclick= would be
+        // blocked by the Content-Security-Policy.
         html += `<div class="popup-buttons">`;
-        html += `<button class="popup-btn popup-details-btn" onclick="window.CRM.openOverview(${contact.id})">Details</button>`;
-        html += `<button class="popup-btn popup-edit-btn" onclick="window.CRM.editContact(${contact.id})">Edit</button>`;
+        html += `<button type="button" class="popup-btn popup-details-btn" data-crm-action="open-overview" data-contact-id="${contact.id}">Details</button>`;
+        html += `<button type="button" class="popup-btn popup-edit-btn" data-crm-action="edit-contact" data-contact-id="${contact.id}">Edit</button>`;
         html += `</div>`;
         html += `</div>`;
 
@@ -1287,6 +1299,7 @@
                         ${flagHtml}
                     </div>
                 </div>
+                ${assigneeChip(contact)}
                 <button class="pin-btn${isPinned ? ' pin-btn--active' : ''}" data-id="${contact.id}" title="${isPinned ? 'Unpin contact' : 'Pin contact'}">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
@@ -1314,14 +1327,24 @@
         });
 
         // Update view panels
+        if (elements.workloadView) {
+            elements.workloadView.classList.toggle('active', view === 'workload');
+        }
         elements.mapView.classList.toggle('active', view === 'map');
         elements.listView.classList.toggle('active', view === 'list');
         elements.calendarView.classList.toggle('active', view === 'calendar');
         elements.todoView.classList.toggle('active', view === 'todos');
         elements.projectsView.classList.toggle('active', view === 'projects');
+        if (elements.bookkeepingView) {
+            elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
+        }
 
         // Refresh data for the active view
-        if (view === 'map') {
+        if (view === 'workload') {
+            if (window.CRMWorkload) {
+                window.CRMWorkload.load();
+            }
+        } else if (view === 'map') {
             // Force map to recalculate size after becoming visible
             setTimeout(() => {
                 state.map.invalidateSize();
@@ -1336,6 +1359,10 @@
             // Also load contacts for autocomplete in project assignment
             if (!state.contacts || state.contacts.length === 0) {
                 loadAllContacts();
+            }
+        } else if (view === 'bookkeeping') {
+            if (window.Bookkeeping) {
+                window.Bookkeeping.load();
             }
         } else {
             loadContacts();
@@ -1676,6 +1703,7 @@
                         <div class="todo-meta">
                             ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label)}</span>` : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
+                            ${assigneeChip(todo)}
                         </div>
                         ${openButtons}
                     </div>
@@ -1835,6 +1863,15 @@
             if (elements.todoPriority) {
                 elements.todoPriority.value = todoData.priority || '';
             }
+            setEditedLine(elements.todoEdited, todoData);
+            setAssigneeControl(elements.todoAssignee, 'todo', todoData);
+            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
+        } else {
+            // A to-do being created has nobody to attribute yet, and nothing to
+            // attach an assignment to until it is saved.
+            setEditedLine(elements.todoEdited, null);
+            setAssigneeControl(elements.todoAssignee, 'todo', null);
+            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = true;
         }
 
         elements.todoModal.classList.add('active');
@@ -2142,6 +2179,8 @@
             elements.overviewName.textContent = contact.name;
             elements.overviewCompany.textContent = contact.company || '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
+            setEditedLine(elements.overviewEdited, contact);
+            setAssigneeControl(elements.overviewAssignee, 'contact', contact);
 
             // Populate details
             renderOverviewDetails(contact);
@@ -2317,6 +2356,7 @@
                 <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -2441,7 +2481,7 @@
         }
 
         const html = projects.map(project => `
-            <div class="project-mini-card" onclick="window.CRM.openProjectOverview(${project.id})">
+            <div class="project-mini-card" data-crm-action="open-project-overview" data-project-id="${project.id}">
                 <div class="project-mini-header">
                     <h4 class="project-mini-name">${escapeHtml(project.name)}</h4>
                     <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(project.stage)}</span>
@@ -2759,6 +2799,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name, note.author_id)}
                         <span class="note-source">von ${escapeHtml(contactName)}</span>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -3240,7 +3281,8 @@
 
     function getCalendarEntryType(entry) {
         const type = entry && entry.entry_type ? String(entry.entry_type) : '';
-        if (type === 'project_note' || type === 'todo' || type === 'contact_activity' || type === 'project_activity') {
+        if (type === 'project_note' || type === 'todo' || type === 'contact_activity'
+            || type === 'project_activity' || type === 'account_activity') {
             return type;
         }
         return 'contact_note';
@@ -3252,6 +3294,7 @@
         if (type === 'todo') return 'todo';
         if (type === 'contact_activity') return 'contact-activity';
         if (type === 'project_activity') return 'project-activity';
+        if (type === 'account_activity') return 'account-activity';
         return 'contact-note';
     }
 
@@ -3261,6 +3304,7 @@
         if (type === 'todo') return 'To-do';
         if (type === 'contact_activity') return 'Kontakt-Update';
         if (type === 'project_activity') return 'Projekt-Update';
+        if (type === 'account_activity') return 'Konto';
         return 'Kontakt-Notiz';
     }
 
@@ -3270,6 +3314,15 @@
 
     function getCalendarEntryContext(entry) {
         const type = getCalendarEntryType(entry);
+
+        // Account events belong to no contact or project - they are about the
+        // team itself, so the actor is the whole context.
+        if (type === 'account_activity') {
+            return {
+                primary: entry.actor_name || 'Konto',
+                secondary: 'Benutzerverwaltung'
+            };
+        }
 
         if (type === 'project_note' || type === 'project_activity') {
             return {
@@ -3527,6 +3580,7 @@
                             <span class="cal-day-note-name">${name}</span>
                             ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
                             <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
+                            ${byLine(entry.actor_name, entry.actor_id)}
                             ${todoMeta}
                             ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
                         </div>
@@ -4050,7 +4104,10 @@
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
                         <p class="project-card-company${project.company ? '' : ' is-empty'}">${project.company ? escapeHtml(project.company) : '&nbsp;'}</p>
                     </div>
-                    <span class="project-stage-badge stage-${stageClass}">${escapeHtml(stageLabel)}</span>
+                    <div class="project-card-head-right">
+                        ${assigneeChip(project)}
+                        <span class="project-stage-badge stage-${stageClass}">${escapeHtml(stageLabel)}</span>
+                    </div>
                 </div>
                 <div class="project-card-metrics">
                     <span class="project-metric-chip">
@@ -4224,6 +4281,8 @@
     function renderProjectOverview(project, contacts, tags, notes = [], todos = []) {
         elements.projectOverviewName.textContent = project.name;
         elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
+        setEditedLine(elements.projectOverviewEdited, project);
+        setAssigneeControl(elements.projectOverviewAssignee, 'project', project);
 
         // Format dates as absolute dates
         elements.projectOverviewStartDate.textContent = project.start_date
@@ -4354,6 +4413,7 @@
                 <div class="note-item">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
+                        ${byLine(note.author_name, note.author_id)}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4674,17 +4734,323 @@
     }
 
     function escapeHtml(text) {
+        // Keep the original falsy handling so nothing renders differently.
         if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        // Escapes the five characters that can break out of either an HTML text
+        // node or a quoted attribute value. The previous textContent/innerHTML
+        // round-trip left " and ' untouched, which let a stored value such as a
+        // contact name containing a double quote escape from attributes like
+        // title="..." or data-company="..." and inject markup.
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function normalizeUrl(url) {
         if (!url) return url;
         url = url.trim();
+
+        // Refuse script-bearing schemes outright. The server already rejects
+        // them, but this href goes straight into the DOM, so it must not depend
+        // on that. Note "javascript://x%0aalert(1)" satisfies the scheme test
+        // below, which is why the deny list is checked first.
+        if (/^\s*(?:javascript|data|vbscript|file|blob):/i.test(url)) return '';
+
         if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return url;
         return 'https://' + url;
+    }
+
+    // ============================================
+    // Assignment
+    // ============================================
+
+    /**
+     * The key the assignment API uses for a record's current assignee.
+     *
+     * assigned_to is NULL when nobody owns the record and 0 for the owner
+     * identity, which has no users row - so a plain falsy check would confuse
+     * "the owner" with "nobody".
+     */
+    function assigneeKey(record) {
+        if (!record) return '';
+        const raw = record.assigned_to;
+        if (raw === null || raw === undefined || raw === '') return '';
+        return Number(raw) === 0 ? 'owner' : String(Number(raw));
+    }
+
+    /**
+     * The small face shown on a card to say who is responsible.
+     *
+     * Renders nothing when a record is unassigned: an empty placeholder on
+     * every card would be noise, and most records never get assigned at all.
+     */
+    function assigneeChip(record) {
+        const name = record && record.assigned_to_name;
+        if (!name) return '';
+
+        const key = assigneeKey(record);
+        const url = window.CRMPeople ? window.CRMPeople.avatarFor(key, name) : null;
+        const inner = url ? `<img src="${escapeHtml(url)}" alt="">` : escapeHtml(getInitials(name));
+
+        return `<span class="assignee-chip${url ? ' has-photo' : ''}"
+                      data-actor-id="${escapeHtml(key)}"
+                      data-actor-name="${escapeHtml(name)}"
+                      title="Assigned to ${escapeHtml(name)}">${inner}</span>`;
+    }
+
+    /**
+     * The "Assigned to" control for a detail view.
+     *
+     * A plain select, because it has to work on a phone and needs no styling
+     * tricks to be usable. The face beside it is what makes the current value
+     * readable at a glance.
+     */
+    function assigneeControl(type, record) {
+        const people = window.CRMPeople ? window.CRMPeople.list() : [];
+        const current = assigneeKey(record);
+        const name = record && record.assigned_to_name;
+
+        const url = name && window.CRMPeople ? window.CRMPeople.avatarFor(current, name) : null;
+        const face = url
+            ? `<img src="${escapeHtml(url)}" alt="">`
+            : (name ? escapeHtml(getInitials(name)) : ASSIGN_EMPTY_ICON);
+
+        const options = [`<option value="">Unassigned</option>`].concat(
+            people.map(person => {
+                const key = person.id === null ? 'owner' : String(person.id);
+                return `<option value="${escapeHtml(key)}"${key === current ? ' selected' : ''}>${escapeHtml(person.name)}</option>`;
+            })
+        );
+
+        // If the record points at somebody no longer in the directory (a
+        // deleted account, say), keep them listed so the select does not
+        // silently reset the value to Unassigned on the next save.
+        if (current && !people.some(p => (p.id === null ? 'owner' : String(p.id)) === current)) {
+            options.push(`<option value="${escapeHtml(current)}" selected>${escapeHtml(name || 'Unknown')}</option>`);
+        }
+
+        return `
+            <div class="assignee-bar">
+                <span class="assignee-bar-face${url ? ' has-photo' : ''}${name ? '' : ' is-empty'}">${face}</span>
+                <div class="assignee-bar-body">
+                    <span class="assignee-bar-label">Assigned to</span>
+                    <select class="form-select assignee-select"
+                            data-assign-type="${escapeHtml(type)}"
+                            data-assign-id="${escapeHtml(String(record && record.id ? record.id : ''))}">
+                        ${options.join('')}
+                    </select>
+                </div>
+            </div>
+        `;
+    }
+
+    const ASSIGN_EMPTY_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+
+    /**
+     * Write the assignment control into a slot, or clear it.
+     */
+    function setAssigneeControl(node, type, record) {
+        if (!node) return;
+
+        if (!record || !record.id) {
+            node.innerHTML = '';
+            node.style.display = 'none';
+            return;
+        }
+
+        node.innerHTML = assigneeControl(type, record);
+        node.style.display = '';
+    }
+
+    /**
+     * Persist an assignment change.
+     *
+     * The server re-checks that the target is a real, active account, so a
+     * tampered option value cannot park work on a stranger.
+     */
+    async function saveAssignment(type, id, value) {
+        const response = await fetch('api/assign.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ type: type, id: Number(id), assigned_to: value === '' ? null : value })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.error) {
+            throw new Error(result.error || 'Could not save the assignment.');
+        }
+
+        return result.data;
+    }
+
+    /**
+     * One delegated listener for every assignment select in the app.
+     *
+     * The controls are rendered into innerHTML as detail views open, so binding
+     * per control would mean rebinding on every render - and inline handlers
+     * are blocked by the Content-Security-Policy anyway.
+     */
+    function bindAssignmentControls() {
+        document.addEventListener('change', async function (event) {
+            const select = event.target.closest('select.assignee-select');
+            if (!select) return;
+
+            const type = select.getAttribute('data-assign-type');
+            const id = select.getAttribute('data-assign-id');
+            if (!type || !id) return;
+
+            const previous = select.getAttribute('data-previous') || '';
+            select.disabled = true;
+
+            try {
+                const saved = await saveAssignment(type, id, select.value);
+
+                // Repaint the face next to the control.
+                const bar = select.closest('.assignee-bar');
+                if (bar) {
+                    const face = bar.querySelector('.assignee-bar-face');
+                    if (face) paintAssigneeFace(face, saved.assigned_to, saved.assigned_to_name);
+                }
+
+                select.setAttribute('data-previous', select.value);
+                applyAssignmentLocally(type, Number(id), saved);
+                showAssignmentToast(saved.assigned_to_name);
+
+                // The nav badge counts open to-dos assigned to me, so it can
+                // change whether or not I was the one reassigned.
+                if (window.CRMWorkload) {
+                    window.CRMWorkload.refreshBadge();
+                }
+            } catch (error) {
+                select.value = previous;
+                alert(error.message);
+            } finally {
+                select.disabled = false;
+            }
+        });
+    }
+
+    /**
+     * Paint a face node for a given assignee, or the empty-state icon.
+     */
+    function paintAssigneeFace(node, assignedTo, assignedName) {
+        const key = assignedTo === null || assignedTo === undefined
+            ? ''
+            : (Number(assignedTo) === 0 ? 'owner' : String(assignedTo));
+        const url = assignedName && window.CRMPeople ? window.CRMPeople.avatarFor(key, assignedName) : null;
+
+        node.classList.toggle('has-photo', !!url);
+        node.classList.toggle('is-empty', !assignedName);
+
+        if (url) {
+            node.textContent = '';
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = '';
+            node.appendChild(img);
+        } else if (assignedName) {
+            node.textContent = getInitials(assignedName);
+        } else {
+            node.innerHTML = ASSIGN_EMPTY_ICON;
+        }
+    }
+
+    /**
+     * Keep the already-loaded lists in step, so the card behind the open detail
+     * view shows the new face as soon as the dialog closes.
+     */
+    function applyAssignmentLocally(type, id, saved) {
+        const collections = {
+            contact: [state.contacts, state.allContacts],
+            project: [state.projects, state.allProjects],
+            todo: [state.todos]
+        }[type] || [];
+
+        collections.forEach(list => {
+            if (!Array.isArray(list)) return;
+            const hit = list.find(item => Number(item.id) === id);
+            if (hit) {
+                hit.assigned_to = saved.assigned_to;
+                hit.assigned_to_name = saved.assigned_to_name;
+            }
+        });
+
+        if (state.viewingContact && type === 'contact' && Number(state.viewingContact.id) === id) {
+            state.viewingContact.assigned_to = saved.assigned_to;
+            state.viewingContact.assigned_to_name = saved.assigned_to_name;
+        }
+    }
+
+    function showAssignmentToast(name) {
+        const toast = document.getElementById('bkToast');
+        if (!toast) return;
+
+        toast.textContent = name ? `Assigned to ${name}.` : 'Assignment cleared.';
+        toast.classList.remove('bk-toast-error');
+        toast.classList.add('visible');
+        clearTimeout(showAssignmentToast._timer);
+        showAssignmentToast._timer = setTimeout(() => toast.classList.remove('visible'), 3000);
+    }
+
+    /**
+     * A quiet "by <name>" marker for anything a person authored.
+     *
+     * Attribution should be findable, never the first thing you read, so it
+     * renders as small muted text rather than another badge. Returns an empty
+     * string when nothing is recorded, which is the case for everything created
+     * before multi-user existed.
+     */
+    function byLine(name, actorId) {
+        if (!name) return '';
+
+        // The face comes from the directory profile.js loads once per page.
+        // Falls back to initials when the person has no picture, or when the
+        // directory has not arrived yet.
+        const url = window.CRMPeople ? window.CRMPeople.avatarFor(actorId, name) : null;
+        const inner = url
+            ? `<img src="${escapeHtml(url)}" alt="">`
+            : escapeHtml(getInitials(name));
+
+        // The data-* attributes let profile.js repaint these in place after
+        // somebody changes their picture, without a reload.
+        return `<span class="by-line"><span class="by-line-avatar${url ? ' has-photo' : ''}" data-actor-id="${actorId === null || actorId === undefined ? '' : escapeHtml(actorId)}" data-actor-name="${escapeHtml(name)}">${inner}</span><span class="by-line-name">${escapeHtml(name)}</span></span>`;
+    }
+
+    /**
+     * A muted "Last edited by ..." line for a record's detail view.
+     *
+     * Falls back to the creator when nothing has been edited yet, and renders
+     * nothing at all for records written before attribution existed.
+     */
+    /**
+     * Write a "last edited by" line into a slot, or hide it when the record
+     * predates attribution.
+     */
+    function setEditedLine(node, record) {
+        if (!node) return;
+
+        const html = lastEditedLine(record);
+        node.innerHTML = html;
+        node.style.display = html ? '' : 'none';
+    }
+
+    function lastEditedLine(record) {
+        if (!record) return '';
+
+        const edited = record.updated_by_name || null;
+        const created = record.created_by_name || null;
+        const name = edited || created;
+        if (!name) return '';
+
+        const actorId = edited ? record.updated_by : record.created_by;
+        const label = edited ? 'Last edited by' : 'Created by';
+        const when = record.updated_at || record.created_at;
+        const stamp = when ? formatDate(new Date(when.replace(' ', 'T') + 'Z')) : '';
+
+        return `<span class="edited-by">${label} ${byLine(name, actorId)}${stamp ? `<span class="edited-by-when">${escapeHtml(stamp)}</span>` : ''}</span>`;
     }
 
     function getInitials(name) {
@@ -5311,9 +5677,41 @@
     // Initialization
     // ============================================
 
+    /**
+     * Delegated click handling for markup that is rendered into innerHTML.
+     *
+     * The Content-Security-Policy has no 'unsafe-inline' in script-src, which
+     * means an inline onclick="..." attribute never fires. Elements declare
+     * their intent with data-crm-action instead and are dispatched from here,
+     * so the behaviour is identical while injected markup stays inert.
+     */
+    function bindCspSafeDelegates() {
+        document.addEventListener('click', function (event) {
+            const trigger = event.target.closest('[data-crm-action]');
+            if (!trigger) return;
+
+            const action = trigger.getAttribute('data-crm-action');
+            const contactId = parseInt(trigger.getAttribute('data-contact-id'), 10);
+            const projectId = parseInt(trigger.getAttribute('data-project-id'), 10);
+
+            if (action === 'open-overview' && !isNaN(contactId)) {
+                event.preventDefault();
+                openOverviewModal(contactId);
+            } else if (action === 'edit-contact' && !isNaN(contactId)) {
+                event.preventDefault();
+                editContact(contactId);
+            } else if (action === 'open-project-overview' && !isNaN(projectId)) {
+                event.preventDefault();
+                openProjectOverview(projectId);
+            }
+        });
+    }
+
     function init() {
         applyTheme(getStoredTheme(), false);
 
+        bindCspSafeDelegates();
+        bindAssignmentControls();
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();
