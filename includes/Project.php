@@ -45,12 +45,38 @@ class Project
             $params['search'] = '%' . $search . '%';
         }
 
-        $sql .= " ORDER BY $sortBy $sortOrder";
+        // Stage is a pipeline position, not a word: sorting it alphabetically
+        // puts Complete first and In Progress in the middle. Order it the way
+        // the work actually reads instead - what is running, then what is being
+        // won, then what is only a lead, and finished work last.
+        if ($sortBy === 'stage') {
+            $sql .= " ORDER BY " . self::stageRankSql() . " $sortOrder, name COLLATE NOCASE ASC";
+        } else {
+            $sql .= " ORDER BY $sortBy $sortOrder";
+        }
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Pipeline order for the stage column, as a SQL CASE expression.
+     *
+     * Kept next to STAGE_RANK in app.js - both have to agree, or a list sorted
+     * on the server would reshuffle the moment the client re-sorts it.
+     */
+    private static function stageRankSql(): string
+    {
+        return "CASE stage
+                    WHEN 'In Progress' THEN 1
+                    WHEN 'Proposal'    THEN 2
+                    WHEN 'Negotiation' THEN 3
+                    WHEN 'Lead'        THEN 4
+                    WHEN 'Complete'    THEN 5
+                    ELSE 6
+                END";
     }
 
     /**

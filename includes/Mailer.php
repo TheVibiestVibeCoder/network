@@ -66,6 +66,32 @@ class Mailer
         return self::send($email, $name, $subject, $body);
     }
 
+    /**
+     * Send the one-time sign-in code for two-factor authentication.
+     *
+     * Deliberately carries no link: the code is only useful to somebody who is
+     * already part-way through a sign-in on this site, so there is nothing here
+     * for a forwarded copy of the mail to be clicked into.
+     */
+    public static function sendLoginCode(string $email, string $name, string $code, int $lifetime): bool
+    {
+        $appName = APP_NAME;
+        $validFor = self::describeDuration($lifetime);
+
+        $subject = 'Your ' . $appName . ' sign-in code: ' . $code;
+        $body = self::paragraphs([
+            'Hi ' . $name . ',',
+            'Your sign-in code for ' . $appName . ' is:',
+            $code,
+            'It is valid for ' . $validFor . ' and can only be used once.',
+            'If you did not just try to sign in, someone else knows your '
+                . 'password. The code alone will not let them in, but you '
+                . 'should change your password now.',
+        ]);
+
+        return self::send($email, $name, $subject, $body);
+    }
+
     // -------------------------------------------------------------------------
     // Internals
     // -------------------------------------------------------------------------

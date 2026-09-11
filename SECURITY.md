@@ -64,9 +64,9 @@ What takes effect immediately, on the target's very next request:
 | Action | Effect |
 |---|---|
 | Change a role | New permissions apply without re-login |
-| Disable an account | Existing sessions die, sign-in refused |
-| Delete an account | Sessions die; their tokens are removed |
-| Change a password | Every other session for that account dies |
+| Disable an account | Existing sessions die, sign-in refused, remembered devices refused |
+| Delete an account | Sessions die; their tokens and remembered devices are removed |
+| Change a password | Every other session dies, and every remembered device is retired |
 
 Deleting a user never deletes their work. Each record carries both the actor's
 id and a snapshot of their name, so the history stays readable after the
@@ -86,6 +86,48 @@ Guards worth knowing about:
 
 If mail cannot be sent, nothing breaks: the Users panel always shows the
 generated link so an admin can pass it on by hand.
+
+### Two-factor sign-in
+
+A user account's password only opens a *challenge*: a six-digit code goes to
+the registered address and has to come back before a session exists. The code
+is stored as a bcrypt hash, is single-use, lasts 10 minutes, and dies after 5
+wrong guesses. Requesting a new one immediately invalidates the previous one.
+
+Nothing the client holds names the account being signed in - the session
+carries only an opaque challenge id, and the row behind it is the authority on
+whose sign-in it is.
+
+**The owner login is exempt**, deliberately. It has no registered address, and
+it is the way back in when mail, the database or an account is broken; putting
+it behind a mail server would make the recovery path depend on the component
+most likely to be down. This is the trade the design makes: the owner password
+is single-factor, so it has to be long, random and not reused.
+
+A corollary worth planning for: **mail has to work before you invite anyone.**
+An account whose code cannot be delivered cannot sign in, and unlike an invite
+link there is no panel to copy it out of. Prove delivery with an account of
+your own first.
+
+### Keep me signed in
+
+Opt-in, off by default. The cookie is `<selector>:<validator>`; the selector is
+the lookup key, and only a SHA-256 of the validator is stored, so a dump of the
+table yields nothing presentable. It restores a session with neither password
+nor code, which makes it a second key to the account - `REMEMBER_ME_LIFETIME`
+(30 days by default) is effectively how long a stolen laptop stays useful.
+
+It is retired by: signing out, changing the password (the token is pinned to
+the `password_changed_at` it was issued under), disabling the account, and
+expiry.
+
+The validator is rotated on every use. A cookie presenting a *superseded*
+validator is evidence it was copied, so every token on that account is dropped
+rather than just refused - one stolen cookie costs the thief and the owner the
+same thing. The exception is a 60-second grace window
+(`REMEMBER_ROTATION_GRACE`) after a rotation, because a single page load fires
+several requests carrying the cookie the browser held before any of them
+returned; without it, ordinary use would look like theft.
 
 ## Assignment and My Work
 
@@ -218,6 +260,12 @@ The `^/(data|includes|config|vendor)/` rule already covers the invoice store and
   `X-Forwarded-For` and sidestep the login lockout entirely.
 - **Login lockout is per IP.** It stops a single-source brute force, not a
   distributed one. A long, random `APP_PASSWORD` is what actually protects you.
+- **The owner account is single-factor.** Every other account needs an emailed
+  code; the owner cannot, because it has no address and must stay usable when
+  mail is down. That password is the one credential with no second gate.
+- **"Keep me signed in" trades a factor for convenience.** While the cookie
+  lives, the device needs neither password nor code. Reuse detection limits the
+  damage after the fact; it does not prevent the first use of a stolen cookie.
 - **`style-src` keeps `'unsafe-inline'`.** The UI sets inline styles for tag
   colours and map layout. Inline CSS is not a script execution primitive, and
   tag colours are validated as hex server-side.

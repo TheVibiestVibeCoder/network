@@ -94,6 +94,10 @@ try {
             case 'delete-pdfs':
                 bkDeletePdfs($db);
                 break;
+            case 'set-month-tax':
+                bkSetMonthTax($db);
+                break;
+
             case 'set-no-pdf':
                 bkSetNoPdf($db);
                 break;
@@ -301,6 +305,71 @@ function bkSetSetting(PDO $db, string $key, string $value): void
 }
 
 /**
+ * The per-month tax amounts, as {"YYYY-MM": float}.
+ *
+ * A flat amount the user types in, not a rate: it is subtracted from that
+ * month's result to give the net. Stored as one JSON blob rather than a table
+ * because it is a handful of numbers keyed by month, only ever read and
+ * written whole.
+ */
+function bkGetMonthTax(PDO $db): array
+{
+    $raw = bkGetSetting($db, 'month_tax');
+    if ($raw === null || $raw === '') {
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $out = [];
+    foreach ($decoded as $month => $amount) {
+        if (is_string($month) && preg_match('/^\d{4}-\d{2}$/', $month) && is_numeric($amount)) {
+            $out[$month] = (float) $amount;
+        }
+    }
+
+    return $out;
+}
+
+/**
+ * Set or clear one month's tax amount.
+ */
+function bkSetMonthTax(PDO $db): void
+{
+    $body = bkReadJsonBody();
+    $month = (string) ($body['month'] ?? '');
+
+    if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+        bkJson(['error' => 'Invalid month'], 400);
+    }
+
+    $current = bkGetMonthTax($db);
+    $raw = $body['amount'] ?? null;
+
+    // null or an empty string clears the entry, so the month goes back to
+    // showing no net line at all rather than a net that equals the result.
+    if ($raw === null || $raw === '') {
+        unset($current[$month]);
+    } elseif (is_numeric($raw)) {
+        $amount = round((float) $raw, 2);
+        if (abs($amount) > 1e12) {
+            bkJson(['error' => 'Amount out of range'], 400);
+        }
+        $current[$month] = $amount;
+    } else {
+        bkJson(['error' => 'Invalid amount'], 400);
+    }
+
+    ksort($current);
+    bkSetSetting($db, 'month_tax', json_encode($current, JSON_THROW_ON_ERROR));
+
+    bkJson(['success' => true, 'month_tax' => (object) $current]);
+}
+
+/**
  * Normalize a raw date string to YYYY-MM-DD, or null if it can't be parsed.
  * Supports YYYY-MM-DD, DD.MM.YYYY, DD/MM/YYYY (day-first preferred) and 2-digit years.
  */
@@ -476,6 +545,10 @@ function bkGetTable(PDO $db): void
             'settings' => [
                 'selected_columns' => is_array($selection) ? $selection : [],
                 'date_column' => bkGetSetting($db, 'csv_date_column'),
+                // Cast so an empty map serialises as {} and not [] - the
+                // client indexes it by month key either way, but an array
+                // there is a lie about the shape.
+                'month_tax' => (object) bkGetMonthTax($db),
             ],
             'limits' => [
                 'max_upload_bytes' => bkMaxUploadBytes(),

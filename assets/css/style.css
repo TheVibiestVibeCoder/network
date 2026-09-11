@@ -544,6 +544,15 @@ textarea.form-input {
     overflow: hidden;
 }
 
+/* My Work is one long column that routinely outgrows the viewport. The panel
+   is absolutely positioned inside an .app-main that hides its overflow, so
+   without this the bottom of the list is simply unreachable. */
+#workloadView.active {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
 /* ============================================
    Map View
    ============================================ */
@@ -1987,6 +1996,39 @@ textarea.form-input {
     align-items: center;
     gap: var(--spacing-4);
     margin-top: var(--spacing-3);
+}
+
+/* Inline filter toggle in a list header, e.g. "Hide completed" on projects. */
+.filter-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.filter-check input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.filter-check:hover {
+    color: var(--color-text);
+}
+
+.filter-check-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
 }
 
 .group-toggle {
@@ -5363,6 +5405,100 @@ textarea.form-input {
 .login-form .form-input[readonly] {
     color: var(--color-text-tertiary);
     cursor: default;
+}
+
+/* --- Two-factor + remember me ------------------------------------------ */
+
+.login-remember {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin: calc(var(--spacing-1) * -1) 0 var(--spacing-4);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.login-remember input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--color-primary, var(--color-text));
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* The code is six glyphs read off a phone and typed back - tracking them
+   apart makes a mistyped digit visible before the form is submitted. */
+.login-code-input {
+    text-align: center;
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.4em;
+    text-indent: 0.4em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The tracking is for six digits, not for the hint - spaced-out prose is
+   harder to read, not easier. */
+.login-code-input::placeholder {
+    letter-spacing: normal;
+    text-indent: 0;
+    font-size: var(--font-size-base);
+}
+
+.login-resend {
+    margin-top: calc(var(--spacing-1) * -1);
+    text-align: center;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    padding: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.btn-link:hover {
+    color: var(--color-text);
+}
+
+.alert-warning {
+    background-color: color-mix(in srgb, var(--color-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+    color: var(--color-warning);
+}
+
+/* Local-instance fallback that prints the sign-in code. Deliberately styled as
+   a warning, not as a normal part of the flow - it should look out of place. */
+.login-devcode {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    text-align: left;
+}
+
+.login-devcode span {
+    font-size: var(--font-size-xs);
+    opacity: 0.9;
+}
+
+.login-devcode code {
+    align-self: center;
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md, 6px);
+    background: var(--color-surface, rgba(0, 0, 0, 0.06));
+    color: var(--color-text);
 }
 
 /* --- Header identity chip ---------------------------------------------- */

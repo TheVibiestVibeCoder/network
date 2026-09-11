@@ -45,6 +45,14 @@ $passwordError = null;
 $forgotNotice = null;
 $forgotError = null;
 
+// Two-factor screen state
+$twoFactorPending = null;   // the challenge row, when one is in flight
+$twoFactorError = null;
+$twoFactorNotice = null;
+$twoFactorNoticeOk = true;  // false when the notice reports a delivery failure
+$twoFactorDebugCode = null; // only ever set for a request from this machine
+$rememberChecked = false;
+
 // -----------------------------------------------------------------------------
 // Sign in
 // -----------------------------------------------------------------------------
@@ -54,11 +62,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
     } else {
         $loginEmail = trim((string) ($_POST['email'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');
+        $rememberChecked = !empty($_POST['remember']);
 
-        $result = Auth::login($loginEmail, $password);
+        $result = Auth::login($loginEmail, $password, $rememberChecked);
 
         if ($result['success']) {
             header('Location: index.php');
+            exit;
+        }
+
+        // Password accepted, second factor outstanding. Redirect rather than
+        // render, so a refresh on the code screen does not resubmit the
+        // password and mail out a second code.
+        if (isset($result['challenge'])) {
+            $_SESSION['2fa_notice'] = ($result['delivered'] ?? false)
+                ? 'We sent a sign-in code to your email address.'
+                : 'Your sign-in code could not be emailed.';
+            $_SESSION['2fa_notice_ok'] = (bool) ($result['delivered'] ?? false);
+
+            if (isset($result['debug_code'])) {
+                $_SESSION['2fa_debug_code'] = $result['debug_code'];
+            }
+
+            header('Location: index.php?action=verify');
             exit;
         }
 
@@ -66,6 +92,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
         if (isset($result['locked_until'])) {
             $isLockedOut = true;
             $lockoutRemaining = max(0, $result['locked_until'] - time());
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Two-factor: enter the emailed code
+// -----------------------------------------------------------------------------
+if ($action === 'verify') {
+    Auth::pruneChallenges();
+
+    // "Use a different account" - drop the challenge and go back to the form.
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['cancel'])) {
+        Auth::cancelTwoFactor();
+        header('Location: index.php');
+        exit;
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!Auth::validateCsrfToken()) {
+            $twoFactorError = 'Invalid session token. Please refresh and try again.';
+        } elseif (isset($_POST['resend'])) {
+            $resend = Auth::resendTwoFactor();
+
+            if (!empty($resend['success'])) {
+                $_SESSION['2fa_notice'] = !empty($resend['delivered'])
+                    ? 'A new code is on its way.'
+                    : 'A new code was generated but could not be emailed.';
+                $_SESSION['2fa_notice_ok'] = !empty($resend['delivered']);
+
+                if (!empty($resend['debug_code'])) {
+                    $_SESSION['2fa_debug_code'] = $resend['debug_code'];
+                }
+
+                // Redirect so the resend is not repeated by a refresh.
+                header('Location: index.php?action=verify');
+                exit;
+            }
+
+            $twoFactorError = $resend['error'] ?? 'Could not send a new code.';
+        } else {
+            $verdict = Auth::verifyTwoFactor((string) ($_POST['code'] ?? ''));
+
+            if (!empty($verdict['success'])) {
+                unset($_SESSION['2fa_notice'], $_SESSION['2fa_notice_ok'], $_SESSION['2fa_debug_code']);
+                header('Location: index.php');
+                exit;
+            }
+
+            $twoFactorError = $verdict['error'];
+        }
+    }
+
+    $twoFactorPending = Auth::pendingChallenge();
+
+    if ($twoFactorPending === null) {
+        // Nothing in flight - either it expired or the code screen was opened
+        // directly. Back to the sign-in form with an explanation.
+        $loginError = $twoFactorError ?? 'This sign-in has expired. Please sign in again.';
+        $action = '';
+        unset($_SESSION['2fa_notice'], $_SESSION['2fa_notice_ok'], $_SESSION['2fa_debug_code']);
+    } else {
+        // These are one-shot: read them out of the session so a later refresh
+        // does not keep repeating a notice about a code that is long gone.
+        if (isset($_SESSION['2fa_notice'])) {
+            $twoFactorNotice = (string) $_SESSION['2fa_notice'];
+            $twoFactorNoticeOk = (bool) ($_SESSION['2fa_notice_ok'] ?? true);
+            unset($_SESSION['2fa_notice'], $_SESSION['2fa_notice_ok']);
+        }
+        // Not one-shot, unlike the notice: on a local instance this is the only
+        // copy of the code, so it has to survive a refresh of the code screen.
+        // It is cleared when the challenge is spent, cancelled or expires.
+        if (isset($_SESSION['2fa_debug_code'])) {
+            $twoFactorDebugCode = (string) $_SESSION['2fa_debug_code'];
         }
     }
 }
@@ -215,6 +314,29 @@ function resetRequestAllowed(string $email): bool
         error_log('reset throttle check failed: ' . $e->getMessage());
         return false;
     }
+}
+
+/**
+ * Partly hide an address for the two-factor screen: t****@example.com
+ *
+ * Enough for the right person to recognise which inbox to open, not enough for
+ * somebody who only has the password to learn the address itself.
+ */
+function maskEmail(string $email): string
+{
+    $at = strrpos($email, '@');
+    if ($at === false || $at === 0) {
+        return 'your email address';
+    }
+
+    $local = substr($email, 0, $at);
+    $domain = substr($email, $at);
+
+    if (mb_strlen($local) <= 1) {
+        return $local . '***' . $domain;
+    }
+
+    return mb_substr($local, 0, 1) . str_repeat('*', min(6, mb_strlen($local) - 1)) . $domain;
 }
 
 /**
@@ -387,6 +509,63 @@ function buildPasswordLink(string $token): string
                 </div>
             </div>
 
+        <?php elseif ($action === 'verify' && $twoFactorPending !== null): ?>
+            <!-- Two-factor: enter the emailed code -->
+            <div class="login-container">
+                <div class="login-box">
+                    <h1><?= htmlspecialchars(APP_NAME) ?></h1>
+                    <p class="login-subtitle">
+                        Enter the code we sent to
+                        <strong><?= htmlspecialchars(maskEmail((string) $twoFactorPending['email'])) ?></strong>
+                    </p>
+
+                    <?php if ($twoFactorNotice !== null): ?>
+                        <div class="alert <?= $twoFactorNoticeOk ? 'alert-success' : 'alert-warning' ?>"><?= htmlspecialchars($twoFactorNotice) ?></div>
+                    <?php endif; ?>
+
+                    <?php if ($twoFactorError !== null): ?>
+                        <div class="alert alert-error"><?= htmlspecialchars($twoFactorError) ?></div>
+                    <?php endif; ?>
+
+                    <?php if ($twoFactorDebugCode !== null): ?>
+                        <!-- Local instance only: Auth::isLocalRequest() gates this,
+                             so it can never render for a remote visitor. -->
+                        <div class="alert alert-warning login-devcode">
+                            <strong>Local testing</strong>
+                            <span>Mail could not be sent, so the code is shown here. This only
+                                  happens for requests from this machine.</span>
+                            <code><?= htmlspecialchars($twoFactorDebugCode) ?></code>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" action="index.php?action=verify" class="login-form">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
+                        <div class="form-group">
+                            <input type="text"
+                                   name="code"
+                                   placeholder="6-digit code"
+                                   inputmode="numeric"
+                                   pattern="[0-9]*"
+                                   maxlength="6"
+                                   autocomplete="one-time-code"
+                                   required
+                                   autofocus
+                                   class="form-input login-code-input">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Verify &amp; sign in</button>
+                    </form>
+
+                    <form method="POST" action="index.php?action=verify" class="login-form login-resend">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Auth::getCsrfToken()) ?>">
+                        <button type="submit" name="resend" value="1" class="btn-link">Send a new code</button>
+                    </form>
+
+                    <p class="login-alt">
+                        <a href="index.php?action=verify&amp;cancel=1">Use a different account</a>
+                    </p>
+                </div>
+            </div>
+
         <?php else: ?>
             <!-- Login Screen -->
             <div class="login-container">
@@ -454,6 +633,12 @@ function buildPasswordLink(string $token): string
                                        autocomplete="current-password"
                                        class="form-input">
                             </div>
+                            <?php if (REMEMBER_ME_ENABLED): ?>
+                                <label class="login-remember">
+                                    <input type="checkbox" name="remember" value="1"<?= $rememberChecked ? ' checked' : '' ?>>
+                                    <span>Keep me signed in on this device</span>
+                                </label>
+                            <?php endif; ?>
                             <button type="submit" class="btn btn-primary btn-block">Sign in</button>
                         </form>
                         <p class="login-alt">
@@ -480,7 +665,7 @@ function buildPasswordLink(string $token): string
                     <div class="view-toggle">
                         <button type="button" class="toggle-btn" data-view="workload" title="My Work">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                             </svg>
                             <span class="toggle-badge" id="workloadBadge" hidden>0</span>
                         </button>
@@ -494,9 +679,9 @@ function buildPasswordLink(string $token): string
                                 <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
                             </svg>
                         </button>
-                        <button type="button" class="toggle-btn" data-view="list" title="List">
+                        <button type="button" class="toggle-btn" data-view="list" title="Contacts">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                                <path d="M20 0H4v2h16V0zM4 24h16v-2H4v2zM20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 2.75c1.24 0 2.25 1.01 2.25 2.25s-1.01 2.25-2.25 2.25S9.75 10.24 9.75 9 10.76 6.75 12 6.75zM17 17H7v-1.5c0-1.67 3.33-2.5 5-2.5s5 .83 5 2.5V17z"/>
                             </svg>
                         </button>
                         <button type="button" class="toggle-btn" data-view="calendar" title="Kalender">
@@ -857,7 +1042,7 @@ function buildPasswordLink(string $token): string
                                     <span>Projects</span>
                                 </div>
                                 <div class="dashboard-bar-stat">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/></svg>
                                     <span class="dashboard-bar-stat-value" id="dashBarPotential">—</span>
                                 </div>
                                 <div class="dashboard-bar-stat">
@@ -893,7 +1078,7 @@ function buildPasswordLink(string $token): string
                             <div class="dashboard-card">
                                 <div class="dashboard-card-icon">
                                     <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                                        <path d="M15 18.5c-2.51 0-4.68-1.42-5.76-3.5H15v-2H8.58c-.05-.33-.08-.66-.08-1s.03-.67.08-1H15V9H9.24C10.32 6.92 12.5 5.5 15 5.5c1.61 0 3.09.59 4.23 1.57L21 5.3C19.41 3.87 17.3 3 15 3c-3.92 0-7.24 2.51-8.48 6H3v2h3.06c-.04.33-.06.66-.06 1s.02.67.06 1H3v2h3.52c1.24 3.49 4.56 6 8.48 6 2.31 0 4.41-.87 6-2.3l-1.78-1.77c-1.13.98-2.6 1.57-4.22 1.57z"/>
                                     </svg>
                                 </div>
                                 <div class="dashboard-card-body">
@@ -973,7 +1158,7 @@ function buildPasswordLink(string $token): string
                                     <option value="name">Name</option>
                                     <option value="company">Company</option>
                                     <option value="start_date">Start Date</option>
-                                    <option value="stage">Stage</option>
+                                    <option value="stage" selected>Stage</option>
                                     <option value="success_chance">Success Chance</option>
                                 </select>
                                 <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
@@ -982,6 +1167,11 @@ function buildPasswordLink(string $token): string
                                     </svg>
                                 </button>
                             </div>
+                            <label class="filter-check" id="hideCompletedWrap">
+                                <input type="checkbox" id="hideCompletedProjects" checked>
+                                <span>Hide completed</span>
+                                <span class="filter-check-count" id="hiddenCompletedCount" hidden></span>
+                            </label>
                         </div>
                     </div>
                     <div class="projects-list" id="projectsList">

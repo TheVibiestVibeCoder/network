@@ -108,6 +108,13 @@
     margin-right: var(--spacing-2);
 }
 
+/* Shared height for the select/date/filter controls in the toolbars below.
+   34px is what .form-select already renders at, so the selects are unchanged
+   and the inputs come down to meet them. */
+#bookkeepingView {
+    --bk-control-height: 34px;
+}
+
 /* Select-by-date tools */
 
 .bk-select-bar {
@@ -131,6 +138,23 @@
     color: var(--color-text-secondary);
     font-weight: 500;
     white-space: nowrap;
+}
+
+/* One height for every control in these bars.
+   The base .form-input (10px padding) and .form-select (8px) disagree by 4px,
+   and input[type="date"] adds another 2px of its own intrinsic height on top -
+   so the three sat at 38px, 34px and 40px next to each other. Pinning the
+   height rather than re-tuning each padding keeps them aligned whatever the
+   browser does with the date field's internal spinner. */
+.bk-select-bar select.form-select,
+.bk-select-bar input.form-input {
+    height: var(--bk-control-height);
+}
+
+.bk-select-bar input.form-input {
+    /* Vertical padding is now the height's job; keep the horizontal rhythm. */
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 .bk-select-bar select.form-select {
@@ -297,6 +321,107 @@
     border-top: 2px solid var(--color-border);
     position: sticky;
     letter-spacing: 0.02em;
+}
+
+/* Month separator: name on the left, this month's arithmetic on the right. */
+
+.bk-month-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    flex-wrap: wrap;
+}
+
+.bk-month-name {
+    white-space: nowrap;
+}
+
+.bk-month-sums {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-4);
+    flex-wrap: wrap;
+    /* The sums are a readout, not a heading - drop the month row's bold. */
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.bk-month-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--spacing-2);
+    white-space: nowrap;
+}
+
+.bk-month-stat-label {
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Result and Net are the conclusions; the two inputs to them sit quieter. */
+.bk-month-stat:nth-child(1),
+.bk-month-stat:nth-child(2) {
+    opacity: 0.85;
+}
+
+.bk-month-tax {
+    align-items: center;
+}
+
+.bk-month-tax-input {
+    width: 96px;
+    height: 26px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.bk-month-tax-input:hover {
+    border-color: var(--color-text-muted);
+}
+
+.bk-month-tax-input:focus {
+    outline: none;
+    border-color: var(--color-text-tertiary);
+    background: var(--color-surface-2);
+}
+
+.bk-month-tax-input::placeholder {
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
+/* With no tax set, Net repeats Result - shown, because the box next to it
+   invites a number, but dimmed so it does not read as a second finding. */
+.bk-month-net.is-idle {
+    opacity: 0.45;
+}
+
+/* The month row is sticky; its controls must sit above the rows scrolling
+   underneath it. */
+.bk-month-row td {
+    z-index: 1;
+}
+
+@media (max-width: 900px) {
+    .bk-month-sums {
+        gap: var(--spacing-3);
+        font-size: var(--font-size-xs);
+    }
+
+    .bk-month-tax-input {
+        width: 78px;
+    }
 }
 
 /* Row status colors */

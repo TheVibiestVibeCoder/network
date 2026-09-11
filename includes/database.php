@@ -374,6 +374,69 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_reset_requests_email ON reset_requests(email, requested_at)");
 
         // ---------------------------------------------------------------
+        // Two-factor sign-in challenges
+        // ---------------------------------------------------------------
+        // A correct password does not sign anyone in on its own: it opens a
+        // challenge here, and only the emailed code closes it. The row holds a
+        // hash of the code, never the code - a readable database must not be
+        // enough to walk through somebody's second factor.
+        //
+        // The challenge, not the session, is the authority on what is being
+        // authenticated. The session only carries the challenge id, so a user
+        // cannot edit their way into a different account between the two steps.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS login_challenges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                challenge_id TEXT NOT NULL UNIQUE,
+                user_id INTEGER NOT NULL,
+                code_hash TEXT NOT NULL,
+                remember INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                ip_address VARCHAR(45),
+                expires_at DATETIME NOT NULL,
+                consumed_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_cid ON login_challenges(challenge_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_user ON login_challenges(user_id, created_at)");
+
+        // ---------------------------------------------------------------
+        // "Remember this device" tokens
+        // ---------------------------------------------------------------
+        // Split into a selector and a validator. The selector is the lookup key
+        // and is stored as-is; the validator is only ever stored as a SHA-256
+        // hash and compared in constant time. That way the lookup needs no
+        // scan over every row, and a database read still does not yield a
+        // usable cookie.
+        //
+        // The validator is rotated on every use. A cookie that presents a known
+        // selector with a stale validator is evidence the cookie was copied, so
+        // that whole family of tokens is dropped rather than just refused.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS remember_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                selector TEXT NOT NULL UNIQUE,
+                validator_hash TEXT NOT NULL,
+                previous_hash TEXT,
+                rotated_at DATETIME,
+                user_id INTEGER NOT NULL,
+                pw_stamp TEXT,
+                expires_at DATETIME NOT NULL,
+                last_used_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_remember_tokens_selector ON remember_tokens(selector)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_remember_tokens_user ON remember_tokens(user_id)");
+        // Added after the table shipped: the grace window that keeps a page's
+        // parallel requests from looking like a stolen cookie.
+        self::addColumnIfMissing($db, 'remember_tokens', 'previous_hash', 'TEXT');
+        self::addColumnIfMissing($db, 'remember_tokens', 'rotated_at', 'DATETIME');
+
+        // ---------------------------------------------------------------
         // Attribution columns
         // ---------------------------------------------------------------
         // Every actor column is stored as a nullable id plus a name snapshot.

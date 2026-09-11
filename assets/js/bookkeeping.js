@@ -17,7 +17,7 @@
         columns: [],
         rows: [],
         pool: [],
-        settings: { selected_columns: [], date_column: null },
+        settings: { selected_columns: [], date_column: null, month_tax: {} },
         limits: { maxUploadBytes: 0, maxUploadLabel: '' },
         selection: new Set(),
         loaded: false,
@@ -251,6 +251,243 @@
         if (!dateStr) return 'No date';
         const [y, m] = dateStr.split('-').map(Number);
         return `${MONTH_NAMES[(m || 1) - 1]} ${y}`;
+    }
+
+    /**
+     * Read what is typed in a tax box, accepting either decimal convention.
+     *
+     * Returns null for an empty field, which means "no tax set" rather than
+     * zero - the difference decides whether a net line is shown at all.
+     */
+    function parseTaxInput(text) {
+        const raw = String(text ?? '').trim();
+        if (raw === '') return null;
+
+        const value = parseDecimalValue(raw);
+        if (value !== null) return value;
+
+        // parseDecimalValue deliberately refuses whole numbers (so a date or a
+        // reference is never mistaken for an amount). Here the field can only
+        // be an amount, so a plain integer is fine.
+        const plain = raw.replace(/[\s'.]/g, '').replace(',', '.');
+        const num = Number(plain);
+        return Number.isFinite(num) ? num : null;
+    }
+
+    /**
+     * Recompute one month's net line from what is currently in its tax box.
+     */
+    function updateNetFor(input) {
+        const key = input.dataset.month;
+        const target = els.tableWrap.querySelector(`[data-net-for="${CSS.escape(key)}"]`);
+        if (!target) return;
+
+        const totals = monthTotals(getDisplayRows(), detectAmountColumn());
+        const sums = totals.get(key);
+        if (!sums) return;
+
+        const tax = parseTaxInput(input.value);
+        const net = sums.result - (tax ?? 0);
+
+        target.textContent = formatSigned(net);
+        target.className = signClass(net);
+
+        const cell = input.closest('.bk-month-line');
+        const netWrap = cell ? cell.querySelector('.bk-month-net') : null;
+        if (netWrap) netWrap.classList.toggle('is-idle', tax === null || tax === 0);
+    }
+
+    /**
+     * Persist one month's tax amount.
+     */
+    async function saveMonthTax(input) {
+        const key = input.dataset.month;
+        const tax = parseTaxInput(input.value);
+
+        if (input.value.trim() !== '' && tax === null) {
+            // Unparseable: put back whatever was last saved rather than leaving
+            // a number on screen that is not the number being used.
+            const stored = state.settings.month_tax?.[key];
+            input.value = stored ? stored.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            updateNetFor(input);
+            return;
+        }
+
+        if (!state.settings.month_tax) state.settings.month_tax = {};
+        if (tax === null) {
+            delete state.settings.month_tax[key];
+        } else {
+            state.settings.month_tax[key] = tax;
+        }
+
+        // Normalize what is displayed to the stored value.
+        input.value = tax === null ? '' : tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        updateNetFor(input);
+
+        try {
+            await postJson('set-month-tax', { month: key, amount: tax });
+        } catch (error) {
+            showToast(`Could not save the tax amount: ${error.message}`, true);
+        }
+    }
+
+    /**
+     * The contents of a month separator row: the month, its sums, and the tax
+     * box that turns the result into a net figure.
+     *
+     * The tax is a flat amount the user types in, not a rate - the list entries
+     * stay exactly as imported and only the bottom line moves. A positive
+     * number is deducted; a negative one is added back, which is how a refund
+     * or a credit gets in.
+     */
+    function monthRowContent(dateStr, label, totals) {
+        const key = monthKey(dateStr);
+        const sums = key ? totals.get(key) : null;
+
+        if (!sums) {
+            // No amount column, or nothing in this month parsed as one: show
+            // the month exactly as before rather than a row of zeroes.
+            return `<div class="bk-month-line"><span class="bk-month-name">${escapeHtml(label)}</span></div>`;
+        }
+
+        const tax = Number(state.settings.month_tax?.[key] ?? 0);
+        const hasTax = Number.isFinite(tax) && tax !== 0;
+        const net = sums.result - tax;
+
+        return `
+            <div class="bk-month-line">
+                <span class="bk-month-name">${escapeHtml(label)}</span>
+                <span class="bk-month-sums">
+                    <span class="bk-month-stat">
+                        <span class="bk-month-stat-label">Income</span>
+                        <span class="${signClass(sums.income)}">${formatSigned(sums.income)}</span>
+                    </span>
+                    <span class="bk-month-stat">
+                        <span class="bk-month-stat-label">Expenses</span>
+                        <span class="${signClass(sums.expenses)}">${formatSigned(sums.expenses)}</span>
+                    </span>
+                    <span class="bk-month-stat">
+                        <span class="bk-month-stat-label">Result</span>
+                        <span class="${signClass(sums.result)}">${formatSigned(sums.result)}</span>
+                    </span>
+                    <span class="bk-month-stat bk-month-tax">
+                        <label class="bk-month-stat-label" for="bkTax-${key}">Tax</label>
+                        <input type="text"
+                               inputmode="decimal"
+                               id="bkTax-${key}"
+                               class="bk-month-tax-input"
+                               data-month="${key}"
+                               value="${hasTax ? escapeHtml(tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}"
+                               placeholder="0,00"
+                               title="A flat amount deducted from this month's result. Negative adds it back.">
+                    </span>
+                    <span class="bk-month-stat bk-month-net${hasTax ? '' : ' is-idle'}">
+                        <span class="bk-month-stat-label">Net</span>
+                        <span class="${signClass(net)}" data-net-for="${key}">${formatSigned(net)}</span>
+                    </span>
+                </span>
+            </div>`;
+    }
+
+    /**
+     * "2026-07" for a row, used as the key for month totals and month tax.
+     */
+    function monthKey(dateStr) {
+        return /^\d{4}-\d{2}/.test(String(dateStr || '')) ? String(dateStr).slice(0, 7) : '';
+    }
+
+    /**
+     * Which column holds the amount.
+     *
+     * Nothing records this - the import only ever asks which column is the
+     * date - so it is inferred the same way the date column is guessed: by
+     * looking at the values. The winner is the column where the most values
+     * parse as decimals, which on a bank export is the one signed amount
+     * column ("Betrag", "Amount", "Umsatz"). A name match is preferred when it
+     * also carries numbers, so a stray numeric reference column cannot win.
+     */
+    function detectAmountColumn() {
+        if (!state.columns.length || !state.rows.length) return null;
+
+        const named = /^(betrag|amount|umsatz|summe|value|wert|saldo|total)$/i;
+        let best = null;
+
+        state.columns.forEach(col => {
+            if (isDateSortColumn(col.name)) return;
+
+            let parsed = 0;
+            state.rows.forEach(row => {
+                if (parseDecimalValue(row.data[col.name]) !== null) parsed++;
+            });
+            if (parsed === 0) return;
+
+            // A column has to look like an amount in most of its rows before it
+            // is believed at all - one numeric cell in a text column is noise.
+            const ratio = parsed / state.rows.length;
+            if (ratio < 0.5) return;
+
+            const score = ratio + (named.test(col.name.trim()) ? 1 : 0);
+            if (!best || score > best.score) {
+                best = { name: col.name, score };
+            }
+        });
+
+        return best ? best.name : null;
+    }
+
+    /**
+     * Income, expenses and result per month, over the rows currently shown.
+     *
+     * Built from the displayed rows rather than every row, so the totals always
+     * describe the list underneath them - filter the table and the sums follow.
+     *
+     * @return {Map<string, {income: number, expenses: number, result: number}>}
+     */
+    function monthTotals(rows, amountColumn) {
+        const totals = new Map();
+        if (!amountColumn) return totals;
+
+        rows.forEach(row => {
+            const key = monthKey(row.row_date);
+            if (!key) return;
+
+            const value = parseDecimalValue(row.data[amountColumn]);
+            if (value === null) return;
+
+            if (!totals.has(key)) {
+                totals.set(key, { income: 0, expenses: 0, result: 0 });
+            }
+            const bucket = totals.get(key);
+            if (value >= 0) {
+                bucket.income += value;
+            } else {
+                bucket.expenses += value;
+            }
+            bucket.result += value;
+        });
+
+        return totals;
+    }
+
+    /**
+     * The colour class for a signed figure. Zero is neither a gain nor a loss,
+     * so it stays in the body colour instead of rendering green.
+     */
+    function signClass(value) {
+        if (!Number.isFinite(value) || Math.abs(value) < 0.005) return '';
+        return value < 0 ? 'bk-amount-neg' : 'bk-amount-pos';
+    }
+
+    /**
+     * Format a signed amount the way the table's own values read: German
+     * grouping, two decimals, explicit sign.
+     */
+    function formatSigned(value) {
+        const sign = value > 0 ? '+' : value < 0 ? '\u2212' : '';
+        return sign + Math.abs(value).toLocaleString('de-DE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
     }
 
     /**
@@ -519,12 +756,18 @@
         });
         html += '<th class="bk-col-pdf">PDF / Invoice</th><th class="bk-col-actions"></th></tr></thead><tbody>';
 
+        // Totals are computed over the displayed rows, so filtering the table
+        // narrows the sums with it rather than leaving a figure that no longer
+        // matches what is on screen.
+        const amountColumn = detectAmountColumn();
+        const totals = monthTotals(displayRows, amountColumn);
+
         let previousMonth = null;
         displayRows.forEach(row => {
             if (groupByMonth) {
                 const month = monthLabel(row.row_date);
                 if (month !== previousMonth) {
-                    html += `<tr class="bk-month-row"><td colspan="${colCount}">${escapeHtml(month)}</td></tr>`;
+                    html += `<tr class="bk-month-row"><td colspan="${colCount}">${monthRowContent(row.row_date, month, totals)}</td></tr>`;
                     previousMonth = month;
                 }
             }
@@ -1557,7 +1800,34 @@
         });
 
         // Table interactions (delegated)
+        // The tax box lives inside the table, so it is delegated like everything
+        // else here. Typing updates the net figure in place - re-rendering the
+        // table on each keystroke would tear the focus out of the field - and
+        // the value is only written back when the field is left or Enter is
+        // pressed.
+        els.tableWrap.addEventListener('input', event => {
+            const taxInput = event.target.closest('.bk-month-tax-input');
+            if (taxInput) updateNetFor(taxInput);
+        });
+
+        els.tableWrap.addEventListener('change', event => {
+            const taxInput = event.target.closest('.bk-month-tax-input');
+            if (taxInput) saveMonthTax(taxInput);
+        });
+
+        els.tableWrap.addEventListener('keydown', event => {
+            const taxInput = event.target.closest('.bk-month-tax-input');
+            if (taxInput && event.key === 'Enter') {
+                event.preventDefault();
+                taxInput.blur(); // fires change, which saves
+            }
+        });
+
         els.tableWrap.addEventListener('click', event => {
+            // A click in the tax box must not be read as a click on the month
+            // row underneath it.
+            if (event.target.closest('.bk-month-tax')) return;
+
             const sortHeader = event.target.closest('.bk-sortable-th');
             if (sortHeader) {
                 const key = sortHeader.dataset.sortKey;
