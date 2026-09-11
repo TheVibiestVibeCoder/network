@@ -228,52 +228,45 @@
 
         const dueThisWeek = days.reduce((sum, n) => sum + n, 0);
 
-        // 1 - Due this week, day by day, late work first
-        const cols = [{
-            label: 'Late',
-            short: 'Late',
-            value: overdue,
-            text: String(overdue),
-            tone: overdue ? 'late' : '',
-            title: `${overdue} overdue`
-        }];
+        // 1 - Due this week, day by day from today. What is already late is
+        //     not a day of the week: it is the red flag beside the number.
+        const cols = [];
         for (let i = 0; i < 7; i++) {
             const date = new Date(today);
             date.setDate(date.getDate() + i);
-            const name = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+            const day = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
             cols.push({
-                label: name,
-                short: name.charAt(0),
+                letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }),
                 value: days[i],
-                text: String(days[i]),
                 current: i === 0,
-                title: `${date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}: ${days[i]} due`
+                title: `${i === 0 ? 'Today, ' : ''}${day}: ${days[i]} due`
             });
         }
+        const week = C.columns(cols, 'To-dos due per day, from today: '
+            + cols.map(col => col.title).join(', '), { min: 2 });
 
         const due = C.tile({
-            split: true,
-            label: 'Due this week',
+            label: { long: 'Due this week', short: 'This week' },
             value: String(dueThisWeek),
-            flag: overdue > 0 ? `${overdue} overdue` : '',
-            chart: C.columns(cols, 'To-dos due per day: '
-                + cols.map(col => `${col.label} ${col.value}`).join(', '), { min: 3 })
+            flag: overdue > 0 ? { long: `${overdue} overdue`, short: `${overdue} late` } : '',
+            key: week.axis,
+            chart: week.bars
         });
 
         // 2 - Open to-dos by priority
         const byPriority = PRIORITY_TONES.filter(([key]) => priorities[key] > 0);
         const open = C.tile({
-            label: openTodos.length === 1 ? 'Open to-do' : 'Open to-dos',
+            label: { long: openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', short: 'Open' },
             value: String(openTodos.length),
+            key: byPriority.length
+                ? C.legend(byPriority.map(([key, name]) => ({ tone: key, label: name, text: String(priorities[key]) })))
+                : C.note('Nothing open'),
             chart: C.stack(
                 byPriority.map(([key, name]) => ({ tone: key, value: priorities[key], title: `${name}: ${priorities[key]}` })),
                 'Open to-dos by priority: ' + (byPriority.length
                     ? byPriority.map(([key, name]) => `${name} ${priorities[key]}`).join(', ')
                     : 'none')
-            ),
-            foot: byPriority.length
-                ? C.legend(byPriority.map(([key, name]) => ({ tone: key, label: name, text: String(priorities[key]) })))
-                : C.note('Nothing open')
+            )
         });
 
         // 3 - Projects by stage
@@ -287,15 +280,15 @@
         const work = C.tile({
             label: projects.length === 1 ? 'Project' : 'Projects',
             value: String(projects.length),
+            key: byStage.length
+                ? C.legend(byStage.map(([name, tone]) => ({ tone, label: name, text: String(stageCounts[name]) })))
+                : C.note('None assigned'),
             chart: C.stack(
                 byStage.map(([name, tone]) => ({ tone, value: stageCounts[name], title: `${name}: ${stageCounts[name]}` })),
                 'Projects by stage: ' + (byStage.length
                     ? byStage.map(([name]) => `${name} ${stageCounts[name]}`).join(', ')
                     : 'none')
-            ),
-            foot: byStage.length
-                ? C.legend(byStage.map(([name, tone]) => ({ tone, label: name, text: String(stageCounts[name]) })))
-                : C.note('None assigned')
+            )
         });
 
         stats.innerHTML = `<div class="kpi-grid">${due}${open}${work}</div>`;

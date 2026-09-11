@@ -1472,34 +1472,42 @@ input[type="checkbox"] {
    -------------------------------------------------------------------------- */
 
 /* ---- Summary bands (Home and Projects) ---------------------------------- */
-/* One quiet mist band per page, three tiles in it. Every tile reads the same
-   way, top to bottom: what it is, the number, a small chart, its key. The
-   charts reuse the colours the lists already use - stage colours, priority
-   colours, the accent - so a colour means the same thing everywhere.
+/* One quiet mist band per page, three equal tiles. Every tile has the same
+   four rows, each of a fixed height, so the tiles line up whatever they
+   show:
 
-   The band lays itself out by its own width (container queries), not the
-   window's: three across when there is room, otherwise the first tile on a
-   row of its own and the other two side by side. */
+       label        what it is
+       number       the figure, the only large type on the band
+       key          the legend or the axis letters for the chart below
+       chart        resting on the floor of the band
+
+   Every word on the band is one size (--t-sm); only the number is larger.
+   Narrow tiles keep the rows and swap in shorter words (.kc-short). */
 
 .kpi-band {
-    --kpi-pad-x: 24px;
-    --kpi-pad-y: 20px;
+    --kpi-pad-x: 22px;
+    --kpi-pad-y: 16px;
+    --kpi-gutter: 20px;
+    --kpi-number: 24px;
+    --kpi-chart: 22px;
     --kpi-rule: rgba(17, 45, 78, 0.10);
-    --kc-track: rgba(17, 45, 78, 0.09);
+    --kc-track: rgba(17, 45, 78, 0.10);
     --kc-quiet: rgba(17, 45, 78, 0.22);
-    --kc-plot: 46px;
     position: relative;
     container: kpiband / inline-size;
     margin: 0 0 24px;
     padding: var(--kpi-pad-y) var(--kpi-pad-x);
     background: var(--c-tint);
     border-radius: var(--r-xl);
+    font-size: var(--t-sm);
+    line-height: 16px;
+    color: var(--c-ink-2);
 }
 
 :root[data-theme="dark"] .kpi-band {
     --kpi-rule: rgba(219, 226, 239, 0.12);
-    --kc-track: rgba(219, 226, 239, 0.10);
-    --kc-quiet: rgba(219, 226, 239, 0.26);
+    --kc-track: rgba(219, 226, 239, 0.12);
+    --kc-quiet: rgba(219, 226, 239, 0.28);
 }
 
 .kpi-band--projects {
@@ -1508,41 +1516,39 @@ input[type="checkbox"] {
 
 .kpi-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: calc(var(--kpi-gutter) * 2 + 1px);
 }
 
+/* Equal tiles: the dividers sit in the gaps, so no tile loses width to
+   padding its neighbours do not have. */
 .kpi {
     container: kpi / inline-size;
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 0 22px;
-    border-left: 1px solid var(--kpi-rule);
 }
 
-.kpi:first-child {
-    padding-left: 0;
-    border-left: 0;
+.kpi + .kpi::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(-1 * var(--kpi-gutter) - 1px);
+    width: 1px;
+    background: var(--kpi-rule);
 }
 
-.kpi:last-child {
-    padding-right: 0;
-}
-
-/* Room for the chevron in the corner it sits in. */
-.kpi-band--projects .kpi:last-child .kpi-head {
-    padding-right: 34px;
-}
-
+/* Row 1 - label */
 .kpi-head {
     display: flex;
     align-items: baseline;
     gap: 6px;
+    height: 16px;
     min-width: 0;
-    font-size: var(--t-sm);
+    overflow: hidden;
     font-weight: 500;
-    line-height: 20px;
-    color: var(--c-ink-2);
     white-space: nowrap;
 }
 
@@ -1562,12 +1568,19 @@ input[type="checkbox"] {
     margin-right: 6px;
 }
 
+/* Room for the chevron in the corner it sits in. */
+.kpi-band--projects .kpi:last-child .kpi-head {
+    padding-right: 30px;
+}
+
+/* Row 2 - number */
 .kpi-value {
     display: flex;
     align-items: baseline;
     gap: 6px;
+    height: 30px;
+    margin-top: 4px;
     min-width: 0;
-    margin-top: 2px;
     white-space: nowrap;
 }
 
@@ -1575,9 +1588,9 @@ input[type="checkbox"] {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: var(--t-2xl);
+    font-size: var(--kpi-number);
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 30px;
     letter-spacing: -0.02em;
     color: var(--c-ink);
     font-variant-numeric: tabular-nums;
@@ -1585,24 +1598,20 @@ input[type="checkbox"] {
 
 .kpi-unit {
     flex-shrink: 0;
-    font-size: var(--t-sm);
     font-weight: 500;
-    color: var(--c-ink-2);
 }
 
-/* "2 overdue": the one thing on the band allowed to raise its voice. White
-   ground, so the red stays legible on the mist. */
+/* "1 overdue": the one thing allowed to raise its voice. A white pill, so
+   the red stays legible on the mist. Same type size as everything else. */
 .kpi-flag {
     align-self: center;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     flex-shrink: 0;
-    margin-left: 4px;
-    padding: 2px 9px 2px 8px;
-    font-size: var(--t-xs);
+    height: 20px;
+    padding: 0 8px 0 7px;
     font-weight: 600;
-    line-height: 18px;
     color: var(--c-danger);
     background: var(--c-surface);
     border-radius: 999px;
@@ -1616,26 +1625,31 @@ input[type="checkbox"] {
     background: currentColor;
 }
 
+/* Row 3 - key */
+.kpi-key {
+    height: 16px;
+    margin-top: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* Row 4 - chart, on the floor */
 .kpi-chart {
-    margin-top: 12px;
-}
-
-.kpi-chart:empty {
-    display: none;
-}
-
-.kpi-foot {
-    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: var(--kpi-chart);
+    margin-top: 6px;
 }
 
 /* ---- The charts --------------------------------------------------------- */
 
-/* A split bar: one whole, parts in proportion. The 2px gaps let the band
-   show through, so neighbouring colours never smear into each other. */
+/* A split bar: one whole, parts in proportion; 2px gaps keep neighbouring
+   colours apart. */
 .kc-stack {
     display: flex;
     gap: 2px;
-    height: 8px;
+    height: 6px;
     border-radius: 999px;
     overflow: hidden;
 }
@@ -1646,13 +1660,13 @@ input[type="checkbox"] {
 
 .kc-seg {
     flex: 1 1 0;
-    min-width: 4px;
+    min-width: 3px;
     background: var(--kc);
 }
 
 /* A meter: one share of a whole. */
 .kc-meter {
-    height: 8px;
+    height: 6px;
     border-radius: 999px;
     background: var(--kc-track);
     overflow: hidden;
@@ -1666,100 +1680,74 @@ input[type="checkbox"] {
     background: var(--c-accent);
 }
 
-/* Columns over time. Empty periods keep a short stub so the rhythm of the
-   days or months stays readable; figures sit on the bars they belong to. */
+/* Columns over time, and the letters over them, on one shared grid. */
+.kc-axis,
 .kc-cols {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
-    gap: 6px;
+}
+
+.kc-axis span {
+    text-align: center;
+}
+
+.kc-axis .is-current {
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.kc-cols {
+    height: 100%;
+    align-items: end;
 }
 
 .kc-col {
     --kc: var(--c-accent);
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 0;
-}
-
-.kc-col-plot {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 3px;
-    width: 100%;
-    height: var(--kc-plot);
-}
-
-.kc-col-num {
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 13px;
-    color: var(--c-ink-2);
-    font-variant-numeric: tabular-nums;
-}
-
-.kc-col-num:empty {
-    display: none;
+    justify-content: center;
+    align-items: flex-end;
+    height: 100%;
 }
 
 .kc-col-bar {
     width: 100%;
-    max-width: 30px;
-    height: max(3px, calc(var(--h, 0) * (var(--kc-plot) - 16px)));
-    border-radius: 5px 5px 2px 2px;
+    max-width: 14px;
+    height: max(2px, calc(var(--h, 0) * var(--kpi-chart)));
+    border-radius: 3px;
     background: var(--kc);
 }
 
 .kc-col.is-zero .kc-col-bar {
-    height: 3px;
-    border-radius: 2px;
+    height: 2px;
+    border-radius: 1px;
     background: var(--kc-track);
 }
 
-/* Today: the one navy column, and its label in full ink. */
+/* Today: the one navy column. */
 .kc-col.is-current .kc-col-bar {
     background: var(--c-primary);
 }
 
-/* Labels are centred on their column and may run a little past it ("Today"
-   on a narrow day); below 200px the initials take over before they touch. */
-.kc-col-label {
-    margin-top: 6px;
-    font-size: 11px;
-    line-height: 14px;
-    color: var(--c-ink-2);
-    white-space: nowrap;
-}
-
-.kc-col.is-current .kc-col-label {
-    font-weight: 600;
-    color: var(--c-ink);
-}
-
-.kc-short {
-    display: none;
-}
-
-/* The key under a chart. */
+/* The key: dot, name, figure - on one line. Entries that do not fit wrap
+   onto a second line the row hides, so an entry is shown whole or not at
+   all; the chart's own label and the breakdown still name every part. */
 .kc-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 14px;
+    gap: 0 12px;
+    height: 16px;
     margin: 0;
     padding: 0;
+    overflow: hidden;
     list-style: none;
-    font-size: var(--t-xs);
-    line-height: 18px;
-    color: var(--c-ink-2);
 }
 
 .kc-legend li {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+    height: 16px;
     white-space: nowrap;
 }
 
@@ -1779,13 +1767,16 @@ input[type="checkbox"] {
 }
 
 .kc-note {
-    margin: 0;
-    font-size: var(--t-xs);
-    line-height: 18px;
-    color: var(--c-ink-2);
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Tones, after .kc-col so a tone on a column wins over its default. */
+.kc-short {
+    display: none;
+}
+
+/* Tones, after .kc-col so a tone wins over a column's default. */
 .kc-tone-progress    { --kc: var(--stage-progress); }
 .kc-tone-proposal    { --kc: var(--stage-proposal); }
 .kc-tone-negotiation { --kc: var(--stage-negotiation); }
@@ -1795,17 +1786,59 @@ input[type="checkbox"] {
 .kc-tone-medium      { --kc: var(--c-warning); }
 .kc-tone-low         { --kc: var(--c-ink-4); }
 .kc-tone-none        { --kc: var(--kc-quiet); }
-.kc-tone-late        { --kc: var(--c-danger); }
 .kc-tone-accent      { --kc: var(--c-accent); }
+
+/* ---- Narrow tiles ------------------------------------------------------- */
+/* Same rows, shorter words: short labels and figures, and a key of dots and
+   figures without the names. */
+
+@container kpi (max-width: 190px) {
+    .kpi-number {
+        font-size: 20px;
+    }
+
+    .kc-long,
+    .kpi-meta,
+    .kpi-unit,
+    .kc-legend-name {
+        display: none;
+    }
+
+    .kc-short {
+        display: inline;
+    }
+
+    .kc-legend {
+        gap: 0 9px;
+    }
+
+    .kc-legend li {
+        gap: 4px;
+    }
+}
+
+@container kpi (max-width: 118px) {
+    .kpi-number {
+        font-size: 18px;
+    }
+
+    .kpi-flag {
+        padding: 0 6px;
+    }
+
+    .kpi-flag::before {
+        display: none;
+    }
+}
 
 /* ---- The breakdown behind the chevron (Projects) ------------------------ */
 
 .kpi-toggle {
     position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 32px;
-    height: 32px;
+    top: 10px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
     display: grid;
     place-items: center;
     padding: 0;
@@ -1838,9 +1871,10 @@ input[type="checkbox"] {
     display: grid;
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
     gap: 36px;
-    margin-top: 20px;
-    padding-top: 20px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px solid var(--kpi-rule);
+    line-height: 18px;
 }
 
 .kb-block {
@@ -1848,9 +1882,10 @@ input[type="checkbox"] {
 }
 
 .kb-title {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     font-size: var(--t-sm);
     font-weight: 600;
+    line-height: 18px;
     color: var(--c-ink);
 }
 
@@ -1863,18 +1898,18 @@ input[type="checkbox"] {
 
 .kb-table th,
 .kb-table td {
-    padding: 6px 0;
+    padding: 5px 0;
     border: 0;
     background: transparent;
     text-align: left;
     vertical-align: middle;
+    font-size: var(--t-sm);
     font-weight: 400;
     color: var(--c-ink);
 }
 
 .kb-table thead th {
     padding: 0 0 4px;
-    font-size: var(--t-xs);
     font-weight: 500;
     color: var(--c-ink-2);
 }
@@ -1918,7 +1953,7 @@ input[type="checkbox"] {
 .kb-bar {
     position: relative;
     display: block;
-    height: 8px;
+    height: 6px;
     overflow: hidden;
     border-radius: 999px;
     background: var(--kc-track);
@@ -1953,13 +1988,14 @@ input[type="checkbox"] {
 }
 
 .kb-scenario span {
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     color: var(--c-ink-2);
 }
 
 .kb-scenario b {
     font-size: var(--t-lg);
     font-weight: 600;
+    line-height: 22px;
     letter-spacing: -0.01em;
     color: var(--c-ink-2);
     font-variant-numeric: tabular-nums;
@@ -1973,8 +2009,8 @@ input[type="checkbox"] {
    figure as a mark inside it. */
 .kb-range {
     position: relative;
-    height: 10px;
-    margin: 18px 0 8px;
+    height: 6px;
+    margin: 16px 0 8px;
     border-radius: 999px;
     background: var(--kc-track);
 }
@@ -2006,13 +2042,13 @@ input[type="checkbox"] {
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     color: var(--c-ink-2);
 }
 
 .kb-note {
     margin: 10px 0 0;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     line-height: 18px;
     color: var(--c-ink-2);
 }
@@ -2021,169 +2057,21 @@ input[type="checkbox"] {
     margin-top: 2px;
 }
 
-/* ---- Sizes -------------------------------------------------------------- */
-
-/* A narrow band: the first tile gets a row to itself, the other two share
-   the next one; the breakdown stacks. */
-@container kpiband (max-width: 720px) {
-    .kpi-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        row-gap: 16px;
-    }
-
-    .kpi:first-child {
-        grid-column: 1 / -1;
-        padding: 0 0 16px;
-        border-bottom: 1px solid var(--kpi-rule);
-    }
-
-    .kpi:nth-child(2) {
-        padding-left: 0;
-        border-left: 0;
-    }
-
-    .kpi-band--projects .kpi:last-child .kpi-head {
-        padding-right: 0;
-    }
-
-    .kpi-band--projects .kpi:first-child .kpi-head {
-        padding-right: 34px;
-    }
-
+@container kpiband (max-width: 640px) {
     .kpi-detail {
         grid-template-columns: minmax(0, 1fr);
-        gap: 24px;
-    }
-
-    /* A column chart with a whole row to itself: the number sits to its
-       left instead of leaving a wide empty strip above it. */
-    .kpi--split {
-        display: grid;
-        grid-template-columns: minmax(120px, 26%) minmax(0, 1fr);
-        grid-template-areas:
-            "head  chart"
-            "value chart";
-        grid-template-rows: auto 1fr;
-        column-gap: 28px;
-    }
-
-    .kpi--split .kpi-head { grid-area: head; }
-
-    .kpi--split .kpi-value {
-        grid-area: value;
-        flex-wrap: wrap;
-        align-content: flex-start;
-        row-gap: 6px;
-    }
-
-    .kpi--split .kpi-chart {
-        grid-area: chart;
-        align-self: end;
-        margin-top: 0;
+        gap: 22px;
     }
 }
 
-/* A phone-narrow band: stacking three tiles would make a tall block, so the
-   tiles line up in a strip that snaps tile by tile, the next one peeking in
-   at the edge. The band stays about as low as a single tile, and every
-   chart keeps a full tile's width for its labels. */
-@container kpiband (max-width: 540px) {
-    .kpi-grid {
-        grid-template-columns: none;
-        grid-auto-flow: column;
-        grid-auto-columns: 86%;
-        row-gap: 0;
-        margin: 0 calc(-1 * var(--kpi-pad-x));
-        padding: 0 var(--kpi-pad-x);
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x mandatory;
-        scroll-padding-inline: var(--kpi-pad-x);
-        scrollbar-width: none;
-    }
-
-    .kpi-grid::-webkit-scrollbar {
-        display: none;
-    }
-
-    .kpi {
-        scroll-snap-align: start;
-    }
-
-    /* In the strip every tile is stacked again. */
-    .kpi--split {
-        display: flex;
-    }
-
-    .kpi--split .kpi-chart {
-        margin-top: 12px;
-    }
-
-    .kpi:first-child {
-        grid-column: auto;
-        padding: 0 18px 0 0;
-        border-bottom: 0;
-    }
-
-    .kpi:nth-child(2) {
-        padding-left: 18px;
-        border-left: 1px solid var(--kpi-rule);
-    }
-
-    .kpi-band--projects .kpi:first-child .kpi-head {
-        padding-right: 0;
-    }
-
-    /* The strip moves under the top corner, so the chevron becomes a small
-       handle centred under the tiles instead. (A container query cannot
-       style the band itself, so the room is made inside it.) */
-    .kpi-band--projects .kpi-grid,
-    .kpi-band--projects .kpi-detail {
-        margin-bottom: 28px;
-    }
-
-    .kpi-band--projects .kpi-toggle {
-        top: auto;
-        right: auto;
-        bottom: 8px;
-        left: 50%;
-        width: 44px;
-        height: 28px;
-        transform: translateX(-50%);
-    }
-}
-
-/* A tight tile: a smaller number and no figures over the columns. */
-@container kpi (max-width: 250px) {
-    .kpi-number {
-        font-size: var(--t-xl);
-    }
-
-    .kc-col-num {
-        display: none;
-    }
-}
-
-/* Tighter still: initials for the months and days. */
-@container kpi (max-width: 200px) {
-    .kc-long {
-        display: none;
-    }
-
-    .kc-short {
-        display: inline;
-    }
-
-    .kc-cols {
-        gap: 4px;
-    }
-}
+/* ---- Phones ------------------------------------------------------------- */
 
 @media (max-width: 768px) {
     .kpi-band {
-        --kpi-pad-x: 18px;
-        --kpi-pad-y: 16px;
-        --kc-plot: 40px;
+        --kpi-pad-x: 14px;
+        --kpi-pad-y: 14px;
+        --kpi-gutter: 11px;
+        --kpi-chart: 20px;
         margin-bottom: 20px;
     }
 
@@ -2191,13 +2079,15 @@ input[type="checkbox"] {
         margin-bottom: 4px;
     }
 
-    .kpi {
-        padding: 0 18px;
+    .kpi-toggle {
+        top: 8px;
+        right: 6px;
+        width: 28px;
+        height: 28px;
     }
 
-    .kpi-toggle {
-        top: 10px;
-        right: 10px;
+    .kpi-band--projects .kpi:last-child .kpi-head {
+        padding-right: 22px;
     }
 }
 

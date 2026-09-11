@@ -4153,11 +4153,23 @@
         const hasProjection = s.projIncluded > 0 && s.projOptimistic > 0;
 
         // 1 - Pipeline value, split by stage
+        const low = money(s.sumMinPotential);
+        const high = money(s.sumMaxPotential);
+        const sameSuffix = low.slice(-1) === high.slice(-1) && /[KM]$/.test(high);
+        const pipelineValue = !hasBudget ? '—'
+            : (low === high ? high : {
+                long: `${low} – ${high}`,
+                short: `${sameSuffix ? low.slice(0, -1) : low}–${high}`
+            });
+
         const pipeline = C.tile({
-            label: 'Pipeline value',
+            label: { long: 'Pipeline value', short: 'Pipeline' },
             meta: `${s.total} ${s.total === 1 ? 'project' : 'projects'}`,
-            value: hasBudget ? range(s.sumMinPotential, s.sumMaxPotential).replace('–', ' – ') : '—',
+            value: pipelineValue,
             unit: hasBudget ? 'EUR' : '',
+            key: valued.length
+                ? C.legend(valued.map(row => ({ tone: row.tone, label: row.name, text: C.percent(row.mid, midTotal) })))
+                : C.note({ long: 'No budgets entered yet', short: 'No budgets' }),
             chart: C.stack(
                 valued.map(row => ({
                     tone: row.tone,
@@ -4167,52 +4179,45 @@
                 'Pipeline value by stage: ' + (valued.length
                     ? valued.map(row => `${row.name} ${C.percent(row.mid, midTotal)}`).join(', ')
                     : 'no budgets yet')
-            ),
-            foot: valued.length
-                ? C.legend(valued.map(row => ({ tone: row.tone, label: row.name, text: C.percent(row.mid, midTotal) })))
-                : C.note('No budgets entered yet')
+            )
         });
 
         // 2 - Projected revenue, by the month it should land
         const months = s.byMonth.map((amount, i) => {
             const date = new Date(s.today.getFullYear(), s.today.getMonth() + i, 1);
-            const name = date.toLocaleDateString('en-US', { month: 'short' });
             return {
-                label: name,
-                short: name.charAt(0),
+                letter: date.toLocaleDateString('en-US', { month: 'narrow' }),
                 value: amount,
-                text: money(amount),
                 title: `${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}: ~${money(amount)} EUR`
             };
         });
         if (s.projectedLater > 0) {
             months.push({
-                label: 'Later',
-                short: '+',
+                letter: '+',
                 value: s.projectedLater,
-                text: money(s.projectedLater),
                 title: `Later, or no completion date: ~${money(s.projectedLater)} EUR`
             });
         }
+        const monthChart = C.columns(months, 'Projected revenue by expected completion: '
+            + months.map(col => col.title).join(', '));
 
         const projected = C.tile({
             label: 'Projected',
             value: hasProjection ? `~${money(s.projRealistic)}` : '—',
             unit: hasProjection ? 'EUR' : '',
-            chart: hasProjection
-                ? C.columns(months, 'Projected revenue by expected completion: '
-                    + months.map(col => `${col.label} ${col.value > 0 ? '~' + col.text + ' EUR' : 'none'}`).join(', '))
-                : '',
-            foot: hasProjection ? '' : C.note('No open projects with a budget')
+            key: hasProjection ? monthChart.axis : C.note({ long: 'No open projects with a budget', short: 'No budgets' }),
+            chart: hasProjection ? monthChart.bars : C.stack([], 'No projection yet')
         });
 
         // 3 - How sure the open pipeline is, weighted by value
         const chance = C.tile({
-            label: 'Avg. chance',
+            label: { long: 'Avg. chance', short: 'Chance' },
             value: s.avgChance !== null ? `${s.avgChance}%` : '—',
+            key: C.note(s.avgChance !== null
+                ? { long: 'Weighted by value', short: 'By value' }
+                : { long: 'No open projects with a budget', short: 'No budgets' }),
             chart: C.meter(s.avgChance !== null ? s.avgChance / 100 : 0,
-                s.avgChance !== null ? `Average chance ${s.avgChance} percent` : 'No average chance yet'),
-            foot: C.note(s.avgChance !== null ? 'Weighted by value' : 'No open projects with a budget')
+                s.avgChance !== null ? `Average chance ${s.avgChance} percent` : 'No average chance yet')
         });
 
         grid.innerHTML = pipeline + projected + chance;

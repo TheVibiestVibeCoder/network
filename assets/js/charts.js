@@ -4,7 +4,11 @@
  * Plain HTML and CSS - no chart library, no canvas - so every chart follows
  * the theme tokens, scales with its container and needs nothing beyond what
  * the Content-Security-Policy already allows. Each chart carries a text
- * label for screen readers; the key underneath it is ordinary text.
+ * label for screen readers; the key above it is ordinary text.
+ *
+ * Every tile has the same four rows - label, number, key, chart - so the
+ * tiles of a band line up with each other whatever they show. Text that has
+ * a shorter form (for a narrow tile) is given as { long, short }.
  *
  * Everything returned is an HTML string with every piece of text escaped.
  */
@@ -23,7 +27,7 @@
     // Tones are fixed words chosen by the callers; anything else falls back to
     // the neutral tone rather than landing in a class attribute.
     const TONES = ['progress', 'proposal', 'negotiation', 'lead', 'complete',
-        'high', 'medium', 'low', 'none', 'late', 'accent'];
+        'high', 'medium', 'low', 'none', 'accent'];
 
     function tone(name) {
         return TONES.includes(name) ? name : 'none';
@@ -46,6 +50,19 @@
     }
 
     /**
+     * Text with an optional shorter form for narrow tiles. Accepts a string
+     * or { long, short }.
+     */
+    function text(value) {
+        if (value && typeof value === 'object') {
+            const long = esc(value.long);
+            if (value.short === undefined || value.short === value.long) return long;
+            return `<span class="kc-long">${long}</span><span class="kc-short">${esc(value.short)}</span>`;
+        }
+        return esc(value);
+    }
+
+    /**
      * One bar split into parts, widths in proportion to value.
      * parts: [{ tone, value, title }]
      */
@@ -65,33 +82,32 @@
     }
 
     /**
-     * A row of columns over a short run of periods.
-     * cols: [{ label, short, value, text, title, tone, current }]
+     * Columns over a short run of periods, and the letters that name them.
+     * cols: [{ letter, value, title, current }]
      * options.min keeps a single small value from filling the whole height.
+     * Returns { axis, bars }: the letters go in the key row, the columns in
+     * the chart row, on the same grid so each letter sits over its column.
      */
     function columns(cols, label, options) {
         const floor = options && options.min ? options.min : 0;
         const max = Math.max(floor, ...cols.map(col => col.value || 0));
 
-        const html = cols.map(col => {
+        const axis = cols.map(col =>
+            `<span${col.current ? ' class="is-current"' : ''}>${esc(col.letter)}</span>`
+        ).join('');
+
+        const bars = cols.map(col => {
             const classes = ['kc-col'];
             if (!(col.value > 0)) classes.push('is-zero');
             if (col.current) classes.push('is-current');
-            if (col.tone) classes.push('kc-tone-' + tone(col.tone));
 
-            const short = col.short || col.label;
-
-            return `
-                <span class="${classes.join(' ')}" title="${esc(col.title || '')}">
-                    <span class="kc-col-plot">
-                        <span class="kc-col-num">${col.value > 0 ? esc(col.text) : ''}</span>
-                        <span class="kc-col-bar" style="--h:${fixed(fraction(col.value, max))}"></span>
-                    </span>
-                    <span class="kc-col-label"><span class="kc-long">${esc(col.label)}</span><span class="kc-short">${esc(short)}</span></span>
-                </span>`;
+            return `<span class="${classes.join(' ')}" title="${esc(col.title || '')}"><span class="kc-col-bar" style="--h:${fixed(fraction(col.value, max))}"></span></span>`;
         }).join('');
 
-        return `<div class="kc-cols" role="img" aria-label="${esc(label)}">${html}</div>`;
+        return {
+            axis: `<div class="kc-axis" aria-hidden="true">${axis}</div>`,
+            bars: `<div class="kc-cols" role="img" aria-label="${esc(label)}">${bars}</div>`
+        };
     }
 
     /**
@@ -103,42 +119,40 @@
     }
 
     /**
-     * The key under a chart: a coloured dot, a name, a figure.
+     * The key: a coloured dot, a name, a figure. On one line; entries that
+     * do not fit are left out whole rather than cut, and narrow tiles drop
+     * the names and keep dot and figure.
      * items: [{ tone, label, text }]
      */
     function legend(items) {
-        const html = items.map(item => `
-            <li><span class="kc-dot kc-tone-${tone(item.tone)}" aria-hidden="true"></span>${esc(item.label)}${item.text !== undefined && item.text !== '' ? ` <b>${esc(item.text)}</b>` : ''}</li>`
-        ).join('');
+        const html = items.map(item => `<li><span class="kc-dot kc-tone-${tone(item.tone)}" aria-hidden="true"></span><span class="kc-legend-name">${esc(item.label)}</span><b>${esc(item.text)}</b></li>`).join('');
 
         return `<ul class="kc-legend">${html}</ul>`;
     }
 
-    function note(text) {
-        return `<p class="kc-note">${esc(text)}</p>`;
+    function note(value) {
+        return `<span class="kc-note">${text(value)}</span>`;
     }
 
     /**
-     * One tile of a summary band. label, meta, value, unit and flag are text;
-     * chart and foot are HTML from the helpers above. split: the number may
-     * sit beside its chart when the tile has a wide row to itself.
+     * One tile of a summary band.
+     * label, value, flag: text or { long, short }. meta, unit: text.
+     * key and chart: HTML from the helpers above.
      */
-    function tile(options) {
-        const o = options || {};
-
+    function tile(o) {
         return `
-            <div class="kpi${o.split ? ' kpi--split' : ''}">
+            <div class="kpi">
                 <div class="kpi-head">
-                    <span class="kpi-label">${esc(o.label)}</span>
+                    <span class="kpi-label">${text(o.label)}</span>
                     ${o.meta ? `<span class="kpi-meta">${esc(o.meta)}</span>` : ''}
                 </div>
                 <div class="kpi-value">
-                    <span class="kpi-number">${esc(o.value)}</span>
+                    <span class="kpi-number">${text(o.value)}</span>
                     ${o.unit ? `<span class="kpi-unit">${esc(o.unit)}</span>` : ''}
-                    ${o.flag ? `<span class="kpi-flag">${esc(o.flag)}</span>` : ''}
+                    ${o.flag ? `<span class="kpi-flag">${text(o.flag)}</span>` : ''}
                 </div>
+                <div class="kpi-key">${o.key || ''}</div>
                 <div class="kpi-chart">${o.chart || ''}</div>
-                ${o.foot ? `<div class="kpi-foot">${o.foot}</div>` : ''}
             </div>`;
     }
 
