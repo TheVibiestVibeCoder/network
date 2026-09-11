@@ -94,6 +94,10 @@ try {
             case 'delete-pdfs':
                 bkDeletePdfs($db);
                 break;
+            case 'set-excluded':
+                bkSetExcluded($db);
+                break;
+
             case 'set-month-tax':
                 bkSetMonthTax($db);
                 break;
@@ -212,6 +216,7 @@ function bkEnsureSchema(PDO $db): void
             row_date DATE,
             data TEXT NOT NULL DEFAULT '{}',
             no_pdf_needed INTEGER NOT NULL DEFAULT 0,
+            excluded INTEGER NOT NULL DEFAULT 0,
             import_batch INTEGER NOT NULL DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -243,6 +248,14 @@ function bkEnsureSchema(PDO $db): void
     ");
     $db->exec("CREATE INDEX IF NOT EXISTS idx_bk_pdfs_row ON bookkeeping_pdfs(row_id)");
     $db->exec("CREATE INDEX IF NOT EXISTS idx_bk_rows_date ON bookkeeping_rows(row_date)");
+
+    // Added after the table shipped. An excluded row stays in the list and
+    // keeps its PDF - it is only left out of the month's arithmetic, which is
+    // what a transfer between your own accounts or a duplicate import needs.
+    $rowColumns = array_column($db->query("PRAGMA table_info(bookkeeping_rows)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+    if (!in_array('excluded', $rowColumns, true)) {
+        $db->exec("ALTER TABLE bookkeeping_rows ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0");
+    }
 
     if (!is_dir(BK_PDF_DIR)) {
         mkdir(BK_PDF_DIR, 0700, true);
@@ -500,7 +513,7 @@ function bkGetTable(PDO $db): void
         ->fetchAll();
 
     $rows = $db->query("
-        SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.import_batch,
+        SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.excluded, r.import_batch,
                p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size
         FROM bookkeeping_rows r
         LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
@@ -514,6 +527,7 @@ function bkGetTable(PDO $db): void
             'row_date' => $row['row_date'],
             'data' => json_decode($row['data'], true) ?: [],
             'no_pdf_needed' => (int) $row['no_pdf_needed'] === 1,
+            'excluded' => (int) $row['excluded'] === 1,
             'pdf' => $row['pdf_id'] !== null ? [
                 'id' => (int) $row['pdf_id'],
                 'name' => $row['pdf_name'],
@@ -981,6 +995,29 @@ function bkDeletePdfs(PDO $db): void
     $stmt->execute($ids);
 
     bkJson(['success' => true, 'deleted' => $stmt->rowCount()]);
+}
+
+/**
+ * Leave rows in or out of the month totals.
+ *
+ * Mirrors bkSetNoPdf: the row is untouched otherwise, so excluding is always
+ * reversible and never loses the entry or its invoice.
+ */
+function bkSetExcluded(PDO $db): void
+{
+    $body = bkReadJsonBody();
+    $ids = bkIntList($body['ids'] ?? []);
+    $value = !empty($body['value']) ? 1 : 0;
+
+    if (empty($ids)) {
+        bkJson(['error' => 'No rows selected'], 400);
+    }
+
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("UPDATE bookkeeping_rows SET excluded = ? WHERE id IN ($placeholders)");
+    $stmt->execute(array_merge([$value], $ids));
+
+    bkJson(['success' => true]);
 }
 
 function bkSetNoPdf(PDO $db): void

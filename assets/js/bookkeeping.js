@@ -12,6 +12,26 @@
     const API = 'api/bookkeeping.php';
 
     const DATE_SORT_KEY = '__date__';
+    const PDF_SORT_KEY = '__pdf__';
+
+    /**
+     * Where a row sits when sorting by its PDF state.
+     *
+     * Ascending puts the work first: entries still missing an invoice, then the
+     * ones marked as not needing one, then the ones already settled. Clicking
+     * again reverses it, which is the "everything done" end of the list.
+     *
+     * These are sentinels, not a scale - only their order matters.
+     */
+    const PDF_STATUS_MISSING = 0;
+    const PDF_STATUS_NOT_NEEDED = 1;
+    const PDF_STATUS_ASSIGNED = 2;
+
+    function pdfStatusRank(row) {
+        if (row.pdf) return PDF_STATUS_ASSIGNED;
+        if (row.no_pdf_needed) return PDF_STATUS_NOT_NEEDED;
+        return PDF_STATUS_MISSING;
+    }
 
     const state = {
         columns: [],
@@ -226,7 +246,9 @@
      * removed (e.g. pruned after its last row was deleted).
      */
     function ensureValidSortColumn() {
-        const stillExists = state.sortColumn === DATE_SORT_KEY || state.columns.some(c => c.name === state.sortColumn);
+        const stillExists = state.sortColumn === DATE_SORT_KEY
+            || state.sortColumn === PDF_SORT_KEY
+            || state.columns.some(c => c.name === state.sortColumn);
         if (!stillExists) {
             state.sortColumn = DATE_SORT_KEY;
             state.sortDirection = 'asc';
@@ -277,24 +299,37 @@
     /**
      * Recompute one month's net line from what is currently in its tax box.
      */
+    /**
+     * Recompute what a month shows from what is currently in its tax box.
+     *
+     * Two places move together: the Net line inside the breakdown, and the
+     * single figure on the month row behind it - which switches between
+     * showing the result and the net as the tax is typed in or cleared.
+     */
     function updateNetFor(input) {
         const key = input.dataset.month;
-        const target = els.tableWrap.querySelector(`[data-net-for="${CSS.escape(key)}"]`);
-        if (!target) return;
-
         const totals = monthTotals(getDisplayRows(), detectAmountColumn());
         const sums = totals.get(key);
         if (!sums) return;
 
         const tax = parseTaxInput(input.value);
+        const hasTax = tax !== null && tax !== 0;
         const net = sums.result - (tax ?? 0);
 
-        target.textContent = formatSigned(net);
-        target.className = signClass(net);
+        const netCell = document.querySelector(`[data-net-for="${CSS.escape(key)}"]`);
+        if (netCell) {
+            netCell.textContent = formatSigned(net);
+            netCell.className = signClass(net);
+        }
 
-        const cell = input.closest('.bk-month-line');
-        const netWrap = cell ? cell.querySelector('.bk-month-net') : null;
-        if (netWrap) netWrap.classList.toggle('is-idle', tax === null || tax === 0);
+        const shown = hasTax ? net : sums.result;
+        const totalCell = document.querySelector(`[data-total-for="${CSS.escape(key)}"]`);
+        if (totalCell) {
+            totalCell.textContent = formatSigned(shown);
+            totalCell.className = signClass(shown);
+            const label = totalCell.parentElement.querySelector('.bk-month-stat-label');
+            if (label) label.textContent = hasTax ? 'Net' : 'Gross';
+        }
     }
 
     /**
@@ -329,64 +364,6 @@
         } catch (error) {
             showToast(`Could not save the tax amount: ${error.message}`, true);
         }
-    }
-
-    /**
-     * The contents of a month separator row: the month, its sums, and the tax
-     * box that turns the result into a net figure.
-     *
-     * The tax is a flat amount the user types in, not a rate - the list entries
-     * stay exactly as imported and only the bottom line moves. A positive
-     * number is deducted; a negative one is added back, which is how a refund
-     * or a credit gets in.
-     */
-    function monthRowContent(dateStr, label, totals) {
-        const key = monthKey(dateStr);
-        const sums = key ? totals.get(key) : null;
-
-        if (!sums) {
-            // No amount column, or nothing in this month parsed as one: show
-            // the month exactly as before rather than a row of zeroes.
-            return `<div class="bk-month-line"><span class="bk-month-name">${escapeHtml(label)}</span></div>`;
-        }
-
-        const tax = Number(state.settings.month_tax?.[key] ?? 0);
-        const hasTax = Number.isFinite(tax) && tax !== 0;
-        const net = sums.result - tax;
-
-        return `
-            <div class="bk-month-line">
-                <span class="bk-month-name">${escapeHtml(label)}</span>
-                <span class="bk-month-sums">
-                    <span class="bk-month-stat">
-                        <span class="bk-month-stat-label">Income</span>
-                        <span class="${signClass(sums.income)}">${formatSigned(sums.income)}</span>
-                    </span>
-                    <span class="bk-month-stat">
-                        <span class="bk-month-stat-label">Expenses</span>
-                        <span class="${signClass(sums.expenses)}">${formatSigned(sums.expenses)}</span>
-                    </span>
-                    <span class="bk-month-stat">
-                        <span class="bk-month-stat-label">Result</span>
-                        <span class="${signClass(sums.result)}">${formatSigned(sums.result)}</span>
-                    </span>
-                    <span class="bk-month-stat bk-month-tax">
-                        <label class="bk-month-stat-label" for="bkTax-${key}">Tax</label>
-                        <input type="text"
-                               inputmode="decimal"
-                               id="bkTax-${key}"
-                               class="bk-month-tax-input"
-                               data-month="${key}"
-                               value="${hasTax ? escapeHtml(tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}"
-                               placeholder="0,00"
-                               title="A flat amount deducted from this month's result. Negative adds it back.">
-                    </span>
-                    <span class="bk-month-stat bk-month-net${hasTax ? '' : ' is-idle'}">
-                        <span class="bk-month-stat-label">Net</span>
-                        <span class="${signClass(net)}" data-net-for="${key}">${formatSigned(net)}</span>
-                    </span>
-                </span>
-            </div>`;
     }
 
     /**
@@ -455,9 +432,19 @@
             if (value === null) return;
 
             if (!totals.has(key)) {
-                totals.set(key, { income: 0, expenses: 0, result: 0 });
+                totals.set(key, { income: 0, expenses: 0, result: 0, excluded: 0 });
             }
             const bucket = totals.get(key);
+
+            // An excluded row still belongs to the month - it is only kept out
+            // of the arithmetic. Counting it lets the breakdown say how many
+            // entries are being left out, so a total can never quietly
+            // disagree with the rows above it.
+            if (row.excluded) {
+                bucket.excluded += 1;
+                return;
+            }
+
             if (value >= 0) {
                 bucket.income += value;
             } else {
@@ -487,6 +474,138 @@
         return sign + Math.abs(value).toLocaleString('de-DE', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
+        });
+    }
+
+    /**
+     * A month separator: its name and one number.
+     *
+     * The line used to carry Income, Expenses, Result, a tax box and Net all
+     * at once, which is five figures competing for attention on a row that is
+     * mostly a label. Only the conclusion stays out here - labelled Gross
+     * while no tax has been entered, and Net once one has - and the workings
+     * move into the breakdown popover behind it.
+     */
+    function monthRowContent(dateStr, label, totals) {
+        const key = monthKey(dateStr);
+        const sums = key ? totals.get(key) : null;
+
+        if (!sums) {
+            // No amount column, or nothing in this month parsed as one: show
+            // the month exactly as it used to look, with nothing to add up.
+            return `<div class="bk-month-line"><span class="bk-month-name">${escapeHtml(label)}</span></div>`;
+        }
+
+        const tax = Number(state.settings.month_tax?.[key] ?? 0);
+        const hasTax = Number.isFinite(tax) && tax !== 0;
+        const shown = hasTax ? sums.result - tax : sums.result;
+
+        return `
+            <div class="bk-month-line">
+                <span class="bk-month-name">${escapeHtml(label)}</span>
+                <button type="button"
+                        class="bk-month-total"
+                        data-action="month-breakdown"
+                        data-month="${key}"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        title="Show income, expenses and tax for ${escapeHtml(label)}">
+                    <span class="bk-month-stat-label">${hasTax ? 'Net' : 'Gross'}</span>
+                    <span class="${signClass(shown)}" data-total-for="${key}">${formatSigned(shown)}</span>
+                    ${sums.excluded > 0 ? `<span class="bk-month-excluded-dot" title="${sums.excluded} entr${sums.excluded === 1 ? 'y' : 'ies'} excluded"></span>` : ''}
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="bk-month-chevron" aria-hidden="true">
+                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                    </svg>
+                </button>
+            </div>`;
+    }
+
+    /**
+     * The breakdown popover: the workings behind a month's one figure.
+     *
+     * Rebuilt from current state each time it opens, so it cannot drift from
+     * the table, and anchored to the button that opened it.
+     */
+    function openMonthBreakdown(button) {
+        closeMonthBreakdown();
+
+        const key = button.dataset.month;
+        const totals = monthTotals(getDisplayRows(), detectAmountColumn());
+        const sums = totals.get(key);
+        if (!sums) return;
+
+        const tax = Number(state.settings.month_tax?.[key] ?? 0);
+        const hasTax = Number.isFinite(tax) && tax !== 0;
+        const net = sums.result - tax;
+
+        const panel = document.createElement('div');
+        panel.className = 'bk-breakdown';
+        panel.id = 'bkMonthBreakdown';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-label', 'Month breakdown');
+        panel.innerHTML = `
+            <p class="bk-breakdown-title">${escapeHtml(monthLabel(key + '-01'))}</p>
+            <div class="bk-breakdown-row">
+                <span>Income</span>
+                <span class="${signClass(sums.income)}">${formatSigned(sums.income)}</span>
+            </div>
+            <div class="bk-breakdown-row">
+                <span>Expenses</span>
+                <span class="${signClass(sums.expenses)}">${formatSigned(sums.expenses)}</span>
+            </div>
+            <div class="bk-breakdown-sep"></div>
+            <div class="bk-breakdown-row bk-breakdown-row--strong">
+                <span>Gross</span>
+                <span class="${signClass(sums.result)}">${formatSigned(sums.result)}</span>
+            </div>
+            <div class="bk-breakdown-row">
+                <label for="bkTax-${key}">Tax</label>
+                <input type="text"
+                       inputmode="decimal"
+                       id="bkTax-${key}"
+                       class="bk-month-tax-input"
+                       data-month="${key}"
+                       value="${hasTax ? escapeHtml(tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}"
+                       placeholder="0,00"
+                       title="A flat amount deducted from this month's result. Negative adds it back.">
+            </div>
+            <div class="bk-breakdown-sep"></div>
+            <div class="bk-breakdown-row bk-breakdown-row--strong">
+                <span>Net</span>
+                <span class="${signClass(net)}" data-net-for="${key}">${formatSigned(net)}</span>
+            </div>
+            ${sums.excluded > 0 ? `
+                <p class="bk-breakdown-note">
+                    ${sums.excluded} entr${sums.excluded === 1 ? 'y is' : 'ies are'} excluded from these totals.
+                </p>` : ''}
+        `;
+
+        document.body.appendChild(panel);
+
+        // Anchored in viewport coordinates on <body> rather than inside the
+        // scrolling table, where the cell's own overflow would clip it.
+        const r = button.getBoundingClientRect();
+        const width = panel.offsetWidth;
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
+        const below = r.bottom + 6;
+        const fitsBelow = below + panel.offsetHeight < window.innerHeight - 8;
+        panel.style.left = `${left}px`;
+        panel.style.top = fitsBelow ? `${below}px` : `${Math.max(8, r.top - panel.offsetHeight - 6)}px`;
+
+        button.setAttribute('aria-expanded', 'true');
+        button.classList.add('is-open');
+
+        const input = panel.querySelector('.bk-month-tax-input');
+        if (input) input.focus();
+    }
+
+    function closeMonthBreakdown() {
+        const panel = document.getElementById('bkMonthBreakdown');
+        if (panel) panel.remove();
+
+        els.tableWrap.querySelectorAll('.bk-month-total.is-open').forEach(btn => {
+            btn.classList.remove('is-open');
+            btn.setAttribute('aria-expanded', 'false');
         });
     }
 
@@ -523,6 +642,27 @@
         if (prevYear && sortedYears.includes(parseInt(prevYear, 10))) {
             els.selectYear.value = prevYear;
         }
+    }
+
+    /**
+     * The Select popover. Its state lives on the button's aria-expanded and the
+     * panel's hidden attribute, so the markup stays the source of truth and
+     * assistive tech is told the same thing the styling shows.
+     */
+    function openSelectTools() {
+        if (!els.selectTools) return;
+        els.selectTools.hidden = false;
+        els.selectToolsBtn.setAttribute('aria-expanded', 'true');
+        els.selectToolsBtn.parentElement.classList.add('is-open');
+        // Land on the first control, so the popover is usable from the keyboard.
+        if (els.selectMonth) els.selectMonth.focus();
+    }
+
+    function closeSelectTools() {
+        if (!els.selectTools || els.selectTools.hidden) return;
+        els.selectTools.hidden = true;
+        els.selectToolsBtn.setAttribute('aria-expanded', 'false');
+        els.selectToolsBtn.parentElement.classList.remove('is-open');
     }
 
     function selectRowsByMonth() {
@@ -674,11 +814,27 @@
         const dir = state.sortDirection === 'desc' ? -1 : 1;
         const sortCol = state.sortColumn;
         const byDate = isDateSortColumn(sortCol);
+        const byPdf = sortCol === PDF_SORT_KEY;
 
         rows = [...rows].sort((a, b) => {
             let cmp;
 
-            if (byDate) {
+            if (byPdf) {
+                cmp = pdfStatusRank(a) - pdfStatusRank(b);
+                // Within one status the rows are still a statement, so they
+                // stay in date order rather than falling back to insertion id.
+                // Not multiplied by the direction: reversing the click flips
+                // which status leads, while each group stays chronological,
+                // which is the order these are actually read in.
+                if (cmp === 0) {
+                    const va = a.row_date || '';
+                    const vb = b.row_date || '';
+                    if (va !== vb) {
+                        if (va === '' || vb === '') return va === '' ? 1 : -1;
+                        return va < vb ? -1 : 1;
+                    }
+                }
+            } else if (byDate) {
                 const va = a.row_date || '';
                 const vb = b.row_date || '';
                 // Rows without a parsable date sort last either way round.
@@ -746,21 +902,33 @@
         const triangleUp = '<svg class="bk-sort-arrow" viewBox="0 0 10 6" width="10.5" height="6.3" fill="currentColor" aria-hidden="true"><path d="M0 6 L5 0 L10 6 Z"/></svg>';
         const dirIndicator = state.sortDirection === 'desc' ? triangleUp : triangleDown;
 
+        // Resolved before any markup is built: the header row needs to know
+        // which column is the amount, and the month separators need the totals.
+        // Totals come from the displayed rows, so filtering the table narrows
+        // the sums with it rather than leaving a figure that no longer matches
+        // what is on screen.
+        const amountColumn = detectAmountColumn();
+        const totals = monthTotals(displayRows, amountColumn);
+        const isAmountCol = name => amountColumn !== null && name === amountColumn;
+
         let html = '<table class="bk-table"><thead><tr>';
         html += `<th class="bk-col-check"><input type="checkbox" id="bkSelectAll" title="Select all" ${displayRows.length > 0 && displayRows.every(r => state.selection.has(r.id)) ? 'checked' : ''}></th>`;
         state.columns.forEach(col => {
             const active = col.name === activeSortCol;
-            html += `<th class="bk-sortable-th ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(col.name)}" title="Sort by ${escapeHtml(col.name)}">
+            const amount = isAmountCol(col.name) ? ' bk-col-amount' : '';
+            html += `<th class="bk-sortable-th${amount} ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(col.name)}" title="Sort by ${escapeHtml(col.name)}">
                 <span>${escapeHtml(col.name)}</span>${active ? dirIndicator : ''}
             </th>`;
         });
-        html += '<th class="bk-col-pdf">PDF / Invoice</th><th class="bk-col-actions"></th></tr></thead><tbody>';
-
-        // Totals are computed over the displayed rows, so filtering the table
-        // narrows the sums with it rather than leaving a figure that no longer
-        // matches what is on screen.
-        const amountColumn = detectAmountColumn();
-        const totals = monthTotals(displayRows, amountColumn);
+        // Sortable like any other header, but by state rather than by text:
+        // "PDF missing" is not a value in a cell, so it needs its own key.
+        const pdfActive = state.sortColumn === PDF_SORT_KEY;
+        html += `<th class="bk-sortable-th bk-col-pdf ${pdfActive ? 'bk-sort-active' : ''}"
+                     data-sort-key="${PDF_SORT_KEY}"
+                     title="Sort by PDF status">
+                <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}
+            </th>`;
+        html += '<th class="bk-col-actions"></th></tr></thead><tbody>';
 
         let previousMonth = null;
         displayRows.forEach(row => {
@@ -774,11 +942,13 @@
 
             const ok = !!row.pdf || row.no_pdf_needed;
             const selected = state.selection.has(row.id);
-            html += `<tr class="bk-row ${ok ? 'bk-row-ok' : 'bk-row-missing'} ${selected ? 'bk-row-selected' : ''}" data-row-id="${row.id}">`;
+            html += `<tr class="bk-row ${ok ? 'bk-row-ok' : 'bk-row-missing'} ${selected ? 'bk-row-selected' : ''} ${row.excluded ? 'bk-row-excluded' : ''}" data-row-id="${row.id}">`;
             html += `<td class="bk-col-check"><input type="checkbox" class="bk-row-check" data-row-id="${row.id}" ${selected ? 'checked' : ''}></td>`;
             state.columns.forEach(col => {
                 const value = row.data[col.name] ?? '';
-                html += `<td class="${amountClass(value, col.name)}">${escapeHtml(value)}</td>`;
+                const classes = [amountClass(value, col.name)];
+                if (isAmountCol(col.name)) classes.push('bk-col-amount');
+                html += `<td class="${classes.filter(Boolean).join(' ')}">${escapeHtml(value)}</td>`;
             });
 
             // PDF status cell
@@ -798,6 +968,12 @@
 
             // Actions cell
             html += '<td class="bk-col-actions"><div class="bk-row-actions">';
+            html += `
+                <button type="button" class="bk-icon-btn ${row.excluded ? 'bk-icon-btn-excluded' : ''}" data-action="toggle-excluded" data-row-id="${row.id}" title="${row.excluded ? 'Include in the month totals again' : 'Exclude from the month totals'}">
+                    ${row.excluded
+                        ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>'
+                        : '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.8 11.8 0 0 0 23 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2.7 3.42 1.29 4.83l2.53 2.53A11.77 11.77 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.52 0 2.98-.29 4.32-.82l3.02 3.02 1.41-1.41L2.7 3.42zM7.53 11.07A4.6 4.6 0 0 0 7.5 12a4.5 4.5 0 0 0 6.44 4.06l-1.5-1.5A3 3 0 0 1 9 12l-.02-.2-1.45-1.45z"/></svg>'}
+                </button>`;
             if (!row.pdf) {
                 html += `
                     <button type="button" class="bk-icon-btn" data-action="upload" data-row-id="${row.id}" title="Upload PDF for this row">
@@ -1462,6 +1638,48 @@
         });
     }
 
+    /**
+     * Take a row out of the month's arithmetic, or put it back.
+     *
+     * Excluding asks first: the row keeps sitting in the list looking normal
+     * apart from its styling, so a total silently changing under someone who
+     * mis-clicked would be hard to account for later. Putting a row back is
+     * not destructive and needs no confirmation.
+     */
+    function confirmToggleExcluded(rowId) {
+        const row = state.rows.find(r => r.id === rowId);
+        if (!row) return;
+
+        if (row.excluded) {
+            setExcluded(rowId, false);
+            return;
+        }
+
+        showConfirm({
+            title: 'Exclude from totals?',
+            message: `<p>This entry stays in the list and keeps any PDF, but stops counting
+                      towards its month's income, expenses and result.</p>
+                      <div class="bk-row-card">
+                          <div class="bk-row-card-item">
+                              <span class="bk-row-card-label">Entry</span>
+                              <span class="bk-row-card-value">${escapeHtml(rowSummary(row))}</span>
+                          </div>
+                      </div>`,
+            actions: [{
+                label: 'Exclude',
+                className: 'btn-primary',
+                handler: () => setExcluded(rowId, true)
+            }]
+        });
+    }
+
+    async function setExcluded(rowId, value) {
+        await postJson('set-excluded', { ids: [rowId], value });
+        closeMonthBreakdown();
+        await load();
+        showToast(value ? 'Entry excluded from the totals' : 'Entry counted again');
+    }
+
     async function toggleNoPdf(rowId) {
         const row = state.rows.find(r => r.id === rowId);
         if (!row) return;
@@ -1688,6 +1906,8 @@
             poolCount: $('bkPoolCount'),
             poolInput: $('bkPoolInput'),
             poolBrowseBtn: $('bkPoolBrowseBtn'),
+            selectToolsBtn: $('bkSelectToolsBtn'),
+            selectTools: $('bkSelectTools'),
             selectMonth: $('bkSelectMonth'),
             selectYear: $('bkSelectYear'),
             selectMonthBtn: $('bkSelectMonthBtn'),
@@ -1805,28 +2025,55 @@
         // table on each keystroke would tear the focus out of the field - and
         // the value is only written back when the field is left or Enter is
         // pressed.
-        els.tableWrap.addEventListener('input', event => {
-            const taxInput = event.target.closest('.bk-month-tax-input');
+        // The tax box lives in the breakdown popover, which is appended to
+        // <body> so the scrolling table cannot clip it - so these are delegated
+        // from document rather than from the table. Typing updates the figures
+        // in place; the value is written back on blur or Enter.
+        document.addEventListener('input', event => {
+            const taxInput = event.target.closest?.('.bk-month-tax-input');
             if (taxInput) updateNetFor(taxInput);
         });
 
-        els.tableWrap.addEventListener('change', event => {
-            const taxInput = event.target.closest('.bk-month-tax-input');
+        document.addEventListener('change', event => {
+            const taxInput = event.target.closest?.('.bk-month-tax-input');
             if (taxInput) saveMonthTax(taxInput);
         });
 
-        els.tableWrap.addEventListener('keydown', event => {
-            const taxInput = event.target.closest('.bk-month-tax-input');
+        document.addEventListener('keydown', event => {
+            const taxInput = event.target.closest?.('.bk-month-tax-input');
             if (taxInput && event.key === 'Enter') {
                 event.preventDefault();
                 taxInput.blur(); // fires change, which saves
             }
+            if (event.key === 'Escape' && document.getElementById('bkMonthBreakdown')) {
+                closeMonthBreakdown();
+            }
         });
 
+        // Dismiss the breakdown on any click that is not in it or on the
+        // button that opened it.
+        document.addEventListener('click', event => {
+            if (!document.getElementById('bkMonthBreakdown')) return;
+            if (event.target.closest?.('#bkMonthBreakdown')) return;
+            if (event.target.closest?.('.bk-month-total')) return;
+            closeMonthBreakdown();
+        });
+
+        // Reposition would be wrong once its anchor has moved, so it just closes.
+        els.tableWrap.addEventListener('scroll', () => closeMonthBreakdown(), { passive: true });
+        window.addEventListener('resize', () => closeMonthBreakdown());
+
         els.tableWrap.addEventListener('click', event => {
-            // A click in the tax box must not be read as a click on the month
-            // row underneath it.
-            if (event.target.closest('.bk-month-tax')) return;
+            const monthTotal = event.target.closest('.bk-month-total');
+            if (monthTotal) {
+                event.stopPropagation();
+                if (monthTotal.classList.contains('is-open')) {
+                    closeMonthBreakdown();
+                } else {
+                    openMonthBreakdown(monthTotal);
+                }
+                return;
+            }
 
             const sortHeader = event.target.closest('.bk-sortable-th');
             if (sortHeader) {
@@ -1887,6 +2134,9 @@
                     break;
                 case 'toggle-nopdf':
                     toggleNoPdf(rowId);
+                    break;
+                case 'toggle-excluded':
+                    confirmToggleExcluded(rowId);
                     break;
                 case 'delete-row':
                     confirmDeleteRows([rowId]);
@@ -1994,9 +2244,32 @@
         });
         els.poolBrowseBtn.addEventListener('click', () => els.poolInput.click());
 
-        // Select-by-date tools
-        els.selectMonthBtn.addEventListener('click', selectRowsByMonth);
-        els.selectRangeBtn.addEventListener('click', selectRowsByRange);
+        // Select-by-date tools, now inside a popover
+        els.selectMonthBtn.addEventListener('click', () => { selectRowsByMonth(); closeSelectTools(); });
+        els.selectRangeBtn.addEventListener('click', () => { selectRowsByRange(); closeSelectTools(); });
+
+        if (els.selectToolsBtn && els.selectTools) {
+            els.selectToolsBtn.addEventListener('click', event => {
+                event.stopPropagation();
+                els.selectTools.hidden ? openSelectTools() : closeSelectTools();
+            });
+
+            // A click anywhere else dismisses it, the way a menu should. The
+            // listener is on document so it also catches clicks in the table.
+            document.addEventListener('click', event => {
+                if (els.selectTools.hidden) return;
+                if (els.selectTools.contains(event.target)) return;
+                if (els.selectToolsBtn.contains(event.target)) return;
+                closeSelectTools();
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !els.selectTools.hidden) {
+                    closeSelectTools();
+                    els.selectToolsBtn.focus();
+                }
+            });
+        }
 
         // Filter (sorting is driven by clicking the column headers)
         els.filterInput.addEventListener('input', () => {

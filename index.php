@@ -663,13 +663,13 @@ function buildPasswordLink(string $token): string
                 <div class="header-center">
                     <!-- View Toggle -->
                     <div class="view-toggle">
-                        <button type="button" class="toggle-btn" data-view="workload" title="My Work">
+                        <button type="button" class="toggle-btn active" data-view="workload" title="My Work">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
                             </svg>
                             <span class="toggle-badge" id="workloadBadge" hidden>0</span>
                         </button>
-                        <button type="button" class="toggle-btn active" data-view="projects" title="Projects">
+                        <button type="button" class="toggle-btn" data-view="projects" title="Projects">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                 <path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>
                             </svg>
@@ -759,7 +759,10 @@ function buildPasswordLink(string $token): string
             <!-- Main Content -->
             <main class="app-main">
                 <!-- My Work: everything assigned to one person -->
-                <div class="view-panel" id="workloadView">
+                <!-- My Work is the home tab, so it is the one the server renders
+                     active. app.js switches to the device's remembered tab on
+                     load if there is one. -->
+                <div class="view-panel active" id="workloadView">
                     <div class="workload-wrap">
                         <div class="workload-head">
                             <div class="workload-person">
@@ -834,57 +837,73 @@ function buildPasswordLink(string $token): string
 
                 <!-- Bookkeeping View -->
                 <div class="view-panel" id="bookkeepingView">
-                    <div class="bk-toolbar">
-                        <div class="bk-toolbar-left">
-                            <button type="button" class="btn btn-primary" id="bkImportCsvBtn" title="Import a CSV file">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                                    <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
-                                </svg>
-                                <span>Import CSV</span>
-                            </button>
-                            <input type="file" id="bkCsvInput" accept=".csv,text/csv" hidden>
+                    <!-- One toolbar. The date tools that used to occupy a bar of
+                         their own are behind the Select button: they tick rows by
+                         month or range, which is an occasional job, not something
+                         that needs permanent screen space. -->
+                    <header class="bk-bar">
+                        <div class="bk-bar-lead">
+                            <h2 class="bk-bar-title">Bookkeeping</h2>
                             <span class="bk-row-count" id="bkRowCount">0 entries</span>
                         </div>
-                        <div class="bk-selection-bar" id="bkSelectionBar">
-                            <span class="bk-selection-count" id="bkSelectionCount"></span>
-                            <button type="button" class="btn btn-secondary btn-small" id="bkExportSelectedBtn" title="Download all PDFs of the selected rows as a ZIP file">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+
+                        <div class="bk-bar-tools">
+                            <div class="bk-search">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" class="bk-search-icon" aria-hidden="true">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                                 </svg>
-                                <span>Export PDFs</span>
-                            </button>
-                            <button type="button" class="btn btn-danger btn-small" id="bkDeleteSelectedBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                <input type="text" id="bkFilterInput" class="bk-search-input" placeholder="Search" aria-label="Search all columns">
+                            </div>
+
+                            <div class="bk-menu-wrap">
+                                <button type="button" class="bk-btn" id="bkSelectToolsBtn"
+                                        aria-haspopup="dialog" aria-expanded="false" aria-controls="bkSelectTools"
+                                        title="Select rows by date">
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                        <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+                                    </svg>
+                                    <span>Select</span>
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="bk-btn-chevron" aria-hidden="true">
+                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                    </svg>
+                                </button>
+
+                                <div class="bk-menu" id="bkSelectTools" role="dialog" aria-label="Select rows by date" hidden>
+                                    <p class="bk-menu-title">Select rows by date</p>
+
+                                    <div class="bk-menu-section">
+                                        <label class="bk-menu-label" for="bkSelectMonth">Month</label>
+                                        <div class="bk-menu-row">
+                                            <select id="bkSelectMonth" class="form-select"></select>
+                                            <select id="bkSelectYear" class="form-select"></select>
+                                        </div>
+                                        <button type="button" class="bk-btn bk-btn-block" id="bkSelectMonthBtn">Select month</button>
+                                    </div>
+
+                                    <div class="bk-menu-sep"></div>
+
+                                    <div class="bk-menu-section">
+                                        <label class="bk-menu-label" for="bkSelectFrom">Date range</label>
+                                        <div class="bk-menu-row">
+                                            <input type="date" id="bkSelectFrom" class="form-input" aria-label="From">
+                                            <span class="bk-menu-dash">&ndash;</span>
+                                            <input type="date" id="bkSelectTo" class="form-input" aria-label="To">
+                                        </div>
+                                        <button type="button" class="bk-btn bk-btn-block" id="bkSelectRangeBtn">Select range</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="button" class="bk-btn bk-btn-primary" id="bkImportCsvBtn" title="Import a CSV file">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                    <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
                                 </svg>
-                                <span>Delete</span>
+                                <span>Import</span>
                             </button>
-                            <button type="button" class="btn btn-secondary btn-small" id="bkClearSelectionBtn">Clear</button>
+                            <input type="file" id="bkCsvInput" accept=".csv,text/csv" hidden>
                         </div>
-                    </div>
-                    <div class="bk-select-bar">
-                        <div class="bk-select-group">
-                            <label>Select month:</label>
-                            <select id="bkSelectMonth" class="form-select"></select>
-                            <select id="bkSelectYear" class="form-select"></select>
-                            <button type="button" class="btn btn-secondary btn-small" id="bkSelectMonthBtn">Select</button>
-                        </div>
-                        <div class="bk-select-divider"></div>
-                        <div class="bk-select-group">
-                            <label>Select range:</label>
-                            <input type="date" id="bkSelectFrom" class="form-input">
-                            <span class="bk-select-range-sep">&ndash;</span>
-                            <input type="date" id="bkSelectTo" class="form-input">
-                            <button type="button" class="btn btn-secondary btn-small" id="bkSelectRangeBtn">Select</button>
-                        </div>
-                    </div>
-                    <div class="bk-select-bar">
-                        <div class="bk-select-group bk-filter-group">
-                            <label>Filter:</label>
-                            <input type="text" id="bkFilterInput" class="form-input" placeholder="Search all columns...">
-                        </div>
-                        <div class="bk-select-hint">Click a column title to sort by it</div>
-                    </div>
+                    </header>
+
                     <div class="bk-body">
                         <div class="bk-table-wrap" id="bkTableWrap">
                             <div class="bk-table-inner" id="bkTableInner">
@@ -892,24 +911,46 @@ function buildPasswordLink(string $token): string
                             </div>
                             <div class="bk-row-drop-pill" id="bkRowDropPill" aria-hidden="true">Drop PDF here</div>
                         </div>
+
                         <aside class="bk-dropzone" id="bkDropzone">
                             <div class="bk-dropzone-header">
-                                <h3>PDF Drop Zone <span class="bk-pool-count" id="bkPoolCount">0 files</span></h3>
-                                <p>Store invoices here before the matching bank entry is imported. Drag a file onto a table row to assign it.</p>
+                                <h3 class="bk-dropzone-title">
+                                    Drop Zone
+                                    <span class="bk-pool-count" id="bkPoolCount">0 files</span>
+                                </h3>
+                                <button type="button" class="bk-btn bk-btn-small" id="bkPoolBrowseBtn" title="Upload PDFs">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                                        <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+                                    </svg>
+                                    <span>Upload</span>
+                                </button>
                             </div>
+                            <p class="bk-dropzone-hint">Invoices parked here until their bank entry is imported. Drag one onto a row to assign it.</p>
                             <div class="bk-pool-list" id="bkPoolList">
                                 <!-- Unassigned PDFs rendered by JS -->
                             </div>
-                            <div class="bk-dropzone-footer">
-                                <input type="file" id="bkPoolInput" accept=".pdf,application/pdf" multiple hidden>
-                                <button type="button" class="btn btn-secondary btn-block" id="bkPoolBrowseBtn">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
-                                    </svg>
-                                    Upload PDFs
-                                </button>
-                            </div>
+                            <input type="file" id="bkPoolInput" accept=".pdf,application/pdf" multiple hidden>
                         </aside>
+
+                        <!-- Contextual action bar: floats over the table only while
+                             rows are ticked, so the toolbar above stays uncluttered. -->
+                        <div class="bk-selection-bar" id="bkSelectionBar">
+                            <span class="bk-selection-count" id="bkSelectionCount"></span>
+                            <span class="bk-selection-sep" aria-hidden="true"></span>
+                            <button type="button" class="bk-sel-btn" id="bkExportSelectedBtn" title="Download all PDFs of the selected rows as a ZIP file">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                </svg>
+                                <span>Export PDFs</span>
+                            </button>
+                            <button type="button" class="bk-sel-btn bk-sel-btn-danger" id="bkDeleteSelectedBtn">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                            <button type="button" class="bk-sel-btn bk-sel-btn-plain" id="bkClearSelectionBtn">Done</button>
+                        </div>
                     </div>
                 </div>
 
@@ -1029,7 +1070,7 @@ function buildPasswordLink(string $token): string
                 </div>
 
                 <!-- Projects View -->
-                <div class="view-panel active" id="projectsView">
+                <div class="view-panel" id="projectsView">
                     <!-- Dashboard -->
                     <div class="dashboard-wrapper collapsed" id="dashboardWrapper">
                         <!-- Collapsed bar (always visible) -->

@@ -24,7 +24,7 @@
     // ============================================
 
     const state = {
-        currentView: 'projects',
+        currentView: 'workload',
         contacts: [],
         mapContacts: [],
         sortField: 'name',
@@ -1321,8 +1321,38 @@
     // View Toggle Functions
     // ============================================
 
+    // Every tab that can be opened. Used to vet what comes back out of
+    // storage, so a stale or hand-edited value cannot leave the app with no
+    // panel showing at all.
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'map'];
+    const HOME_VIEW = 'workload';
+    const VIEW_STORAGE_KEY = 'crm.currentView';
+
+    /**
+     * The tab to open on load: the one last used on this device, else home.
+     */
+    function readStoredView() {
+        let stored = null;
+        try {
+            stored = localStorage.getItem(VIEW_STORAGE_KEY);
+        } catch (e) {
+            // Private mode or blocked storage: just open the home tab.
+        }
+
+        return VIEWS.includes(stored) ? stored : HOME_VIEW;
+    }
+
+    function storeView(view) {
+        try {
+            localStorage.setItem(VIEW_STORAGE_KEY, view);
+        } catch (e) {
+            // Not remembering the tab is not worth failing over.
+        }
+    }
+
     function switchView(view) {
         state.currentView = view;
+        storeView(view);
 
         // Update toggle buttons
         elements.toggleBtns.forEach(btn => {
@@ -1348,9 +1378,11 @@
                 window.CRMWorkload.load();
             }
         } else if (view === 'map') {
-            // Force map to recalculate size after becoming visible
+            // Force map to recalculate size after becoming visible. Guarded
+            // because this now also runs on load, when the map may be the
+            // remembered tab and initMap() has not finished wiring it up.
             setTimeout(() => {
-                state.map.invalidateSize();
+                if (state.map) state.map.invalidateSize();
             }, 100);
             loadMapMarkers();
         } else if (view === 'calendar') {
@@ -5797,19 +5829,12 @@
             populateCalendarTagFilter();
         });
 
-        // Load initial data based on current view
-        if (state.currentView === 'projects') {
-            loadProjects();
-            loadAllContacts();
-        } else if (state.currentView === 'todos') {
-            loadTodos();
-        } else if (state.currentView === 'map') {
-            loadMapMarkers();
-        } else if (state.currentView === 'calendar') {
-            loadCalendarNotes();
-        } else {
-            loadContacts();
-        }
+        // Open the tab this device was last on, falling back to home. Going
+        // through switchView rather than repeating the per-view loading here
+        // means the two can never disagree about what a tab needs - the copy
+        // that used to live in this function knew nothing about My Work or
+        // Bookkeeping, so those two never loaded their data on a fresh open.
+        switchView(readStoredView());
     }
 
     // Expose functions globally for map popup buttons and onclick handlers

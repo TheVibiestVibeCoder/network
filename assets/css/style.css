@@ -6180,6 +6180,13 @@ button.user-chip:focus-visible {
     pointer-events: none;
 }
 
+/* The badge is toggled with the hidden attribute, whose display:none comes
+   from the UA stylesheet - which the display:flex above outranks. Without
+   this the badge never hides, so an empty My Work still wore a red "0". */
+.toggle-badge[hidden] {
+    display: none;
+}
+
 /* --- My Work ------------------------------------------------------------ */
 
 .workload-wrap {

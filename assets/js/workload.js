@@ -23,6 +23,7 @@
     };
 
     const els = {};
+    let initialized = false;
 
     // ------------------------------------------------------------------
     // Utilities
@@ -350,6 +351,10 @@
 
     async function load(who) {
         if (who) state.who = who;
+
+        // No-op once it has run; here for the case where this is the first
+        // view shown and app.js asks for it before this file has initialized.
+        init();
         if (!els.body) return;
 
         els.body.innerHTML = '<div class="workload-loading">Loading...</div>';
@@ -397,8 +402,17 @@
     // ------------------------------------------------------------------
 
     function init() {
+        // Guarded so it can be called from load() as well as on DOMContentLoaded.
+        // app.js opens the starting view from its own DOMContentLoaded handler,
+        // which is registered first and therefore runs before this file's - so
+        // load() can arrive before the elements below have been looked up, and
+        // the listeners here must not be attached twice when it does.
+        if (initialized) return;
+
         els.body = $('workloadBody');
         if (!els.body) return;
+
+        initialized = true;
 
         els.title = $('workloadTitle');
         els.summary = $('workloadSummary');
