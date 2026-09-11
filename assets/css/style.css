@@ -5393,15 +5393,6 @@ textarea.form-input {
     border-bottom-color: var(--color-border);
 }
 
-.login-alt-sep {
-    margin: 0 var(--spacing-2);
-    color: var(--color-border);
-}
-
-.login-hint-inline {
-    color: var(--color-text-muted);
-}
-
 .login-form .form-input[readonly] {
     color: var(--color-text-tertiary);
     cursor: default;

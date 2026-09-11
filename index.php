@@ -643,8 +643,6 @@ function buildPasswordLink(string $token): string
                         </form>
                         <p class="login-alt">
                             <a href="index.php?action=forgot">Forgot password?</a>
-                            <span class="login-alt-sep">&middot;</span>
-                            <span class="login-hint-inline">Owner: leave email empty</span>
                         </p>
                     <?php endif; ?>
                 </div>
