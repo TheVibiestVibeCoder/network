@@ -32,6 +32,8 @@ nicht ausliefern, egal was mit `.htaccess` passiert.
 - Mein Webordner: `/home/markussc/network.disinfocombat.eu`
 - Anzahl Kontakte vor dem Umzug: `_______`
 - Datum des Umzugs: `_______`
+- Branch, der in cPanel **vor** dem Update aktiv ist: `_______`
+  (vermutlich `UPDATE_DESIGN`, das ist dein Weg zurück)
 
 ---
 
@@ -153,8 +155,9 @@ umgezogen ohne Daten (→ Fehlerseite, keine leere Datenbank) und keine `.env`
 
 **Geänderte Dateien:** `config/config.php`, `api/bookkeeping.php`,
 `api/profile.php` und `.htaccess`, dazu `SECURITY.md`, `.env.example` und
-diese Anleitung. Alles liegt im Branch `claude/mcp-server-api-feasibility-poaxuy`
-und kommt in Schritt 7 per Git auf den Server, wie sonst auch.
+diese Anleitung. Alles liegt im Branch **`UPDATE_DESIGN_DATA_MIGRATION`**.
+Der enthält das neue Design aus `UPDATE_DESIGN` **plus** den Umzug und kommt
+in Schritt 7 per Git auf den Server, wie sonst auch.
 
 `.env` und `data/crm.db` fasst Git **nicht** an. Sie stehen in `.gitignore`,
 deshalb überschreibt oder löscht ein Git-Update sie nie.
@@ -200,10 +203,11 @@ herunter.
 
 So wie du sonst Updates machst, per Git:
 
-- [ ] Prüfen, dass die Änderungen auf GitHub im Branch
-      `claude/mcp-server-api-feasibility-poaxuy` sind (gepusht)
+- [ ] Prüfen, dass der Branch `UPDATE_DESIGN_DATA_MIGRATION` auf GitHub ist
+      (gepusht)
 - [ ] cPanel → **Git Version Control** → beim CRM auf **Manage** (Verwalten)
-- [ ] Auf den Branch `claude/mcp-server-api-feasibility-poaxuy` wechseln und
+- [ ] Nachsehen, welcher Branch gerade aktiv ist, und in den Merkzettel schreiben
+- [ ] Auf den Branch `UPDATE_DESIGN_DATA_MIGRATION` wechseln und
       **Update from Remote** klicken
   - Meldet cPanel einen Fehler (z. B. wegen „lokaler Änderungen“ oder
     „would be overwritten“): **abbrechen**, nichts erzwingen, Claude Bescheid
@@ -212,7 +216,8 @@ So wie du sonst Updates machst, per Git:
       die Kontakte sind da.
   - Es hat sich noch nichts geändert, und das ist richtig so.
 
-> **Zurück zum alten Code:** In cPanel wieder auf `main` wechseln.
+> **Zurück zum alten Code:** In cPanel wieder auf den Branch aus dem
+> Merkzettel wechseln (vermutlich `UPDATE_DESIGN`).
 > Das geht einfach **nur bis Schritt 9**. Danach musst du vorher die `.env`
 > zurück in den Webordner verschieben, denn der alte Code kennt `crm-private`
 > nicht.
@@ -334,8 +339,8 @@ aktualisierst. **Nicht löschen.** Wichtig ist nur, dass
 
 Damit spätere Updates wieder ganz normal über `main` laufen:
 
-- [ ] Auf GitHub den Branch `claude/mcp-server-api-feasibility-poaxuy` per
-      Pull Request in `main` mergen
+- [ ] Auf GitHub den Branch `UPDATE_DESIGN_DATA_MIGRATION` per Pull Request
+      in `main` mergen. Damit kommen das neue Design **und** der Umzug in `main`.
 - [ ] cPanel → **Git Version Control** → **Manage** → auf `main` wechseln →
       **Update from Remote**
 - [ ] Kurz einloggen und prüfen, ob alles läuft. Der Code ist derselbe, es
@@ -366,7 +371,7 @@ Das CRM macht selbst keine Backups.
 | Du siehst … | Das heißt wahrscheinlich … | Das tust du |
 |---|---|---|
 | „Service temporarily unavailable“ direkt nach Schritt 9 | Die App findet die `.env` oder die Datenbank im neuen Ordner nicht | `.env` zurück in den Webordner, Claude Bescheid sagen. Evtl. Hoster fragen: „Darf PHP im Ordner `/home/markussc/crm-private` lesen und schreiben (open_basedir)?“ |
-| „Service temporarily unavailable“ nach Schritt 7 | Beim Update ist etwas schiefgegangen | In cPanel zurück auf `main` wechseln, Claude Bescheid sagen |
+| „Service temporarily unavailable“ nach Schritt 7 | Beim Update ist etwas schiefgegangen | In cPanel zurück auf den Branch aus dem Merkzettel wechseln, Claude Bescheid sagen |
 | Das CRM ist leer | Die App liest eine falsche Datenbank | `.env` zurück in den Webordner, Claude Bescheid sagen |
 | Rechnungen oder Profilbilder fehlen | Ein Ordner wurde nicht mitkopiert | Prüfen, ob `bookkeeping_pdfs` und `avatars` in `crm-private/data` liegen |
 | Speichern klappt nicht | Fehlende Schreibrechte | Rechte auf `755` (Ordner) und `644` (Dateien), Claude Bescheid sagen |
