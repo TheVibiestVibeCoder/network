@@ -4,8 +4,10 @@
  * Everything Claude writes through the MCP API is a proposal until a person
  * decides. This module is where that happens:
  *
- *   - the "From Claude" screen: one card per proposal, with Accept, Edit and
- *     Reject, and a history of what was decided and by whom;
+ *   - the "From Claude" screen: one row per proposal, grouped like the other
+ *     lists in the CRM, with accept and reject at the end of the row and the
+ *     details (before/after, Claude's note, edit) one click away; plus a
+ *     history of what was decided and by whom;
  *   - the small "Claude" marks and accept/reject buttons that app.js and
  *     bookkeeping.js put on proposed records where they are listed;
  *   - the box in a contact's or project's detail view listing the open
@@ -64,6 +66,7 @@
         items: [],
         loading: false,
         busy: new Set(),
+        open: new Set(),
         editing: new Set(),
         errors: {},
         pollTimer: null
@@ -178,49 +181,118 @@
         return norm(a) === norm(b);
     }
 
+    function joinParts(parts) {
+        return parts.filter(v => !isEmpty(v)).join(' · ');
+    }
+
+    function excerpt(text, length = 140) {
+        const flat = String(text || '').replace(/\s+/g, ' ').trim();
+        return flat.length > length ? flat.slice(0, length - 1) + '…' : flat;
+    }
+
+    function budgetText(r) {
+        return [r.budget_min, r.budget_max].filter(v => !isEmpty(v)).map(v => Number(v).toLocaleString('de-AT') + ' €').join(' – ');
+    }
+
     // ------------------------------------------------------------------
     // Describing a proposal
     // ------------------------------------------------------------------
 
-    function kindTitle(item) {
-        const noun = TYPE_LABEL[item.entity_type] || 'record';
+    /** The record as it is now, or - once it is gone - what Claude proposed. */
+    function source(item) {
+        return item.record || item.payload || {};
+    }
+
+    function kindLabel(item) {
         switch (item.kind) {
-            case 'create': return 'New ' + noun;
-            case 'update': return 'Change to ' + noun;
-            case 'delete': return 'Delete ' + noun;
-            case 'link': return 'Add contact to project';
-            case 'unlink': return 'Remove contact from project';
+            case 'create': return 'New ' + (TYPE_LABEL[item.entity_type] || 'record');
+            case 'update': return 'Change';
+            case 'delete': return 'Delete';
+            case 'link': return 'Add to project';
+            case 'unlink': return 'Remove from project';
             case 'tag': return 'Add tag';
             case 'untag': return 'Remove tag';
-            case 'assign': return 'Assign ' + noun;
+            case 'assign': return 'Assign';
             default: return 'Proposal';
         }
     }
 
-    function kindTone(item) {
+    /** Which colour the row's mark takes: what kind of decision, or how it ended. */
+    function tone(item) {
+        if (item.status === 'accepted') return 'accepted';
+        if (item.status === 'rejected') return 'rejected';
+        if (item.status !== 'pending') return 'neutral';
         if (item.kind === 'create') return 'new';
         if (item.kind === 'delete' || item.kind === 'unlink' || item.kind === 'untag') return 'remove';
         return 'change';
     }
 
-    function recordTitle(item) {
+    function titleFor(item) {
         const r = item.record || {};
-        if (item.kind === 'create') {
-            if (item.entity_type === 'contact' || item.entity_type === 'project') return r.name || item.entity_label;
-            if (item.entity_type === 'todo') return r.title || item.entity_label;
-            if (item.entity_type === 'bookkeeping_pdf') return r.original_name || item.entity_label;
+        const label = String(item.entity_label || '');
+        switch (item.entity_type) {
+            case 'contact':
+            case 'project':
+                return r.name || label;
+            case 'todo':
+                return r.title || label;
+            case 'contact_note':
+                return r.contact_name || label.split(':')[0];
+            case 'project_note':
+                return r.project_name || label.split(':')[0];
+            case 'bookkeeping_pdf':
+                return r.original_name || label;
+            default:
+                return label;
         }
-        return item.entity_label || '';
     }
 
-    function recordSubtitle(item) {
+    /** One line that says what the proposal is, readable without opening it. */
+    function summaryFor(item) {
+        const s = source(item);
+        const p = item.payload || {};
         const r = item.record || {};
-        if (item.kind !== 'create') return '';
-        if (item.entity_type === 'contact' || item.entity_type === 'project') return r.company || '';
-        if (item.entity_type === 'todo') return r.contact_name ? 'For ' + r.contact_name : (r.project_name ? 'For project ' + r.project_name : '');
-        if (item.entity_type === 'contact_note') return r.contact_name ? 'On ' + r.contact_name : '';
-        if (item.entity_type === 'project_note') return r.project_name ? 'On project ' + r.project_name : '';
-        return '';
+
+        switch (item.kind) {
+            case 'create':
+                switch (item.entity_type) {
+                    case 'contact': return joinParts([s.company, s.email, s.phone, s.location]);
+                    case 'project': return joinParts([s.company, s.stage, budgetText(s)]);
+                    case 'todo': return joinParts([
+                        r.contact_name ? 'For ' + r.contact_name : (r.project_name ? 'Project ' + r.project_name : ''),
+                        s.due_date ? 'Due ' + s.due_date : '',
+                        s.priority ? displayValue('priority', s.priority) + ' priority' : ''
+                    ]);
+                    case 'contact_note':
+                    case 'project_note': return excerpt(s.content);
+                    case 'bookkeeping_pdf': return joinParts([formatBytes(r.file_size || p.size), 'Bookkeeping drop zone']);
+                    default: return '';
+                }
+            case 'update':
+                return Object.keys(p).map(field => (FIELD_LABEL[field] || field) + ' → ' + displayValue(field, p[field])).join(' · ');
+            case 'delete':
+                return 'Claude suggests deleting this ' + (TYPE_LABEL[item.entity_type] || 'record');
+            case 'link':
+            case 'unlink': {
+                const contact = (item.related || {}).contact;
+                return (item.kind === 'link' ? '+ ' : '− ') + (contact ? contact.name : 'a contact that no longer exists');
+            }
+            case 'tag':
+                return '+ ' + (p.tag_name || '');
+            case 'untag':
+                return '− ' + (p.tag_name || '');
+            case 'assign':
+                return ((item.previous || {}).assigned_to_name || 'Nobody') + ' → ' + (p.assigned_to_name || 'nobody');
+            default:
+                return '';
+        }
+    }
+
+    /** Whether somebody changed the record after Claude proposed a change to it. */
+    function isStale(item) {
+        if (item.kind !== 'update' || !item.record) return false;
+        const previous = item.previous || {};
+        return Object.keys(item.payload || {}).some(field => !sameValue(previous[field], item.record[field]));
     }
 
     function factsList(pairs) {
@@ -236,38 +308,40 @@
         return `<a class="review-link" href="api/bookkeeping.php?action=download-pdf&id=${encodeURIComponent(pdfId)}" target="_blank" rel="noopener">${escapeHtml(label || 'View PDF')}</a>`;
     }
 
-    function bodyFor(item) {
-        const r = item.record || {};
+    /** The details behind the row: every field, the before/after, the warnings. */
+    function detailFor(item) {
+        const s = source(item);
         const p = item.payload || {};
+        const r = item.record || {};
 
         switch (item.kind) {
             case 'create':
                 if (item.entity_type === 'contact') {
                     return factsList([
-                        ['Email', r.email], ['Phone', r.phone], ['Location', r.location],
-                        ['Website', r.website], ['Address', r.address, true], ['Note', r.note, true]
+                        ['Company', s.company], ['Email', s.email], ['Phone', s.phone], ['Location', s.location],
+                        ['Website', s.website], ['Address', s.address, true], ['Note', s.note, true]
                     ]);
                 }
                 if (item.entity_type === 'project') {
-                    const budget = [r.budget_min, r.budget_max].filter(v => !isEmpty(v)).map(v => Number(v).toLocaleString('de-AT') + ' €').join(' – ');
                     return factsList([
-                        ['Stage', r.stage], ['Start', r.start_date], ['Planned finish', r.estimated_completion],
-                        ['Budget', budget], ['Chance', isEmpty(r.success_chance) ? '' : r.success_chance + ' %'],
-                        ['Description', r.description, true]
+                        ['Company', s.company], ['Stage', s.stage], ['Start', s.start_date], ['Planned finish', s.estimated_completion],
+                        ['Budget', budgetText(s)], ['Chance', isEmpty(s.success_chance) ? '' : s.success_chance + ' %'],
+                        ['Description', s.description, true]
                     ]);
                 }
                 if (item.entity_type === 'todo') {
                     return factsList([
-                        ['Due', r.due_date], ['Priority', displayValue('priority', r.priority) === '—' ? '' : displayValue('priority', r.priority)],
-                        ['Description', r.description, true]
+                        ['Due', s.due_date], ['Priority', isEmpty(s.priority) ? '' : displayValue('priority', s.priority)],
+                        ['Description', s.description, true]
                     ]);
                 }
                 if (item.entity_type === 'contact_note' || item.entity_type === 'project_note') {
-                    return `<p class="review-quote-text">${escapeHtml(r.content || p.content || '')}</p>`;
+                    return `<p class="review-quote-text">${escapeHtml(s.content || '')}</p>`;
                 }
                 if (item.entity_type === 'bookkeeping_pdf') {
-                    return `<p class="review-line">${formatBytes(r.file_size)} · in the bookkeeping drop zone · ${pdfLink(item.entity_id)}</p>
-                        <p class="review-line review-muted">Accept keeps it there; filing it on its bank entry accepts it too.</p>`;
+                    return item.record
+                        ? `<p class="review-line">${pdfLink(item.entity_id)} <span class="review-muted">· Filing it on its bank entry accepts it too.</span></p>`
+                        : '';
                 }
                 return '';
 
@@ -280,7 +354,7 @@
                     return `
                         <tr>
                             <th scope="row">${escapeHtml(FIELD_LABEL[field] || field)}</th>
-                            <td class="review-old">${escapeHtml(displayValue(field, was))}${stale ? `<span class="review-stale" title="Changed by someone since Claude proposed this">now: ${escapeHtml(displayValue(field, now))}</span>` : ''}</td>
+                            <td class="review-old">${escapeHtml(displayValue(field, was))}${stale ? `<span class="review-stale">changed since, now: ${escapeHtml(displayValue(field, now))}</span>` : ''}</td>
                             <td class="review-arrow" aria-hidden="true">→</td>
                             <td class="review-new">${escapeHtml(displayValue(field, p[field]))}</td>
                         </tr>`;
@@ -291,28 +365,29 @@
             case 'delete': {
                 const snapshot = item.previous || {};
                 const facts = factsList(Object.keys(snapshot).map(field => [FIELD_LABEL[field] || field, displayValue(field, snapshot[field]), LONG_FIELDS.includes(field)]));
-                const goesWith = item.entity_type === 'contact' ? 'Its notes, to-dos, tags and project links go with it.'
-                    : item.entity_type === 'project' ? 'Its notes, to-dos and tags go with it.' : '';
-                return `${facts}<p class="review-warning">Accepting deletes it for good.${goesWith ? ' ' + goesWith : ''}</p>`;
+                const goesWith = item.entity_type === 'contact' ? ' Its notes, to-dos, tags and project links go with it.'
+                    : item.entity_type === 'project' ? ' Its notes, to-dos and tags go with it.' : '';
+                return `${facts}${item.status === 'pending' ? `<p class="review-warning">Accepting deletes it for good.${goesWith}</p>` : ''}`;
             }
 
             case 'link':
             case 'unlink': {
                 const contact = (item.related || {}).contact;
-                const project = r.name || item.entity_label;
-                const who = contact ? contact.name + (contact.company ? ' (' + contact.company + ')' : '') : 'a contact that no longer exists';
-                return `<p class="review-line">${escapeHtml(who)} <span class="review-arrow">${item.kind === 'link' ? '→' : '↛'}</span> ${escapeHtml(project || '')}</p>`;
+                return factsList([
+                    ['Contact', contact ? joinParts([contact.name, contact.company]) : ''],
+                    ['Project', r.name || item.entity_label]
+                ]);
             }
 
             case 'tag':
             case 'untag':
-                return `<p class="review-line"><span class="review-tag">${escapeHtml(p.tag_name || '')}</span> ${item.kind === 'tag' ? 'on' : 'off'} ${escapeHtml(r.name || '')}</p>`;
+                return factsList([['Tag', p.tag_name], [TYPE_LABEL[item.entity_type] === 'project' ? 'Project' : 'Contact', r.name]]);
 
-            case 'assign': {
-                const before = (item.previous || {}).assigned_to_name || 'nobody';
-                const after = p.assigned_to_name || 'nobody';
-                return `<p class="review-line">${escapeHtml(before)} <span class="review-arrow">→</span> <strong>${escapeHtml(after)}</strong></p>`;
-            }
+            case 'assign':
+                return factsList([
+                    ['Before', (item.previous || {}).assigned_to_name || 'Nobody'],
+                    ['After', p.assigned_to_name || 'Nobody']
+                ]);
 
             default:
                 return '';
@@ -320,16 +395,24 @@
     }
 
     function canEdit(item) {
-        return (item.kind === 'create' && EDITABLE[item.entity_type]) || item.kind === 'update';
+        return item.status === 'pending' && ((item.kind === 'create' && EDITABLE[item.entity_type]) || item.kind === 'update');
     }
 
     function canOpen(item) {
-        return !!item.record && ['contact', 'project', 'todo', 'contact_note', 'project_note', 'bookkeeping_pdf'].includes(item.entity_type);
+        return !!item.record && item.status !== 'obsolete'
+            && ['contact', 'project', 'todo', 'contact_note', 'project_note', 'bookkeeping_pdf'].includes(item.entity_type);
     }
 
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
+
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+    const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
+    const ICON_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/></svg>';
+    const ICON_CHEVRON = '<svg class="review-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+    const ICON_WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 
     function fieldInput(field, value) {
         const id = 'rv-' + field + '-' + Math.random().toString(36).slice(2, 8);
@@ -355,82 +438,96 @@
 
     function editForm(item) {
         const fields = item.kind === 'create' ? EDITABLE[item.entity_type] : Object.keys(item.payload || {});
-        const source = item.kind === 'create' ? (item.record || {}) : (item.payload || {});
+        const values = item.kind === 'create' ? (item.record || {}) : (item.payload || {});
         const primary = item.kind === 'create' ? 'Save & accept' : 'Apply & accept';
 
         return `
             <form class="review-edit" data-review-form>
-                <div class="review-edit-grid">${fields.map(f => fieldInput(f, source[f])).join('')}</div>
-                <div class="review-card-actions">
-                    <button type="submit" class="btn btn-primary btn-small" data-review-act="save-accept">${primary}</button>
+                <div class="review-edit-grid">${fields.map(f => fieldInput(f, values[f])).join('')}</div>
+                <div class="review-detail-actions">
+                    <button type="submit" class="btn btn-primary btn-small">${primary}</button>
                     ${item.kind === 'create' ? '<button type="button" class="btn btn-secondary btn-small" data-review-act="save" title="Keep your edits, decide later">Save only</button>' : ''}
                     <button type="button" class="btn btn-secondary btn-small" data-review-act="cancel">Cancel</button>
                 </div>
             </form>`;
     }
 
-    const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-    const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-    const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
-    const ICON_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/></svg>';
-
-    function statusLine(item) {
+    function statusPill(item) {
         const who = item.resolved_by_name || 'someone';
-        const when = fullDate(item.resolved_at);
         switch (item.status) {
-            case 'accepted': return `<span class="review-status review-status--accepted">Accepted by ${escapeHtml(who)}</span><span class="review-when">${escapeHtml(when)}</span>`;
-            case 'rejected': return `<span class="review-status review-status--rejected">Rejected by ${escapeHtml(who)}</span><span class="review-when">${escapeHtml(when)}</span>`;
-            case 'withdrawn': return `<span class="review-status">Withdrawn by Claude</span><span class="review-when">${escapeHtml(when)}</span>`;
-            case 'obsolete': return `<span class="review-status">No longer relevant - the record was removed</span><span class="review-when">${escapeHtml(when)}</span>`;
+            case 'accepted': return `<span class="review-pill review-pill--accepted">Accepted · ${escapeHtml(who)}</span>`;
+            case 'rejected': return `<span class="review-pill review-pill--rejected">Rejected · ${escapeHtml(who)}</span>`;
+            case 'withdrawn': return '<span class="review-pill">Withdrawn by Claude</span>';
+            case 'obsolete': return '<span class="review-pill" title="The record was removed in the meantime">No longer relevant</span>';
             default: return '';
         }
     }
 
-    function renderCard(item, options = {}) {
-        const compact = options.compact === true;
+    function renderRow(item) {
         const pending = item.status === 'pending';
         const busy = state.busy.has(item.id);
-        const editing = pending && !compact && state.editing.has(item.id);
-        const title = recordTitle(item);
-        const sub = recordSubtitle(item);
+        const editing = pending && state.editing.has(item.id);
+        const open = editing || state.open.has(item.id);
         const error = state.errors[item.id];
+        const stale = isStale(item);
+        const summary = summaryFor(item);
+        const when = pending ? item.created_at : (item.resolved_at || item.created_at);
 
-        const actions = pending ? `
-            <div class="review-card-actions">
-                <button type="button" class="btn btn-primary btn-small" data-review-act="accept"${busy ? ' disabled' : ''}>${ICON_CHECK}<span>Accept</span></button>
-                ${!compact && canEdit(item) ? `<button type="button" class="btn btn-secondary btn-small" data-review-act="edit"${busy ? ' disabled' : ''}>${ICON_EDIT}<span>Edit</span></button>` : ''}
-                <button type="button" class="btn btn-secondary btn-small review-btn-reject" data-review-act="reject"${busy ? ' disabled' : ''}>${ICON_X}<span>Reject</span></button>
-            </div>` : `<div class="review-card-status">${statusLine(item)}</div>`;
+        const end = pending ? `
+            <div class="review-row-actions">
+                <button type="button" class="review-act review-act--accept" data-review-act="accept" title="Accept" aria-label="Accept"${busy ? ' disabled' : ''}>${ICON_CHECK}</button>
+                <button type="button" class="review-act review-act--reject" data-review-act="reject" title="Reject" aria-label="Reject"${busy ? ' disabled' : ''}>${ICON_X}</button>
+            </div>` : `<div class="review-row-status">${statusPill(item)}</div>`;
 
-        const openLink = !compact && canOpen(item) && item.status !== 'obsolete'
-            ? '<button type="button" class="review-open" data-review-act="open">Open</button>'
-            : '';
+        let detail = '';
+        if (open) {
+            const tools = [
+                canEdit(item) && !editing ? `<button type="button" class="btn btn-secondary btn-small" data-review-act="edit">${ICON_EDIT}<span>Edit</span></button>` : '',
+                canOpen(item) ? '<button type="button" class="btn btn-secondary btn-small" data-review-act="open">Open</button>' : ''
+            ].filter(Boolean).join('');
+
+            detail = `
+                <div class="review-row-detail">
+                    ${editing ? editForm(item) : detailFor(item)}
+                    ${item.comment ? `<p class="review-reason"><span class="review-reason-label">${ICON_SPARK} Claude's note</span>${escapeHtml(item.comment)}</p>` : ''}
+                    ${!pending ? `<p class="review-line review-muted">Proposed ${escapeHtml(fullDate(item.created_at))}${item.resolved_at ? ' · decided ' + escapeHtml(fullDate(item.resolved_at)) : ''}</p>` : ''}
+                    ${tools && !editing ? `<div class="review-detail-actions">${tools}</div>` : ''}
+                </div>`;
+        }
 
         return `
-            <article class="review-card review-card--${kindTone(item)}${compact ? ' review-card--compact' : ''}${busy ? ' is-busy' : ''}" data-review-id="${item.id}">
-                <header class="review-card-head">
-                    <span class="review-kind review-kind--${kindTone(item)}">${escapeHtml(kindTitle(item))}</span>
-                    <span class="review-head-end">
-                        ${openLink}
-                        <span class="review-when" title="${escapeHtml(fullDate(item.created_at))}">${escapeHtml(timeAgo(item.created_at))}</span>
-                    </span>
-                </header>
-                ${title && !compact ? `<h3 class="review-card-title">${escapeHtml(title)}</h3>` : ''}
-                ${sub && !compact ? `<p class="review-card-sub">${escapeHtml(sub)}</p>` : ''}
-                ${editing ? editForm(item) : `<div class="review-card-body">${bodyFor(item)}</div>`}
-                ${item.comment ? `<p class="review-reason"><span class="review-reason-label">${ICON_SPARK} Claude's note</span>${escapeHtml(item.comment)}</p>` : ''}
+            <article class="review-row review-row--${tone(item)}${open ? ' is-open' : ''}${busy ? ' is-busy' : ''}" data-review-id="${item.id}">
+                <div class="review-row-head">
+                    <button type="button" class="review-row-toggle" data-review-act="toggle" aria-expanded="${open ? 'true' : 'false'}">
+                        <span class="review-row-mark" aria-hidden="true"></span>
+                        <span class="review-row-text">
+                            <span class="review-row-line">
+                                <span class="review-row-title">${escapeHtml(titleFor(item))}</span>
+                                <span class="review-row-kind">${escapeHtml(kindLabel(item))}</span>
+                            </span>
+                            <span class="review-row-summary">${stale ? `<span class="review-row-warn" title="Changed by someone since Claude proposed this">${ICON_WARN}</span>` : ''}${item.comment ? `<span class="review-row-note" title="${escapeHtml(item.comment)}">${ICON_SPARK}</span>` : ''}<span class="review-row-summary-text">${escapeHtml(summary)}</span></span>
+                        </span>
+                        <span class="review-row-when" title="${escapeHtml(fullDate(when))}">${escapeHtml(timeAgo(when))}</span>
+                        ${ICON_CHEVRON}
+                    </button>
+                    ${end}
+                </div>
                 ${error ? `<p class="review-error" role="alert">${escapeHtml(error)}</p>` : ''}
-                ${editing ? '' : actions}
+                ${detail}
             </article>`;
     }
 
+    function listCard(items) {
+        return `<div class="review-list-card">${items.map(renderRow).join('')}</div>`;
+    }
+
     const GROUPS = [
-        { key: 'new-contact', title: 'New contacts', match: i => i.kind === 'create' && i.entity_type === 'contact' },
-        { key: 'new-project', title: 'New projects', match: i => i.kind === 'create' && i.entity_type === 'project' },
-        { key: 'new-todo', title: 'New to-dos', match: i => i.kind === 'create' && i.entity_type === 'todo' },
-        { key: 'new-note', title: 'New notes', match: i => i.kind === 'create' && (i.entity_type === 'contact_note' || i.entity_type === 'project_note') },
-        { key: 'invoices', title: 'Invoices', match: i => i.entity_type === 'bookkeeping_pdf' },
-        { key: 'changes', title: 'Changes to existing records', match: () => true }
+        { title: 'New contacts', match: i => i.kind === 'create' && i.entity_type === 'contact' },
+        { title: 'New projects', match: i => i.kind === 'create' && i.entity_type === 'project' },
+        { title: 'New to-dos', match: i => i.kind === 'create' && i.entity_type === 'todo' },
+        { title: 'New notes', match: i => i.kind === 'create' && (i.entity_type === 'contact_note' || i.entity_type === 'project_note') },
+        { title: 'Invoices', match: i => i.entity_type === 'bookkeeping_pdf' },
+        { title: 'Changes to existing records', match: () => true }
     ];
 
     function render() {
@@ -457,23 +554,21 @@
         }
 
         if (state.tab === 'resolved') {
-            els.list.innerHTML = `<div class="review-group"><div class="review-cards">${state.items.map(i => renderCard(i)).join('')}</div></div>`;
+            els.list.innerHTML = `<section class="review-group">${listCard(state.items)}</section>`;
             return;
         }
 
         const used = new Set();
-        const html = GROUPS.map(group => {
+        els.list.innerHTML = GROUPS.map(group => {
             const items = state.items.filter(i => !used.has(i.id) && group.match(i));
             items.forEach(i => used.add(i.id));
             if (!items.length) return '';
             return `
                 <section class="review-group" aria-label="${escapeHtml(group.title)}">
                     <h2 class="review-group-title">${escapeHtml(group.title)} <span class="review-group-count">${items.length}</span></h2>
-                    <div class="review-cards">${items.map(i => renderCard(i)).join('')}</div>
+                    ${listCard(items)}
                 </section>`;
         }).join('');
-
-        els.list.innerHTML = html;
     }
 
     function updateTabs() {
@@ -484,12 +579,11 @@
         });
     }
 
-    function rerenderCard(id) {
+    function rerenderRow(id) {
         const item = findItem(id);
         if (!item) return;
-        document.querySelectorAll(`.review-card[data-review-id="${id}"]`).forEach(node => {
-            const compact = node.classList.contains('review-card--compact');
-            node.outerHTML = renderCard(item, { compact });
+        document.querySelectorAll(`.review-row[data-review-id="${id}"]`).forEach(node => {
+            node.outerHTML = renderRow(item);
         });
     }
 
@@ -506,6 +600,7 @@
             state.items = Array.isArray(result.data) ? result.data : [];
             state.errors = {};
             state.editing.clear();
+            state.open.clear();
         } catch (error) {
             state.items = [];
             if (els.list) els.list.innerHTML = `<div class="review-empty"><p class="review-error">${escapeHtml(error.message)}</p></div>`;
@@ -643,7 +738,7 @@
     }
 
     function confirmText(item, action) {
-        const name = recordTitle(item) || item.entity_label || '';
+        const name = titleFor(item) || item.entity_label || '';
         if (action === 'reject' && item.kind === 'create' && (item.entity_type === 'contact' || item.entity_type === 'project')) {
             return `Remove the proposed ${TYPE_LABEL[item.entity_type]} "${name}"? Anything added to it goes too.`;
         }
@@ -662,7 +757,7 @@
 
         state.busy.add(id);
         delete state.errors[id];
-        rerenderCard(id);
+        rerenderRow(id);
 
         try {
             if (action === 'reject') {
@@ -679,13 +774,14 @@
 
             state.busy.delete(id);
             state.editing.delete(id);
+            state.open.delete(id);
             removeItem(id);
             toast(action === 'reject' ? 'Rejected' : 'Accepted');
             notifyChanged({ id, action, entity_type: item.entity_type, entity_id: item.entity_id });
         } catch (error) {
             state.busy.delete(id);
             state.errors[id] = error.message;
-            rerenderCard(id);
+            rerenderRow(id);
         }
     }
 
@@ -705,28 +801,27 @@
         } catch (error) {
             state.busy.delete(id);
             state.errors[id] = error.message;
-            rerenderCard(id);
+            rerenderRow(id);
         }
     }
 
     function removeItem(id) {
         state.items = state.items.filter(i => i.id !== id);
         panelItems.delete(id);
-        document.querySelectorAll(`.review-card[data-review-id="${id}"]`).forEach(node => {
+        document.querySelectorAll(`.review-row[data-review-id="${id}"]`).forEach(node => {
             node.classList.add('is-leaving');
             setTimeout(() => {
                 const group = node.closest('.review-group');
+                const panel = node.closest('.review-record-slot');
                 node.remove();
-                if (group && !group.querySelector('.review-card')) group.remove();
+                if (group && !group.querySelector('.review-row')) group.remove();
+                if (panel && !panel.querySelector('.review-row')) panel.hidden = true;
                 if (els.list && state.tab === 'pending' && state.items.length === 0) render();
-                document.querySelectorAll('.review-record-slot').forEach(slot => {
-                    if (!slot.querySelector('.review-card')) slot.hidden = true;
-                });
             }, 180);
         });
         if (state.tab === 'pending' && els.list) {
             els.list.querySelectorAll('.review-group').forEach(group => {
-                const count = group.querySelectorAll('.review-card:not(.is-leaving)').length;
+                const count = group.querySelectorAll('.review-row:not(.is-leaving)').length;
                 const badge = group.querySelector('.review-group-count');
                 if (badge) badge.textContent = String(count);
             });
@@ -736,25 +831,19 @@
     function openRecord(item) {
         // app.js exposes its openers as window.CRM.
         const crm = window.CRM || {};
-        const app = {
-            openContact: crm.openOverview,
-            openProject: crm.openProjectOverview,
-            openBookkeepingRow: crm.openBookkeepingRow,
-            switchView: crm.switchView
-        };
         const r = item.record || {};
         switch (item.entity_type) {
-            case 'contact': return app.openContact && app.openContact(item.entity_id);
-            case 'project': return app.openProject && app.openProject(item.entity_id);
+            case 'contact': return crm.openOverview && crm.openOverview(item.entity_id);
+            case 'project': return crm.openProjectOverview && crm.openProjectOverview(item.entity_id);
             case 'todo':
-                if (r.contact_id && app.openContact) return app.openContact(r.contact_id);
-                if (r.project_id && app.openProject) return app.openProject(r.project_id);
+                if (r.contact_id && crm.openOverview) return crm.openOverview(r.contact_id);
+                if (r.project_id && crm.openProjectOverview) return crm.openProjectOverview(r.project_id);
                 return null;
-            case 'contact_note': return r.contact_id && app.openContact && app.openContact(r.contact_id);
-            case 'project_note': return r.project_id && app.openProject && app.openProject(r.project_id);
+            case 'contact_note': return r.contact_id && crm.openOverview && crm.openOverview(r.contact_id);
+            case 'project_note': return r.project_id && crm.openProjectOverview && crm.openProjectOverview(r.project_id);
             case 'bookkeeping_pdf':
-                if (r.row_id && app.openBookkeepingRow) return app.openBookkeepingRow(r.row_id);
-                return app.switchView && app.switchView('bookkeeping');
+                if (r.row_id && crm.openBookkeepingRow) return crm.openBookkeepingRow(r.row_id);
+                return crm.switchView && crm.switchView('bookkeeping');
             default: return null;
         }
     }
@@ -834,7 +923,7 @@
                     ${ICON_SPARK}
                     <span>${isNew ? `This ${TYPE_LABEL[entityType]} was proposed by Claude and is not accepted yet.` : `Claude proposes ${items.length === 1 ? 'a change' : items.length + ' changes'} here.`}</span>
                 </div>
-                ${items.map(i => renderCard(i, { compact: true })).join('')}
+                ${listCard(items)}
             </div>`;
         slot.hidden = false;
     }
@@ -851,13 +940,13 @@
             btn.addEventListener('click', () => load(btn.dataset.reviewTab));
         });
 
-        // One delegated handler for every card, wherever it is rendered.
+        // One delegated handler for every row, wherever it is rendered.
         document.addEventListener('click', event => {
             const actBtn = event.target.closest('[data-review-act]');
             if (actBtn) {
-                const card = actBtn.closest('.review-card');
-                if (!card) return;
-                const id = Number(card.dataset.reviewId);
+                const row = actBtn.closest('.review-row');
+                if (!row) return;
+                const id = Number(row.dataset.reviewId);
                 const act = actBtn.dataset.reviewAct;
                 const item = findItem(id);
                 if (!item) return;
@@ -865,17 +954,26 @@
                 if (act === 'accept' || act === 'reject') {
                     event.preventDefault();
                     decide(id, act);
+                } else if (act === 'toggle') {
+                    if (state.open.has(id) || state.editing.has(id)) {
+                        state.open.delete(id);
+                        state.editing.delete(id);
+                    } else {
+                        state.open.add(id);
+                    }
+                    rerenderRow(id);
                 } else if (act === 'edit') {
+                    state.open.add(id);
                     state.editing.add(id);
-                    rerenderCard(id);
-                    const first = document.querySelector(`.review-card[data-review-id="${id}"] [data-field]`);
+                    rerenderRow(id);
+                    const first = document.querySelector(`.review-row[data-review-id="${id}"] [data-field]`);
                     if (first) first.focus();
                 } else if (act === 'cancel') {
                     state.editing.delete(id);
-                    rerenderCard(id);
+                    rerenderRow(id);
                 } else if (act === 'save') {
                     event.preventDefault();
-                    saveOnly(id, readForm(card.querySelector('[data-review-form]')));
+                    saveOnly(id, readForm(row.querySelector('[data-review-form]')));
                 } else if (act === 'open') {
                     openRecord(item);
                 }
@@ -896,8 +994,8 @@
             const form = event.target.closest('[data-review-form]');
             if (!form) return;
             event.preventDefault();
-            const card = form.closest('.review-card');
-            decide(Number(card.dataset.reviewId), 'accept', readForm(form));
+            const row = form.closest('.review-row');
+            decide(Number(row.dataset.reviewId), 'accept', readForm(form));
         });
 
         refreshBadge();

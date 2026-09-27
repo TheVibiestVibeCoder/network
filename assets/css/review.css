@@ -5,11 +5,12 @@
    Built only from the tokens in design.css, so it follows the winter palette
    and the dark theme without any colour of its own.
 
-   One idea carries through: a proposal is visible but provisional. Proposed
-   records wear a small "Claude" mark and a dashed edge wherever they are
-   listed; the review screen shows each proposal as one card whose top edge
-   says what kind of decision it is - blue for something new, amber for a
-   change, red for a removal.
+   The proposals use the same pattern as every other list in the CRM: one
+   card per group, one row per proposal, hairlines between rows. A row shows
+   what the proposal is in two lines and ends in accept / reject; everything
+   else (before and after, Claude's note, editing) opens on click. A small
+   dot says what kind of decision it is - blue for something new, amber for a
+   change, red for a removal; in the history, green or red for how it ended.
    ========================================================================== */
 
 
@@ -22,15 +23,14 @@
 .review-list {
     display: flex;
     flex-direction: column;
-    gap: 28px;
-    max-width: 1080px;
+    gap: 24px;
 }
 
 .review-group-title {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     color: var(--c-ink);
     font: 600 var(--t-md)/1.3 var(--font);
     letter-spacing: -0.01em;
@@ -50,103 +50,275 @@
     font-weight: 600;
 }
 
-.review-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 14px;
-    align-items: start;
+/* One card per group, rows separated by hairlines - like Contacts and To-dos. */
+.review-list-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
 }
 
 
 /* ---- A proposal ---------------------------------------------------------- */
 
-.review-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-    padding: 16px 16px 14px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-top: 3px solid var(--c-accent);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e-1);
-    transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+.review-row {
+    transition: opacity var(--dur-2) var(--ease), background-color var(--dur-1) var(--ease);
 }
 
-.review-card:hover {
-    box-shadow: var(--e-2);
+.review-row + .review-row {
+    border-top: 1px solid var(--c-line-2);
 }
 
-.review-card--change { border-top-color: var(--c-warning); }
-.review-card--remove { border-top-color: var(--c-danger); }
-
-.review-card.is-busy {
-    opacity: 0.6;
+.review-row.is-busy {
+    opacity: 0.55;
     pointer-events: none;
 }
 
-.review-card.is-leaving {
+.review-row.is-leaving {
     opacity: 0;
-    transform: scale(0.98);
 }
 
-.review-card-head {
+.review-row.is-open {
+    background: var(--c-tint-3);
+}
+
+.review-row-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    gap: 6px;
+    padding-right: 14px;
 }
 
-.review-kind {
-    display: inline-flex;
+.review-row-head:hover {
+    background: var(--c-tint-3);
+}
+
+.review-row-toggle {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
     align-items: center;
-    height: 22px;
-    padding: 0 9px;
+    gap: 12px;
+    min-height: 62px;
+    padding: 10px 8px 10px 16px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.review-row-toggle:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+    border-radius: var(--r-md);
+}
+
+.review-row-mark {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
     border-radius: var(--r-full);
-    background: var(--c-accent-soft);
+    background: var(--c-accent);
+}
+
+.review-row--change .review-row-mark { background: var(--c-warning); }
+.review-row--remove .review-row-mark,
+.review-row--rejected .review-row-mark { background: var(--c-danger); }
+.review-row--accepted .review-row-mark { background: var(--c-success); }
+.review-row--neutral .review-row-mark { background: var(--c-line-strong); }
+
+.review-row-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.review-row-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.review-row-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--c-ink);
-    font: 600 var(--t-xs)/1 var(--font);
+    font: 600 var(--t-base)/1.35 var(--font);
+}
+
+.review-row-kind {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
     white-space: nowrap;
 }
 
-.review-kind--change { background: var(--c-warning-soft); color: var(--c-warning); }
-.review-kind--remove { background: var(--c-danger-soft); color: var(--c-danger); }
+.review-row-summary {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+    line-height: 1.4;
+}
 
-.review-when {
+.review-row-summary-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-row-note,
+.review-row-warn {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.review-row-note svg {
+    width: 12px;
+    height: 12px;
+    color: var(--c-accent);
+}
+
+.review-row-warn svg {
+    width: 14px;
+    height: 14px;
+    color: var(--c-warning);
+}
+
+.review-row-when {
+    flex-shrink: 0;
     color: var(--c-ink-3);
     font-size: var(--t-xs);
     white-space: nowrap;
 }
 
-.review-card-title {
-    margin: 0;
-    color: var(--c-ink);
-    font: 600 var(--t-lg)/1.3 var(--font);
-    letter-spacing: -0.015em;
-    overflow-wrap: anywhere;
+.review-row-chevron {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--c-ink-4);
+    transition: transform var(--dur-2) var(--ease);
 }
 
-.review-card-sub {
-    margin: -6px 0 0;
-    color: var(--c-ink-3);
-    font-size: var(--t-sm);
+.review-row.is-open .review-row-chevron {
+    transform: rotate(90deg);
 }
 
-.review-card-body {
-    min-width: 0;
+/* Accept and reject: the only two things most proposals need. */
+.review-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
-.review-card-body:empty {
-    display: none;
+.review-act {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 
-/* Facts: the quiet two-column grid the detail views use. */
+.review-act svg {
+    width: 16px;
+    height: 16px;
+}
+
+.review-act--accept {
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+    color: var(--c-on-primary);
+}
+
+.review-act--accept:hover:not(:disabled) {
+    background: var(--c-primary-2);
+    border-color: var(--c-primary-2);
+}
+
+.review-act--reject:hover:not(:disabled) {
+    border-color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.review-act:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* History: how it ended, instead of the buttons. */
+.review-row-status {
+    flex-shrink: 0;
+}
+
+.review-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.review-pill--accepted { background: var(--c-success-soft); color: var(--c-success); }
+.review-pill--rejected { background: var(--c-danger-soft); color: var(--c-danger); }
+
+
+/* ---- Opened: the details -------------------------------------------------- */
+
+.review-row-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 2px 16px 16px 36px;
+}
+
+.review-row > .review-error {
+    margin: 0 16px 12px 36px;
+}
+
+.review-detail-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.review-detail-actions .btn svg {
+    width: 15px;
+    height: 15px;
+}
+
 .review-facts {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 16px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px 20px;
     margin: 0;
 }
 
@@ -187,19 +359,11 @@
 
 .review-quote-text {
     margin: 0;
-    padding: 10px 12px;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
     color: var(--c-ink);
     font-size: var(--t-sm);
-    line-height: 1.5;
+    line-height: 1.55;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-}
-
-.review-arrow {
-    color: var(--c-ink-4);
-    padding: 0 4px;
 }
 
 .review-link {
@@ -212,21 +376,10 @@
     text-decoration: underline;
 }
 
-.review-tag {
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 9px;
-    border-radius: var(--r-full);
-    background: var(--c-tint-2);
-    color: var(--c-ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
-}
-
 /* Before and after, field by field. */
 .review-diff {
     width: 100%;
+    max-width: 720px;
     border-collapse: collapse;
     font-size: var(--t-sm);
 }
@@ -246,8 +399,8 @@
 }
 
 .review-diff th {
-    width: 28%;
-    padding-right: 10px;
+    width: 26%;
+    padding-right: 12px;
     color: var(--c-ink-3);
     font-size: var(--t-xs);
     font-weight: 500;
@@ -260,8 +413,9 @@
 }
 
 .review-diff .review-arrow {
-    width: 18px;
+    width: 24px;
     padding: 6px 4px;
+    color: var(--c-ink-4);
 }
 
 .review-diff .review-new {
@@ -278,7 +432,7 @@
 }
 
 .review-warning {
-    margin: 8px 0 0;
+    margin: 0;
     color: var(--c-danger);
     font-size: var(--t-sm);
 }
@@ -286,9 +440,10 @@
 /* Why Claude proposed it. */
 .review-reason {
     margin: 0;
-    padding: 9px 12px;
-    border-radius: var(--r-md);
-    background: var(--c-accent-softer);
+    padding: 8px 12px;
+    border-left: 2px solid var(--c-accent);
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    background: var(--c-surface);
     color: var(--c-ink-2);
     font-size: var(--t-sm);
     line-height: 1.45;
@@ -320,66 +475,6 @@
     font-size: var(--t-sm);
 }
 
-.review-card-actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 2px;
-}
-
-.review-card-actions .btn svg {
-    width: 15px;
-    height: 15px;
-}
-
-.review-btn-reject:hover:not(:disabled) {
-    border-color: var(--c-danger);
-    color: var(--c-danger);
-    background: var(--c-danger-soft);
-}
-
-.review-head-end {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-}
-
-.review-open {
-    padding: 2px 8px;
-    border: 0;
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: var(--c-accent);
-    font: 500 var(--t-xs)/1.4 var(--font);
-    cursor: pointer;
-}
-
-.review-open:hover {
-    background: var(--c-accent-softer);
-    color: var(--c-accent-2);
-}
-
-.review-card-status {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding-top: 8px;
-    border-top: 1px solid var(--c-line-2);
-}
-
-.review-status {
-    color: var(--c-ink-2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-}
-
-.review-status--accepted { color: var(--c-success); }
-.review-status--rejected { color: var(--c-danger); }
-
 
 /* ---- Editing before accepting ------------------------------------------- */
 
@@ -387,6 +482,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    max-width: 720px;
 }
 
 .review-edit-grid {
@@ -416,6 +512,7 @@
 .review-field .form-select {
     width: 100%;
     min-width: 0;
+    background: var(--c-surface);
 }
 
 .review-field textarea.form-input {
@@ -548,10 +645,6 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 12px;
-    border: 1px dashed var(--c-accent);
-    border-radius: var(--r-lg);
-    background: var(--c-accent-softer);
 }
 
 .review-panel-head {
@@ -570,10 +663,14 @@
     flex-shrink: 0;
 }
 
-.review-card--compact {
-    padding: 12px;
-    gap: 8px;
+.review-panel .review-list-card {
+    border-style: dashed;
+    border-color: var(--c-accent);
     box-shadow: none;
+}
+
+.review-panel .review-row-when {
+    display: none;
 }
 
 
@@ -605,13 +702,35 @@
 /* ---- Phones --------------------------------------------------------------- */
 
 @media (max-width: 768px) {
-    .review-cards {
+    .review-row-when {
+        display: none;
+    }
+
+    .review-row-toggle {
+        gap: 10px;
+        padding-left: 14px;
+    }
+
+    .review-row-head {
+        padding-right: 10px;
+    }
+
+    .review-row-detail {
+        padding: 2px 14px 14px;
+    }
+
+    .review-row > .review-error {
+        margin: 0 14px 12px;
+    }
+
+    .review-edit-grid {
         grid-template-columns: 1fr;
     }
 
-    .review-facts,
-    .review-edit-grid {
-        grid-template-columns: 1fr;
+    .review-pill {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .review-toast {
@@ -620,7 +739,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .review-card,
+    .review-row,
+    .review-row-chevron,
     .review-toast {
         transition: none;
     }
