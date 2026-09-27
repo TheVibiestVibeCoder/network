@@ -101,8 +101,8 @@ Options -Indexes -MultiViews
 #  includes/ - PHP classes, included by the entry points only
 #  config/   - configuration loader
 #  vendor/   - third party code
-#  MCP/      - the MCP server's source, deployed on another machine; it has
-#              no business being served from here
+#  MCP/      - the MCP server's source lives in its own repository now; the
+#              rule stays in case a copy ever lands here again
 #  .git/     - full source history
 #  Each of these also ships its own .htaccess for servers where only per
 #  directory overrides are enabled.

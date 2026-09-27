@@ -91,8 +91,9 @@ A step-by-step walkthrough for cPanel is in `db_migration_to_do.md`.
 
 ## The MCP API: Claude as a colleague who proposes
 
-`api/mcp.php` lets Claude (through the MCP server in `MCP/`, which runs on a
-separate machine) read the CRM and propose changes. It is built so that the
+`api/mcp.php` lets Claude (through the MCP server in the separate private
+repository `crm-mcp`, running on its own machine) read the CRM and propose
+changes. It is built so that the
 worst a compromised MCP server or a manipulated Claude can do is *read* and
 *ask* - never change anything on its own.
 
