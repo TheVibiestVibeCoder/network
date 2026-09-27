@@ -268,12 +268,30 @@ class Auth
     }
 
     /**
+     * Whose name this request's writes carry, when it is not a signed-in person.
+     *
+     * Set only by api/mcp.php, and only after the request's signature has been
+     * verified: everything Claude writes is then attributed to Claude without
+     * touching the session at all (the API never starts one).
+     */
+    private static ?array $actorOverride = null;
+
+    public static function actAs(?int $id, string $name): void
+    {
+        self::$actorOverride = ['id' => $id, 'name' => $name];
+    }
+
+    /**
      * The actor to stamp onto whatever this request writes.
      *
      * @return array{id: ?int, name: string}
      */
     public static function actor(): array
     {
+        if (self::$actorOverride !== null) {
+            return self::$actorOverride;
+        }
+
         $user = self::currentUser();
 
         if ($user === null) {

@@ -420,6 +420,7 @@ function buildPasswordLink(string $token): string
     <!-- The design system. Loaded last: its tokens and components are the
          final word over the two stylesheets above. -->
     <link rel="stylesheet" href="assets/css/design.css">
+    <link rel="stylesheet" href="assets/css/review.css">
 </head>
 <body>
     <?php if (!$isAuthenticated): ?>
@@ -709,6 +710,13 @@ function buildPasswordLink(string $token): string
                         </svg>
                         <span class="nav-label">Bookkeeping</span>
                     </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="review" title="From Claude - waiting for review">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>
+                        </svg>
+                        <span class="nav-label">From Claude</span>
+                        <span class="toggle-badge nav-count nav-count--alert" id="reviewBadge" data-review-badge hidden>0</span>
+                    </button>
                 </nav>
 
                 <!-- The team, one click away from each person's workload -->
@@ -857,6 +865,22 @@ function buildPasswordLink(string $token): string
                 </div>
 
                 <!-- Bookkeeping View -->
+                <!-- From Claude: everything the MCP API proposed, waiting for a person.
+                     Filled in by review.js. -->
+                <div class="view-panel" id="reviewView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">From Claude</h1>
+                            <p class="view-sub" id="reviewSubtitle">Everything Claude adds or changes waits here until someone on the team accepts it.</p>
+                        </div>
+                        <div class="segmented" role="tablist" aria-label="Show proposals">
+                            <button type="button" class="segmented-btn active" data-review-tab="pending" role="tab" aria-selected="true">Waiting</button>
+                            <button type="button" class="segmented-btn" data-review-tab="resolved" role="tab" aria-selected="false">History</button>
+                        </div>
+                    </div>
+                    <div class="review-list" id="reviewList" aria-live="polite"></div>
+                </div>
+
                 <div class="view-panel" id="bookkeepingView">
                     <div class="view-head">
                         <div class="view-head-text">
@@ -1243,6 +1267,8 @@ function buildPasswordLink(string $token): string
                         <circle cx="5.5" cy="12" r="1.25"/><circle cx="12" cy="12" r="1.25"/><circle cx="18.5" cy="12" r="1.25"/>
                     </svg>
                     <span>More</span>
+                    <!-- "From Claude" lives in the drawer on phones; its count shows here -->
+                    <span class="toggle-badge tab-badge" data-review-badge hidden>0</span>
                 </button>
             </nav>
         </div>
@@ -1364,6 +1390,9 @@ function buildPasswordLink(string $token): string
                 <div class="modal-body overview-body">
                     <!-- Who is responsible for this contact -->
                     <div id="overviewAssignee"></div>
+
+                    <!-- Proposals from Claude about this contact (review.js) -->
+                    <div class="review-record-slot" id="overviewReview" hidden></div>
 
                     <!-- Contact Details Section -->
                     <div class="overview-section">
@@ -1756,6 +1785,9 @@ function buildPasswordLink(string $token): string
                 <div class="modal-body overview-body">
                     <!-- Who is responsible for this project -->
                     <div id="projectOverviewAssignee"></div>
+
+                    <!-- Proposals from Claude about this project (review.js) -->
+                    <div class="review-record-slot" id="projectOverviewReview" hidden></div>
 
                     <!-- Project Details Section -->
                     <div class="overview-section">
@@ -2152,6 +2184,7 @@ function buildPasswordLink(string $token): string
 
         <!-- Application JS -->
         <script src="assets/js/charts.js"></script>
+        <script src="assets/js/review.js"></script>
         <script src="assets/js/app.js"></script>
         <script src="assets/js/bookkeeping.js"></script>
         <script src="assets/js/profile.js"></script>

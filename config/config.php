@@ -255,3 +255,23 @@ define('CSRF_TOKEN_NAME', 'csrf_token');  // CSRF token parameter/header name
 // SQLite performance tuning
 define('SQLITE_BUSY_TIMEOUT_MS', max(1000, envInt('SQLITE_BUSY_TIMEOUT_MS', 5000)));
 define('SQLITE_CACHE_SIZE_KB', max(2048, envInt('SQLITE_CACHE_SIZE_KB', 20000)));
+
+// -----------------------------------------------------------------------------
+// MCP API (api/mcp.php)
+// -----------------------------------------------------------------------------
+// The door Claude's MCP server uses. Closed unless every one of these is set:
+// it answers 404 while disabled, while the secret is shorter than 64
+// characters, and to every address not on the allow-list. See SECURITY.md.
+define('MCP_API_ENABLED', envBool('MCP_API_ENABLED', false));
+// Shared HMAC key. Never sent over the wire - requests carry a signature made
+// with it, so a captured request cannot be altered or replayed.
+define('MCP_API_SECRET', trim((string) ($_ENV['MCP_API_SECRET'] ?? '')));
+// Comma-separated IPs and CIDR ranges, IPv4 and IPv6. Compared against
+// REMOTE_ADDR only - never a forwarded header, which the caller controls.
+define('MCP_API_ALLOWED_IPS', trim((string) ($_ENV['MCP_API_ALLOWED_IPS'] ?? '')));
+// With writes off, the API only reads. With them on, every write is still a
+// proposal a person has to accept in the CRM.
+define('MCP_API_ALLOW_WRITES', envBool('MCP_API_ALLOW_WRITES', true));
+define('MCP_API_RATE_LIMIT', max(10, envInt('MCP_API_RATE_LIMIT', 120)));      // signed requests per minute
+define('MCP_API_MAX_PENDING', max(10, envInt('MCP_API_MAX_PENDING', 200)));    // open proposals before new ones are refused
+define('MCP_ACTOR_NAME', trim((string) ($_ENV['MCP_ACTOR_NAME'] ?? '')) !== '' ? trim((string) $_ENV['MCP_ACTOR_NAME']) : 'Claude');

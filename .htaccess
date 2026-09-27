@@ -101,13 +101,15 @@ Options -Indexes -MultiViews
 #  includes/ - PHP classes, included by the entry points only
 #  config/   - configuration loader
 #  vendor/   - third party code
+#  MCP/      - the MCP server's source, deployed on another machine; it has
+#              no business being served from here
 #  .git/     - full source history
 #  Each of these also ships its own .htaccess for servers where only per
 #  directory overrides are enabled.
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(?:data|includes|config|vendor)(?:/|$) - [F,L]
+    RewriteRule ^(?:data|includes|config|vendor|MCP)(?:/|$) - [F,L]
 </IfModule>
 
 # -----------------------------------------------------------------------------

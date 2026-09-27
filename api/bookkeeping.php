@@ -267,6 +267,13 @@ function bkEnsureSchema(PDO $db): void
     }
     $db->exec("CREATE INDEX IF NOT EXISTS idx_bk_rows_assigned ON bookkeeping_rows(assigned_to)");
 
+    // An invoice Claude uploaded through the MCP API stays 'pending' until a
+    // person accepts it (see includes/ReviewQueue.php). NULL is an ordinary file.
+    $pdfColumns = array_column($db->query("PRAGMA table_info(bookkeeping_pdfs)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+    if (!in_array('review_status', $pdfColumns, true)) {
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN review_status VARCHAR(16)");
+    }
+
     if (!is_dir(BK_PDF_DIR)) {
         mkdir(BK_PDF_DIR, 0700, true);
     }
@@ -525,7 +532,8 @@ function bkGetTable(PDO $db): void
     $rows = $db->query("
         SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.excluded, r.import_batch,
                r.assigned_to, r.assigned_to_name,
-               p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size
+               p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size,
+               p.review_status AS pdf_review_status
         FROM bookkeeping_rows r
         LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
         ORDER BY (r.row_date IS NULL), r.row_date, r.id
@@ -545,12 +553,13 @@ function bkGetTable(PDO $db): void
                 'id' => (int) $row['pdf_id'],
                 'name' => $row['pdf_name'],
                 'size' => (int) $row['pdf_size'],
+                'review_status' => $row['pdf_review_status'],
             ] : null,
         ];
     }
 
     $pool = $db->query("
-        SELECT id, original_name AS name, file_size AS size, created_at
+        SELECT id, original_name AS name, file_size AS size, created_at, review_status
         FROM bookkeeping_pdfs
         WHERE row_id IS NULL
         ORDER BY created_at DESC, id DESC
@@ -873,7 +882,9 @@ function bkAssignPdf(PDO $db): void
         bkJson(['error' => 'This row already has a PDF assigned. Remove it first.'], 409);
     }
 
-    $stmt = $db->prepare("UPDATE bookkeeping_pdfs SET row_id = :row_id WHERE id = :id");
+    // Filing an invoice by hand is a person deciding it belongs here, so a
+    // PDF Claude uploaded stops being a proposal at the same moment.
+    $stmt = $db->prepare("UPDATE bookkeeping_pdfs SET row_id = :row_id, review_status = NULL WHERE id = :id");
     $stmt->execute(['row_id' => $rowId, 'id' => $pdfId]);
 
     $wasAssigned = bkClearAssignment($db, $rowId);

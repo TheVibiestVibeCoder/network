@@ -81,6 +81,7 @@
         workloadView: document.getElementById('workloadView'),
         mapView: document.getElementById('mapView'),
         bookkeepingView: document.getElementById('bookkeepingView'),
+        reviewView: document.getElementById('reviewView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -1275,15 +1276,16 @@
         // field was filled in, not what was in it. The row shows who and where;
         // the contact details themselves are one click away.
         const isPinned = contact.pinned == 1;
+        const isProposed = contact.review_status === 'pending';
 
         return `
-            <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}" data-id="${contact.id}">
+            <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}${isProposed ? ' is-proposed' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
                     <div class="contact-avatar">
                         ${escapeHtml(getInitials(contact.name))}
                     </div>
                     <div class="contact-card-content">
-                        <h3 class="contact-card-name">${escapeHtml(contact.name)}</h3>
+                        <h3 class="contact-card-name">${escapeHtml(contact.name)} ${reviewBadge(contact)}</h3>
                         <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
                     </div>
                 </div>
@@ -1309,7 +1311,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping'];
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'review'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1366,6 +1368,9 @@
         if (elements.bookkeepingView) {
             elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
         }
+        if (elements.reviewView) {
+            elements.reviewView.classList.toggle('active', view === 'review');
+        }
 
         // Refresh data for the active view
         if (view === 'workload') {
@@ -1385,6 +1390,10 @@
         } else if (view === 'bookkeeping') {
             if (window.Bookkeeping) {
                 window.Bookkeeping.load();
+            }
+        } else if (view === 'review') {
+            if (window.CRMReview) {
+                window.CRMReview.load();
             }
         } else {
             // Contacts always opens as the list; the map is one tap away.
@@ -1817,8 +1826,13 @@
             </div>
         ` : '';
 
+        // A to-do Claude proposed carries the mark on every copy; the decision
+        // is about the to-do itself, which a mirrored copy points to.
+        const isProposed = todo.review_status === 'pending';
+        const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
+
         return `
-            <div class="todo-item${isCompleted ? ' todo-completed' : ''}" data-todo-id="${todo.id}">
+            <div class="todo-item${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
                 <div class="todo-main">
                     <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
                         <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
@@ -1827,6 +1841,7 @@
                     <div class="todo-content">
                         <div class="todo-title-row">
                             <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
+                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : ''}
                             ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
@@ -2330,6 +2345,11 @@
             // Populate details
             renderOverviewDetails(contact);
 
+            // What Claude proposes about this contact, if anything
+            if (window.CRMReview) {
+                window.CRMReview.renderRecordPanel('contact', contactId, document.getElementById('overviewReview'));
+            }
+
             // Load and render tags
             await loadContactTags(contactId);
 
@@ -2497,12 +2517,15 @@
             const isCompanyNote = note.source === 'company';
             const contactName = note.contact_name || '';
 
+            const isProposed = note.review_status === 'pending';
+
             html += `
-                <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
+                <div class="note-item ${isCompanyNote ? 'note-company' : ''}${isProposed ? ' is-proposed' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
+                        ${isProposed ? reviewBadge(note) + reviewInline('contact_note', note.id) : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4488,12 +4511,14 @@
             facts.push(`<span class="project-fact project-fact--chance" style="--chance:${chance}" title="${chance}% likely">${chance}%</span>`);
         }
 
+        const isProposed = project.review_status === 'pending';
+
         return `
-            <article class="project-card" data-id="${project.id}" tabindex="0" role="button"
+            <article class="project-card${isProposed ? ' is-proposed' : ''}" data-id="${project.id}" tabindex="0" role="button"
                      aria-label="${escapeHtml(project.name)}">
                 <div class="project-card-head">
                     <div class="project-card-title-wrap">
-                        <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
+                        <h3 class="project-card-title">${escapeHtml(project.name)} ${reviewBadge(project)}</h3>
                         ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                     </div>
                     ${assigneeChip(project)}
@@ -4683,6 +4708,11 @@
             : 'N/A';
         elements.projectOverviewDescription.textContent = project.description || 'No description';
 
+        // What Claude proposes about this project, if anything
+        if (window.CRMReview) {
+            window.CRMReview.renderRecordPanel('project', project.id, document.getElementById('projectOverviewReview'));
+        }
+
         // Render tags
         renderProjectTags(tags);
 
@@ -4778,11 +4808,14 @@
             const date = new Date(note.created_at);
             const formattedDate = formatDate(date);
 
+            const isProposed = note.review_status === 'pending';
+
             html += `
-                <div class="note-item">
+                <div class="note-item${isProposed ? ' is-proposed' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
+                        ${isProposed ? reviewBadge(note) + reviewInline('project_note', note.id) : ''}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -5099,6 +5132,55 @@
                 document.querySelectorAll('[data-contact-count]').forEach(node => {
                     node.textContent = String(count);
                 });
+            }
+        });
+    }
+
+    /** The "Claude" mark on a proposed record (review.js). */
+    function reviewBadge(record) {
+        return window.CRMReview ? window.CRMReview.badge(record) : '';
+    }
+
+    /** Accept / reject buttons on a proposed note or to-do (review.js). */
+    function reviewInline(entityType, id) {
+        return window.CRMReview ? window.CRMReview.inlineActions(entityType, id) : '';
+    }
+
+    /**
+     * After somebody decides on a proposal, show the CRM as it now is: the
+     * current view, and any detail view that is open.
+     */
+    function bindReviewRefresh() {
+        document.addEventListener('crm:review-changed', event => {
+            const detail = event.detail || {};
+
+            if (state.currentView === 'todos') {
+                loadTodos();
+            } else if (state.currentView === 'workload') {
+                if (window.CRMWorkload) window.CRMWorkload.load();
+            } else if (state.currentView === 'bookkeeping') {
+                if (window.Bookkeeping) window.Bookkeeping.load();
+            } else if (state.currentView !== 'review') {
+                refreshData();
+            }
+            updateContactCount();
+
+            // A rejected proposal for the record on screen means that record
+            // is gone; everything else just needs a fresh look.
+            const gone = detail.action === 'reject';
+            if (elements.overviewModal.classList.contains('active') && state.viewingContactId) {
+                if (gone && detail.entity_type === 'contact' && Number(detail.entity_id) === Number(state.viewingContactId)) {
+                    closeOverviewModal();
+                } else {
+                    openOverviewModal(state.viewingContactId);
+                }
+            }
+            if (elements.projectOverviewModal.classList.contains('active') && state.viewingProjectId) {
+                if (gone && detail.entity_type === 'project' && Number(detail.entity_id) === Number(state.viewingProjectId)) {
+                    closeProjectOverview();
+                } else {
+                    openProjectOverview(state.viewingProjectId);
+                }
             }
         });
     }
@@ -6104,6 +6186,7 @@
 
         bindCspSafeDelegates();
         bindAssignmentControls();
+        bindReviewRefresh();
         bindShell();
         initEventListeners();
         initImportExportEvents();

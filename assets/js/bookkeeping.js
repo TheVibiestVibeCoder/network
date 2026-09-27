@@ -1019,13 +1019,17 @@
             return;
         }
 
+        // An invoice Claude uploaded is marked until somebody accepts it -
+        // here, or by simply dragging it onto its row.
+        const review = window.CRMReview;
         els.poolList.innerHTML = state.pool.map(pdf => `
-            <div class="bk-pool-item" draggable="true" data-pdf-id="${pdf.id}" title="Drag onto a table row to assign">
+            <div class="bk-pool-item${pdf.review_status === 'pending' ? ' is-proposed' : ''}" draggable="true" data-pdf-id="${pdf.id}" title="Drag onto a table row to assign">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="bk-pool-item-icon"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                 <div class="bk-pool-item-info">
                     <a class="bk-pool-item-name" href="#" data-action="preview-pdf" data-pdf-id="${pdf.id}" data-pdf-name="${escapeHtml(pdf.name)}">${escapeHtml(pdf.name)}</a>
-                    <span class="bk-pool-item-size">${formatSize(pdf.size)}</span>
+                    <span class="bk-pool-item-size">${formatSize(pdf.size)} ${review ? review.badge(pdf) : ''}</span>
                 </div>
+                ${pdf.review_status === 'pending' && review ? review.inlineActions('bookkeeping_pdf', pdf.id) : ''}
                 <button type="button" class="bk-icon-btn bk-icon-btn-danger" data-action="delete-pool-pdf" data-pdf-id="${pdf.id}" title="Delete PDF">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>

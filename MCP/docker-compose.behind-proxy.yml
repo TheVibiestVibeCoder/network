@@ -1,0 +1,17 @@
+# ONLY for the case that ports 80 and 443 on this machine are already used by
+# another web server (for example the one in front of Narrative Capture).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.behind-proxy.yml up -d --build
+#
+# The bundled Caddy is then not started, and the MCP server listens on
+# 127.0.0.1:8765 - reachable from this machine only. Your existing web server
+# forwards the MCP domain to it and must apply the same address rules as the
+# Caddyfile. See ANLEITUNG.md, "Fall B".
+
+services:
+  mcp:
+    ports:
+      - "127.0.0.1:8765:8000"
+
+  caddy:
+    profiles: ["not-used"]

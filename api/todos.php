@@ -487,6 +487,15 @@ function handlePut(PDO $db, ?int $id): void
             }
         }
 
+        // Rebuilt copies carry the root's review state, so a to-do Claude
+        // proposed stays marked everywhere it shows until somebody decides.
+        $syncReview = $db->prepare("
+            UPDATE todos
+            SET review_status = (SELECT review_status FROM todos WHERE id = :root_id)
+            WHERE parent_todo_id = :root_id2
+        ");
+        $syncReview->execute(['root_id' => $rootTodoId, 'root_id2' => $rootTodoId]);
+
         $db->commit();
     } catch (Exception $e) {
         $db->rollBack();

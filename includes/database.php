@@ -496,6 +496,57 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_is_completed ON todos(is_completed)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_due_date ON todos(due_date)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at)");
+
+        // ---------------------------------------------------------------
+        // Review queue for what Claude writes through the MCP API
+        // ---------------------------------------------------------------
+        // Nothing Claude sends becomes a settled record on its own. A record it
+        // creates lands in its normal table with review_status = 'pending', so
+        // it shows up where people already look - marked, and with an accept
+        // and a reject button. A change to a record that already exists is
+        // never written straight away: it waits in review_items until somebody
+        // accepts it. NULL means an ordinary, settled row.
+        foreach (['contacts', 'projects', 'todos', 'notes', 'project_notes'] as $table) {
+            self::addColumnIfMissing($db, $table, 'review_status', 'VARCHAR(16)');
+        }
+
+        // One row per proposal. entity_label is a snapshot so the list still
+        // reads correctly after the record itself has been deleted; payload and
+        // previous are JSON - what Claude proposes, and what was there when it
+        // proposed it, so a reviewer sees the change and not just the result.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS review_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind VARCHAR(16) NOT NULL,
+                entity_type VARCHAR(32) NOT NULL,
+                entity_id INTEGER NOT NULL,
+                entity_label VARCHAR(255),
+                payload TEXT NOT NULL DEFAULT '{}',
+                previous TEXT,
+                comment TEXT,
+                status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                source VARCHAR(64) NOT NULL DEFAULT 'Claude',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                resolved_at DATETIME,
+                resolved_by INTEGER,
+                resolved_by_name VARCHAR(255)
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_review_items_status ON review_items(status, created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_review_items_entity ON review_items(entity_type, entity_id, status)");
+
+        // Every signed API request carries a one-time nonce. Remembering them
+        // for the length of the timestamp window is what makes a captured
+        // request useless a second time; the same rows double as the rate
+        // limiter's request log.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS mcp_api_nonces (
+                nonce VARCHAR(64) PRIMARY KEY,
+                seen_at INTEGER NOT NULL,
+                action VARCHAR(64)
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_mcp_api_nonces_seen ON mcp_api_nonces(seen_at)");
     }
 
     /**
