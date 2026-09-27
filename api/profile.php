@@ -20,7 +20,7 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 
-const AVATAR_DIR = APP_ROOT . '/data/avatars';
+const AVATAR_DIR = DATA_DIR . '/avatars';
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;   // 5 MB before re-encoding
 const AVATAR_MAX_PIXELS = 40000000;         // Guard against decompression bombs
 const AVATAR_SIZE = 256;                    // Stored edge length, square

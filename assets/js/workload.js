@@ -102,7 +102,7 @@
         if (days <= 7) return { text: `In ${days} days`, overdue: false };
 
         return {
-            text: due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             overdue: false
         };
     }
@@ -116,7 +116,7 @@
         const date = new Date(value + 'T00:00:00');
         if (isNaN(date.getTime())) return String(value);
 
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     // ------------------------------------------------------------------
@@ -132,6 +132,7 @@
         const doneTodos = todos.filter(t => Number(t.is_completed) === 1);
 
         renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
+        renderStats(openTodos, projects);
 
         if (openTodos.length === 0 && doneTodos.length === 0
             && projects.length === 0 && contacts.length === 0 && bookkeeping.length === 0) {
@@ -173,6 +174,127 @@
         els.body.innerHTML = html;
     }
 
+    // Chart order and tone for stages and priorities - the same colours the
+    // lists below use for their dots.
+    const STAGE_TONES = [
+        ['In Progress', 'progress'],
+        ['Proposal', 'proposal'],
+        ['Negotiation', 'negotiation'],
+        ['Lead', 'lead'],
+        ['Complete', 'complete']
+    ];
+
+    const PRIORITY_TONES = [
+        ['high', 'High'],
+        ['medium', 'Medium'],
+        ['low', 'Low'],
+        ['none', 'No priority']
+    ];
+
+    /**
+     * The band across the top, as three small charts: what is due over the
+     * next seven days (and what is already late), how the open to-dos split
+     * by priority, and where this person's projects stand.
+     *
+     * Computed from the rows already loaded, so the band can never disagree
+     * with the list underneath it.
+     */
+    function renderStats(openTodos, projects) {
+        const stats = $('workloadStats');
+        const C = window.CRMCharts;
+        if (!stats || !C) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Today and the six days after it; anything earlier is late.
+        const days = new Array(7).fill(0);
+        let overdue = 0;
+        const priorities = { high: 0, medium: 0, low: 0, none: 0 };
+
+        openTodos.forEach(todo => {
+            const priority = (todo.priority || '').toLowerCase();
+            priorities[priority === 'high' || priority === 'medium' || priority === 'low' ? priority : 'none']++;
+
+            if (!todo.due_date) return;
+            const due = new Date(todo.due_date + 'T00:00:00');
+            if (isNaN(due.getTime())) return;
+
+            // Rounded, so a daylight-saving day still counts as one day.
+            const offset = Math.round((due - today) / 86400000);
+            if (offset < 0) overdue++;
+            else if (offset < 7) days[offset]++;
+        });
+
+        const dueThisWeek = days.reduce((sum, n) => sum + n, 0);
+
+        // 1 - Due this week, day by day from today. What is already late is
+        //     not a day of the week: it is the red flag beside the number.
+        const cols = [];
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(today);
+            date.setDate(date.getDate() + i);
+            const day = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            cols.push({
+                letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }),
+                value: days[i],
+                current: i === 0,
+                title: `${i === 0 ? 'Today, ' : ''}${day}: ${days[i]} due`
+            });
+        }
+        const week = C.columns(cols, 'To-dos due per day, from today: '
+            + cols.map(col => col.title).join(', '), { min: 2 });
+
+        const due = C.tile({
+            label: { long: 'Due this week', short: 'This week' },
+            value: String(dueThisWeek),
+            flag: overdue > 0 ? { long: `${overdue} overdue`, short: `${overdue} late` } : '',
+            key: week.axis,
+            chart: week.bars
+        });
+
+        // 2 - Open to-dos by priority
+        const byPriority = PRIORITY_TONES.filter(([key]) => priorities[key] > 0);
+        const open = C.tile({
+            label: { long: openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', short: 'Open' },
+            value: String(openTodos.length),
+            key: byPriority.length
+                ? C.legend(byPriority.map(([key, name]) => ({ tone: key, label: name, text: String(priorities[key]) })))
+                : C.note('Nothing open'),
+            chart: C.stack(
+                byPriority.map(([key, name]) => ({ tone: key, value: priorities[key], title: `${name}: ${priorities[key]}` })),
+                'Open to-dos by priority: ' + (byPriority.length
+                    ? byPriority.map(([key, name]) => `${name} ${priorities[key]}`).join(', ')
+                    : 'none')
+            )
+        });
+
+        // 3 - Projects by stage
+        const stageCounts = {};
+        projects.forEach(project => {
+            const stage = STAGE_TONES.some(([name]) => name === project.stage) ? project.stage : 'Lead';
+            stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+        });
+        const byStage = STAGE_TONES.filter(([name]) => stageCounts[name] > 0);
+
+        const work = C.tile({
+            label: projects.length === 1 ? 'Project' : 'Projects',
+            value: String(projects.length),
+            key: byStage.length
+                ? C.legend(byStage.map(([name, tone]) => ({ tone, label: name, text: String(stageCounts[name]) })))
+                : C.note('None assigned'),
+            chart: C.stack(
+                byStage.map(([name, tone]) => ({ tone, value: stageCounts[name], title: `${name}: ${stageCounts[name]}` })),
+                'Projects by stage: ' + (byStage.length
+                    ? byStage.map(([name]) => `${name} ${stageCounts[name]}`).join(', ')
+                    : 'none')
+            )
+        });
+
+        stats.innerHTML = `<div class="kpi-grid">${due}${open}${work}</div>`;
+        stats.hidden = false;
+    }
+
     function renderHead(openCount, projectCount, contactCount, bookkeepingCount) {
         const person = state.person || {};
         const isMe = state.who === 'me';
@@ -211,7 +333,12 @@
         if (projectCount) bits.push(projectCount + (projectCount === 1 ? ' project' : ' projects'));
         if (contactCount) bits.push(contactCount + (contactCount === 1 ? ' contact' : ' contacts'));
 
-        els.summary.textContent = bits.length ? bits.join(' · ') : 'Nothing assigned yet';
+        // The tiles below carry the counts now, so the line under the name
+        // orients instead: which day it is, or whose plate you are looking at.
+        const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+        els.summary.textContent = person.unassigned
+            ? 'Work nobody has picked up yet'
+            : (isMe ? today : (bits.length ? bits.join(' · ') : 'Nothing assigned yet'));
     }
 
     function section(title, count, rows, emptyText) {
@@ -540,18 +667,98 @@
      * assigned to you, which is the one count worth interrupting someone for.
      */
     async function refreshBadge() {
-        if (!els.badge) return;
+        // The count appears on the sidebar entry and on the phone tab bar.
+        const badges = document.querySelectorAll('[data-workload-badge]');
+        if (!badges.length) return;
+
+        const paint = (text, hidden) => badges.forEach(badge => {
+            badge.textContent = text;
+            badge.hidden = hidden;
+        });
 
         try {
             const result = await api('?action=workload&user=me');
             const counts = result.counts || {};
             const open = (counts.todos_open || 0) + (counts.bookkeeping || 0);
 
-            els.badge.textContent = open > 99 ? '99+' : String(open);
-            els.badge.hidden = open === 0;
+            paint(open > 99 ? '99+' : String(open), open === 0);
         } catch (e) {
-            els.badge.hidden = true;
+            paint('0', true);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The team, in the sidebar
+    // ------------------------------------------------------------------
+
+    /**
+     * List everyone in the sidebar, each one click from their workload.
+     *
+     * The same people the "Showing" switch offers, surfaced where they are
+     * always visible - so "what is Anna working on?" is one click, not a
+     * dropdown hunt. Hidden entirely until there is somebody besides you.
+     */
+    function renderTeam() {
+        const wrap = $('sidebarTeamWrap');
+        const list = $('sidebarTeam');
+        if (!wrap || !list || !window.CRMPeople) return;
+
+        const people = window.CRMPeople.list();
+        const meKey = window.CRMPeople.meKey();
+        const others = people.filter(person => {
+            const key = person.id === null ? 'owner' : String(person.id);
+            return key !== meKey;
+        });
+
+        if (!others.length) {
+            wrap.hidden = true;
+            return;
+        }
+
+        list.innerHTML = others.map(person => {
+            const key = person.id === null ? 'owner' : String(person.id);
+            const face = person.avatar_url
+                ? `<span class="team-face has-photo"><img src="${escapeHtml(person.avatar_url)}" alt=""></span>`
+                : `<span class="team-face">${escapeHtml(getInitials(person.name))}</span>`;
+
+            return `
+                <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="Open ${escapeHtml(person.name)}'s work">
+                    ${face}
+                    <span class="team-name">${escapeHtml(person.name)}</span>
+                    ${countBadge(key)}
+                </button>
+            `;
+        }).join('');
+
+        wrap.hidden = false;
+    }
+
+    /**
+     * A small count of open items for one person, or nothing.
+     */
+    function countBadge(key) {
+        const bucket = state.counts[key === 'owner' ? '0' : key];
+        if (!bucket) return '';
+
+        const total = (bucket.todos || 0) + (bucket.projects || 0)
+            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
+
+        return total ? `<span class="team-count">${total}</span>` : '';
+    }
+
+    async function refreshTeam() {
+        await loadCounts();
+        renderTeam();
+    }
+
+    /**
+     * Open one teammate's workload from the sidebar.
+     */
+    function openPerson(key) {
+        if (window.CRM && window.CRM.switchView) {
+            window.CRM.switchView('workload');
+        }
+        load(key);
     }
 
     // ------------------------------------------------------------------
@@ -575,9 +782,23 @@
         els.summary = $('workloadSummary');
         els.face = $('workloadFace');
         els.who = $('workloadWho');
-        els.badge = $('workloadBadge');
 
         els.who.addEventListener('change', () => load(els.who.value));
+
+        const team = $('sidebarTeam');
+        if (team) {
+            team.addEventListener('click', (event) => {
+                const item = event.target.closest('[data-team-person]');
+                if (item) openPerson(item.getAttribute('data-team-person'));
+            });
+        }
+
+        // profile.js announces whenever it has (re)loaded the directory, which
+        // is when names and faces for the team list are known.
+        window.addEventListener('crm:people', refreshTeam);
+        if (window.CRMPeople && window.CRMPeople.ready()) {
+            refreshTeam();
+        }
 
         // Checking a to-do off, before the rule that opens records: the mark
         // sits inside a row, and clicking it means only this.

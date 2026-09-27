@@ -19,6 +19,7 @@ define('APP_ROOT', dirname(__DIR__));
 require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/Project.php';
 
 header('Content-Type: application/json');
 Auth::sendSecurityHeaders();
@@ -242,7 +243,9 @@ function handleWorkload(string $who): void
         'assigned_to',
         $isUnassigned,
         $target['id'],
-        "ORDER BY start_date DESC, name COLLATE NOCASE ASC"
+        // Same pipeline order as the Projects view: what is running first,
+        // then what is being won, then leads, and finished work last.
+        "ORDER BY " . Project::stageRankSql() . " ASC, name COLLATE NOCASE ASC"
     );
 
     $contacts = fetchAssigned(

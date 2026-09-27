@@ -31,6 +31,8 @@ is part of "working correctly", not optional polish.
    https://your-domain/includes/auth.php
    https://your-domain/.git/config
    https://your-domain/composer.lock
+   https://your-domain/error_log
+   https://your-domain/api/error_log
    ```
 
    `.env` and `data/crm.db` are the two that matter most: the first is the
@@ -41,7 +43,51 @@ is part of "working correctly", not optional polish.
    `.git` directory hands out the full source and history.
 
 5. **Check the error log after the first real use.** Errors are logged, never
-   displayed, so a broken deployment fails quietly by design.
+   displayed, so a broken deployment fails quietly by design. With a private
+   folder (below) the log is `crm-private/logs/php-error.log`; otherwise it is
+   wherever the host puts it - on cPanel usually an `error_log` file next to
+   the failing script, which `.htaccess` denies.
+
+6. **Keep `.env` and the data outside the web root.** Recommended wherever the
+   host allows it - see the next section.
+
+## Keeping `.env` and the data outside the web root
+
+The deny rules only protect what the web server honours them for. The stronger
+setup keeps secrets and data in a folder the web server has no URL for at all:
+
+```
+/home/you/
+├── crm-private/          <- not reachable from the web
+│   ├── .env
+│   ├── data/             <- crm.db, bookkeeping_pdfs/, avatars/
+│   └── logs/             <- php-error.log, created automatically
+└── your-web-root/        <- the app
+```
+
+- The folder must be called `crm-private` and sit **directly next to** the web
+  root. Make sure that place is not itself inside another site's web root:
+  with a layout like `public_html/crm`, the sibling would be
+  `public_html/crm-private`, which the main domain serves.
+- It only takes effect once `crm-private/.env` exists. Until then `.env` and
+  `data/` are read from the web root as before, so moving `.env` is the switch.
+- If `crm-private/.env` exists but `crm-private/data/crm.db` does not, the app
+  refuses to start instead of silently creating an empty database. For a fresh
+  install in the private folder, create an empty `data/crm.db` file first.
+- PHP must be allowed to read and write there. On hosts with `open_basedir`,
+  the folder has to be inside the allowed paths.
+
+Moving an existing install:
+
+1. Make sure nobody saves anything, and back up `data/` and `.env`.
+2. Copy the whole `data/` folder into `crm-private/`.
+3. Move `.env` into `crm-private/`.
+4. Test (sign in, open an invoice PDF, create and delete a contact). If
+   anything is wrong, move `.env` back - the old data is still in place.
+5. Delete `crm.db*`, `bookkeeping_pdfs/` and `avatars/` from the web root's
+   `data/`. Keep its `.htaccess`.
+
+A step-by-step walkthrough for cPanel is in `db_migration_to_do.md`.
 
 ## Users and roles
 
@@ -159,7 +205,8 @@ level of access - see the trade-off note below about all members seeing all data
 
 | Layer | File | Protects against |
 |---|---|---|
-| Web server deny rules | `.htaccess`, `*/.htaccess` | Direct download of `.env`, the SQLite DB, uploaded PDFs, PHP includes, `.git` |
+| Private folder | `crm-private/` next to the web root | Everything below, even when the deny rules are not honoured |
+| Web server deny rules | `.htaccess`, `*/.htaccess` | Direct download of `.env`, the SQLite DB, uploaded PDFs, PHP includes, `.git`, `error_log`, stray archives |
 | PHP direct-access guard | top of `config/config.php`, `includes/*.php` | The same, on nginx, which ignores `.htaccess` |
 | Session auth | `includes/auth.php` | Unauthenticated API access (every endpoint checks first) |
 | CSRF tokens | `Auth::validateCsrfToken()` | Cross-site state changes; required on POST/PUT/PATCH/DELETE |
@@ -221,6 +268,16 @@ server {
         return 404;
     }
 
+    # Never serve PHP error logs or archives (a misplaced backup ZIP)
+    location ~ (^|/)error_log$ {
+        deny all;
+        return 404;
+    }
+    location ~ \.(zip|tar|gz|tgz|7z|rar)$ {
+        deny all;
+        return 404;
+    }
+
     # Only ever execute real .php files
     location ~ \.php$ {
         try_files $uri =404;
@@ -269,6 +326,14 @@ The `^/(data|includes|config|vendor)/` rule already covers the invoice store and
 - **`style-src` keeps `'unsafe-inline'`.** The UI sets inline styles for tag
   colours and map layout. Inline CSS is not a script execution primitive, and
   tag colours are validated as hex server-side.
+- **Two outside hosts, both for the map.** Leaflet and its cluster plugin load
+  from `unpkg.com`, pinned to exact versions with Subresource Integrity, so a
+  changed file is refused rather than run. Map tiles are plain images from
+  `tile.openstreetmap.org`, the only outside image host the CSP allows; each
+  tile request tells OpenStreetMap roughly which area is on screen, and their
+  usage policy expects light traffic with the attribution kept visible. Fonts
+  (General Sans, `assets/fonts/`) are served from this site, so no font CDN
+  sees your visitors.
 
 ## Reporting
 
