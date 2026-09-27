@@ -64,8 +64,11 @@ Options -Indexes -MultiViews
 #  - db / sqlite (+ the WAL and SHM sidecars) : the entire CRM dataset
 #  - env / ini / log / bak / sql / lock / json / md / dist / yml : secrets,
 #    dependency manifests, backups and notes
+#  - zip / tar / gz / 7z / rar : archives - a backup packed in the wrong
+#    folder would otherwise be one download away. The app never serves
+#    archives as files; the invoice ZIP is streamed by api/bookkeeping.php.
 # -----------------------------------------------------------------------------
-<FilesMatch "\.(?:env|db|db-wal|db-shm|sqlite|sqlite3|sql|log|bak|backup|old|orig|save|swp|swo|ini|lock|dist|yml|yaml|md|sh|bat|ps1)$">
+<FilesMatch "\.(?:env|db|db-wal|db-shm|sqlite|sqlite3|sql|log|bak|backup|old|orig|save|swp|swo|ini|lock|dist|yml|yaml|md|sh|bat|ps1|zip|tar|gz|tgz|7z|rar)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
@@ -78,7 +81,10 @@ Options -Indexes -MultiViews
 # composer.json is the one JSON we must name explicitly (the API returns
 # application/json responses from .php files, so a blanket *.json block is safe
 # here but kept narrow on purpose).
-<FilesMatch "^(?:composer\.(?:json|lock)|package(?:-lock)?\.json|README\.md|check\.php)$">
+# error_log is the file cPanel-style hosts write PHP errors to, next to the
+# script that failed. It has no extension, so the list above misses it, and
+# it is full of absolute paths.
+<FilesMatch "^(?:composer\.(?:json|lock)|package(?:-lock)?\.json|README\.md|check\.php|error_log)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

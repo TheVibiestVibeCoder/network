@@ -27,15 +27,58 @@ if (!defined('APP_ROOT')) {
 error_reporting(E_ALL);
 
 /**
+ * Locate the private folder that keeps .env and data/ out of the web root.
+ *
+ * .htaccess can only deny what the web server would otherwise serve. A folder
+ * next to the web root is not mapped to any URL at all, so nothing in it can be
+ * downloaded, whatever happens to the deny rules. The folder only counts once
+ * it holds a .env: creating it changes nothing, and moving .env into it is the
+ * single switch that moves the whole application over.
+ *
+ * Returns null when there is none - .env and data/ are then read from the web
+ * root, exactly as before.
+ */
+function findPrivateDir(): ?string
+{
+    $candidate = dirname(APP_ROOT) . '/crm-private';
+
+    // @: under open_basedir a path outside the allowed list warns on every
+    // request, and not finding the folder is the ordinary case.
+    return @is_file($candidate . '/.env') ? $candidate : null;
+}
+
+/**
+ * Point the PHP error log into the private folder.
+ *
+ * Left to the host, the log usually becomes an error_log file next to whichever
+ * script failed - inside the web root, and full of absolute paths.
+ */
+function routeErrorLog(string $privateDir): void
+{
+    $logDir = $privateDir . '/logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0700, true);
+    }
+    if (is_dir($logDir) && is_writable($logDir)) {
+        @ini_set('error_log', $logDir . '/php-error.log');
+    }
+}
+
+define('PRIVATE_DIR', findPrivateDir());
+
+if (PRIVATE_DIR !== null) {
+    routeErrorLog(PRIVATE_DIR);
+}
+
+/**
  * Load environment variables from .env file
  */
-function loadEnv(): void
+function loadEnv(string $envFile): void
 {
-    $envFile = APP_ROOT . '/.env';
-
     if (!file_exists($envFile)) {
         // Detailed setup state goes to the log, not to an anonymous visitor.
-        error_log('Configuration error: .env not found at ' . $envFile);
+        error_log('Configuration error: .env not found at ' . $envFile
+            . ' or ' . dirname(APP_ROOT) . '/crm-private/.env');
         http_response_code(503);
         header('Content-Type: text/plain; charset=utf-8');
         exit('Service temporarily unavailable.');
@@ -66,7 +109,7 @@ function loadEnv(): void
 }
 
 // Load environment variables
-loadEnv();
+loadEnv((PRIVATE_DIR ?? APP_ROOT) . '/.env');
 
 /**
  * Parse an integer environment variable with a safe fallback.
@@ -99,7 +142,27 @@ function envBool(string $key, bool $default): bool
 // Application constants
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'Simple CRM');
 define('APP_PASSWORD', $_ENV['APP_PASSWORD'] ?? '');
-define('DB_PATH', APP_ROOT . '/data/crm.db');
+// The database, invoice PDFs and profile pictures all live under DATA_DIR.
+define('DATA_DIR', (PRIVATE_DIR ?? APP_ROOT) . '/data');
+define('DB_PATH', DATA_DIR . '/crm.db');
+
+// ---------------------------------------------------------------------------
+// Refuse to start on a database that was not moved along
+// ---------------------------------------------------------------------------
+// SQLite does not report a missing file - it quietly creates a new, empty one.
+// In the web root that is how a fresh install starts. In the private folder it
+// means data/ was not copied over, and everyone would be greeted by an empty
+// CRM that starts collecting new records. A deliberately fresh install can
+// create an empty data/crm.db first: SQLite treats a zero-byte file as an
+// empty database.
+if (PRIVATE_DIR !== null && !is_file(DB_PATH)) {
+    error_log('Configuration error: ' . PRIVATE_DIR . '/.env exists but ' . DB_PATH
+        . ' does not. Copy data/ into the private folder, or create an empty'
+        . ' crm.db there for a fresh install.');
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Service temporarily unavailable.');
+}
 
 // ---------------------------------------------------------------------------
 // Refuse to run with a placeholder password

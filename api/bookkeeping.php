@@ -15,7 +15,7 @@ require_once APP_ROOT . '/includes/auth.php';
 use ZipStream\Option\Archive;
 use ZipStream\ZipStream;
 
-const BK_PDF_DIR = APP_ROOT . '/data/bookkeeping_pdfs';
+const BK_PDF_DIR = DATA_DIR . '/bookkeeping_pdfs';
 const BK_MAX_PDF_SIZE = 25 * 1024 * 1024; // 25 MB
 
 Auth::sendSecurityHeaders();
