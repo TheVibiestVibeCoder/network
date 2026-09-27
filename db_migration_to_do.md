@@ -216,8 +216,11 @@ So wie du sonst Updates machst, per Git:
       die Kontakte sind da.
   - Es hat sich noch nichts geändert, und das ist richtig so.
 
-> **Zurück zum alten Code:** In cPanel wieder auf den Branch aus dem
-> Merkzettel wechseln (vermutlich `UPDATE_DESIGN`).
+> **Läuft alles? Dann einfach weiter mit Schritt 8.** Du bleibst auf
+> `UPDATE_DESIGN_DATA_MIGRATION`.
+>
+> **Nur im Notfall – zurück zum alten Code:** In cPanel wieder auf den Branch
+> aus dem Merkzettel wechseln (vermutlich `UPDATE_DESIGN`).
 > Das geht einfach **nur bis Schritt 9**. Danach musst du vorher die `.env`
 > zurück in den Webordner verschieben, denn der alte Code kennt `crm-private`
 > nicht.
