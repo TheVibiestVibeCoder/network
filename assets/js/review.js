@@ -69,8 +69,16 @@
         open: new Set(),
         editing: new Set(),
         errors: {},
-        pollTimer: null
+        pollTimer: null,
+        // { action, total, done, failed } while "Accept all" / "Reject all" runs
+        bulk: null,
+        // 'accept' | 'reject' right after the list was cleared in one go, so
+        // the empty state can mark the moment once
+        cleared: null
     };
+
+    const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     const els = {};
 
@@ -410,7 +418,8 @@
     const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
     const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     const ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
-    const ICON_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/></svg>';
+    // Claude's mark - the same one the sidebar's "From Claude" entry uses.
+    const ICON_SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>';
     const ICON_CHEVRON = '<svg class="review-row-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
     const ICON_WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 
@@ -533,9 +542,26 @@
     function render() {
         if (!els.list) return;
         updateTabs();
+        renderBulk();
 
         if (state.loading && state.items.length === 0) {
             els.list.innerHTML = '<div class="review-empty"><p>Loading…</p></div>';
+            return;
+        }
+
+        if (state.items.length === 0 && state.tab === 'pending' && state.cleared) {
+            // Straight after "Accept all" / "Reject all": a check that draws itself.
+            const accepted = state.cleared === 'accept';
+            state.cleared = null;
+            els.list.innerHTML = `
+                <div class="review-empty review-empty--cleared review-empty--${accepted ? 'accept' : 'reject'}">
+                    <svg class="review-done-mark" viewBox="0 0 52 52" aria-hidden="true">
+                        <circle class="review-done-ring" cx="26" cy="26" r="23"/>
+                        <path class="review-done-check" d="m15.5 27 7 7 14-15"/>
+                    </svg>
+                    <h3>${accepted ? 'All accepted' : 'All rejected'}</h3>
+                    <p>${accepted ? 'Everything Claude proposed is now part of the CRM.' : 'Nothing Claude proposed was kept.'} New proposals will show up here.</p>
+                </div>`;
             return;
         }
 
@@ -748,9 +774,29 @@
         return null;
     }
 
+    /**
+     * The network half of a decision, shared by a single click and by
+     * "Accept all" / "Reject all", so both take exactly the same path:
+     * changes the browser applies go through the ordinary endpoints first.
+     */
+    async function performDecision(item, action, values = null) {
+        const id = item.id;
+        if (action === 'reject') {
+            await request(`${API}?action=reject`, { method: 'POST', json: { id } });
+        } else if (item.applied_by === 'client') {
+            await applyChange(item, values);
+            await request(`${API}?action=resolve`, { method: 'POST', json: { id } });
+        } else {
+            if (values && item.kind === 'create') {
+                await saveProposedRecord(item, values);
+            }
+            await request(`${API}?action=accept`, { method: 'POST', json: { id } });
+        }
+    }
+
     async function decide(id, action, values = null) {
         const item = findItem(id);
-        if (!item || state.busy.has(id)) return;
+        if (!item || state.busy.has(id) || state.bulk) return;
 
         const question = confirmText(item, action);
         if (question && !window.confirm(question)) return;
@@ -760,22 +806,12 @@
         rerenderRow(id);
 
         try {
-            if (action === 'reject') {
-                await request(`${API}?action=reject`, { method: 'POST', json: { id } });
-            } else if (item.applied_by === 'client') {
-                await applyChange(item, values);
-                await request(`${API}?action=resolve`, { method: 'POST', json: { id } });
-            } else {
-                if (values && item.kind === 'create') {
-                    await saveProposedRecord(item, values);
-                }
-                await request(`${API}?action=accept`, { method: 'POST', json: { id } });
-            }
+            await performDecision(item, action, values);
 
             state.busy.delete(id);
             state.editing.delete(id);
             state.open.delete(id);
-            removeItem(id);
+            removeItem(id, action);
             toast(action === 'reject' ? 'Rejected' : 'Accepted');
             notifyChanged({ id, action, entity_type: item.entity_type, entity_id: item.entity_id });
         } catch (error) {
@@ -805,19 +841,39 @@
         }
     }
 
-    function removeItem(id) {
+    /**
+     * Take a decided row off the screen. With an outcome it leaves the way the
+     * decision went: a green sweep and a slide to the right for accepted, a red
+     * one to the left for rejected, then the gap closes. Without motion (or
+     * with "reduce motion" set) it simply fades.
+     */
+    /**
+     * Take a decided row off the screen. With an outcome it takes on a faint
+     * tint of it, lifts and fades, then the gap closes; with "reduce motion"
+     * set, or no outcome, it simply fades.
+     */
+    function removeItem(id, outcome = null) {
         state.items = state.items.filter(i => i.id !== id);
         panelItems.delete(id);
+        const still = reduceMotion() || !outcome;
+        const fade = still ? 0 : 220;     // tint + lift, before the gap closes
+        const collapse = still ? 180 : 260;
+
         document.querySelectorAll(`.review-row[data-review-id="${id}"]`).forEach(node => {
+            // A fixed height to collapse from; 'auto' cannot be animated.
+            node.style.height = `${node.offsetHeight}px`;
             node.classList.add('is-leaving');
+            if (!still) node.classList.add(`is-leaving--${outcome}`);
+
+            setTimeout(() => node.classList.add('is-collapsing'), fade);
             setTimeout(() => {
                 const group = node.closest('.review-group');
                 const panel = node.closest('.review-record-slot');
                 node.remove();
                 if (group && !group.querySelector('.review-row')) group.remove();
                 if (panel && !panel.querySelector('.review-row')) panel.hidden = true;
-                if (els.list && state.tab === 'pending' && state.items.length === 0) render();
-            }, 180);
+                if (els.list && state.tab === 'pending' && state.items.length === 0 && !state.bulk) render();
+            }, fade + collapse);
         });
         if (state.tab === 'pending' && els.list) {
             els.list.querySelectorAll('.review-group').forEach(group => {
@@ -826,6 +882,128 @@
                 if (badge) badge.textContent = String(count);
             });
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Accept all / Reject all
+    // ------------------------------------------------------------------
+
+    function renderBulk() {
+        if (!els.bulk) return;
+        const pending = state.tab === 'pending' && !state.loading && (state.items.length > 0 || state.bulk);
+        els.bulk.hidden = !pending;
+        els.bulk.classList.toggle('is-running', !!state.bulk);
+        if (els.list) els.list.classList.toggle('is-bulk-running', !!state.bulk);
+
+        els.bulk.querySelectorAll('[data-review-bulk]').forEach(btn => { btn.disabled = !!state.bulk; });
+        // Switching tab mid-run would reload the list under the loop and
+        // silently skip whatever was left, so the tabs wait too.
+        document.querySelectorAll('[data-review-tab]').forEach(btn => { btn.disabled = !!state.bulk; });
+
+        const bulk = state.bulk;
+        if (bulk) {
+            els.bulk.dataset.action = bulk.action;
+            els.bulkBar.style.transform = `scaleX(${bulk.total ? bulk.done / bulk.total : 0})`;
+            els.bulkStatus.textContent = `${bulk.action === 'accept' ? 'Accepting' : 'Rejecting'} ${Math.min(bulk.done + 1, bulk.total)} of ${bulk.total}…`;
+        } else {
+            delete els.bulk.dataset.action;
+            els.bulkBar.style.transform = 'scaleX(0)';
+            els.bulkStatus.textContent = '';
+        }
+    }
+
+    function bulkQuestion(action, items) {
+        const n = items.length;
+        const what = n === 1 ? 'the 1 proposal' : `all ${n} proposals`;
+        if (action === 'accept') {
+            const deletes = items.filter(i => i.kind === 'delete').length;
+            return `Accept ${what} from Claude?` + (deletes
+                ? `\n\n${deletes === 1 ? 'One of them deletes a record' : deletes + ' of them delete records'} for good.`
+                : '');
+        }
+        return `Reject ${what} from Claude?\n\nNew records Claude proposed are removed, along with anything added to them, and proposed changes are discarded.`;
+    }
+
+    /**
+     * Records proposed on top of other proposals (a note on a proposed
+     * contact) need their parent settled the right way round: accepting goes
+     * parents first, rejecting children first - rejecting a proposed contact
+     * already takes everything attached to it along.
+     */
+    function bulkOrder(items, action) {
+        const isParent = i => i.kind === 'create' && (i.entity_type === 'contact' || i.entity_type === 'project');
+        const parents = items.filter(isParent);
+        const rest = items.filter(i => !isParent(i));
+        return action === 'accept' ? parents.concat(rest) : rest.concat(parents);
+    }
+
+    async function decideAll(action) {
+        if (state.bulk) return;
+        const items = state.items.filter(i => i.status === 'pending' && !state.busy.has(i.id));
+        if (items.length === 0) return;
+        if (!window.confirm(bulkQuestion(action, items))) return;
+
+        state.bulk = { action, total: items.length, done: 0, failed: 0 };
+        state.editing.clear();
+        renderBulk();
+
+        for (const item of bulkOrder(items, action)) {
+            // Taken along by an earlier decision (a child of a rejected record).
+            if (!findItem(item.id)) {
+                state.bulk.done++;
+                renderBulk();
+                continue;
+            }
+
+            state.busy.add(item.id);
+            delete state.errors[item.id];
+            rerenderRow(item.id);
+
+            try {
+                await performDecision(item, action);
+                state.busy.delete(item.id);
+                state.open.delete(item.id);
+                removeItem(item.id, action);
+            } catch (error) {
+                state.busy.delete(item.id);
+                state.errors[item.id] = error.message;
+                state.bulk.failed++;
+                rerenderRow(item.id);
+            }
+
+            state.bulk.done++;
+            renderBulk();
+            // A beat between rows, so a fast connection still reads as a
+            // cascade rather than everything vanishing at once.
+            if (!reduceMotion()) await wait(90);
+        }
+
+        const { failed, total } = state.bulk;
+        // Let the last rows finish leaving before the list is rebuilt.
+        await wait(reduceMotion() ? 200 : 520);
+        state.bulk = null;
+
+        if (failed === 0) {
+            state.cleared = action;
+            toast(action === 'accept' ? `Accepted ${total === 1 ? '1 proposal' : 'all ' + total}` : `Rejected ${total === 1 ? '1 proposal' : 'all ' + total}`);
+        } else {
+            toast(`${total - failed} of ${total} done - ${failed} need${failed === 1 ? 's' : ''} a look`);
+        }
+
+        // Reload rather than trust the local list: decisions can settle other
+        // proposals on the server (a rejected contact takes its notes along).
+        // An empty result shows the "all done" mark, which consumes the flag.
+        // load() starts from a clean slate; keep the reason on any row that failed.
+        const errors = { ...state.errors };
+        await load();
+        state.cleared = null;
+        if (failed > 0) {
+            Object.keys(errors).forEach(id => {
+                if (findItem(Number(id))) state.errors[id] = errors[id];
+            });
+            render();
+        }
+        notifyChanged({ action, bulk: true });
     }
 
     function openRecord(item) {
@@ -880,7 +1058,8 @@
     /** The mark on a proposed record in a list. */
     function badge(record) {
         if (!record || record.review_status !== 'pending') return '';
-        return `<span class="review-badge" title="Proposed by Claude - not accepted yet">${ICON_SPARK}<span>Claude</span></span>`;
+        // Says what it means, not just who: the point is that nobody has accepted it yet.
+        return `<span class="review-badge" title="Proposed by Claude - not accepted yet">${ICON_SPARK}<span>Awaiting review</span></span>`;
     }
 
     /** Accept / reject buttons for a proposed note, to-do or invoice, where it is listed. */
@@ -935,6 +1114,16 @@
     function bind() {
         els.list = document.getElementById('reviewList');
         els.subtitle = document.getElementById('reviewSubtitle');
+        els.bulk = document.getElementById('reviewBulk');
+        els.bulkBar = document.getElementById('reviewBulkBar');
+        els.bulkStatus = document.getElementById('reviewBulkStatus');
+
+        if (els.bulk) {
+            els.bulk.addEventListener('click', event => {
+                const btn = event.target.closest('[data-review-bulk]');
+                if (btn) decideAll(btn.dataset.reviewBulk);
+            });
+        }
 
         document.querySelectorAll('[data-review-tab]').forEach(btn => {
             btn.addEventListener('click', () => load(btn.dataset.reviewTab));

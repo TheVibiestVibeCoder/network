@@ -319,13 +319,16 @@
     }
 
     /**
-     * Everyone who can be assigned work, in display order.
+     * Everyone who can be assigned work, alphabetically as the endpoint
+     * returned them.
      *
-     * The owner is first because it is the account that always exists; the
-     * rest follow alphabetically as the endpoint returned them.
+     * The owner login is left out: it is the recovery account behind
+     * APP_PASSWORD, not a person on the team, so it is not offered in the team
+     * list or any assignment picker. It stays in the directory itself, so
+     * records already assigned to it still show its name and face.
      */
     function list() {
-        return Array.from(state.people.values());
+        return Array.from(state.people.values()).filter(person => person.id !== null);
     }
 
     /**

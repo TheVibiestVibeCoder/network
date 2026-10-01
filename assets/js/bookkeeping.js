@@ -46,7 +46,8 @@
         initialized: false,
         filterQuery: '',
         sortColumn: DATE_SORT_KEY,
-        sortDirection: 'asc',
+        // Newest first: the entries being worked on are the recent ones.
+        sortDirection: 'desc',
         // Import preview (step 2 of the import modal)
         importStep: 'columns',
         previewColumns: [],
@@ -54,6 +55,145 @@
         previewDateColumn: null,
         previewRows: [] // [{ data, isDuplicate, selected }]
     };
+
+    // ------------------------------------------------------------------
+    // Column widths
+    // ------------------------------------------------------------------
+    // Widths the user dragged are remembered per browser, keyed by column
+    // name so they survive a re-import. Every other column is measured once at
+    // its natural width; after that the table switches to a fixed layout, so
+    // columns also stop jumping around while the filter narrows the rows.
+
+    const COL_WIDTHS_KEY = 'crm-bk-col-widths';
+    const COL_MIN_WIDTH = 60;
+    const COL_MAX_WIDTH = 1200;
+    // The checkbox and menu columns, which are not resizable (see .bk-col-check / .bk-col-menu).
+    const FIXED_COLS_WIDTH = 34 + 58;
+
+    // Keyed by column names from an imported file, so the maps have no
+    // prototype: a column called "constructor" must not find a built-in.
+    const colWidths = {
+        stored: readStoredColWidths(),
+        measured: Object.create(null)
+    };
+    let suppressSortClick = false;
+
+    function readStoredColWidths() {
+        const widths = Object.create(null);
+        try {
+            const parsed = JSON.parse(localStorage.getItem(COL_WIDTHS_KEY) || '{}');
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                // Only sane numbers survive; anything else falls back to measuring.
+                Object.keys(parsed).forEach(key => {
+                    const width = Number(parsed[key]);
+                    if (Number.isFinite(width) && width >= COL_MIN_WIDTH && width <= COL_MAX_WIDTH) {
+                        widths[key] = Math.round(width);
+                    }
+                });
+            }
+        } catch (e) {
+            // Unreadable storage: every column is measured instead
+        }
+        return widths;
+    }
+
+    function saveColWidths() {
+        try {
+            localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(colWidths.stored));
+        } catch (e) {
+            // Ignore storage errors; the widths still hold until the page reloads
+        }
+    }
+
+    function colWidth(key) {
+        return colWidths.stored[key] || colWidths.measured[key] || null;
+    }
+
+    /** Resizable columns in table order: the imported ones, then the PDF column. */
+    function resizableColKeys() {
+        return state.columns.map(c => c.name).concat(PDF_SORT_KEY);
+    }
+
+    function applyColWidths(table) {
+        let total = FIXED_COLS_WIDTH;
+        table.querySelectorAll('col[data-col-key]').forEach(col => {
+            const width = colWidth(col.dataset.colKey);
+            col.style.width = `${width}px`;
+            total += width;
+        });
+        table.style.minWidth = `${total}px`;
+        table.classList.add('bk-table-fixed');
+    }
+
+    /**
+     * Measure the columns that have no width yet at their natural size, then
+     * fix the layout. Skipped while the view is hidden, where everything
+     * measures zero - the next render tries again.
+     */
+    function measureColWidths(table) {
+        table.classList.add('bk-table-measuring');
+        const headers = Array.from(table.querySelectorAll('th[data-col-key]'));
+        if (headers.length === 0 || headers[0].getBoundingClientRect().width === 0) {
+            table.classList.remove('bk-table-measuring');
+            return;
+        }
+        headers.forEach(th => {
+            const key = th.dataset.colKey;
+            if (colWidth(key) === null) {
+                colWidths.measured[key] = Math.max(COL_MIN_WIDTH, Math.ceil(th.getBoundingClientRect().width));
+            }
+        });
+        table.classList.remove('bk-table-measuring');
+        applyColWidths(table);
+    }
+
+    function startColResize(handle, event) {
+        const table = handle.closest('table');
+        const key = handle.dataset.colKey;
+        const col = table && table.querySelector(`col[data-col-key="${CSS.escape(key)}"]`);
+        if (!col) return;
+
+        event.preventDefault();
+        if (!table.classList.contains('bk-table-fixed')) measureColWidths(table);
+
+        const startX = event.clientX;
+        const startWidth = colWidth(key) || handle.closest('th').getBoundingClientRect().width;
+        try {
+            // Keeps the drag going when the pointer outruns the 10px handle.
+            handle.setPointerCapture(event.pointerId);
+        } catch (e) {
+            // The pointer is already gone; the listeners below still work while it is over the handle.
+        }
+        document.body.classList.add('bk-col-resizing');
+
+        const move = e => {
+            const width = Math.round(Math.min(COL_MAX_WIDTH, Math.max(COL_MIN_WIDTH, startWidth + e.clientX - startX)));
+            colWidths.stored[key] = width;
+            applyColWidths(table);
+        };
+        const end = () => {
+            handle.removeEventListener('pointermove', move);
+            handle.removeEventListener('pointerup', end);
+            handle.removeEventListener('pointercancel', end);
+            document.body.classList.remove('bk-col-resizing');
+            saveColWidths();
+            // Releasing the mouse over the header also "clicks" it, which
+            // would re-sort the table. Swallow that one click.
+            suppressSortClick = true;
+            setTimeout(() => { suppressSortClick = false; }, 0);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    }
+
+    /** Double-click on a handle: forget that column's width and fit it to its content again. */
+    function resetColWidth(key) {
+        delete colWidths.stored[key];
+        delete colWidths.measured[key];
+        saveColWidths();
+        renderTable();
+    }
 
     const els = {};
 
@@ -283,7 +423,7 @@
             || state.columns.some(c => c.name === state.sortColumn);
         if (!stillExists) {
             state.sortColumn = DATE_SORT_KEY;
-            state.sortDirection = 'asc';
+            state.sortDirection = 'desc';
         }
     }
 
@@ -743,7 +883,7 @@
 
     /**
      * Returns state.rows filtered by state.filterQuery and sorted by
-     * state.sortColumn/state.sortDirection. Defaults to date order (undated
+     * state.sortColumn/state.sortDirection. Defaults to newest first (undated
      * rows last) regardless of import batch, so entries always line up
      * chronologically no matter when each CSV was uploaded.
      */
@@ -922,7 +1062,7 @@
         // Month separators stay visible for any chronological sort, not just
         // the implicit default one.
         const groupByMonth = isDateSortColumn(state.sortColumn);
-        const colCount = state.columns.length + 3; // checkbox + menu + columns + pdf
+        const colCount = state.columns.length + 4; // checkbox + menu + columns + pdf + filler
 
         // With the default (implicit) date sort, highlight the date column's
         // own header so the active sort is always visible on a real column.
@@ -946,24 +1086,37 @@
         const totals = monthTotals(displayRows, amountColumn);
         const isAmountCol = name => amountColumn !== null && name === amountColumn;
 
-        let html = '<table class="bk-table"><thead><tr>';
+        // Once every column has a width the layout is fixed straight away;
+        // otherwise it renders naturally first and is measured below.
+        const colKeys = resizableColKeys();
+        const allSized = colKeys.every(key => colWidth(key) !== null);
+        const resizer = key => `<span class="bk-col-resizer" data-col-key="${escapeHtml(key)}" title="Drag to resize, double-click to fit" aria-hidden="true"></span>`;
+
+        let html = `<table class="bk-table"><colgroup><col class="bk-col-check"><col class="bk-col-menu">`;
+        colKeys.forEach(key => {
+            html += `<col data-col-key="${escapeHtml(key)}">`;
+        });
+        // The filler takes whatever width the sized columns leave over, so
+        // widening one column never squeezes the others.
+        html += '<col class="bk-col-fill"></colgroup><thead><tr>';
         html += `<th class="bk-col-check"><input type="checkbox" id="bkSelectAll" title="Select all" ${displayRows.length > 0 && displayRows.every(r => state.selection.has(r.id)) ? 'checked' : ''}></th>`;
         html += '<th class="bk-col-menu"></th>';
         state.columns.forEach(col => {
             const active = col.name === activeSortCol;
             const amount = isAmountCol(col.name) ? ' bk-col-amount' : '';
-            html += `<th class="bk-sortable-th${amount} ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(col.name)}" title="Sort by ${escapeHtml(col.name)}">
-                <span>${escapeHtml(col.name)}</span>${active ? dirIndicator : ''}
+            html += `<th class="bk-sortable-th${amount} ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(col.name)}" data-col-key="${escapeHtml(col.name)}" title="Sort by ${escapeHtml(col.name)}">
+                <span>${escapeHtml(col.name)}</span>${active ? dirIndicator : ''}${resizer(col.name)}
             </th>`;
         });
         // Sortable like any other header, but by state rather than by text:
         // "PDF missing" is not a value in a cell, so it needs its own key.
         const pdfActive = state.sortColumn === PDF_SORT_KEY;
         html += `<th class="bk-sortable-th bk-col-pdf ${pdfActive ? 'bk-sort-active' : ''}"
-                     data-sort-key="${PDF_SORT_KEY}"
+                     data-sort-key="${PDF_SORT_KEY}" data-col-key="${PDF_SORT_KEY}"
                      title="Sort by PDF status">
-                <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}
+                <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}${resizer(PDF_SORT_KEY)}
             </th>`;
+        html += '<th class="bk-col-fill" aria-hidden="true"></th>';
         html += '</tr></thead><tbody>';
 
         let previousMonth = null;
@@ -1002,12 +1155,20 @@
                 html += '<span class="bk-badge bk-badge-missing">PDF missing</span>';
             }
             html += '</td>';
+            html += '<td class="bk-col-fill"></td>';
 
             html += '</tr>';
         });
 
         html += '</tbody></table>';
         wrap.innerHTML = html;
+
+        const table = wrap.querySelector('table.bk-table');
+        if (allSized) {
+            applyColWidths(table);
+        } else {
+            measureColWidths(table);
+        }
     }
 
     function renderPool() {
@@ -1908,18 +2069,118 @@
     // PDF preview
     // ------------------------------------------------------------------
 
-    function openPdfPreview(pdfId, pdfName) {
+    // The preview draws the PDF itself with PDF.js (assets/pdfjs) instead of
+    // handing it to the browser's viewer in an iframe. Safari treats a framed
+    // PDF as plug-in content and refuses it, while canvases render the same
+    // everywhere. Self-hosted, because the CSP only trusts 'self' for workers.
+    // Loaded on the first preview, not with the page: it is ~1.8 MB.
+    const PDFJS_BASE = new URL('assets/pdfjs/', document.baseURI).href;
+    const PDF_PREVIEW_MAX_PAGES = 30;
+    let pdfjsPromise = null;
+    let previewToken = 0;
+    let previewDoc = null;
+
+    function loadPdfJs() {
+        if (!pdfjsPromise) {
+            pdfjsPromise = import(PDFJS_BASE + 'pdf.min.js')
+                .then(lib => {
+                    lib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+                    return lib;
+                })
+                .catch(error => {
+                    pdfjsPromise = null; // let the next preview try again
+                    throw error;
+                });
+        }
+        return pdfjsPromise;
+    }
+
+    async function openPdfPreview(pdfId, pdfName) {
         if (!pdfId) return;
         const url = `${API}?action=download-pdf&id=${pdfId}`;
+        // Any preview still rendering stops at its next page.
+        const token = ++previewToken;
+
         els.pdfPreviewTitle.textContent = pdfName || 'PDF';
-        els.pdfPreviewFrame.src = url;
         els.pdfPreviewOpenBtn.href = url;
+        els.pdfPreviewFrame.hidden = true;
+        els.pdfPreviewPages.hidden = false;
+        els.pdfPreviewPages.innerHTML = '<p class="bk-pdf-preview-status">Loading preview…</p>';
         els.pdfPreviewModal.classList.add('active');
+
+        try {
+            const [lib, data] = await Promise.all([
+                loadPdfJs(),
+                fetch(url, { credentials: 'same-origin' }).then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.arrayBuffer();
+                })
+            ]);
+            if (token !== previewToken) return;
+
+            const doc = await lib.getDocument({
+                data,
+                // The CSP forbids eval; without this PDF.js tries it first and logs the refusal.
+                isEvalSupported: false,
+                // Invoices often use Helvetica/Arial without embedding them.
+                standardFontDataUrl: PDFJS_BASE + 'standard_fonts/'
+            }).promise;
+            if (token !== previewToken) {
+                doc.destroy();
+                return;
+            }
+            previewDoc = doc;
+            els.pdfPreviewPages.innerHTML = '';
+
+            const ratio = window.devicePixelRatio || 1;
+            const available = els.pdfPreviewPages.clientWidth - 32;
+            const pageCount = Math.min(doc.numPages, PDF_PREVIEW_MAX_PAGES);
+
+            for (let number = 1; number <= pageCount; number++) {
+                const page = await doc.getPage(number);
+                if (token !== previewToken) return;
+
+                // Fit the page to the modal's width, rendered at the screen's
+                // pixel density so text stays sharp on Retina displays.
+                const scale = Math.min(available / page.getViewport({ scale: 1 }).width, 2);
+                const viewport = page.getViewport({ scale: scale * ratio });
+                const canvas = document.createElement('canvas');
+                canvas.className = 'bk-pdf-page';
+                canvas.width = Math.floor(viewport.width);
+                canvas.height = Math.floor(viewport.height);
+                canvas.style.width = `${Math.floor(viewport.width / ratio)}px`;
+                canvas.style.height = `${Math.floor(viewport.height / ratio)}px`;
+                els.pdfPreviewPages.appendChild(canvas);
+
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            }
+
+            if (doc.numPages > pageCount) {
+                const note = document.createElement('p');
+                note.className = 'bk-pdf-preview-status';
+                note.textContent = `Showing the first ${pageCount} of ${doc.numPages} pages. Open in a new tab to see the rest.`;
+                els.pdfPreviewPages.appendChild(note);
+            }
+        } catch (error) {
+            if (token !== previewToken) return;
+            console.error('PDF preview failed, falling back to the browser viewer:', error);
+            // Fall back to the browser's own viewer - fine everywhere but Safari.
+            els.pdfPreviewPages.hidden = true;
+            els.pdfPreviewPages.innerHTML = '';
+            els.pdfPreviewFrame.hidden = false;
+            els.pdfPreviewFrame.src = url;
+        }
     }
 
     function closePdfPreview() {
         els.pdfPreviewModal.classList.remove('active');
-        // Release the embedded document so it stops rendering in the background.
+        previewToken++;
+        if (previewDoc) {
+            previewDoc.destroy();
+            previewDoc = null;
+        }
+        // Release the rendered pages / embedded document.
+        els.pdfPreviewPages.innerHTML = '';
         els.pdfPreviewFrame.src = 'about:blank';
     }
 
@@ -2172,15 +2433,137 @@
      * this is a best-effort guess used only to pick the right hover
      * affordance. The actual drop decision is made from the file name.
      */
-    function dragLooksLikeCsv(dataTransfer) {
-        const items = dataTransfer.items;
-        if (!items) return false;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].kind === 'file' && /csv|excel|spreadsheet/i.test(items[i].type || '')) {
-                return true;
-            }
+    /**
+     * What is being dragged, as far as the browser will say before the drop:
+     *   'pool'    - a PDF from the drop zone list, onto a row
+     *   'csv'     - a bank statement, which is an import wherever it lands
+     *   'pdf'     - one or more PDFs
+     *   'unknown' - files whose type is not exposed yet (Safari reports none
+     *               until the drop), so either of the above
+     *   null      - not files at all (text, links)
+     */
+    function dragKind(dataTransfer) {
+        const types = Array.from(dataTransfer.types || []);
+        if (types.includes('application/x-bk-pdf-id')) return 'pool';
+        if (!types.includes('Files')) return null;
+
+        const items = Array.from(dataTransfer.items || []).filter(item => item.kind === 'file');
+        if (items.some(item => /csv|excel|spreadsheet/i.test(item.type || ''))) return 'csv';
+        if (items.length > 0 && items.every(item => item.type === 'application/pdf')) return 'pdf';
+        return 'unknown';
+    }
+
+    /**
+     * Show exactly one drop overlay - the one for where the file will go - and
+     * clear the others. Every drag event funnels through here, so two overlays
+     * can never be on screen together.
+     *
+     *   'page'     the whole view: a CSV import (or an unidentified file over
+     *              empty space)
+     *   'dropzone' the drop zone: PDFs going into the pool
+     *   'row'      one table row: a PDF being attached to it
+     */
+    let dropOverlayClearTimer = null;
+
+    function setDropOverlay(mode, rowEl = null, label = '') {
+        clearTimeout(dropOverlayClearTimer);
+
+        const view = document.getElementById('bookkeepingView');
+        if (view) {
+            view.classList.toggle('bk-csv-drop-active', mode === 'page');
+            if (mode === 'page') view.dataset.dropLabel = label;
         }
-        return false;
+        els.dropzone.classList.toggle('bk-dropzone-hover', mode === 'dropzone');
+
+        els.tableWrap.querySelectorAll('tr.bk-drop-target').forEach(tr => {
+            if (mode !== 'row' || tr !== rowEl) tr.classList.remove('bk-drop-target');
+        });
+        if (mode === 'row' && rowEl) {
+            rowEl.classList.add('bk-drop-target');
+            positionDropPill(rowEl);
+        } else {
+            hideDropPill();
+        }
+    }
+
+    function bindFileDrops() {
+        const view = document.getElementById('bookkeepingView');
+        if (!view) return;
+
+        view.addEventListener('dragover', event => {
+            const kind = dragKind(event.dataTransfer);
+            if (kind === null) return;
+
+            const rowEl = event.target.closest('tr.bk-row');
+            const overDropzone = !!event.target.closest('#bkDropzone');
+            let mode = null;
+            let label = '';
+
+            if (kind === 'pool') {
+                mode = rowEl ? 'row' : null;
+            } else if (kind === 'csv') {
+                mode = 'page';
+                label = 'Drop CSV file to import';
+            } else if (rowEl) {
+                mode = 'row';
+            } else if (overDropzone || kind === 'pdf') {
+                // A PDF let go over empty space lands in the pool too, so the
+                // drop zone is what lights up for it.
+                mode = 'dropzone';
+            } else {
+                mode = 'page';
+                label = 'Drop a CSV to import, or PDFs for the drop zone';
+            }
+
+            if (mode !== null) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = kind === 'pool' ? 'move' : 'copy';
+            }
+            setDropOverlay(mode, rowEl, label);
+        });
+
+        // dragleave fires on every child boundary, and Safari often reports no
+        // relatedTarget, so a leave alone cannot tell "left the view" from
+        // "moved onto a child". Clear a moment later instead; the dragover
+        // that follows any move inside the view cancels it.
+        view.addEventListener('dragleave', () => {
+            clearTimeout(dropOverlayClearTimer);
+            dropOverlayClearTimer = setTimeout(() => setDropOverlay(null), 80);
+        });
+        // A drag cancelled with Escape, or dropped outside the window.
+        document.addEventListener('dragend', () => setDropOverlay(null));
+
+        view.addEventListener('drop', event => {
+            setDropOverlay(null);
+
+            const rowEl = event.target.closest('tr.bk-row');
+            const pdfId = event.dataTransfer.getData('application/x-bk-pdf-id');
+            if (pdfId) {
+                event.preventDefault();
+                if (rowEl) assignPdfToRow(parseInt(pdfId, 10), parseInt(rowEl.dataset.rowId, 10));
+                return;
+            }
+
+            const files = event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            event.preventDefault();
+
+            // A CSV is always an import, wherever it lands.
+            const csv = findCsvFile(files);
+            if (csv) {
+                handleCsvFile(csv);
+                return;
+            }
+            if (rowEl) {
+                uploadDroppedFileToRow(files[0], parseInt(rowEl.dataset.rowId, 10));
+                return;
+            }
+            if (event.target.closest('#bkDropzone') || Array.from(files).some(f => /\.pdf$/i.test(f.name))) {
+                uploadPoolFiles(files);
+                return;
+            }
+            showToast('Drop a .csv file to import, or a .pdf to store it in the drop zone', true);
+        });
     }
 
     function findCsvFile(files) {
@@ -2394,6 +2777,7 @@
             pdfPreviewModal: $('bkPdfPreviewModal'),
             pdfPreviewTitle: $('bkPdfPreviewTitle'),
             pdfPreviewFrame: $('bkPdfPreviewFrame'),
+            pdfPreviewPages: $('bkPdfPreviewPages'),
             pdfPreviewOpenBtn: $('bkPdfPreviewOpenBtn'),
             pdfPreviewCloseBtn: $('bkPdfPreviewCloseBtn'),
             pdfPreviewDoneBtn: $('bkPdfPreviewDoneBtn'),
@@ -2559,6 +2943,16 @@
             closeRowMenu();
         });
 
+        // Column resizing: drag a header's right edge; double-click it to fit.
+        els.tableWrap.addEventListener('pointerdown', event => {
+            const handle = event.target.closest('.bk-col-resizer');
+            if (handle && event.button === 0) startColResize(handle, event);
+        });
+        els.tableWrap.addEventListener('dblclick', event => {
+            const handle = event.target.closest('.bk-col-resizer');
+            if (handle) resetColWidth(handle.dataset.colKey);
+        });
+
         els.tableWrap.addEventListener('click', event => {
             const monthTotal = event.target.closest('.bk-month-total');
             if (monthTotal) {
@@ -2570,6 +2964,8 @@
                 }
                 return;
             }
+
+            if (suppressSortClick || event.target.closest('.bk-col-resizer')) return;
 
             const sortHeader = event.target.closest('.bk-sortable-th');
             if (sortHeader) {
@@ -2655,88 +3051,8 @@
             if (item) item.classList.remove('dragging');
         });
 
-        els.tableWrap.addEventListener('dragover', event => {
-            const isInternal = event.dataTransfer.types.includes('application/x-bk-pdf-id');
-            const isOsFile = event.dataTransfer.types.includes('Files');
-            if (!isInternal && !isOsFile) return;
-            // A CSV over the table is an import, so don't offer the per-row
-            // PDF affordance for it.
-            if (!isInternal && dragLooksLikeCsv(event.dataTransfer)) {
-                hideDropPill();
-                els.tableWrap.querySelectorAll('tr.bk-drop-target').forEach(tr => tr.classList.remove('bk-drop-target'));
-                return;
-            }
+        bindFileDrops();
 
-            const rowEl = event.target.closest('tr.bk-row');
-            els.tableWrap.querySelectorAll('tr.bk-drop-target').forEach(tr => {
-                if (tr !== rowEl) tr.classList.remove('bk-drop-target');
-            });
-            if (rowEl) {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = isInternal ? 'move' : 'copy';
-                rowEl.classList.add('bk-drop-target');
-                positionDropPill(rowEl);
-            } else {
-                hideDropPill();
-            }
-        });
-        els.tableWrap.addEventListener('dragleave', event => {
-            const rowEl = event.target.closest('tr.bk-row');
-            if (rowEl && !rowEl.contains(event.relatedTarget)) {
-                rowEl.classList.remove('bk-drop-target');
-            }
-            if (!els.tableWrap.contains(event.relatedTarget)) {
-                hideDropPill();
-            }
-        });
-        els.tableWrap.addEventListener('drop', event => {
-            const rowEl = event.target.closest('tr.bk-row');
-            els.tableWrap.querySelectorAll('tr.bk-drop-target').forEach(tr => tr.classList.remove('bk-drop-target'));
-            hideDropPill();
-            if (!rowEl) return;
-
-            const pdfId = event.dataTransfer.getData('application/x-bk-pdf-id');
-            if (pdfId) {
-                event.preventDefault();
-                assignPdfToRow(parseInt(pdfId, 10), parseInt(rowEl.dataset.rowId, 10));
-                return;
-            }
-
-            const files = event.dataTransfer.files;
-            if (files && files.length > 0) {
-                // A CSV dropped on the table is an import, never a row
-                // attachment - leave it unhandled so it bubbles to the
-                // view-level handler.
-                if (findCsvFile(files)) return;
-                event.preventDefault();
-                uploadDroppedFileToRow(files[0], parseInt(rowEl.dataset.rowId, 10));
-            }
-        });
-
-        // Drop zone: OS file drops + browse + pool item deletion
-        ['dragover', 'dragenter'].forEach(type => {
-            els.dropzone.addEventListener(type, event => {
-                if (event.dataTransfer.types.includes('Files') && !dragLooksLikeCsv(event.dataTransfer)) {
-                    event.preventDefault();
-                    els.dropzone.classList.add('bk-dropzone-hover');
-                }
-            });
-        });
-        els.dropzone.addEventListener('dragleave', event => {
-            if (!els.dropzone.contains(event.relatedTarget)) {
-                els.dropzone.classList.remove('bk-dropzone-hover');
-            }
-        });
-        els.dropzone.addEventListener('drop', event => {
-            els.dropzone.classList.remove('bk-dropzone-hover');
-            const files = event.dataTransfer.files;
-            if (files && files.length > 0) {
-                // Same here: a CSV means import, so let it bubble.
-                if (findCsvFile(files)) return;
-                event.preventDefault();
-                uploadPoolFiles(files);
-            }
-        });
         els.poolBrowseBtn.addEventListener('click', () => els.poolInput.click());
 
         // Select-by-date tools, now inside a popover
@@ -2817,48 +3133,6 @@
                 modal.classList.remove('active');
             });
         });
-
-        // Files can be dropped anywhere on the bookkeeping view. The drop zone
-        // and table rows handle their own drops first (and call preventDefault
-        // when they do); anything they leave unhandled - notably a CSV, which
-        // is always an import no matter where it lands - arrives here.
-        const bookkeepingView = document.getElementById('bookkeepingView');
-        if (bookkeepingView) {
-            bookkeepingView.addEventListener('dragover', event => {
-                if (!event.dataTransfer.types.includes('Files')) return;
-                const overOwnTarget = event.target.closest('#bkDropzone') || event.target.closest('tr.bk-row');
-                if (overOwnTarget && !dragLooksLikeCsv(event.dataTransfer)) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-                bookkeepingView.classList.add('bk-csv-drop-active');
-            });
-            bookkeepingView.addEventListener('dragleave', event => {
-                if (!bookkeepingView.contains(event.relatedTarget)) {
-                    bookkeepingView.classList.remove('bk-csv-drop-active');
-                }
-            });
-            bookkeepingView.addEventListener('drop', event => {
-                bookkeepingView.classList.remove('bk-csv-drop-active');
-                // The drop zone / a table row already dealt with it.
-                if (event.defaultPrevented) return;
-
-                const files = event.dataTransfer.files;
-                if (!files || files.length === 0) return;
-                event.preventDefault();
-
-                const csv = findCsvFile(files);
-                if (csv) {
-                    handleCsvFile(csv);
-                    return;
-                }
-                if (Array.from(files).some(f => /\.pdf$/i.test(f.name))) {
-                    // A PDF dropped on empty space goes to the drop zone pool.
-                    uploadPoolFiles(files);
-                    return;
-                }
-                showToast('Drop a .csv file to import, or a .pdf to store it in the drop zone', true);
-            });
-        }
     }
 
     window.Bookkeeping = { load, focusRow };

@@ -137,13 +137,16 @@
 
     --c-scrim: rgba(17, 45, 78, 0.34);
 
-    /* The pipeline, told in the palette rather than a rainbow. The label is
-       always shown next to the dot, so colour is never the only signal. */
-    --stage-progress: #3F72AF;
-    --stage-proposal: #6F93C4;
-    --stage-negotiation: #112D4E;
-    --stage-lead: #9AAAC0;
-    --stage-complete: #2A7550;
+    /* The pipeline: one distinct hue per stage, so they tell apart at a
+       glance - slate for a lead, amber for an offer out, violet while it is
+       negotiated, blue while it runs, green when done. Muted to sit with the
+       winter palette. The label is always shown next to the colour, so colour
+       is never the only signal. */
+    --stage-lead: #8A94A6;
+    --stage-proposal: #C98A2B;
+    --stage-negotiation: #7B5CC0;
+    --stage-progress: #2F6FD0;
+    --stage-complete: #2E8A5C;
 
     --e-1: 0 1px 2px rgba(17, 45, 78, 0.05);
     --e-2: 0 1px 2px rgba(17, 45, 78, 0.04), 0 6px 16px -6px rgba(17, 45, 78, 0.10);
@@ -190,11 +193,11 @@
 
     --c-scrim: rgba(3, 8, 16, 0.62);
 
-    --stage-progress: #83A9DC;
-    --stage-proposal: #A6C2E9;
-    --stage-negotiation: #DBE2EF;
-    --stage-lead: #6F809A;
-    --stage-complete: #7ACFA2;
+    --stage-lead: #8E9AB0;
+    --stage-proposal: #E2A857;
+    --stage-negotiation: #A890E8;
+    --stage-progress: #6FA2F2;
+    --stage-complete: #6CCB97;
 
     --e-1: 0 1px 2px rgba(0, 0, 0, 0.30);
     --e-2: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 20px -8px rgba(0, 0, 0, 0.45);
@@ -419,6 +422,41 @@ h1, h2, h3, h4 {
     text-overflow: ellipsis;
 }
 
+/* Folds the desktop sidebar into the icon rail. Desktop only: tablets always
+   get the rail and phones the drawer, so there is nothing to fold there. */
+.sidebar-collapse-btn {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin: -6px -6px -6px auto;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.sidebar-collapse-btn:hover {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+.sidebar-collapse-chevron {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+@media (min-width: 1100px) {
+    .sidebar-collapse-btn {
+        display: inline-flex;
+    }
+}
+
 .sidebar-nav {
     display: flex;
     flex-direction: column;
@@ -466,6 +504,13 @@ h1, h2, h3, h4 {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+/* A filled mark reads heavier than the outline icons; a touch smaller evens it out. */
+.sidebar .nav-icon--claude {
+    width: 18px;
+    height: 18px;
+    margin: 0 1px;
 }
 
 .nav-label {
@@ -2180,16 +2225,18 @@ input[type="checkbox"] {
 }
 
 #projectsView .project-card {
+    --stage-tone: var(--stage-lead);
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 0;
-    min-height: 176px;
+    min-height: 0;
     height: auto;
     margin: 0;
     padding: 18px 18px 16px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    /* The stage, as the colour of the border: softened at rest, full on hover. */
+    border: 1px solid color-mix(in srgb, var(--stage-tone) 55%, var(--c-line));
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     cursor: pointer;
@@ -2197,16 +2244,26 @@ input[type="checkbox"] {
     transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
 
+#projectsView .project-card.stage-in-progress { --stage-tone: var(--stage-progress); }
+#projectsView .project-card.stage-proposal { --stage-tone: var(--stage-proposal); }
+#projectsView .project-card.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+#projectsView .project-card.stage-complete { --stage-tone: var(--stage-complete); }
+
 #projectsView .project-card:hover {
-    border-color: var(--c-line-strong);
+    border-color: var(--stage-tone);
     box-shadow: var(--e-2);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+}
+
+#projectsView .project-card:active {
+    transform: translateY(0);
+    box-shadow: var(--e-1);
 }
 
 #projectsView .project-card:focus-visible {
     outline: none;
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px var(--c-accent-soft);
+    box-shadow: 0 0 0 3px var(--c-accent-soft), var(--e-2);
 }
 
 #projectsView .project-card-head {
@@ -2221,7 +2278,7 @@ input[type="checkbox"] {
 #projectsView .project-card-title-wrap {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
 }
 
@@ -2235,8 +2292,15 @@ input[type="checkbox"] {
     font-size: var(--t-md);
     font-weight: 600;
     line-height: 1.35;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
     color: var(--c-ink);
+}
+
+/* "Awaiting review" on its own line: inside the title it counted towards the
+   title's two-line clamp and picked up the clamp's ellipsis. */
+#projectsView .project-card-review {
+    display: flex;
+    margin-top: 6px;
 }
 
 #projectsView .project-card-company {
@@ -2250,9 +2314,10 @@ input[type="checkbox"] {
 }
 
 #projectsView .project-card .assignee-chip {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     margin-top: -2px;
+    box-shadow: 0 0 0 2px var(--c-surface);
 }
 
 #projectsView .project-card-description {
@@ -2261,43 +2326,132 @@ input[type="checkbox"] {
     -webkit-line-clamp: 2;
     overflow: hidden;
     min-height: 0;
-    margin: 12px 0 0;
+    margin: 10px 0 0;
     font-size: var(--t-sm);
     line-height: 1.55;
     color: var(--c-ink-2);
 }
 
-#projectsView .project-card-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+/* Timeline and figures sit at the bottom, so cards in a row line up even
+   when their descriptions differ in length. */
+#projectsView .project-card-bottom {
     margin-top: auto;
     padding-top: 16px;
 }
 
-.project-card-facts {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
+/* Small uppercase labels: Start, End, Budget, Chance. */
+.project-meta-label {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-ink-3);
 }
 
-.project-fact {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--t-sm);
-    font-weight: 500;
+/* ---- When it runs: one quiet line, lighter than the budget ---- */
+
+.project-when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 6px;
+    margin: 0;
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.project-when-part {
+    white-space: nowrap;
     color: var(--c-ink-2);
+}
+
+.project-when-label {
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.project-when-empty {
+    color: var(--c-ink-3);
+}
+
+.project-when-arrow,
+.project-when-sep {
+    color: var(--c-ink-3);
+    opacity: 0.7;
+}
+
+.project-when-part.is-late,
+.project-when-part.is-late .project-when-label,
+.project-when-status.is-late {
+    color: var(--c-danger);
+}
+
+.project-when-status {
     white-space: nowrap;
 }
 
+.project-when-status.is-soon {
+    color: var(--c-warning);
+}
+
+.project-when-status.is-done {
+    color: var(--c-success);
+}
+
+/* ---- Figures ---- */
+
+#projectsView .project-card-foot {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.project-stat {
+    min-width: 0;
+}
+
+.project-stat--budget {
+    flex: 1;
+}
+
+.project-stat--chance {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.project-stat-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-stat--budget .project-stat-value {
+    display: block;
+}
+
+.project-stat-value.is-empty {
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
 /* Likelihood as a small ring rather than a bar and a sentence. */
-.project-fact--chance::before {
-    content: "";
-    width: 14px;
-    height: 14px;
+.project-chance-ring {
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
     border-radius: var(--r-full);
     background:
@@ -2576,6 +2730,35 @@ input[type="checkbox"] {
     border-color: var(--c-line-2);
 }
 
+/* A PDF being dragged over a bookkeeping row (workload.js): same blue dashed
+   language as dropping onto a row in the Bookkeeping tab. */
+#workloadView .workload-row.is-drop-target {
+    position: relative;
+    background: rgba(37, 99, 235, 0.08);
+    box-shadow: inset 0 0 0 2px #2563eb;
+    border-radius: var(--r-md);
+}
+
+#workloadView .workload-row.is-drop-target::after {
+    content: attr(data-drop-label);
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    padding: 5px 11px;
+    border-radius: var(--r-full);
+    background: #2563eb;
+    color: #fff;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    pointer-events: none;
+}
+
+#workloadView .workload-row.is-uploading {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 #workloadView .workload-row-mark {
     width: 22px;
     height: 22px;
@@ -2696,48 +2879,6 @@ input[type="checkbox"] {
 /* Inside a stage group the heading already names the stage. */
 .project-group .project-card .project-stage-badge {
     display: none;
-}
-
-.project-group .project-card-foot {
-    justify-content: flex-start;
-}
-
-.project-group .project-card-facts {
-    width: 100%;
-    justify-content: space-between;
-}
-
-/* The planned finish, as a small date chip. */
-.project-fact--due {
-    height: 26px;
-    padding: 0 9px 0 8px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
-    background: var(--c-surface);
-    font-size: var(--t-xs);
-    color: var(--c-ink-2);
-}
-
-.project-fact--due::before {
-    content: "";
-    width: 13px;
-    height: 13px;
-    flex-shrink: 0;
-    background-color: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='2.5'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='2.5'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
-    opacity: 0.8;
-}
-
-.project-fact--due.is-late {
-    color: var(--c-danger);
-    border-color: var(--c-danger-soft);
-    background: var(--c-danger-soft);
-}
-
-/* Value and chance sit together on the right; the date anchors the left. */
-.project-fact--due + .project-fact {
-    margin-left: auto;
 }
 
 /* ---- To-do groups ------------------------------------------------------- */
@@ -3006,6 +3147,7 @@ input[type="checkbox"] {
     .sidebar .nav-item,
     .sidebar .nav-item.toggle-btn {
         width: 48px;
+        min-width: 0;
         height: 44px;
         padding: 0;
         justify-content: center;
@@ -3061,6 +3203,119 @@ input[type="checkbox"] {
     .sidebar .profile-pop {
         left: calc(100% + 10px);
         bottom: 0;
+    }
+}
+
+/* ---- Desktop, collapsed: the same icon rail, by choice ------------------
+   The <html> class is set by the collapse button (app.js) and restored before
+   first paint by the inline script in index.php. Keep in step with the tablet
+   rail above - only the brand row differs: it stays, holding just the button
+   that expands the sidebar again. */
+
+@media (min-width: 1100px) {
+    .sidebar-collapsed .app-container {
+        grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    }
+
+    .sidebar-collapsed .sidebar {
+        align-items: center;
+        padding: 16px 10px 12px;
+    }
+
+    .sidebar-collapsed .sidebar-brand {
+        justify-content: center;
+        width: 100%;
+        padding: 4px 0 16px;
+    }
+
+    .sidebar-collapsed .sidebar-collapse-btn {
+        width: 48px;
+        height: 36px;
+        margin: 0;
+    }
+
+    .sidebar-collapsed .sidebar-collapse-chevron {
+        transform: scaleX(-1);
+    }
+
+    .sidebar-collapsed .brand-name,
+    .sidebar-collapsed .nav-label,
+    .sidebar-collapsed .sidebar-heading,
+    .sidebar-collapsed .team-name,
+    .sidebar-collapsed .team-count,
+    .sidebar-collapsed .user-chip-text {
+        display: none;
+    }
+
+    .sidebar-collapsed .sidebar-nav,
+    .sidebar-collapsed .team-list,
+    .sidebar-collapsed .sidebar-foot {
+        align-items: center;
+        width: 100%;
+    }
+
+    .sidebar-collapsed .sidebar .nav-item,
+    .sidebar-collapsed .sidebar .nav-item.toggle-btn {
+        width: 48px;
+        min-width: 0;
+        height: 44px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .sidebar-collapsed .sidebar .nav-count {
+        display: none;
+    }
+
+    .sidebar-collapsed .sidebar .nav-count--alert:not([hidden]),
+    .sidebar-collapsed .sidebar .toggle-badge.nav-count--alert:not([hidden]) {
+        display: inline-flex;
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 10px;
+        box-shadow: 0 0 0 2px var(--c-surface);
+    }
+
+    .sidebar-collapsed .team-item {
+        width: 44px;
+        height: 40px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .sidebar-collapsed .sidebar-team {
+        width: 100%;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--c-line-2);
+    }
+
+    .sidebar-collapsed .sidebar-foot .user-chip-wrap {
+        flex-direction: column;
+        gap: 6px;
+        padding: 12px 0 0;
+        width: 100%;
+    }
+
+    .sidebar-collapsed .sidebar .user-chip,
+    .sidebar-collapsed .sidebar button.user-chip {
+        flex: none;
+        padding: 4px;
+        justify-content: center;
+    }
+
+    /* Fixed beside the rail, like on tablets, so the sidebar cannot clip it. */
+    .sidebar-collapsed .sidebar .profile-pop {
+        position: fixed;
+        left: calc(var(--rail-w) + 10px);
+        bottom: 12px;
+        top: auto;
+        width: 260px;
+        z-index: 1200;
     }
 }
 
@@ -3605,9 +3860,13 @@ input[type="checkbox"] {
 
 /* ---- Detail sheets (desktop and tablet) ---- */
 
+/* The project form is a sheet too, although it is a form: it opens from the
+   project's detail sheet, and jumping from the right edge to the centre of the
+   screen to edit what was just being read is disorienting. */
 @media (min-width: 769px) {
     #overviewModal,
     #projectOverviewModal,
+    #projectModal,
     #companyNotesModal,
     #usersModal {
         justify-content: flex-end;
@@ -3617,6 +3876,7 @@ input[type="checkbox"] {
 
     #overviewModal .modal-content,
     #projectOverviewModal .modal-content,
+    #projectModal .modal-content,
     #companyNotesModal .modal-content,
     #usersModal .modal-content {
         width: min(600px, 100%);
@@ -4149,6 +4409,7 @@ a.detail-value:hover,
 @media (min-width: 769px) {
     #overviewModal .modal-backdrop,
     #projectOverviewModal .modal-backdrop,
+    #projectModal .modal-backdrop,
     #companyNotesModal .modal-backdrop,
     #usersModal .modal-backdrop {
         background: rgba(17, 45, 78, 0.18);
@@ -4158,6 +4419,7 @@ a.detail-value:hover,
 
     :root[data-theme="dark"] #overviewModal .modal-backdrop,
     :root[data-theme="dark"] #projectOverviewModal .modal-backdrop,
+    :root[data-theme="dark"] #projectModal .modal-backdrop,
     :root[data-theme="dark"] #companyNotesModal .modal-backdrop,
     :root[data-theme="dark"] #usersModal .modal-backdrop {
         background: rgba(3, 8, 16, 0.45);

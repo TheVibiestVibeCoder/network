@@ -75,8 +75,204 @@
     pointer-events: none;
 }
 
+/* ---- Leaving: how a decided row goes ------------------------------------
+   One quiet motion. The row takes on a faint tint of the outcome, its
+   content lifts a few pixels while blurring and fading, then the gap closes
+   (review.js removeItem pins the height and adds .is-collapsing). ~480ms. */
+
+.review-row {
+    position: relative;
+}
+
 .review-row.is-leaving {
+    overflow: hidden;
+    pointer-events: none;
     opacity: 0;
+}
+
+.review-row.is-leaving--accept,
+.review-row.is-leaving--reject {
+    opacity: 1;
+    transition: background-color 200ms var(--ease);
+}
+
+.review-row.is-leaving--accept { background: var(--c-success-soft); }
+.review-row.is-leaving--reject { background: var(--c-danger-soft); }
+
+.review-row.is-leaving--accept > *,
+.review-row.is-leaving--reject > * {
+    animation: reviewVanish 240ms var(--ease) both;
+}
+
+/* Then the gap closes. The row's height is pinned in px by review.js first. */
+.review-row.is-collapsing {
+    height: 0 !important;
+    border-top-color: transparent !important;
+    opacity: 0;
+    transition: height 240ms var(--ease), opacity 160ms var(--ease), border-color 160ms var(--ease);
+}
+
+@keyframes reviewVanish {
+    to { opacity: 0; transform: translateY(-6px); filter: blur(3px); }
+}
+
+/* While "Accept all" / "Reject all" runs, nothing else in the list is clickable. */
+.review-list.is-bulk-running .review-row-actions,
+.review-list.is-bulk-running .review-row-toggle {
+    pointer-events: none;
+}
+
+
+/* ---- Accept all / Reject all --------------------------------------------- */
+
+.review-bulk {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin: -6px 0 18px;
+}
+
+.review-bulk[hidden] {
+    display: none;
+}
+
+.review-bulk-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.review-bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.review-bulk-btn--reject:hover:not(:disabled) {
+    border-color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.review-bulk-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.review-bulk-status {
+    margin-right: auto;
+    color: var(--c-ink-2);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A hairline under the bar that fills as the decisions land, in the colour
+   of the decision. */
+.review-bulk-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -9px;
+    height: 3px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
+.review-bulk.is-running .review-bulk-progress {
+    opacity: 1;
+}
+
+.review-bulk-bar {
+    display: block;
+    height: 100%;
+    background: var(--c-success);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 260ms var(--ease);
+}
+
+.review-bulk[data-action="reject"] .review-bulk-bar {
+    background: var(--c-danger);
+}
+
+
+/* ---- Everything decided at once: a check that draws itself ---------------- */
+
+.review-empty--cleared .review-done-mark {
+    width: 56px;
+    height: 56px;
+    opacity: 1;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.review-empty--accept .review-done-mark { color: var(--c-success); }
+.review-empty--reject .review-done-mark { color: var(--c-ink-3); }
+
+.review-done-ring,
+.review-done-check {
+    stroke: currentColor;
+}
+
+.review-done-ring {
+    stroke-dasharray: 145;
+    stroke-dashoffset: 145;
+    animation: reviewDraw 520ms var(--ease) forwards;
+}
+
+.review-done-check {
+    stroke-dasharray: 34;
+    stroke-dashoffset: 34;
+    animation: reviewDraw 320ms 420ms var(--ease) forwards;
+}
+
+.review-empty--cleared .review-done-mark {
+    animation: reviewSettle 360ms 700ms var(--ease) both;
+}
+
+.review-empty--cleared h3,
+.review-empty--cleared p {
+    animation: reviewRise 360ms 520ms var(--ease) both;
+}
+
+@keyframes reviewDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes reviewSettle {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+@keyframes reviewRise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .review-done-ring,
+    .review-done-check {
+        animation: none;
+        stroke-dashoffset: 0;
+    }
+
+    .review-empty--cleared .review-done-mark,
+    .review-empty--cleared h3,
+    .review-empty--cleared p {
+        animation: none;
+    }
+
+    .review-bulk-bar,
+    .review-row.is-collapsing {
+        transition: none;
+    }
 }
 
 .review-row.is-open {
@@ -581,14 +777,42 @@
     height: 11px;
 }
 
-.is-proposed {
-    border-left: 3px dashed var(--c-accent) !important;
+/* A proposed record: a solid accent frame and a tint, so it stands apart from
+   accepted records at a glance. The frame is an inset ring rather than a
+   border, so nothing shifts or resizes; it follows each element's own radius.
+   The id-scoped selectors match design.css, which restyles these elements
+   (hover included) by id and would otherwise win. */
+.is-proposed,
+.is-proposed:hover,
+#listView .contact-card.is-proposed,
+#listView .contact-card.is-proposed:hover,
+#todoView .todo-item.is-proposed,
+#todoView .todo-item.is-proposed:hover {
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
 }
 
+/* Cards already have a border and a lift; colour the border and keep the lift. */
+#projectsView .project-card.is-proposed,
+#projectsView .project-card.is-proposed:hover {
+    background: color-mix(in srgb, var(--c-accent) 6%, var(--c-surface));
+    border-color: var(--c-accent);
+    box-shadow: inset 0 0 0 1px var(--c-accent), var(--e-1);
+}
+
+/* Rows sit flush in their list; round the frame a touch so it reads as a
+   marked item rather than a stray rule between rows. */
 #listView .contact-card.is-proposed,
-.todo-item.is-proposed,
-.note-item.is-proposed {
-    background: var(--c-accent-softer);
+#todoView .todo-item.is-proposed {
+    border-radius: var(--r-md);
+}
+
+/* The badge on a proposed record is the second half of the signal. */
+.is-proposed .review-badge {
+    background: var(--c-accent);
+    /* The page background: near-white on the dark blue of light mode, near-black
+       on the light blue of dark mode. */
+    color: var(--c-bg);
 }
 
 .review-inline {

@@ -408,6 +408,10 @@ function buildPasswordLink(string $token): string
                 if (storedTheme === 'light' || storedTheme === 'dark') {
                     document.documentElement.setAttribute('data-theme', storedTheme);
                 }
+                // Before first paint, so a collapsed sidebar does not flash open.
+                if (localStorage.getItem('crm-sidebar-collapsed') === '1') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
             } catch (e) {
                 // Ignore storage errors and keep default theme
             }
@@ -669,6 +673,13 @@ function buildPasswordLink(string $token): string
             <aside class="sidebar" id="sidebar" aria-label="Main navigation">
                 <div class="sidebar-brand">
                     <span class="brand-name"><?= htmlspecialchars(APP_NAME) ?></span>
+                    <!-- Desktop only: folds the sidebar into the same icon rail tablets get -->
+                    <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn"
+                            aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M9.5 4v16"/><path class="sidebar-collapse-chevron" d="m15.5 10-2 2 2 2"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <nav class="sidebar-nav">
@@ -696,7 +707,6 @@ function buildPasswordLink(string $token): string
                             <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/>
                         </svg>
                         <span class="nav-label">Contacts</span>
-                        <span class="nav-count contact-count" data-contact-count><?= (int) $contactCount ?></span>
                     </button>
                     <button type="button" class="toggle-btn nav-item" data-view="calendar" title="Calendar">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -711,8 +721,9 @@ function buildPasswordLink(string $token): string
                         <span class="nav-label">Bookkeeping</span>
                     </button>
                     <button type="button" class="toggle-btn nav-item" data-view="review" title="From Claude - waiting for review">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>
+                        <!-- Claude's mark, filled: the outline style of the other icons would blur its rays -->
+                        <svg class="nav-icon nav-icon--claude" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/>
                         </svg>
                         <span class="nav-label">From Claude</span>
                         <span class="toggle-badge nav-count nav-count--alert" id="reviewBadge" data-review-badge hidden>0</span>
@@ -876,6 +887,21 @@ function buildPasswordLink(string $token): string
                         <div class="segmented" role="tablist" aria-label="Show proposals">
                             <button type="button" class="segmented-btn active" data-review-tab="pending" role="tab" aria-selected="true">Waiting</button>
                             <button type="button" class="segmented-btn" data-review-tab="resolved" role="tab" aria-selected="false">History</button>
+                        </div>
+                    </div>
+                    <!-- Decide everything waiting at once (review.js decideAll) -->
+                    <div class="review-bulk" id="reviewBulk" hidden>
+                        <div class="review-bulk-progress" aria-hidden="true"><span class="review-bulk-bar" id="reviewBulkBar"></span></div>
+                        <span class="review-bulk-status" id="reviewBulkStatus" role="status"></span>
+                        <div class="review-bulk-actions">
+                            <button type="button" class="btn btn-secondary btn-small review-bulk-btn review-bulk-btn--reject" data-review-bulk="reject">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                                <span>Reject all</span>
+                            </button>
+                            <button type="button" class="btn btn-primary btn-small review-bulk-btn review-bulk-btn--accept" data-review-bulk="accept">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                                <span>Accept all</span>
+                            </button>
                         </div>
                     </div>
                     <div class="review-list" id="reviewList" aria-live="polite"></div>
@@ -1131,8 +1157,11 @@ function buildPasswordLink(string $token): string
                             </div>
                         </div>
                         <div class="todo-controls list-controls" id="todoFilterControls">
+                            <select id="todoAssignedFilter" class="form-select" title="Assigned to">
+                                <option value="">Assigned to anyone</option>
+                            </select>
                             <select id="todoContactFilter" class="form-select">
-                                <option value="">All People</option>
+                                <option value="">All Contacts</option>
                             </select>
                             <select id="todoProjectFilter" class="form-select">
                                 <option value="">All Projects</option>
@@ -1937,8 +1966,8 @@ function buildPasswordLink(string $token): string
                                 <input type="date" id="todoDueDate" class="form-input">
                             </div>
 
-                            <!-- Only rendered once the to-do exists, since an
-                                 assignment needs a record to attach to. -->
+                            <!-- On a new to-do the choice is applied right after
+                                 it is created (saveTodo in app.js). -->
                             <div class="form-group" id="todoAssigneeGroup" hidden>
                                 <label>Assigned to</label>
                                 <div id="todoAssignee"></div>
@@ -2078,7 +2107,9 @@ function buildPasswordLink(string $token): string
                     <button type="button" class="modal-close" id="bkPdfPreviewCloseBtn">&times;</button>
                 </div>
                 <div class="modal-body bk-pdf-preview-body">
-                    <iframe id="bkPdfPreviewFrame" class="bk-pdf-preview-frame" title="PDF preview"></iframe>
+                    <!-- Pages drawn by PDF.js; the iframe is only the fallback if PDF.js cannot load -->
+                    <div id="bkPdfPreviewPages" class="bk-pdf-preview-pages" aria-label="PDF preview"></div>
+                    <iframe id="bkPdfPreviewFrame" class="bk-pdf-preview-frame" title="PDF preview" hidden></iframe>
                 </div>
                 <div class="modal-footer">
                     <a href="#" class="btn btn-secondary" id="bkPdfPreviewOpenBtn" target="_blank" rel="noopener">Open in new tab</a>

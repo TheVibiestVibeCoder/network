@@ -130,7 +130,9 @@ final class McpService
 
     private function meta(array $p): array
     {
-        $users = [['id' => 0, 'name' => OWNER_DISPLAY_NAME, 'role' => 'owner']];
+        // The owner login is the recovery account, not a team member, so it is
+        // not offered as someone to assign work to.
+        $users = [];
         foreach ($this->db->query("SELECT id, name, role FROM users WHERE status <> 'disabled' ORDER BY name COLLATE NOCASE")->fetchAll() as $u) {
             $users[] = ['id' => (int) $u['id'], 'name' => $u['name'], 'role' => $u['role']];
         }
@@ -1254,17 +1256,14 @@ final class McpService
         return (bool) $stmt->fetchColumn();
     }
 
-    /** Same rules as api/assign.php: nobody, the owner (0), or an account that is not disabled. */
+    /** Same rules as api/assign.php: nobody, or an account that is not disabled. Never the owner login. */
     private function resolveAssignee($raw): array
     {
         if ($raw === null || $raw === '' || $raw === 'none') {
             return ['id' => null, 'name' => null];
         }
-        if (!is_numeric($raw) || (int) $raw < 0) {
-            throw new McpError('user_id must be a team member id from meta, 0 for the owner, or null to unassign.', 422);
-        }
-        if ((int) $raw === 0) {
-            return ['id' => 0, 'name' => OWNER_DISPLAY_NAME];
+        if (!is_numeric($raw) || (int) $raw <= 0) {
+            throw new McpError('user_id must be a team member id from meta, or null to unassign.', 422);
         }
 
         $stmt = $this->db->prepare("SELECT id, name, status FROM users WHERE id = :id");
