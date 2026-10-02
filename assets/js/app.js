@@ -4867,6 +4867,11 @@
             emptyMessage: 'No to-dos yet for this project'
         });
 
+        // The files attached to this project (documents.js)
+        if (window.ProjectDocuments) {
+            window.ProjectDocuments.load(project.id, project.name);
+        }
+
         // Render notes
         renderProjectNotesTimeline(notes);
     }
@@ -5054,6 +5059,10 @@
 
         if (elements.projectTodosList) {
             elements.projectTodosList.innerHTML = '';
+        }
+
+        if (window.ProjectDocuments) {
+            window.ProjectDocuments.reset();
         }
     }
 

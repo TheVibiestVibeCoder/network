@@ -377,6 +377,21 @@ function buildPasswordLink(string $token): string
 
     return rtrim($base, '/') . '/index.php?action=set-password&token=' . urlencode($token);
 }
+
+/**
+ * The address of one of the app's own stylesheets or scripts, with a version
+ * that changes whenever the file does.
+ *
+ * The host serves static files with a cache lifetime of a week. Without the
+ * version, a browser keeps running last week's script against today's page
+ * after an update - until somebody thinks of a hard reload.
+ */
+function assetUrl(string $path): string
+{
+    $modified = @filemtime(APP_ROOT . '/' . $path);
+
+    return htmlspecialchars($path . ($modified ? '?v=' . $modified : ''), ENT_QUOTES, 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -419,12 +434,12 @@ function buildPasswordLink(string $token): string
     </script>
 
     <!-- Application CSS -->
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/bookkeeping.css">
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/style.css') ?>">
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/bookkeeping.css') ?>">
     <!-- The design system. Loaded last: its tokens and components are the
          final word over the two stylesheets above. -->
-    <link rel="stylesheet" href="assets/css/design.css">
-    <link rel="stylesheet" href="assets/css/review.css">
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/design.css') ?>">
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/review.css') ?>">
 </head>
 <body>
     <?php if (!$isAuthenticated): ?>
@@ -1905,6 +1920,23 @@ function buildPasswordLink(string $token): string
                         </div>
                     </div>
 
+                    <!-- Project Documents Section (assets/js/documents.js).
+                         Dragging files over the sheet shows one drop target
+                         per label, so a file is labelled as it is added. -->
+                    <div class="overview-section" id="projectDocuments">
+                        <h3 class="overview-section-title">
+                            Documents
+                            <span class="pdoc-count" id="projectDocumentsCount" hidden></span>
+                        </h3>
+                        <div class="pdoc-list" id="projectDocumentsList" aria-live="polite">
+                            <!-- Documents will be populated by JS -->
+                        </div>
+                        <div class="pdoc-add" id="projectDocumentsAdd">
+                            <!-- One button per label, rendered by JS -->
+                        </div>
+                        <input type="file" id="projectDocumentsInput" multiple hidden>
+                    </div>
+
                     <!-- Project Notes Section -->
                     <div class="overview-section">
                         <h3 class="overview-section-title">Project Notes</h3>
@@ -2214,14 +2246,15 @@ function buildPasswordLink(string $token): string
         <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
-        <script src="assets/js/charts.js"></script>
-        <script src="assets/js/review.js"></script>
-        <script src="assets/js/app.js"></script>
-        <script src="assets/js/bookkeeping.js"></script>
-        <script src="assets/js/profile.js"></script>
-        <script src="assets/js/workload.js"></script>
+        <script src="<?= assetUrl('assets/js/charts.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/profile.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/workload.js') ?>"></script>
         <?php if ($isAdmin): ?>
-        <script src="assets/js/users.js"></script>
+        <script src="<?= assetUrl('assets/js/users.js') ?>"></script>
         <?php endif; ?>
     <?php endif; ?>
 </body>

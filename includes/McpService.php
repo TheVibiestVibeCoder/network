@@ -17,6 +17,11 @@
  * Bookkeeping is deliberately narrow: Claude can see which invoice PDFs sit in
  * the pool and put new ones there. It cannot read bank entries or invoices, and
  * filing an invoice on its row stays a person's job.
+ *
+ * Project documents are the opposite on purpose: they are attached to a project
+ * so that whoever works on it has the context, and that includes Claude. It can
+ * list a project's documents, fetch one to read it, and add new ones - which,
+ * like every other write, are proposals until a person accepts them.
  */
 
 // ---------------------------------------------------------------------------
@@ -30,6 +35,21 @@ if (!defined('APP_ROOT')) {
 /** A refusal Claude should read and act on - the message is shown to it verbatim. */
 class McpError extends ReviewException
 {
+}
+
+/**
+ * A stored file as the answer to an action. api/mcp.php sends its bytes as the
+ * response body instead of JSON, so a document is streamed from disk rather
+ * than base64-encoded in memory.
+ */
+final class McpFile
+{
+    public string $path;
+
+    public function __construct(string $path)
+    {
+        $this->path = $path;
+    }
 }
 
 final class McpService
@@ -63,6 +83,9 @@ final class McpService
         'companies.get' => ['companiesGet', false],
         'projects.search' => ['projectsSearch', false],
         'projects.get' => ['projectsGet', false],
+        'projects.documents' => ['projectsDocuments', false],
+        'projects.document' => ['projectsDocument', false],
+        'projects.document_file' => ['projectsDocumentFile', false],
         'todos.list' => ['todosList', false],
         'activity.recent' => ['activityRecent', false],
         'tags.list' => ['tagsList', false],
@@ -77,6 +100,7 @@ final class McpService
         'projects.add_note' => ['projectsAddNote', true],
         'projects.link_contact' => ['projectsLinkContact', true],
         'projects.unlink_contact' => ['projectsUnlinkContact', true],
+        'projects.upload_document' => ['projectsUploadDocument', true],
         'tags.apply' => ['tagsApply', true],
         'tags.remove' => ['tagsRemove', true],
         'todos.create' => ['todosCreate', true],
@@ -100,7 +124,8 @@ final class McpService
         return isset(self::ACTIONS[$action]) && self::ACTIONS[$action][1];
     }
 
-    public function handle(string $action, array $params): array
+    /** @return array|McpFile The JSON answer, or a file to send as the body. */
+    public function handle(string $action, array $params)
     {
         if (!isset(self::ACTIONS[$action])) {
             throw new McpError('Unknown action "' . mb_substr($action, 0, 64) . '".', 400);
@@ -145,6 +170,7 @@ final class McpService
                 . MCP_ACTOR_NAME . ' and only becomes permanent when a person accepts it.',
             'project_stages' => self::STAGES,
             'todo_priorities' => self::PRIORITIES,
+            'document_labels' => ProjectDocument::LABELS,
             'team' => $users,
             'counts' => [
                 'contacts' => (int) $this->db->query("SELECT COUNT(*) FROM contacts")->fetchColumn(),
@@ -438,8 +464,53 @@ final class McpService
             'tags' => $tags->fetchAll(),
             'notes' => $notes->fetchAll(),
             'todos' => $todos->fetchAll(),
+            'documents' => array_map([ProjectDocument::class, 'present'], ProjectDocument::forProject($id)),
             'open_proposals' => $this->proposalsFor('project', $id),
         ];
+    }
+
+    private function projectsDocuments(array $p): array
+    {
+        $project = $this->fetchProject($this->id($p, 'project_id'));
+        $label = $this->documentLabel($p, false);
+
+        $documents = [];
+        foreach (ProjectDocument::forProject((int) $project['id']) as $row) {
+            if ($label === null || $row['label'] === $label) {
+                $documents[] = ProjectDocument::present($row);
+            }
+        }
+
+        return [
+            'project' => $this->pick($project, ['id', 'name', 'company', 'stage', 'review_status']),
+            'labels' => ProjectDocument::LABELS,
+            'allowed_extensions' => ProjectDocument::extensions(),
+            'max_upload_bytes' => ProjectDocument::MAX_API_BYTES,
+            'documents' => $documents,
+        ];
+    }
+
+    private function projectsDocument(array $p): array
+    {
+        $row = $this->fetchDocument($this->id($p, 'document_id'));
+        $project = $this->fetchProject((int) $row['project_id']);
+
+        return [
+            'document' => ProjectDocument::present($row),
+            'project' => $this->pick($project, ['id', 'name', 'company', 'stage', 'review_status']),
+        ];
+    }
+
+    /** The file itself. Sent as the response body, not as JSON. */
+    private function projectsDocumentFile(array $p): McpFile
+    {
+        $row = $this->fetchDocument($this->id($p, 'document_id'));
+        $path = ProjectDocument::pathOf($row);
+        if ($path === null || !is_file($path)) {
+            throw new McpError('The file behind document ' . (int) $row['id'] . ' is missing on the server.', 404);
+        }
+
+        return new McpFile($path);
     }
 
     private function todosList(array $p): array
@@ -788,6 +859,66 @@ final class McpService
         $reviewId = ReviewQueue::add('unlink', 'project', (int) $project['id'], $label, ['contact_id' => (int) $contact['id']], null, $this->comment($p));
 
         return $this->proposed('project_id', (int) $project['id'], $reviewId, 'Removing the contact from the project was proposed.');
+    }
+
+    private function projectsUploadDocument(array $p): array
+    {
+        $project = $this->fetchProject($this->id($p, 'project_id'));
+        $label = $this->documentLabel($p, true);
+        $filename = $this->str($p, 'filename', 200, true);
+
+        $raw = $p['content_base64'] ?? null;
+        if (!is_string($raw) || $raw === '') {
+            throw new McpError('content_base64 is required.', 422);
+        }
+
+        $raw = preg_replace('/^data:[^;,]*;base64,/i', '', trim($raw));
+        $bytes = base64_decode(preg_replace('/\s+/', '', (string) $raw), true);
+        if ($bytes === false || $bytes === '') {
+            throw new McpError('content_base64 is not valid base64.', 422);
+        }
+
+        // Written under its final name and checked there, by the same rules as
+        // a file uploaded in the CRM itself.
+        try {
+            $stored = ProjectDocument::storeBytes($filename, $bytes, ProjectDocument::MAX_API_BYTES);
+        } catch (InvalidArgumentException $e) {
+            throw new McpError($e->getMessage(), 422);
+        }
+
+        $comment = $this->comment($p);
+
+        try {
+            $result = Database::transactional(function (PDO $db) use ($project, $label, $stored, $comment) {
+                $documentId = ProjectDocument::insert(
+                    (int) $project['id'], $label, $stored['name'], $stored['stored_name'], $stored['mime'], $stored['size'],
+                    ReviewQueue::PENDING
+                );
+
+                $reviewId = ReviewQueue::add(
+                    'create',
+                    'project_document',
+                    $documentId,
+                    $project['name'] . ': ' . $stored['name'],
+                    ['name' => $stored['name'], 'label' => $label, 'size' => $stored['size'], 'project_id' => (int) $project['id']],
+                    null,
+                    $comment
+                );
+
+                return ['document_id' => $documentId, 'review_id' => $reviewId];
+            });
+        } catch (Throwable $e) {
+            @unlink($stored['path']);
+            throw $e;
+        }
+
+        return [
+            'status' => 'proposed',
+            'document_id' => $result['document_id'],
+            'review_id' => $result['review_id'],
+            'message' => 'The document is attached to the project as "' . $label . '", marked as coming from ' . MCP_ACTOR_NAME
+                . '. It waits for a person to accept or reject it.',
+        ];
     }
 
     // =========================================================================
@@ -1196,6 +1327,32 @@ final class McpService
         $row['is_completed'] = (int) $row['is_completed'];
 
         return $row;
+    }
+
+    private function fetchDocument(int $id): array
+    {
+        $row = ProjectDocument::find($id);
+        if ($row === null) {
+            throw new McpError('Document ' . $id . ' not found.', 404);
+        }
+
+        return $row;
+    }
+
+    /** One of the document labels, written as the CRM writes it. */
+    private function documentLabel(array $p, bool $required): ?string
+    {
+        $raw = $this->str($p, 'label', 32, $required);
+        if ($raw === null) {
+            return null;
+        }
+
+        $label = ProjectDocument::label($raw);
+        if ($label === null) {
+            throw new McpError('label must be one of: ' . implode(', ', ProjectDocument::LABELS) . '.', 422);
+        }
+
+        return $label;
     }
 
     private function requireBookkeeping(): void

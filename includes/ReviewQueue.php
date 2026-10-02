@@ -7,8 +7,9 @@
  *
  * There are two shapes of proposal:
  *
- *   - A NEW record (contact, project, to-do, note, invoice PDF) is written to
- *     its ordinary table straight away, with review_status = 'pending'. That
+ *   - A NEW record (contact, project, to-do, note, invoice PDF, project
+ *     document) is written to its ordinary table straight away, with
+ *     review_status = 'pending'. That
  *     way it shows up where people already look - in the lists, the detail
  *     views, the bookkeeping pool - clearly marked, editable with the normal
  *     forms, and Claude can keep referring to it by id (add a note to the
@@ -35,6 +36,10 @@ if (!defined('APP_ROOT')) {
     http_response_code(404);
     exit;
 }
+
+// Rejecting a proposed document - or a proposed project that has documents -
+// has to remove files as well as rows.
+require_once APP_ROOT . '/includes/ProjectDocument.php';
 
 /** A refusal the caller should see, with the HTTP status that fits it. */
 class ReviewException extends RuntimeException
@@ -77,6 +82,7 @@ final class ReviewQueue
         'contact_note' => 'notes',
         'project_note' => 'project_notes',
         'bookkeeping_pdf' => 'bookkeeping_pdfs',
+        'project_document' => 'project_documents',
     ];
 
     /** Every entity a proposal can point at. */
@@ -318,20 +324,18 @@ final class ReviewQueue
     private static function discard(int $id, string $status, array $actor): array
     {
         $item = self::requirePending($id);
-        $fileToRemove = null;
+        $filesToRemove = [];
 
-        Database::transactional(function (PDO $db) use ($item, $status, $actor, &$fileToRemove) {
+        Database::transactional(function (PDO $db) use ($item, $status, $actor, &$filesToRemove) {
             if ($item['kind'] === 'create') {
-                $fileToRemove = self::deletePendingRecord($db, $item['entity_type'], (int) $item['entity_id']);
+                $filesToRemove = self::deletePendingRecord($db, $item['entity_type'], (int) $item['entity_id']);
             }
             self::mark($db, (int) $item['id'], $status, $actor);
         });
 
-        // The file goes only once the row is gone for good: a rolled-back
+        // The files go only once the rows are gone for good: a rolled-back
         // transaction must not leave a database row pointing at nothing.
-        if ($fileToRemove !== null && is_file($fileToRemove)) {
-            @unlink($fileToRemove);
-        }
+        ProjectDocument::removeFiles($filesToRemove);
 
         if ($item['kind'] === 'create') {
             self::logDecision($item, $status);
@@ -437,24 +441,41 @@ final class ReviewQueue
     }
 
     /**
-     * Delete a record that is still pending. Returns the path of a stored file
-     * to remove once the transaction has committed, if there is one.
+     * Delete a record that is still pending. Returns the paths of the stored
+     * files to remove once the transaction has committed, if there are any.
+     *
+     * @return string[]
      */
-    private static function deletePendingRecord(PDO $db, string $type, int $id): ?string
+    private static function deletePendingRecord(PDO $db, string $type, int $id): array
     {
         $table = self::PENDABLE[$type] ?? null;
         if ($table === null || !self::tableExists($table)) {
-            return null;
+            return [];
         }
 
-        $file = null;
+        $files = [];
         if ($type === 'bookkeeping_pdf') {
             $stmt = $db->prepare("SELECT stored_name FROM bookkeeping_pdfs WHERE id = :id AND review_status = 'pending'");
             $stmt->execute(['id' => $id]);
             $stored = $stmt->fetchColumn();
             if (is_string($stored) && preg_match('/^[A-Za-z0-9_]+\.pdf$/', $stored)) {
-                $file = DATA_DIR . '/bookkeeping_pdfs/' . $stored;
+                $files[] = DATA_DIR . '/bookkeeping_pdfs/' . $stored;
             }
+        }
+
+        if ($type === 'project_document') {
+            $stmt = $db->prepare("SELECT stored_name FROM project_documents WHERE id = :id AND review_status = 'pending'");
+            $stmt->execute(['id' => $id]);
+            $path = ProjectDocument::pathOf(['stored_name' => $stmt->fetchColumn()]);
+            if ($path !== null) {
+                $files[] = $path;
+            }
+        }
+
+        // A proposed project takes the documents attached to it along: their
+        // rows through the foreign key, their files here.
+        if ($type === 'project' && self::isPendingRecord('project', $id)) {
+            $files = ProjectDocument::filesOfProject($id);
         }
 
         // A to-do's mirrored copies live and die with it, as in todos.php. Older
@@ -471,7 +492,7 @@ final class ReviewQueue
         $db->prepare("DELETE FROM " . $table . " WHERE id = :id AND review_status = 'pending'")
             ->execute(['id' => $id]);
 
-        return $file;
+        return $files;
     }
 
     private static function applyLink(PDO $db, array $item, bool $link): void
@@ -587,6 +608,11 @@ final class ReviewQueue
                 break;
             case 'bookkeeping_pdf':
                 $sql = "SELECT id, original_name, file_size, row_id, review_status, created_at FROM bookkeeping_pdfs WHERE id = :id";
+                break;
+            case 'project_document':
+                $sql = "SELECT d.id, d.original_name, d.label, d.file_size, d.project_id, d.review_status, d.created_at,
+                               p.name AS project_name
+                        FROM project_documents d LEFT JOIN projects p ON p.id = d.project_id WHERE d.id = :id";
                 break;
             default:
                 return null;

@@ -2095,18 +2095,36 @@
         return pdfjsPromise;
     }
 
-    async function openPdfPreview(pdfId, pdfName) {
+    function openPdfPreview(pdfId, pdfName) {
         if (!pdfId) return;
-        const url = `${API}?action=download-pdf&id=${pdfId}`;
+        return openPreview(`${API}?action=download-pdf&id=${pdfId}`, pdfName);
+    }
+
+    /**
+     * Show a PDF or an image this site serves in the preview dialog: the
+     * invoices here, and a project's documents (documents.js), which reach it
+     * through window.Bookkeeping.preview().
+     */
+    async function openPreview(url, name, kind = 'pdf') {
         // Any preview still rendering stops at its next page.
         const token = ++previewToken;
 
-        els.pdfPreviewTitle.textContent = pdfName || 'PDF';
+        els.pdfPreviewTitle.textContent = name || 'PDF';
         els.pdfPreviewOpenBtn.href = url;
         els.pdfPreviewFrame.hidden = true;
         els.pdfPreviewPages.hidden = false;
         els.pdfPreviewPages.innerHTML = '<p class="bk-pdf-preview-status">Loading preview…</p>';
         els.pdfPreviewModal.classList.add('active');
+
+        if (kind === 'image') {
+            const image = document.createElement('img');
+            image.className = 'bk-pdf-page bk-preview-image';
+            image.alt = name || '';
+            image.src = url;
+            els.pdfPreviewPages.innerHTML = '';
+            els.pdfPreviewPages.appendChild(image);
+            return;
+        }
 
         try {
             const [lib, data] = await Promise.all([
@@ -3135,5 +3153,14 @@
         });
     }
 
-    window.Bookkeeping = { load, focusRow };
+    window.Bookkeeping = {
+        load,
+        focusRow,
+        // The preview dialog belongs to this module; init() only wires it up
+        // and fetches nothing, so it is safe to call from any view.
+        preview(url, name, kind) {
+            init();
+            return openPreview(url, name, kind);
+        }
+    };
 })();

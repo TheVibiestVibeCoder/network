@@ -13,6 +13,10 @@ data/*.db-shm
 # The directory and its .htaccess are recreated automatically on first use.
 data/bookkeeping_pdfs/
 
+# Documents attached to projects - offers, background material, invoices.
+# Recreated automatically on first use, like the invoice folder.
+data/project_documents/
+
 # Uploaded profile pictures - personal data, same story.
 data/avatars/
 
@@ -46,3 +50,5 @@ temp/
 
 # Node modules (if using npm later)
 node_modules/
+
+MCP/
