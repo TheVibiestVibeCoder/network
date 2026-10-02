@@ -1,0 +1,971 @@
+/* ==========================================================================
+   From Claude - review of what Claude proposed through the MCP API
+   ==========================================================================
+
+   Built only from the tokens in design.css, so it follows the winter palette
+   and the dark theme without any colour of its own.
+
+   The proposals use the same pattern as every other list in the CRM: one
+   card per group, one row per proposal, hairlines between rows. A row shows
+   what the proposal is in two lines and ends in accept / reject; everything
+   else (before and after, Claude's note, editing) opens on click. A small
+   dot says what kind of decision it is - blue for something new, amber for a
+   change, red for a removal; in the history, green or red for how it ended.
+   ========================================================================== */
+
+
+/* ---- The screen ---------------------------------------------------------- */
+
+#reviewView .view-head {
+    align-items: flex-end;
+}
+
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.review-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: var(--c-ink);
+    font: 600 var(--t-md)/1.3 var(--font);
+    letter-spacing: -0.01em;
+}
+
+.review-group-count {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+/* One card per group, rows separated by hairlines - like Contacts and To-dos. */
+.review-list-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+
+/* ---- A proposal ---------------------------------------------------------- */
+
+.review-row {
+    transition: opacity var(--dur-2) var(--ease), background-color var(--dur-1) var(--ease);
+}
+
+.review-row + .review-row {
+    border-top: 1px solid var(--c-line-2);
+}
+
+.review-row.is-busy {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* ---- Leaving: how a decided row goes ------------------------------------
+   One quiet motion. The row takes on a faint tint of the outcome, its
+   content lifts a few pixels while blurring and fading, then the gap closes
+   (review.js removeItem pins the height and adds .is-collapsing). ~480ms. */
+
+.review-row {
+    position: relative;
+}
+
+.review-row.is-leaving {
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.review-row.is-leaving--accept,
+.review-row.is-leaving--reject {
+    opacity: 1;
+    transition: background-color 200ms var(--ease);
+}
+
+.review-row.is-leaving--accept { background: var(--c-success-soft); }
+.review-row.is-leaving--reject { background: var(--c-danger-soft); }
+
+.review-row.is-leaving--accept > *,
+.review-row.is-leaving--reject > * {
+    animation: reviewVanish 240ms var(--ease) both;
+}
+
+/* Then the gap closes. The row's height is pinned in px by review.js first. */
+.review-row.is-collapsing {
+    height: 0 !important;
+    border-top-color: transparent !important;
+    opacity: 0;
+    transition: height 240ms var(--ease), opacity 160ms var(--ease), border-color 160ms var(--ease);
+}
+
+@keyframes reviewVanish {
+    to { opacity: 0; transform: translateY(-6px); filter: blur(3px); }
+}
+
+/* While "Accept all" / "Reject all" runs, nothing else in the list is clickable. */
+.review-list.is-bulk-running .review-row-actions,
+.review-list.is-bulk-running .review-row-toggle {
+    pointer-events: none;
+}
+
+
+/* ---- Accept all / Reject all --------------------------------------------- */
+
+.review-bulk {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin: -6px 0 18px;
+}
+
+.review-bulk[hidden] {
+    display: none;
+}
+
+.review-bulk-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.review-bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.review-bulk-btn--reject:hover:not(:disabled) {
+    border-color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.review-bulk-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.review-bulk-status {
+    margin-right: auto;
+    color: var(--c-ink-2);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A hairline under the bar that fills as the decisions land, in the colour
+   of the decision. */
+.review-bulk-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -9px;
+    height: 3px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
+.review-bulk.is-running .review-bulk-progress {
+    opacity: 1;
+}
+
+.review-bulk-bar {
+    display: block;
+    height: 100%;
+    background: var(--c-success);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 260ms var(--ease);
+}
+
+.review-bulk[data-action="reject"] .review-bulk-bar {
+    background: var(--c-danger);
+}
+
+
+/* ---- Everything decided at once: a check that draws itself ---------------- */
+
+.review-empty--cleared .review-done-mark {
+    width: 56px;
+    height: 56px;
+    opacity: 1;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.review-empty--accept .review-done-mark { color: var(--c-success); }
+.review-empty--reject .review-done-mark { color: var(--c-ink-3); }
+
+.review-done-ring,
+.review-done-check {
+    stroke: currentColor;
+}
+
+.review-done-ring {
+    stroke-dasharray: 145;
+    stroke-dashoffset: 145;
+    animation: reviewDraw 520ms var(--ease) forwards;
+}
+
+.review-done-check {
+    stroke-dasharray: 34;
+    stroke-dashoffset: 34;
+    animation: reviewDraw 320ms 420ms var(--ease) forwards;
+}
+
+.review-empty--cleared .review-done-mark {
+    animation: reviewSettle 360ms 700ms var(--ease) both;
+}
+
+.review-empty--cleared h3,
+.review-empty--cleared p {
+    animation: reviewRise 360ms 520ms var(--ease) both;
+}
+
+@keyframes reviewDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes reviewSettle {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+@keyframes reviewRise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .review-done-ring,
+    .review-done-check {
+        animation: none;
+        stroke-dashoffset: 0;
+    }
+
+    .review-empty--cleared .review-done-mark,
+    .review-empty--cleared h3,
+    .review-empty--cleared p {
+        animation: none;
+    }
+
+    .review-bulk-bar,
+    .review-row.is-collapsing {
+        transition: none;
+    }
+}
+
+.review-row.is-open {
+    background: var(--c-tint-3);
+}
+
+.review-row-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 14px;
+}
+
+.review-row-head:hover {
+    background: var(--c-tint-3);
+}
+
+.review-row-toggle {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 62px;
+    padding: 10px 8px 10px 16px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.review-row-toggle:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+    border-radius: var(--r-md);
+}
+
+.review-row-mark {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--c-accent);
+}
+
+.review-row--change .review-row-mark { background: var(--c-warning); }
+.review-row--remove .review-row-mark,
+.review-row--rejected .review-row-mark { background: var(--c-danger); }
+.review-row--accepted .review-row-mark { background: var(--c-success); }
+.review-row--neutral .review-row-mark { background: var(--c-line-strong); }
+
+.review-row-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.review-row-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.review-row-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-ink);
+    font: 600 var(--t-base)/1.35 var(--font);
+}
+
+.review-row-kind {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.review-row-summary {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+    line-height: 1.4;
+}
+
+.review-row-summary-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-row-note,
+.review-row-warn {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.review-row-note svg {
+    width: 12px;
+    height: 12px;
+    color: var(--c-accent);
+}
+
+.review-row-warn svg {
+    width: 14px;
+    height: 14px;
+    color: var(--c-warning);
+}
+
+.review-row-when {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+}
+
+.review-row-chevron {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--c-ink-4);
+    transition: transform var(--dur-2) var(--ease);
+}
+
+.review-row.is-open .review-row-chevron {
+    transform: rotate(90deg);
+}
+
+/* Accept and reject: the only two things most proposals need. */
+.review-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.review-act {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.review-act svg {
+    width: 16px;
+    height: 16px;
+}
+
+.review-act--accept {
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+    color: var(--c-on-primary);
+}
+
+.review-act--accept:hover:not(:disabled) {
+    background: var(--c-primary-2);
+    border-color: var(--c-primary-2);
+}
+
+.review-act--reject:hover:not(:disabled) {
+    border-color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.review-act:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* History: how it ended, instead of the buttons. */
+.review-row-status {
+    flex-shrink: 0;
+}
+
+.review-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.review-pill--accepted { background: var(--c-success-soft); color: var(--c-success); }
+.review-pill--rejected { background: var(--c-danger-soft); color: var(--c-danger); }
+
+
+/* ---- Opened: the details -------------------------------------------------- */
+
+.review-row-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 2px 16px 16px 36px;
+}
+
+.review-row > .review-error {
+    margin: 0 16px 12px 36px;
+}
+
+.review-detail-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.review-detail-actions .btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.review-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px 20px;
+    margin: 0;
+}
+
+.review-fact {
+    min-width: 0;
+}
+
+.review-fact--long {
+    grid-column: 1 / -1;
+}
+
+.review-fact dt {
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
+}
+
+.review-fact dd {
+    margin: 2px 0 0;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.review-line {
+    margin: 0;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.review-muted {
+    color: var(--c-ink-3);
+}
+
+.review-quote-text {
+    margin: 0;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.review-link {
+    color: var(--c-accent);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.review-link:hover {
+    text-decoration: underline;
+}
+
+/* Before and after, field by field. */
+.review-diff {
+    width: 100%;
+    max-width: 720px;
+    border-collapse: collapse;
+    font-size: var(--t-sm);
+}
+
+.review-diff th,
+.review-diff td {
+    padding: 6px 0;
+    vertical-align: top;
+    border-bottom: 1px solid var(--c-line-2);
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.review-diff tr:last-child th,
+.review-diff tr:last-child td {
+    border-bottom: 0;
+}
+
+.review-diff th {
+    width: 26%;
+    padding-right: 12px;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
+}
+
+.review-diff .review-old {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+    text-decoration-color: var(--c-line-strong);
+}
+
+.review-diff .review-arrow {
+    width: 24px;
+    padding: 6px 4px;
+    color: var(--c-ink-4);
+}
+
+.review-diff .review-new {
+    color: var(--c-ink);
+    font-weight: 500;
+}
+
+.review-stale {
+    display: block;
+    margin-top: 3px;
+    color: var(--c-warning);
+    font-size: var(--t-xs);
+    text-decoration: none;
+}
+
+.review-warning {
+    margin: 0;
+    color: var(--c-danger);
+    font-size: var(--t-sm);
+}
+
+/* Why Claude proposed it. */
+.review-reason {
+    margin: 0;
+    padding: 8px 12px;
+    border-left: 2px solid var(--c-accent);
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.review-reason-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 2px;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.review-reason-label svg {
+    width: 12px;
+    height: 12px;
+    color: var(--c-accent);
+}
+
+.review-error {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+    font-size: var(--t-sm);
+}
+
+
+/* ---- Editing before accepting ------------------------------------------- */
+
+.review-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 720px;
+}
+
+.review-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+}
+
+.review-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.review-field--wide {
+    grid-column: 1 / -1;
+}
+
+.review-field label {
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
+}
+
+.review-field .form-input,
+.review-field .form-select {
+    width: 100%;
+    min-width: 0;
+    background: var(--c-surface);
+}
+
+.review-field textarea.form-input {
+    resize: vertical;
+    min-height: 72px;
+    line-height: 1.45;
+}
+
+.review-field--check label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+}
+
+
+/* ---- Nothing to decide --------------------------------------------------- */
+
+.review-empty {
+    max-width: 460px;
+    margin: 48px auto;
+    text-align: center;
+    color: var(--c-ink-3);
+}
+
+.review-empty svg {
+    width: 34px;
+    height: 34px;
+    color: var(--c-accent);
+    opacity: 0.8;
+}
+
+.review-empty h3 {
+    margin: 10px 0 6px;
+    color: var(--c-ink);
+    font: 600 var(--t-lg)/1.3 var(--font);
+}
+
+.review-empty p {
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 1.55;
+}
+
+
+/* ---- The mark on a proposed record, wherever it is listed ---------------- */
+
+.review-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 8px 0 6px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font: 600 11px/1 var(--font);
+    white-space: nowrap;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.review-badge svg {
+    width: 11px;
+    height: 11px;
+}
+
+/* A proposed record: a solid accent frame and a tint, so it stands apart from
+   accepted records at a glance. The frame is an inset ring rather than a
+   border, so nothing shifts or resizes; it follows each element's own radius.
+   The id-scoped selectors match design.css, which restyles these elements
+   (hover included) by id and would otherwise win. */
+.is-proposed,
+.is-proposed:hover,
+#listView .contact-card.is-proposed,
+#listView .contact-card.is-proposed:hover,
+#todoView .todo-item.is-proposed,
+#todoView .todo-item.is-proposed:hover {
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
+}
+
+/* Cards already have a border and a lift; colour the border and keep the lift. */
+#projectsView .project-card.is-proposed,
+#projectsView .project-card.is-proposed:hover {
+    background: color-mix(in srgb, var(--c-accent) 6%, var(--c-surface));
+    border-color: var(--c-accent);
+    box-shadow: inset 0 0 0 1px var(--c-accent), var(--e-1);
+}
+
+/* Rows sit flush in their list; round the frame a touch so it reads as a
+   marked item rather than a stray rule between rows. */
+#listView .contact-card.is-proposed,
+#todoView .todo-item.is-proposed {
+    border-radius: var(--r-md);
+}
+
+/* The badge on a proposed record is the second half of the signal. */
+.is-proposed .review-badge {
+    background: var(--c-accent);
+    /* The page background: near-white on the dark blue of light mode, near-black
+       on the light blue of dark mode. */
+    color: var(--c-bg);
+}
+
+.review-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.review-inline.is-busy {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.review-inline-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.review-inline-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.review-inline-btn--accept:hover {
+    background: var(--c-success-soft);
+    border-color: var(--c-success);
+    color: var(--c-success);
+}
+
+.review-inline-btn--reject:hover {
+    background: var(--c-danger-soft);
+    border-color: var(--c-danger);
+    color: var(--c-danger);
+}
+
+
+/* ---- The box in a contact's or project's detail view ---------------------- */
+
+.review-record-slot {
+    margin: 0 0 18px;
+}
+
+.review-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.review-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
+}
+
+.review-panel-head svg {
+    width: 15px;
+    height: 15px;
+    color: var(--c-accent);
+    flex-shrink: 0;
+}
+
+.review-panel .review-list-card {
+    border-style: dashed;
+    border-color: var(--c-accent);
+    box-shadow: none;
+}
+
+.review-panel .review-row-when {
+    display: none;
+}
+
+
+/* ---- Confirmation -------------------------------------------------------- */
+
+.review-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 3000;
+    padding: 11px 18px;
+    border-radius: var(--r-md);
+    background: var(--c-primary);
+    color: var(--c-on-primary);
+    box-shadow: var(--e-2);
+    font: 500 var(--t-sm)/1.4 var(--font);
+    opacity: 0;
+    transform: translate(-50%, 8px);
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+
+.review-toast.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+
+/* ---- Phones --------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+    .review-row-when {
+        display: none;
+    }
+
+    .review-row-toggle {
+        gap: 10px;
+        padding-left: 14px;
+    }
+
+    .review-row-head {
+        padding-right: 10px;
+    }
+
+    .review-row-detail {
+        padding: 2px 14px 14px;
+    }
+
+    .review-row > .review-error {
+        margin: 0 14px 12px;
+    }
+
+    .review-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .review-pill {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .review-toast {
+        bottom: calc(var(--tabbar-h) + 14px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .review-row,
+    .review-row-chevron,
+    .review-toast {
+        transition: none;
+    }
+}

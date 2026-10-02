@@ -33,17 +33,22 @@
 /* Dropping a CSV anywhere on the view */
 
 #bookkeepingView.bk-csv-drop-active::after {
-    content: "Drop CSV file to import";
+    /* The text depends on what is being dragged; see setDropOverlay(). */
+    content: attr(data-drop-label);
     position: absolute;
-    inset: 0;
+    inset: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--bk-drop-blue);
-    background: rgba(37, 99, 235, 0.08);
-    border: 3px dashed var(--bk-drop-blue);
+    /* Frosted rather than a faint tint, so the label never sits on top of
+       table text and reads as one clear target. */
+    background: color-mix(in srgb, var(--bk-drop-blue) 6%, color-mix(in srgb, var(--color-bg) 82%, transparent));
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    border: 2px dashed var(--bk-drop-blue);
     border-radius: var(--radius-lg);
     pointer-events: none;
     z-index: 50;
@@ -81,6 +86,102 @@
     width: 100%;
     border: none;
     background: var(--color-surface-3);
+}
+
+/* PDF.js pages, stacked like a viewer: grey desk, white sheets. */
+.bk-pdf-preview-pages {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-4);
+    padding: var(--spacing-4);
+    background: var(--color-surface-3);
+}
+
+.bk-pdf-preview-pages[hidden],
+.bk-pdf-preview-frame[hidden] {
+    display: none;
+}
+
+.bk-pdf-page {
+    flex-shrink: 0;
+    background: #fff;
+    box-shadow: var(--shadow-md);
+}
+
+.bk-pdf-preview-status {
+    margin: auto 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+/* ---- Resizable columns -------------------------------------------------- */
+
+/* Measured once at natural width (no stretching to fill), then fixed. */
+.bk-table.bk-table-measuring {
+    width: auto;
+}
+
+.bk-table.bk-table-fixed {
+    table-layout: fixed;
+}
+
+.bk-table.bk-table-fixed th,
+.bk-table.bk-table-fixed td {
+    max-width: none;
+}
+
+/* Soaks up the width the sized columns leave over. */
+.bk-table .bk-col-fill {
+    padding: 0;
+}
+
+.bk-table.bk-table-measuring .bk-col-fill {
+    display: none;
+}
+
+.bk-col-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 10px;
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 1;
+}
+
+.bk-col-resizer::after {
+    content: "";
+    position: absolute;
+    top: 28%;
+    bottom: 28%;
+    right: 4px;
+    width: 2px;
+    border-radius: 1px;
+    background: transparent;
+    transition: background-color var(--transition-fast);
+}
+
+.bk-table thead th:hover .bk-col-resizer::after {
+    background: var(--color-border);
+}
+
+.bk-table thead th .bk-col-resizer:hover::after,
+.bk-col-resizing .bk-col-resizer::after {
+    background: var(--bk-drop-blue);
+}
+
+/* While dragging, keep the resize cursor even off the handle, and don't let
+   the pointer select header text on the way. */
+body.bk-col-resizing,
+body.bk-col-resizing * {
+    cursor: col-resize !important;
+    user-select: none;
 }
 
 /* ==========================================================================
@@ -1328,10 +1429,28 @@
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.bk-dropzone-hover {
-    border-color: var(--bk-drop-blue);
-    border-style: dashed;
-    background: rgba(37, 99, 235, 0.05);
+/* Same language as the page-wide CSV overlay, sized to the drop zone. The
+   #bookkeepingView prefix is needed to beat design.css, which restyles the
+   drop zone by id and used to swallow this highlight entirely. */
+#bookkeepingView .bk-dropzone {
+    position: relative;
+}
+
+#bookkeepingView .bk-dropzone.bk-dropzone-hover::after {
+    content: "Drop PDFs here";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--bk-drop-blue);
+    background: color-mix(in srgb, var(--bk-drop-blue) 8%, var(--color-surface-2));
+    border: 2px dashed var(--bk-drop-blue);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 5;
 }
 
 .bk-dropzone-header {

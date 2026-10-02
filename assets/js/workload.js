@@ -16,6 +16,9 @@
 
     const state = {
         who: 'me',
+        // Set by openPerson() just before it switches to this tab, so the
+        // switch opens that person instead of resetting to "me".
+        nextWho: null,
         data: null,
         person: null,
         counts: {},   // assignee key -> { todos, projects, contacts, bookkeeping }
@@ -404,8 +407,8 @@
     /**
      * A bookkeeping row somebody has been handed: a bank entry still missing
      * its PDF. There is no tick box because there is nothing to tick -
-     * attaching the invoice is what finishes it, and that happens in the
-     * Bookkeeping tab, which is where the row leads.
+     * attaching the invoice is what finishes it: drop the PDF onto the row
+     * (bindPdfDrops), or click through to the Bookkeeping tab.
      */
     function bookkeepingRow(entry) {
         // A bank entry's date is when the money moved, not a deadline, so it
@@ -414,7 +417,8 @@
         const date = formatDate(entry.row_date);
 
         return `
-            <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}">
+            <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}"
+                    data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
                 <span class="workload-row-mark is-icon">${ICON_RECEIPT}</span>
                 <span class="workload-row-body">
                     <span class="workload-row-title">${escapeHtml(entry.summary || '')}</span>
@@ -756,9 +760,124 @@
      */
     function openPerson(key) {
         if (window.CRM && window.CRM.switchView) {
+            // switchView() calls open(), which picks this up - one request.
+            state.nextWho = key;
             window.CRM.switchView('workload');
+        } else {
+            load(key);
         }
-        load(key);
+    }
+
+    /**
+     * The tab was opened from the navigation: always start at the signed-in
+     * person, not whoever was looked at last. A refresh of the open tab goes
+     * through load() instead and keeps the person on screen.
+     */
+    function open() {
+        const who = state.nextWho || 'me';
+        state.nextWho = null;
+        return load(who);
+    }
+
+    // ------------------------------------------------------------------
+    // Dropping an invoice PDF onto a bookkeeping row
+    // ------------------------------------------------------------------
+
+    const BOOKKEEPING_API = 'api/bookkeeping.php';
+
+    function isFileDrag(event) {
+        return Array.from(event.dataTransfer ? event.dataTransfer.types : []).includes('Files');
+    }
+
+    function bookkeepingRowAt(target) {
+        return target.closest ? target.closest('[data-workload-open="bookkeeping"]') : null;
+    }
+
+    function clearDropTarget() {
+        els.body.querySelectorAll('.workload-row.is-drop-target').forEach(row => row.classList.remove('is-drop-target'));
+    }
+
+    /**
+     * Attach the PDF to the row through the Bookkeeping API, the same call its
+     * own tab makes, so size and type checks and "already has a PDF" are
+     * enforced in one place. Attaching it also clears the assignment, so the
+     * row leaves this list on the reload.
+     */
+    async function attachPdf(rowEl, files) {
+        const pdfs = Array.from(files || []).filter(file => /\.pdf$/i.test(file.name));
+        if (pdfs.length === 0) {
+            showToast('Only a PDF can be attached to a bookkeeping entry', true);
+            return;
+        }
+        if (pdfs.length > 1) {
+            showToast('Drop one PDF per entry', true);
+            return;
+        }
+
+        const rowId = Number(rowEl.getAttribute('data-id'));
+        const formData = new FormData();
+        formData.append('row_id', String(rowId));
+        formData.append('pdf', pdfs[0]);
+        formData.append('csrf_token', getCsrfToken());
+
+        rowEl.classList.add('is-uploading');
+        try {
+            const response = await fetch(BOOKKEEPING_API + '?action=upload-pdf', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': getCsrfToken() },
+                body: formData
+            });
+            // PHP answers an oversized upload with an empty body, not JSON.
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || (response.status === 413
+                    ? 'That file is too large to upload'
+                    : 'The PDF could not be attached'));
+            }
+
+            showToast(`Attached ${pdfs[0].name}`);
+            await load();
+            refreshBadge();
+            refreshTeam();
+        } catch (error) {
+            rowEl.classList.remove('is-uploading');
+            showToast(error.message, true);
+        }
+    }
+
+    function bindPdfDrops() {
+        els.body.addEventListener('dragover', event => {
+            if (!isFileDrag(event)) return;
+            // Taken over the whole tab, not just the rows: a file let go next
+            // to a row would otherwise make the browser leave the CRM to open it.
+            event.preventDefault();
+
+            const row = bookkeepingRowAt(event.target);
+            event.dataTransfer.dropEffect = row ? 'copy' : 'none';
+            els.body.querySelectorAll('.workload-row.is-drop-target').forEach(other => {
+                if (other !== row) other.classList.remove('is-drop-target');
+            });
+            if (row) row.classList.add('is-drop-target');
+        });
+
+        els.body.addEventListener('dragleave', event => {
+            const row = bookkeepingRowAt(event.target);
+            if (row && !row.contains(event.relatedTarget)) row.classList.remove('is-drop-target');
+        });
+        document.addEventListener('dragend', clearDropTarget);
+
+        els.body.addEventListener('drop', event => {
+            if (!isFileDrag(event)) return;
+            event.preventDefault();
+            clearDropTarget();
+
+            const row = bookkeepingRowAt(event.target);
+            if (row) {
+                attachPdf(row, event.dataTransfer.files);
+            } else if (els.body.querySelector('[data-workload-open="bookkeeping"]')) {
+                showToast('Drop the PDF onto one of the bookkeeping entries', true);
+            }
+        });
     }
 
     // ------------------------------------------------------------------
@@ -849,6 +968,7 @@
             }
         });
 
+        bindPdfDrops();
         refreshBadge();
     }
 
@@ -859,6 +979,7 @@
     }
 
     window.CRMWorkload = {
+        open: open,
         load: load,
         refreshBadge: refreshBadge
     };

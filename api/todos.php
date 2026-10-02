@@ -120,6 +120,18 @@ function handleGet(PDO $db, ?int $id): void
         $conditions[] = 't.is_completed = 1';
     }
 
+    // Who the to-do is assigned to: a users.id, 'owner' (stored as 0, the
+    // owner has no users row) or 'unassigned' (NULL). Anything else is ignored.
+    $assignedTo = isset($_GET['assigned_to']) ? trim((string) $_GET['assigned_to']) : '';
+    if ($assignedTo === 'unassigned') {
+        $conditions[] = 't.assigned_to IS NULL';
+    } elseif ($assignedTo === 'owner') {
+        $conditions[] = 't.assigned_to = 0';
+    } elseif (ctype_digit($assignedTo) && (int) $assignedTo > 0) {
+        $conditions[] = 't.assigned_to = :assigned_to';
+        $params['assigned_to'] = (int) $assignedTo;
+    }
+
     if ($search !== '') {
         $conditions[] = '(t.title LIKE :search OR t.description LIKE :search OR c.name LIKE :search OR p.name LIKE :search)';
         $params['search'] = '%' . $search . '%';
@@ -486,6 +498,15 @@ function handlePut(PDO $db, ?int $id): void
                 }
             }
         }
+
+        // Rebuilt copies carry the root's review state, so a to-do Claude
+        // proposed stays marked everywhere it shows until somebody decides.
+        $syncReview = $db->prepare("
+            UPDATE todos
+            SET review_status = (SELECT review_status FROM todos WHERE id = :root_id)
+            WHERE parent_todo_id = :root_id2
+        ");
+        $syncReview->execute(['root_id' => $rootTodoId, 'root_id2' => $rootTodoId]);
 
         $db->commit();
     } catch (Exception $e) {

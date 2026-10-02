@@ -89,6 +89,64 @@ Moving an existing install:
 
 A step-by-step walkthrough for cPanel is in `db_migration_to_do.md`.
 
+## The MCP API: Claude as a colleague who proposes
+
+`api/mcp.php` lets Claude (through the MCP server in the separate private
+repository `crm-mcp`, running on its own machine) read the CRM and propose
+changes. It is built so that the
+worst a compromised MCP server or a manipulated Claude can do is *read* and
+*ask* - never change anything on its own.
+
+**Who can call it.** A request is answered only when all of these hold, checked
+in this order by `includes/McpGuard.php`:
+
+1. `MCP_API_ENABLED=true` and `MCP_API_SECRET` has at least 64 characters.
+2. `REMOTE_ADDR` is on `MCP_API_ALLOWED_IPS` (IPs or CIDR ranges, IPv4 and
+   IPv6). Forwarded headers are ignored, whatever `TRUST_PROXY_HEADERS` says.
+3. The connection is HTTPS.
+4. It is a POST with a timestamp within five minutes, a never-seen nonce, and
+   an HMAC-SHA256 signature over timestamp, nonce and the SHA-256 of the exact
+   body. The secret itself never travels, so a captured request can be neither
+   altered nor replayed.
+5. The rate limit (`MCP_API_RATE_LIMIT`, default 120 per minute) holds.
+
+Failing 1 or 2 returns an empty 404, so to everyone else the endpoint does not
+exist.
+
+**What it can do.** A fixed list of actions (`includes/McpService.php`). Every
+list is capped; there is no bulk write and no bulk delete. It never touches
+users, passwords, settings, imports or exports. Bookkeeping is limited to
+listing the drop zone and putting invoice PDFs into it: Claude cannot read
+bank entries or invoices, and filing an invoice on its entry is left to a
+person (doing so also accepts the upload).
+
+**Human in the loop.** Nothing written through the API is settled:
+
+- A new contact, project, to-do, note or invoice PDF is stored with
+  `review_status = 'pending'`. It shows up in the CRM marked "Claude", can be
+  edited with the normal forms, and is deleted if rejected.
+- A change to an existing record (fields, links, tags, assignment, deletion)
+  is not written at all. It waits in `review_items` with
+  the proposed values and a snapshot of what was there, until somebody accepts.
+- Field edits, deletions and assignments are applied by the accepting person's
+  browser through the ordinary endpoints, so they get the same validation and
+  logging and are attributed to that person.
+- `MCP_API_MAX_PENDING` (default 200) stops a runaway client from flooding the
+  queue. `MCP_API_ALLOW_WRITES=false` makes the API read-only.
+
+Every signed-in user may accept, edit or reject ("From Claude" in the sidebar,
+or the buttons on a proposed record). `api/review.php` requires a session and
+the CSRF token like every other endpoint.
+
+**Prompt injection.** Text in the CRM (notes, imported rows) reaches Claude.
+Someone who can write into the CRM could try to steer Claude with it. The
+review queue is the answer: whatever Claude is talked into, it can only
+propose, and a person decides.
+
+**Where the key lives.** `MCP_API_SECRET` sits in `.env` here (outside the web
+root when `crm-private/` is used) and in the MCP server's `.env`. Rotate it by
+changing both.
+
 ## Users and roles
 
 There are two kinds of identity:
@@ -206,6 +264,8 @@ level of access - see the trade-off note below about all members seeing all data
 | Layer | File | Protects against |
 |---|---|---|
 | Private folder | `crm-private/` next to the web root | Everything below, even when the deny rules are not honoured |
+| MCP API guard | `includes/McpGuard.php` | Anyone but the MCP server calling `api/mcp.php`; replayed or altered requests |
+| Review queue | `includes/ReviewQueue.php` | Claude changing data without a person accepting it |
 | Web server deny rules | `.htaccess`, `*/.htaccess` | Direct download of `.env`, the SQLite DB, uploaded PDFs, PHP includes, `.git`, `error_log`, stray archives |
 | PHP direct-access guard | top of `config/config.php`, `includes/*.php` | The same, on nginx, which ignores `.htaccess` |
 | Session auth | `includes/auth.php` | Unauthenticated API access (every endpoint checks first) |

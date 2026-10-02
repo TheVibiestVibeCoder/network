@@ -66,6 +66,8 @@
         todoStatusFilter: 'open',
         todoContactFilterId: '',
         todoProjectFilterId: '',
+        // '' (anyone), 'me', 'owner', 'unassigned' or a users.id
+        todoAssignedFilter: '',
         todoSortBy: 'default',
         todoFilterOptionsInitialized: false,
         editingTodoId: null,
@@ -81,6 +83,7 @@
         workloadView: document.getElementById('workloadView'),
         mapView: document.getElementById('mapView'),
         bookkeepingView: document.getElementById('bookkeepingView'),
+        reviewView: document.getElementById('reviewView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -113,6 +116,7 @@
         // To-do view
         todosList: document.getElementById('todosList'),
         searchTodosInput: document.getElementById('searchTodosInput'),
+        todoAssignedFilter: document.getElementById('todoAssignedFilter'),
         todoContactFilter: document.getElementById('todoContactFilter'),
         todoProjectFilter: document.getElementById('todoProjectFilter'),
         todoStatusFilter: document.getElementById('todoStatusFilter'),
@@ -673,6 +677,7 @@
             const query = new URLSearchParams();
             if (params.contact_id) query.set('contact_id', params.contact_id);
             if (params.project_id) query.set('project_id', params.project_id);
+            if (params.assigned_to) query.set('assigned_to', params.assigned_to);
             if (params.status) query.set('status', params.status);
             if (params.search) query.set('search', params.search);
             if (params.sort) query.set('sort', params.sort);
@@ -1275,15 +1280,16 @@
         // field was filled in, not what was in it. The row shows who and where;
         // the contact details themselves are one click away.
         const isPinned = contact.pinned == 1;
+        const isProposed = contact.review_status === 'pending';
 
         return `
-            <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}" data-id="${contact.id}">
+            <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}${isProposed ? ' is-proposed' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
                     <div class="contact-avatar">
                         ${escapeHtml(getInitials(contact.name))}
                     </div>
                     <div class="contact-card-content">
-                        <h3 class="contact-card-name">${escapeHtml(contact.name)}</h3>
+                        <h3 class="contact-card-name">${escapeHtml(contact.name)} ${reviewBadge(contact)}</h3>
                         <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
                     </div>
                 </div>
@@ -1309,7 +1315,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping'];
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'review'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1366,11 +1372,15 @@
         if (elements.bookkeepingView) {
             elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
         }
+        if (elements.reviewView) {
+            elements.reviewView.classList.toggle('active', view === 'review');
+        }
 
         // Refresh data for the active view
         if (view === 'workload') {
             if (window.CRMWorkload) {
-                window.CRMWorkload.load();
+                // Opening Home always starts at the signed-in person.
+                window.CRMWorkload.open();
             }
         } else if (view === 'calendar') {
             loadCalendarNotes();
@@ -1385,6 +1395,10 @@
         } else if (view === 'bookkeeping') {
             if (window.Bookkeeping) {
                 window.Bookkeeping.load();
+            }
+        } else if (view === 'review') {
+            if (window.CRMReview) {
+                window.CRMReview.load();
             }
         } else {
             // Contacts always opens as the list; the map is one tap away.
@@ -1459,7 +1473,46 @@
         document.body.classList.remove('drawer-open');
     }
 
+    // ------------------------------------------------------------
+    // Desktop: collapse the sidebar into the icon rail
+    // ------------------------------------------------------------
+
+    const SIDEBAR_COLLAPSED_KEY = 'crm-sidebar-collapsed';
+
+    function setSidebarCollapsed(collapsed, persist = true) {
+        document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
+
+        const btn = document.getElementById('sidebarCollapseBtn');
+        if (btn) {
+            const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+            btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            btn.setAttribute('aria-label', label);
+            btn.setAttribute('title', label);
+        }
+
+        if (persist) {
+            try {
+                localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+            } catch (e) {
+                // Ignore storage errors; the choice still holds for this page
+            }
+        }
+
+        // The content column changed width without the window resizing; the
+        // map and the charts only re-measure on a resize.
+        window.dispatchEvent(new Event('resize'));
+    }
+
     function bindShell() {
+        const collapseBtn = document.getElementById('sidebarCollapseBtn');
+        if (collapseBtn) {
+            // The inline script in index.php already set the class; sync the button to it.
+            setSidebarCollapsed(document.documentElement.classList.contains('sidebar-collapsed'), false);
+            collapseBtn.addEventListener('click', () => {
+                setSidebarCollapsed(!document.documentElement.classList.contains('sidebar-collapsed'));
+            });
+        }
+
         const more = document.getElementById('tabbarMoreBtn');
         if (more) {
             more.addEventListener('click', () => {
@@ -1527,6 +1580,10 @@
             } else {
                 await ensureTodoAssignmentData();
             }
+            // The assigned-to filter lists the team, which loads separately.
+            if (window.CRMPeople && !window.CRMPeople.ready()) {
+                await window.CRMPeople.reload();
+            }
             populateTodoOwnerFilters();
 
             const result = await api.getTodos({
@@ -1534,6 +1591,7 @@
                 search: state.todoSearchQuery,
                 contact_id: state.todoContactFilterId || '',
                 project_id: state.todoProjectFilterId || '',
+                assigned_to: todoAssignedFilterKey(),
                 sort: state.todoSortBy || 'default'
             });
 
@@ -1595,13 +1653,49 @@
         }
     }
 
+    /**
+     * The assigned_to value for the API. "Me" is kept as 'me' in the state and
+     * resolved here, so it keeps meaning whoever is signed in.
+     */
+    function todoAssignedFilterKey() {
+        const value = state.todoAssignedFilter;
+        if (value !== 'me') return value || '';
+        const meKey = window.CRMPeople ? window.CRMPeople.meKey() : null;
+        return meKey || '';
+    }
+
     function populateTodoOwnerFilters() {
+        // Same shape as the person picker on Home: Me first, then everyone
+        // else, then the work nobody has picked up.
+        if (elements.todoAssignedFilter) {
+            const people = window.CRMPeople ? window.CRMPeople.list() : [];
+            const meKey = window.CRMPeople ? window.CRMPeople.meKey() : null;
+
+            let assignedOptions = '<option value="">Assigned to anyone</option>';
+            // The owner login cannot be assigned work, so "me" would always be empty for it.
+            if (meKey && meKey !== 'owner') assignedOptions += '<option value="me">Assigned to me</option>';
+            people.forEach(person => {
+                const key = person.id === null ? 'owner' : String(person.id);
+                if (key === meKey) return;
+                assignedOptions += `<option value="${escapeHtml(key)}">${escapeHtml(person.name)}</option>`;
+            });
+            assignedOptions += '<option value="unassigned">Unassigned</option>';
+
+            elements.todoAssignedFilter.innerHTML = assignedOptions;
+            elements.todoAssignedFilter.value = state.todoAssignedFilter;
+            // The person may have left the directory since it was picked.
+            if (elements.todoAssignedFilter.value !== state.todoAssignedFilter) {
+                state.todoAssignedFilter = '';
+                elements.todoAssignedFilter.value = '';
+            }
+        }
+
         if (elements.todoContactFilter) {
             const contacts = (state.contacts || []).slice().sort((a, b) => {
                 return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
             });
 
-            let contactOptions = '<option value="">All People</option>';
+            let contactOptions = '<option value="">All Contacts</option>';
             contacts.forEach(contact => {
                 const label = contact.company
                     ? `${contact.name} (${contact.company})`
@@ -1817,8 +1911,13 @@
             </div>
         ` : '';
 
+        // A to-do Claude proposed carries the mark on every copy; the decision
+        // is about the to-do itself, which a mirrored copy points to.
+        const isProposed = todo.review_status === 'pending';
+        const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
+
         return `
-            <div class="todo-item${isCompleted ? ' todo-completed' : ''}" data-todo-id="${todo.id}">
+            <div class="todo-item${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
                 <div class="todo-main">
                     <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
                         <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
@@ -1827,6 +1926,7 @@
                     <div class="todo-content">
                         <div class="todo-title-row">
                             <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
+                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : ''}
                             ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
@@ -1997,11 +2097,15 @@
             setAssigneeControl(elements.todoAssignee, 'todo', todoData);
             if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
         } else {
-            // A to-do being created has nobody to attribute yet, and nothing to
-            // attach an assignment to until it is saved.
+            // A to-do being created has nobody to attribute yet. The assignee
+            // control has no record id, so choosing someone only marks the
+            // form; saveTodo() applies it once the to-do exists.
             setEditedLine(elements.todoEdited, null);
-            setAssigneeControl(elements.todoAssignee, 'todo', null);
-            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = true;
+            if (elements.todoAssignee) {
+                elements.todoAssignee.innerHTML = assigneeControl('todo', null);
+                elements.todoAssignee.style.display = '';
+            }
+            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
         }
 
         elements.todoModal.classList.add('active');
@@ -2088,6 +2192,24 @@
                 : await api.createTodo(payload);
 
             if (result.success) {
+                // New to-do: apply the assignee chosen in the form now that
+                // there is a record. Through api/assign.php, like any later
+                // reassignment, so it gets the same account checks and log entry.
+                const assignSelect = elements.todoAssignee
+                    ? elements.todoAssignee.querySelector('select.assignee-select')
+                    : null;
+                const assignTo = assignSelect ? assignSelect.value : '';
+                if (!state.editingTodoId && assignTo && result.data && result.data.id) {
+                    try {
+                        const saved = await saveAssignment('todo', result.data.id, assignTo);
+                        showAssignmentToast(saved.assigned_to_name);
+                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+                    } catch (error) {
+                        // The to-do itself was created; only the assignment failed.
+                        alert('The to-do was created, but it could not be assigned: ' + error.message);
+                    }
+                }
+
                 closeTodoModal();
                 await refreshVisibleTodoLists();
             } else {
@@ -2330,6 +2452,11 @@
             // Populate details
             renderOverviewDetails(contact);
 
+            // What Claude proposes about this contact, if anything
+            if (window.CRMReview) {
+                window.CRMReview.renderRecordPanel('contact', contactId, document.getElementById('overviewReview'));
+            }
+
             // Load and render tags
             await loadContactTags(contactId);
 
@@ -2497,12 +2624,15 @@
             const isCompanyNote = note.source === 'company';
             const contactName = note.contact_name || '';
 
+            const isProposed = note.review_status === 'pending';
+
             html += `
-                <div class="note-item ${isCompanyNote ? 'note-company' : ''}">
+                <div class="note-item ${isCompanyNote ? 'note-company' : ''}${isProposed ? ' is-proposed' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
+                        ${isProposed ? reviewBadge(note) + reviewInline('contact_note', note.id) : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4420,10 +4550,9 @@
     }
 
     /**
-     * "€18–24k" for a budget range, "€26k" for a fixed one, '' when unknown.
-     *
-     * A card only has room for the order of magnitude; the exact figures are
-     * one click away in the project's detail view.
+     * A project's budget exactly as entered: "18.000 – 24.000 €" for a range,
+     * "26.000 €" for a fixed amount, '' when unknown. Cents only when there
+     * are any. Shared by the card and the detail view, so both always agree.
      */
     function formatProjectValue(project) {
         const toNumber = (value) => (value === null || value === '' || value === undefined)
@@ -4433,27 +4562,79 @@
         const min = toNumber(project.budget_min);
         const max = toNumber(project.budget_max);
 
-        const compact = (n) => {
-            if (n >= 1000000) return (Math.round(n / 100000) / 10).toString().replace(/\.0$/, '') + 'M';
-            if (n >= 1000) return Math.round(n / 1000) + 'k';
-            return String(Math.round(n));
+        // "18.000" and "18.450,50": dots for thousands (de-AT would use a thin
+        // space), and both decimals whenever there are cents at all.
+        const exact = (n) => {
+            const cents = Math.round(n * 100) % 100 !== 0;
+            return n.toLocaleString('de-DE', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
         };
 
         if (min === null && max === null) return '';
         if ((min || 0) === 0 && (max || 0) === 0) return '';
-        if (min !== null && max !== null && min !== max) return `€${compact(min)}–${compact(max)}`;
+        if (min !== null && max !== null && min !== max) return `${exact(min)} – ${exact(max)} €`;
 
-        return `€${compact(max !== null ? max : min)}`;
+        return `${exact(max !== null ? max : min)} €`;
     }
 
     /**
-     * One project, as a card: what it is, for whom, who has it, and where it
-     * stands. Dates, exact budgets and the rest live in the detail view - the
-     * card is for recognising and prioritising, not for reading.
+     * When a project runs, as one quiet line: "Start Aug 17, 2026 → End
+     * Sep 26, 2026 · 5 days overdue". Either half reads "Not set" when
+     * missing, so a lone date is never ambiguous. Kept below the budget in
+     * weight - it is reference, not the headline. The status only takes a
+     * colour when it needs attention: overdue, or a week or less to go.
+     */
+    function projectTimelineMarkup(project, isComplete) {
+        const parse = (value) => {
+            if (!value) return null;
+            const date = new Date(value + 'T00:00:00');
+            return isNaN(date.getTime()) ? null : date;
+        };
+        const label = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const DAY = 86400000;
+        const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+        const start = parse(project.start_date);
+        const end = parse(project.estimated_completion);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const late = !isComplete && end && end < today;
+
+        let status = '';
+        if (isComplete) {
+            status = '<span class="project-when-status is-done">Completed</span>';
+        } else if (late) {
+            status = `<span class="project-when-status is-late">${plural(Math.round((today - end) / DAY), 'day')} overdue</span>`;
+        } else if (start && start > today) {
+            status = `<span class="project-when-status">starts in ${plural(Math.round((start - today) / DAY), 'day')}</span>`;
+        } else if (end) {
+            const left = Math.round((end - today) / DAY);
+            status = left === 0
+                ? '<span class="project-when-status is-soon">ends today</span>'
+                : `<span class="project-when-status${left <= 7 ? ' is-soon' : ''}">${plural(left, 'day')} left</span>`;
+        }
+
+        const part = (name, date, extra = '') =>
+            `<span class="project-when-part${extra}"><span class="project-when-label">${name}</span> ${date ? escapeHtml(label(date)) : '<span class="project-when-empty">Not set</span>'}</span>`;
+
+        return `
+            <p class="project-when">
+                ${part('Start', start)}
+                <span class="project-when-arrow" aria-hidden="true">→</span>
+                ${part('End', end, late ? ' is-late' : '')}
+                ${status ? `<span class="project-when-sep" aria-hidden="true">·</span>${status}` : ''}
+            </p>`;
+    }
+
+    /**
+     * One project, as a card: what it is, for whom and who has it on top;
+     * when it runs in the timeline panel; budget and chance at the foot.
+     * Notes, contacts and the rest live in the detail view.
      */
     function createProjectCard(project) {
         const stageLabel = project.stage || 'Lead';
         const stageClass = stageLabel.toLowerCase().replace(/ /g, '-');
+        const isComplete = stageClass === 'complete';
 
         const value = formatProjectValue(project);
 
@@ -4466,42 +4647,39 @@
         // lines. Truncating in JS after escaping could cut an entity in half.
         const description = (project.description || '').trim();
 
-        const facts = [];
+        const isProposed = project.review_status === 'pending';
 
-        // When it is meant to be done - the one date worth seeing at a glance.
-        // Late and still open reads in the danger colour.
-        if (project.estimated_completion && stageClass !== 'complete') {
-            const due = new Date(project.estimated_completion + 'T00:00:00');
-            if (!isNaN(due.getTime())) {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const late = due < today;
-                const label = due.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-                facts.push(`<span class="project-fact project-fact--due${late ? ' is-late' : ''}" title="${late ? 'Past its planned finish' : 'Planned finish'}">${escapeHtml(label)}</span>`);
-            }
-        }
-
-        if (value) {
-            facts.push(`<span class="project-fact">${escapeHtml(value)}</span>`);
-        }
-        if (chance !== null && stageClass !== 'complete') {
-            facts.push(`<span class="project-fact project-fact--chance" style="--chance:${chance}" title="${chance}% likely">${chance}%</span>`);
-        }
+        const budgetStat = `
+            <div class="project-stat project-stat--budget">
+                <span class="project-meta-label">Budget</span>
+                <span class="project-stat-value${value ? '' : ' is-empty'}" title="${escapeHtml(value || 'No budget set')}">${escapeHtml(value || 'Not set')}</span>
+            </div>`;
+        // A finished project has no chance left to estimate.
+        const chanceStat = chance !== null && !isComplete ? `
+            <div class="project-stat project-stat--chance">
+                <span class="project-meta-label">Chance</span>
+                <span class="project-stat-value"><span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%</span>
+            </div>` : '';
 
         return `
-            <article class="project-card" data-id="${project.id}" tabindex="0" role="button"
+            <article class="project-card stage-${escapeHtml(stageClass)}${isProposed ? ' is-proposed' : ''}" data-id="${project.id}" tabindex="0" role="button"
                      aria-label="${escapeHtml(project.name)}">
                 <div class="project-card-head">
                     <div class="project-card-title-wrap">
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
                         ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
+                        ${isProposed ? `<div class="project-card-review">${reviewBadge(project)}</div>` : ''}
                     </div>
                     ${assigneeChip(project)}
                 </div>
                 ${description ? `<p class="project-card-description">${escapeHtml(description)}</p>` : ''}
-                <div class="project-card-foot">
-                    <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
-                    ${facts.length ? `<span class="project-card-facts">${facts.join('')}</span>` : ''}
+                <div class="project-card-bottom">
+                    ${projectTimelineMarkup(project, isComplete)}
+                    <div class="project-card-foot">
+                        <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
+                        ${budgetStat}
+                        ${chanceStat}
+                    </div>
                 </div>
             </article>
         `;
@@ -4659,29 +4837,23 @@
             : 'N/A';
         elements.projectOverviewStage.textContent = project.stage || 'N/A';
 
+        // Same exact figures as the card. Both zero means "not decided yet".
         const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
         const ovBMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
-        let budget;
-        if (ovBMin === null && ovBMax === null) {
-            budget = 'N/A';
-        } else if (ovBMin === 0 && ovBMax === 0) {
-            budget = 'Undetermined';
-        } else if (ovBMin !== null && ovBMax !== null) {
-            budget = ovBMin === ovBMax
-                ? `${ovBMin.toFixed(0)} €`
-                : `${ovBMin.toFixed(0)} – ${ovBMax.toFixed(0)} €`;
-        } else if (ovBMin !== null) {
-            budget = `${ovBMin.toFixed(0)} €`;
-        } else {
-            budget = `${ovBMax.toFixed(0)} €`;
-        }
-        elements.projectOverviewBudget.textContent = budget;
+        elements.projectOverviewBudget.textContent = (ovBMin === null && ovBMax === null)
+            ? 'N/A'
+            : (formatProjectValue(project) || 'Undetermined');
 
         elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
         elements.projectOverviewEstCompletion.textContent = project.estimated_completion
             ? new Date(project.estimated_completion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : 'N/A';
         elements.projectOverviewDescription.textContent = project.description || 'No description';
+
+        // What Claude proposes about this project, if anything
+        if (window.CRMReview) {
+            window.CRMReview.renderRecordPanel('project', project.id, document.getElementById('projectOverviewReview'));
+        }
 
         // Render tags
         renderProjectTags(tags);
@@ -4778,11 +4950,14 @@
             const date = new Date(note.created_at);
             const formattedDate = formatDate(date);
 
+            const isProposed = note.review_status === 'pending';
+
             html += `
-                <div class="note-item">
+                <div class="note-item${isProposed ? ' is-proposed' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
+                        ${isProposed ? reviewBadge(note) + reviewInline('project_note', note.id) : ''}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -5103,6 +5278,55 @@
         });
     }
 
+    /** The "Claude" mark on a proposed record (review.js). */
+    function reviewBadge(record) {
+        return window.CRMReview ? window.CRMReview.badge(record) : '';
+    }
+
+    /** Accept / reject buttons on a proposed note or to-do (review.js). */
+    function reviewInline(entityType, id) {
+        return window.CRMReview ? window.CRMReview.inlineActions(entityType, id) : '';
+    }
+
+    /**
+     * After somebody decides on a proposal, show the CRM as it now is: the
+     * current view, and any detail view that is open.
+     */
+    function bindReviewRefresh() {
+        document.addEventListener('crm:review-changed', event => {
+            const detail = event.detail || {};
+
+            if (state.currentView === 'todos') {
+                loadTodos();
+            } else if (state.currentView === 'workload') {
+                if (window.CRMWorkload) window.CRMWorkload.load();
+            } else if (state.currentView === 'bookkeeping') {
+                if (window.Bookkeeping) window.Bookkeeping.load();
+            } else if (state.currentView !== 'review') {
+                refreshData();
+            }
+            updateContactCount();
+
+            // A rejected proposal for the record on screen means that record
+            // is gone; everything else just needs a fresh look.
+            const gone = detail.action === 'reject';
+            if (elements.overviewModal.classList.contains('active') && state.viewingContactId) {
+                if (gone && detail.entity_type === 'contact' && Number(detail.entity_id) === Number(state.viewingContactId)) {
+                    closeOverviewModal();
+                } else {
+                    openOverviewModal(state.viewingContactId);
+                }
+            }
+            if (elements.projectOverviewModal.classList.contains('active') && state.viewingProjectId) {
+                if (gone && detail.entity_type === 'project' && Number(detail.entity_id) === Number(state.viewingProjectId)) {
+                    closeProjectOverview();
+                } else {
+                    openProjectOverview(state.viewingProjectId);
+                }
+            }
+        });
+    }
+
     function escapeHtml(text) {
         // Keep the original falsy handling so nothing renders differently.
         if (!text) return '';
@@ -5270,7 +5494,20 @@
 
             const type = select.getAttribute('data-assign-type');
             const id = select.getAttribute('data-assign-id');
-            if (!type || !id) return;
+            if (!type) return;
+
+            // No record yet (the new to-do form): nothing to save, just show
+            // the chosen face. The form saves the choice with the record.
+            if (!id) {
+                const bar = select.closest('.assignee-bar');
+                const face = bar && bar.querySelector('.assignee-bar-face');
+                const option = select.options[select.selectedIndex];
+                if (face) {
+                    const key = select.value;
+                    paintAssigneeFace(face, key === '' ? null : (key === 'owner' ? 0 : key), key === '' ? null : option.textContent);
+                }
+                return;
+            }
 
             const previous = select.getAttribute('data-previous') || '';
             select.disabled = true;
@@ -5496,6 +5733,13 @@
 
         if (elements.searchTodosInput) {
             elements.searchTodosInput.addEventListener('input', debouncedTodoSearch);
+        }
+
+        if (elements.todoAssignedFilter) {
+            elements.todoAssignedFilter.addEventListener('change', () => {
+                state.todoAssignedFilter = elements.todoAssignedFilter.value;
+                loadTodos();
+            });
         }
 
         if (elements.todoContactFilter) {
@@ -6104,6 +6348,7 @@
 
         bindCspSafeDelegates();
         bindAssignmentControls();
+        bindReviewRefresh();
         bindShell();
         initEventListeners();
         initImportExportEvents();

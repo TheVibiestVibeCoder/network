@@ -155,9 +155,11 @@ function handleAssign(): void
 /**
  * Turn whatever the client sent into a real assignee, or false if it is not one.
  *
- * Accepts null / '' (unassign), the string 'owner', or a users.id. An account
- * that is disabled or does not exist is refused: work must never be parked on
- * somebody who cannot sign in to see it.
+ * Accepts null / '' (unassign) or a users.id. An account that is disabled or
+ * does not exist is refused: work must never be parked on somebody who cannot
+ * sign in to see it. The owner login is refused too - it is the recovery
+ * account, not a team member. Records assigned to it earlier keep that value
+ * until someone reassigns them.
  *
  * @return array{id: ?int, name: ?string}|false
  */
@@ -168,7 +170,7 @@ function resolveAssignee($raw)
     }
 
     if ($raw === 'owner' || (is_numeric($raw) && (int) $raw === ASSIGNEE_OWNER)) {
-        return ['id' => ASSIGNEE_OWNER, 'name' => OWNER_DISPLAY_NAME];
+        return false;
     }
 
     if (!is_numeric($raw)) {
@@ -239,12 +241,13 @@ function handleWorkload(string $who): void
         "SELECT id, name, company, stage, start_date, estimated_completion,
                 success_chance, assigned_to, assigned_to_name
          FROM projects
-         WHERE ",
+         WHERE IFNULL(stage, '') <> 'Complete' AND ",
         'assigned_to',
         $isUnassigned,
         $target['id'],
-        // Same pipeline order as the Projects view: what is running first,
-        // then what is being won, then leads, and finished work last.
+        // Finished projects are left out: they are not work any more. The rest
+        // keep the Projects view's pipeline order - what is running first,
+        // then what is being won, then leads.
         "ORDER BY " . Project::stageRankSql() . " ASC, name COLLATE NOCASE ASC"
     );
 
@@ -414,6 +417,9 @@ function handleSummary(): void
         $extra = '';
         if ($table === 'todos') {
             $extra = ' AND parent_todo_id IS NULL AND is_completed = 0';
+        } elseif ($table === 'projects') {
+            // Same rule as the workload list: a finished project is not work.
+            $extra = " AND IFNULL(stage, '') <> 'Complete'";
         } elseif ($table === 'bookkeeping_rows') {
             // Same rule as the workload list: a row with its invoice attached
             // is no longer work, whatever its assignee column still says.
