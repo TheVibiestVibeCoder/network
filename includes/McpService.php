@@ -32,6 +32,8 @@ if (!defined('APP_ROOT')) {
     exit;
 }
 
+require_once __DIR__ . '/AssignmentFeed.php';
+
 /** A refusal Claude should read and act on - the message is shown to it verbatim. */
 class McpError extends ReviewException
 {
@@ -1123,6 +1125,8 @@ final class McpService
             $table = ReviewQueue::ENTITY_TABLES[$type];
             $this->db->prepare("UPDATE " . $table . " SET assigned_to = :a, assigned_to_name = :n WHERE id = :id")
                 ->execute(['a' => $assignee['id'], 'n' => $assignee['name'], 'id' => $id]);
+            // Shows as new for the assignee once the record is accepted.
+            AssignmentFeed::record($this->db, $type, $id, $assignee['id'], null, MCP_ACTOR_NAME);
 
             return ['status' => 'assigned_pending_record', 'message' => 'Assigned directly, because the record is itself still a proposal.'];
         }

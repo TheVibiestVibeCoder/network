@@ -118,6 +118,15 @@
         }
     }
 
+    const CLAUDE_AVATAR = 'assets/img/claude-avatar.svg';
+
+    /** Whether an attribution without an account id is Claude's. */
+    function isClaude(actorName) {
+        const meta = document.querySelector('meta[name="claude-actor-name"]');
+        const claudeName = meta ? meta.getAttribute('content') : 'Claude';
+        return !!actorName && !!claudeName && String(actorName).toLowerCase() === claudeName.toLowerCase();
+    }
+
     /**
      * The picture URL for an actor, or null when there is none.
      */
@@ -125,6 +134,10 @@
         if (actorId !== null && actorId !== undefined && actorId !== '') {
             const person = state.people.get(String(actorId));
             if (person && person.avatar_url) return person.avatar_url;
+        } else if (isClaude(actorName)) {
+            // Claude writes without an account, under its own name (api/mcp.php),
+            // and wears its own mark as its picture.
+            return CLAUDE_AVATAR;
         }
 
         if (actorName) {

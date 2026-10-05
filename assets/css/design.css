@@ -3860,13 +3860,9 @@ input[type="checkbox"] {
 
 /* ---- Detail sheets (desktop and tablet) ---- */
 
-/* The project form is a sheet too, although it is a form: it opens from the
-   project's detail sheet, and jumping from the right edge to the centre of the
-   screen to edit what was just being read is disorienting. */
 @media (min-width: 769px) {
     #overviewModal,
     #projectOverviewModal,
-    #projectModal,
     #companyNotesModal,
     #usersModal {
         justify-content: flex-end;
@@ -3876,7 +3872,6 @@ input[type="checkbox"] {
 
     #overviewModal .modal-content,
     #projectOverviewModal .modal-content,
-    #projectModal .modal-content,
     #companyNotesModal .modal-content,
     #usersModal .modal-content {
         width: min(600px, 100%);
@@ -4409,7 +4404,6 @@ a.detail-value:hover,
 @media (min-width: 769px) {
     #overviewModal .modal-backdrop,
     #projectOverviewModal .modal-backdrop,
-    #projectModal .modal-backdrop,
     #companyNotesModal .modal-backdrop,
     #usersModal .modal-backdrop {
         background: rgba(17, 45, 78, 0.18);
@@ -4419,7 +4413,6 @@ a.detail-value:hover,
 
     :root[data-theme="dark"] #overviewModal .modal-backdrop,
     :root[data-theme="dark"] #projectOverviewModal .modal-backdrop,
-    :root[data-theme="dark"] #projectModal .modal-backdrop,
     :root[data-theme="dark"] #companyNotesModal .modal-backdrop,
     :root[data-theme="dark"] #usersModal .modal-backdrop {
         background: rgba(3, 8, 16, 0.45);
@@ -5744,4 +5737,2258 @@ details.import-instructions p {
 .pdoc-dot {
     width: 10px;
     height: 10px;
+}
+
+
+/* --------------------------------------------------------------------------
+   31. The project sheet, compact
+   --------------------------------------------------------------------------
+   One scrolling sheet and nothing scrolling inside it. Every section opens
+   with its heading and, on the right, its one way to add something; lists
+   are one line per item until an item is opened.
+   -------------------------------------------------------------------------- */
+
+#projectOverviewModal .overview-section {
+    margin-bottom: 22px;
+}
+
+#projectOverviewModal .overview-section:last-child {
+    margin-bottom: 0;
+}
+
+/* ---- Section head: title left, "Add" right ---- */
+
+.ov-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 8px;
+}
+
+.ov-section-head .overview-section-title {
+    margin: 0;
+}
+
+.ov-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 10px 0 7px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-accent-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.ov-add-btn:hover,
+.ov-add-btn[aria-expanded="true"] {
+    background: var(--c-accent-soft);
+}
+
+.ov-add-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+/* The search field an "Add" button opens. */
+.ov-picker {
+    margin: 0 0 8px;
+}
+
+.ov-picker[hidden] {
+    display: none;
+}
+
+.ov-picker .form-input {
+    height: 34px;
+    font-size: var(--t-sm);
+}
+
+/* A link-sized button: "Show more", "Show older notes". */
+.ov-link-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-accent-2);
+    font: 500 var(--t-sm)/1.4 var(--font);
+    cursor: pointer;
+}
+
+.ov-link-btn:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ov-link-btn[hidden] {
+    display: none;
+}
+
+#projectOverviewModal .empty-hint {
+    padding: 2px 0;
+    text-align: left;
+}
+
+/* ---- Tags: small pills on one wrapping line ---- */
+
+#projectOverviewModal .tags-container {
+    gap: 5px;
+    margin: 0;
+}
+
+#projectOverviewModal .tags-container .tag {
+    height: 24px;
+    gap: 5px;
+    padding: 0 4px 0 8px;
+    font-size: var(--t-xs);
+}
+
+#projectOverviewModal .tag-remove {
+    padding: 0 2px;
+    border: 0;
+    background: none;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* ---- Assigned contacts: chips side by side ---- */
+
+#projectOverviewModal .project-contacts-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pcontact-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 4px 0 2px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.pcontact-avatar {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+    color: var(--c-ink-2);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+/* The chip opens the contact; the name is its keyboard handle. */
+.pcontact-chip {
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+
+.pcontact-chip:hover {
+    border-color: var(--c-line-strong);
+    background: var(--c-tint-3);
+}
+
+.pcontact-name {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.pcontact-name:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Completed to-dos, when shown, read as done. */
+#projectOverviewModal .ptodo.todo-completed .ptodo-title {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+    text-decoration-color: var(--c-ink-4);
+}
+
+.ptodo-done-hint .ov-link-btn {
+    font-size: inherit;
+}
+
+.pcontact-remove {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    color: var(--c-ink-4);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pcontact-remove:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+/* ---- To-dos: one line each, open in place ---- */
+
+.ptodo-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+#projectOverviewModal .ptodo {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--c-line-2);
+    border-radius: 0;
+}
+
+#projectOverviewModal .ptodo:last-child {
+    border-bottom: 0;
+}
+
+.ptodo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 10px 6px 12px;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.ptodo-row:hover {
+    background: var(--c-tint-3);
+}
+
+.ptodo-row .todo-check {
+    margin: 0;
+}
+
+.ptodo-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    color: var(--c-ink);
+    font: 500 var(--t-sm)/1.4 var(--font);
+    cursor: pointer;
+}
+
+.ptodo-title:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ptodo-meta {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.ptodo-meta .todo-priority,
+.ptodo-meta .todo-due {
+    font-size: var(--t-xs);
+    white-space: nowrap;
+}
+
+/* Fixed slots, so dates and faces line up from row to row. */
+.ptodo-meta .todo-due {
+    min-width: 44px;
+    justify-content: flex-end;
+}
+
+.ptodo-meta .assignee-chip,
+.ptodo-no-assignee {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.ptodo-chevron {
+    flex-shrink: 0;
+    color: var(--c-ink-4);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.ptodo.is-expanded .ptodo-chevron {
+    transform: rotate(180deg);
+}
+
+.ptodo-detail {
+    display: none;
+    padding: 0 12px 10px 42px;
+}
+
+.ptodo.is-expanded .ptodo-detail {
+    display: block;
+}
+
+.ptodo-detail .todo-description {
+    margin: 0 0 8px;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    color: var(--c-ink-2);
+    white-space: pre-wrap;
+}
+
+.ptodo-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ptodo-done-hint {
+    margin: 6px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 480px) {
+    /* The priority word gives way to its dot on a phone. */
+    .ptodo-meta .todo-priority {
+        font-size: 0;
+        gap: 0;
+    }
+}
+
+/* ---- Documents: one line per file ---- */
+
+#projectOverviewModal .pdoc-list {
+    margin-bottom: 8px;
+}
+
+#projectOverviewModal .pdoc-list:empty {
+    display: none;
+}
+
+#projectOverviewModal .pdoc-item {
+    gap: 10px;
+    padding: 6px 8px 6px 10px;
+}
+
+#projectOverviewModal .pdoc-type {
+    width: 30px;
+    height: 24px;
+    border-radius: var(--r-sm);
+    font-size: 9px;
+}
+
+#projectOverviewModal .pdoc-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--t-sm);
+}
+
+#projectOverviewModal .pdoc-label {
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.pdoc-date {
+    flex-shrink: 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+#projectOverviewModal .pdoc-act {
+    width: 26px;
+    height: 26px;
+}
+
+#projectOverviewModal .pdoc-tools {
+    gap: 0;
+}
+
+/* Adding: one quiet line, no box. Files can still be dropped anywhere on
+   the sheet. */
+#projectOverviewModal .pdoc-add {
+    padding: 0;
+    background: none;
+    border: 0;
+}
+
+#projectOverviewModal .pdoc-add-text {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+#projectOverviewModal .pdoc-chip {
+    height: 24px;
+    gap: 5px;
+    padding: 0 9px 0 8px;
+    font-size: var(--t-xs);
+}
+
+@media (max-width: 480px) {
+    .pdoc-date {
+        display: none;
+    }
+}
+
+/* ---- Notes: newest few, a few lines each ---- */
+
+#projectOverviewModal .notes-timeline {
+    gap: 6px;
+    margin: 0;
+}
+
+#projectOverviewModal .note-item {
+    padding: 8px 12px;
+}
+
+#projectOverviewModal .note-header {
+    margin-bottom: 2px;
+}
+
+#projectOverviewModal .note-content {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+}
+
+#projectOverviewModal .note-item.is-open .note-content {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+}
+
+#projectOverviewModal .note-more-btn {
+    margin-top: 2px;
+    font-size: var(--t-xs);
+}
+
+#projectOverviewModal .notes-older-btn {
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
+.ov-note-form {
+    margin: 0 0 10px;
+}
+
+.ov-note-form[hidden] {
+    display: none;
+}
+
+.ov-note-form textarea {
+    width: 100%;
+    min-height: 72px;
+}
+
+.ov-note-form-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* ---- Footer: delete on the left, quietly; the main action right ---- */
+
+.ov-footer .ov-delete-btn {
+    margin-right: auto;
+    border-color: transparent;
+    background: transparent;
+    color: var(--c-danger);
+}
+
+.ov-footer .ov-delete-btn:hover {
+    background: var(--c-danger-soft);
+}
+
+@media (max-width: 768px) {
+    .ov-footer .btn {
+        flex: 0 1 auto;
+    }
+
+    .ov-footer [data-ov] {
+        flex: 1;
+    }
+}
+
+/* ---- Reading and editing: one layout, two states ----
+   In edit mode every fact keeps its place and shows a field instead of its
+   value and the sheet gets an accent outline, so the mode is obvious without
+   anything moving. */
+
+#projectOverviewModal:not(.is-editing) [data-ov="edit"],
+#projectOverviewModal.is-editing [data-ov="view"] {
+    display: none !important;
+}
+
+#projectOverviewModal .modal-content {
+    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+
+#projectOverviewModal.is-editing .modal-content {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
+}
+
+/* The name field takes the heading's size, so the header does not change. */
+#projectOverviewModal .ov-edit-title {
+    width: 100%;
+    height: 36px;
+    padding: 0 8px;
+    margin-left: -9px;
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+#projectOverviewModal .ov-edit-company {
+    margin: 4px 0 0 -9px;
+}
+
+#projectOverviewModal .ov-edit-company .form-input {
+    height: 30px;
+    padding: 0 8px;
+    font-size: var(--t-sm);
+}
+
+#projectOverviewModal.is-editing .overview-details {
+    border-color: var(--c-accent);
+    background: color-mix(in srgb, var(--c-accent) 4%, var(--c-surface));
+}
+
+#projectOverviewModal .ov-field {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    font-size: var(--t-base);
+    font-weight: 500;
+}
+
+#projectOverviewModal textarea.ov-field {
+    height: auto;
+    min-height: 72px;
+    padding: 6px 8px;
+    line-height: 1.5;
+}
+
+.ov-field-pair {
+    display: flex;
+    gap: 4px;
+}
+
+.ov-field-pair .ov-field {
+    min-width: 0;
+}
+
+#projectOverviewModal .is-invalid {
+    border-color: var(--c-danger);
+    box-shadow: 0 0 0 3px var(--c-danger-soft);
+}
+
+#projectOverviewModal.is-editing .overview-header-info,
+#projectOverviewModal.is-editing .overview-title-info {
+    flex: 1;
+}
+
+/* A project not yet created: only what can be filled in before it exists. */
+#projectOverviewModal.is-new .ov-section,
+#projectOverviewModal.is-new #projectOverviewEdited,
+#projectOverviewModal.is-new #projectOverviewAssignee,
+#projectOverviewModal.is-new #projectOverviewReview,
+#projectOverviewModal.is-new .ov-delete-btn {
+    display: none !important;
+}
+
+#projectOverviewModal.is-new .ov-footer {
+    justify-content: flex-end;
+}
+
+
+/* --------------------------------------------------------------------------
+   32. To-do links and the to-do sheet
+   --------------------------------------------------------------------------
+   A to-do's link - mostly a Google Drive document - is one click from every
+   list the to-do is in: a small pill with the Drive mark and the document's
+   name. The to-do sheet lists them all.
+   -------------------------------------------------------------------------- */
+
+.tlink-icon {
+    width: 16px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.tlink-icon--web {
+    width: 16px;
+    height: 16px;
+    color: var(--c-ink-3);
+}
+
+.tlink-quick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.tlink-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 200px;
+    height: 26px;
+    padding: 0 10px 0 8px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: 500 var(--t-xs)/1 var(--font);
+    text-decoration: none;
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.tlink-pill:hover {
+    border-color: var(--c-line-strong);
+    box-shadow: var(--e-1);
+    color: var(--c-ink);
+}
+
+.tlink-pill:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.tlink-pill-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The mark alone, where a row has no room for a name. */
+.tlink-quick.is-compact .tlink-pill {
+    width: 26px;
+    padding: 0;
+    justify-content: center;
+}
+
+.tlink-more {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+/* Home rows: the pill sits at the end, outside the row's own button. */
+#workloadView div.workload-row > .tlink-quick {
+    margin-left: -4px;
+}
+
+@media (max-width: 768px) {
+    .tlink-pill {
+        max-width: 130px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* On a phone the mark is enough; the name is in the to-do sheet. */
+    #workloadView .tlink-pill,
+    #todoView .tlink-pill {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    #workloadView .tlink-pill-name,
+    #todoView .tlink-pill-name {
+        display: none;
+    }
+}
+
+/* ---- The to-do sheet ---- */
+
+@media (min-width: 769px) {
+    #todoDetailModal {
+        justify-content: flex-end;
+        align-items: stretch;
+        padding: 12px;
+    }
+
+    #todoDetailModal .modal-content {
+        width: min(560px, 100%);
+        max-width: 560px;
+        height: 100%;
+        max-height: none;
+        border-radius: var(--r-xl);
+        animation: dsSheetIn var(--dur-3) var(--ease) both;
+    }
+
+    #todoDetailModal .modal-backdrop {
+        background: rgba(17, 45, 78, 0.18);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    :root[data-theme="dark"] #todoDetailModal .modal-backdrop {
+        background: rgba(3, 8, 16, 0.45);
+    }
+}
+
+#todoDetailModal .overview-section {
+    margin-bottom: 22px;
+}
+
+#todoDetailModal .empty-hint {
+    padding: 2px 0;
+    text-align: left;
+}
+
+/* What the to-do belongs to: links in the header's subtitle line. */
+.tdetail-context-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-accent-2);
+    font: inherit;
+    cursor: pointer;
+}
+
+.tdetail-context-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.tdetail-context-sep {
+    margin: 0 6px;
+    color: var(--c-ink-4);
+}
+
+.tdetail-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tdetail-status::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: var(--r-full);
+    border: 1.5px solid var(--c-line-strong);
+}
+
+.tdetail-status.is-done::before {
+    border-color: var(--c-success);
+    background: var(--c-success);
+}
+
+.tdetail-muted {
+    color: var(--c-ink-3);
+    font-weight: 400;
+}
+
+.tdetail-description {
+    white-space: pre-wrap;
+    font-weight: 400;
+    line-height: 1.55;
+}
+
+/* ---- Links in the sheet ---- */
+
+.tlink-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.tlink-form[hidden] {
+    display: none;
+}
+
+.tlink-form .form-input {
+    height: 36px;
+    font-size: var(--t-sm);
+}
+
+.tlink-form .form-input.is-invalid {
+    border-color: var(--c-danger);
+    box-shadow: 0 0 0 3px var(--c-danger-soft);
+}
+
+.tlink-form-hint {
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.tlink-form .ov-note-form-actions {
+    justify-content: flex-end;
+}
+
+.tlink-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.tlink-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 12px;
+    border-bottom: 1px solid var(--c-line-2);
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.tlink-row:last-child {
+    border-bottom: 0;
+}
+
+.tlink-row:hover {
+    background: var(--c-tint-3);
+}
+
+.tlink-row-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.tlink-row-icon .tlink-icon {
+    width: 18px;
+    height: 16px;
+}
+
+.tlink-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+}
+
+.tlink-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.tlink-row-main:hover .tlink-row-name {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.tlink-row-kind {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.tlink-row-open {
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   33. Home: new for you
+   --------------------------------------------------------------------------
+   What was assigned to you since you last looked, above your lists. Tinted
+   in the accent so it is seen first, and gone once acknowledged.
+   -------------------------------------------------------------------------- */
+
+#workloadView .workload-news {
+    margin: 0 0 24px;
+    padding: 14px 14px 10px;
+    background: var(--c-accent-soft);
+    border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
+    border-radius: var(--r-lg);
+}
+
+.workload-news-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px;
+}
+
+.workload-news-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+.workload-news-sub {
+    margin: 2px 2px 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.workload-news-dismiss {
+    height: 30px;
+    padding: 0 14px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.workload-news-dismiss:hover:not(:disabled) {
+    border-color: var(--c-line-strong);
+    box-shadow: var(--e-1);
+}
+
+.workload-news-dismiss:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.workload-news-list {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    overflow: hidden;
+}
+
+.workload-news-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--c-line-2);
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.workload-news-item:last-child {
+    border-bottom: 0;
+}
+
+.workload-news-item:hover {
+    background: var(--c-tint-3);
+}
+
+.workload-news-item:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--c-accent);
+}
+
+.workload-news-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--c-accent);
+}
+
+.workload-news-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.workload-news-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-base);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.workload-news-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.workload-news-more {
+    margin: 8px 2px 2px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+/* The same news in the lists below: a small tag after the title. */
+.workload-new {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    margin-left: 8px;
+    padding: 0 7px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+
+/* --------------------------------------------------------------------------
+   34. Home: the layout
+   --------------------------------------------------------------------------
+   Two columns: to-dos - the work itself - in the wide one; bookkeeping,
+   projects and contacts beside them in a narrow one. Every kind of thing has
+   its own colour, on the section's icon and on each row's mark, so the page
+   sorts itself at a glance.
+   -------------------------------------------------------------------------- */
+
+:root {
+    --type-todo: #3F72AF;
+    --type-project: #6D5BD0;
+    --type-bookkeeping: #B7791F;
+    --type-contact: #1F8A84;
+}
+
+:root[data-theme="dark"] {
+    --type-todo: #83A9DC;
+    --type-project: #A795F0;
+    --type-bookkeeping: #E2B26A;
+    --type-contact: #6CC7BF;
+}
+
+#workloadView .workload-wrap {
+    max-width: 1180px;
+}
+
+#workloadView .workload-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    gap: 0 24px;
+    align-items: start;
+}
+
+#workloadView .workload-grid.is-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+    #workloadView .workload-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ---- Type colours ---- */
+
+#workloadView .workload-section.is-todo { --wl-type: var(--type-todo); }
+#workloadView .workload-section.is-project { --wl-type: var(--type-project); }
+#workloadView .workload-section.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
+#workloadView .workload-section.is-contact { --wl-type: var(--type-contact); }
+
+#workloadView .workload-section-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--wl-type, var(--c-ink-3)) 14%, var(--c-surface));
+    color: var(--wl-type, var(--c-ink-3));
+}
+
+#workloadView .workload-section-head {
+    gap: 10px;
+}
+
+/* Each row's mark carries its section's colour. */
+#workloadView .workload-section[class*="is-"] .workload-row-mark.is-icon,
+#workloadView .workload-section[class*="is-"] .workload-row-mark.is-initials {
+    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+#workloadView .workload-section.is-todo .workload-check:not(.is-done) {
+    border-color: color-mix(in srgb, var(--wl-type) 45%, var(--c-line-strong));
+}
+
+#workloadView .workload-section.is-todo .workload-check:not(.is-done):hover {
+    border-color: var(--c-success);
+}
+
+/* ---- To-dos: grouped by when they are due ---- */
+
+#workloadView .workload-group-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px 7px;
+    background: var(--c-tint-3);
+    border-bottom: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--c-ink-3);
+}
+
+#workloadView .workload-group-label + .workload-row,
+#workloadView .workload-row + .workload-group-label {
+    border-top: 0;
+}
+
+#workloadView .workload-group-label.is-overdue {
+    color: var(--c-danger);
+}
+
+#workloadView .workload-group-count {
+    font-weight: 500;
+    letter-spacing: 0;
+    opacity: 0.8;
+}
+
+/* ---- The narrow column: compact rows ---- */
+
+#workloadView .workload-side .workload-row {
+    min-height: 50px;
+    padding: 8px 14px;
+    gap: 10px;
+}
+
+#workloadView .workload-side .workload-row-mark.is-icon,
+#workloadView .workload-side .workload-row-mark.is-initials {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-md);
+}
+
+#workloadView .workload-side .workload-row-mark.is-initials {
+    border-radius: var(--r-full);
+}
+
+#workloadView .workload-side .workload-row-title {
+    font-size: var(--t-sm);
+}
+
+#workloadView .workload-side .workload-row-context,
+#workloadView .workload-side .workload-due {
+    font-size: var(--t-xs);
+}
+
+#workloadView .workload-side .workload-row-body {
+    min-width: 0;
+}
+
+#workloadView .workload-side .workload-row-title,
+#workloadView .workload-side .workload-row-context {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A project's stage: its word and a dot, quieter than the type colour. */
+#workloadView .workload-stage {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+#workloadView .workload-stage::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: var(--r-full);
+    background: var(--stage-lead);
+}
+
+#workloadView .workload-stage[data-stage="proposal"]::before { background: var(--stage-proposal); }
+#workloadView .workload-stage[data-stage="negotiation"]::before { background: var(--stage-negotiation); }
+#workloadView .workload-stage[data-stage="in-progress"]::before { background: var(--stage-progress); }
+#workloadView .workload-stage[data-stage="complete"]::before { background: var(--stage-complete); }
+
+/* A to-do row is a wrapper; its padding lives on the button inside, so the
+   whole height opens the to-do - and is not padded twice. */
+#workloadView div.workload-row {
+    min-height: 56px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+#workloadView .workload-row-main {
+    padding: 9px 0;
+}
+
+
+/* --------------------------------------------------------------------------
+   35. Home: the cards at the top
+   --------------------------------------------------------------------------
+   Three plain cards - due this week, open to-dos, projects - each a number
+   and one line of detail. The icon carries the type colour of the lists
+   below; a card jumps to its list.
+   -------------------------------------------------------------------------- */
+
+#workloadView .home-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0 0 24px;
+}
+
+#workloadView .home-stats[hidden] {
+    display: none;
+}
+
+#workloadView .home-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 16px 18px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    color: var(--c-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+#workloadView .home-stat:hover {
+    border-color: var(--c-line-strong);
+    box-shadow: var(--e-2, var(--e-1));
+}
+
+#workloadView .home-stat:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+#workloadView .home-stat.is-due { --wl-type: var(--type-todo); }
+#workloadView .home-stat.is-todo { --wl-type: var(--type-todo); }
+#workloadView .home-stat.is-project { --wl-type: var(--type-project); }
+
+.home-stat-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.home-stat-icon {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+.home-stat-label {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.home-stat-value {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.home-stat-detail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.home-stat-alert {
+    color: var(--c-danger);
+    font-weight: 600;
+}
+
+.home-stat-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.home-stat-dot::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-full);
+    background: var(--c-ink-4);
+}
+
+.home-stat-dot[data-tone="high"]::before { background: var(--c-danger); }
+.home-stat-dot[data-tone="medium"]::before { background: var(--c-warning); }
+.home-stat-dot[data-tone="progress"]::before { background: var(--stage-progress); }
+.home-stat-dot[data-tone="proposal"]::before { background: var(--stage-proposal); }
+.home-stat-dot[data-tone="negotiation"]::before { background: var(--stage-negotiation); }
+.home-stat-dot[data-tone="complete"]::before { background: var(--stage-complete); }
+
+/* A card's jump lands with a little air above the section. */
+#workloadView .workload-section {
+    scroll-margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+    #workloadView .home-stats {
+        gap: 8px;
+    }
+
+    #workloadView .home-stat {
+        padding: 12px;
+        gap: 4px;
+    }
+
+    /* On a phone each card keeps its number and its one most useful word. */
+    .home-stat-icon {
+        display: none;
+    }
+
+    .home-stat-label {
+        font-size: var(--t-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .home-stat-value {
+        font-size: 24px;
+    }
+
+    .home-stat-detail {
+        font-size: var(--t-xs);
+    }
+
+    .home-stat-detail .home-stat-dot:nth-child(n+2) {
+        display: none;
+    }
+}
+
+/* ---- The week in the "Due this week" card ---- */
+
+#workloadView .home-stat.is-due {
+    gap: 6px;
+}
+
+.home-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.home-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.home-day-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.home-day.is-today .home-day-name {
+    color: var(--c-ink);
+    font-weight: 600;
+}
+
+/* A faint dot for a free day; the count, in the to-do colour, for a busy one. */
+.home-day-count {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-day:not(.has-due) .home-day-count::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+}
+
+.home-day.has-due .home-day-count {
+    background: color-mix(in srgb, var(--type-todo) 16%, var(--c-surface));
+    color: var(--type-todo);
+}
+
+.home-day.is-today.has-due .home-day-count {
+    background: var(--type-todo);
+    color: var(--c-surface);
+}
+
+@media (max-width: 600px) {
+    /* The week needs the width: the due card takes a row of its own. */
+    #workloadView .home-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #workloadView .home-stat.is-due {
+        grid-column: 1 / -1;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   36. Projects: deleted projects
+   -------------------------------------------------------------------------- */
+
+.deleted-projects {
+    margin: 28px 0 8px;
+}
+
+.deleted-projects[hidden] {
+    display: none;
+}
+
+.deleted-projects-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 2px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.deleted-projects-head::-webkit-details-marker {
+    display: none;
+}
+
+.deleted-projects-head::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-left: 4px;
+    border-right: 1.5px solid var(--c-ink-3);
+    border-bottom: 1.5px solid var(--c-ink-3);
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.deleted-projects[open] .deleted-projects-head::after {
+    transform: rotate(-135deg) translateY(-1px);
+}
+
+.deleted-projects-title {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.deleted-projects-count {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.deleted-projects-hint {
+    margin: 6px 2px 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.deleted-projects-list {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.deleted-project {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.deleted-project:last-child {
+    border-bottom: 0;
+}
+
+.deleted-project-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.deleted-project-name {
+    font-size: var(--t-base);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.deleted-project-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.deleted-project-purge {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--c-danger);
+}
+
+.deleted-project-purge:hover:not(:disabled) {
+    background: var(--c-danger-soft);
+}
+
+@media (max-width: 600px) {
+    .deleted-project {
+        flex-wrap: wrap;
+    }
+
+    .deleted-project-body {
+        flex-basis: 100%;
+    }
+
+    .deleted-project-meta {
+        white-space: normal;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   37. Faces: one look everywhere
+   --------------------------------------------------------------------------
+   Every face that stands for a person - by-lines, assignees, the sidebar
+   chip, the profile popover, the home page header, the team and user lists,
+   bookkeeping - shows initials on the same soft tint: light in light mode,
+   dark in dark mode. Some used to take the text colour as their background,
+   which turned them dark in light mode and light in dark mode.
+
+   A face that shows a picture gets no background or ring of its own: the
+   picture (Claude's mark included) brings its own.
+   -------------------------------------------------------------------------- */
+
+:root {
+    --face-bg: var(--c-tint);
+    --face-ink: var(--c-ink-2);
+}
+
+.by-line-avatar,
+.assignee-chip,
+.assignee-bar-face,
+.user-chip-avatar,
+.profile-pop-avatar,
+.user-row-avatar,
+.user-row.is-admin .user-row-avatar,
+.bk-menu-face,
+.bk-assignee,
+.team-face,
+.pcontact-avatar,
+.overview-avatar,
+#workloadView .workload-person-face {
+    background: var(--face-bg);
+    color: var(--face-ink);
+}
+
+/* An admin was marked by an inverted face; the "Admin" badge says it now. */
+.user-row.is-admin .user-row-avatar,
+.bk-assignee {
+    border-color: transparent;
+}
+
+/* "Nobody": an outline, not a face. */
+.assignee-bar-face.is-empty,
+#workloadView .workload-person-face.is-empty {
+    background: transparent;
+    color: var(--c-ink-3);
+    box-shadow: inset 0 0 0 1.5px var(--c-line-strong);
+}
+
+.by-line-avatar.has-photo,
+.assignee-chip.has-photo,
+.assignee-bar-face.has-photo,
+.user-chip-avatar.has-photo,
+.profile-pop-avatar.has-photo,
+.user-row-avatar.has-photo,
+.bk-menu-face.has-photo,
+.bk-assignee.has-photo,
+.team-face.has-photo,
+#workloadView .workload-person-face.has-photo {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   38. Home: the calm version
+   --------------------------------------------------------------------------
+   Fewer boxes, one weight of heading, hairlines instead of bands. Colour is
+   kept for what it means: the type of a thing, a priority, something late.
+   Overrides the home rules above.
+   -------------------------------------------------------------------------- */
+
+/* ---- Header: a greeting, the date above it ---- */
+
+#workloadView .workload-head {
+    align-items: flex-end;
+    margin: 4px 0 28px;
+}
+
+#workloadView .workload-person-text {
+    display: flex;
+    flex-direction: column;
+}
+
+#workloadView .workload-subtitle {
+    order: -1;
+    margin: 0 0 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-ink-3);
+}
+
+#workloadView .workload-title {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+}
+
+/* On your own page the greeting is enough; someone else's keeps their face. */
+#workloadView .workload-head.is-me .workload-person-face {
+    display: none;
+}
+
+#workloadView .workload-person-face {
+    width: 44px;
+    height: 44px;
+}
+
+#workloadView .workload-switch-label {
+    display: none;
+}
+
+#workloadView .workload-switch .form-select {
+    min-width: 0;
+    height: 34px;
+    padding-left: 14px;
+    border-radius: var(--r-full);
+    background-color: var(--c-surface);
+    font-size: var(--t-sm);
+}
+
+/* ---- Overview: one card, three columns ---- */
+
+#workloadView .home-stats {
+    gap: 0;
+    margin: 0 0 28px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl, 16px);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+#workloadView .home-stat {
+    gap: 4px;
+    padding: 20px 24px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#workloadView .home-stat + .home-stat {
+    border-left: 1px solid var(--c-line-2);
+}
+
+#workloadView .home-stat:hover {
+    border-color: var(--c-line-2);
+    box-shadow: none;
+    background: var(--c-tint-3);
+}
+
+#workloadView .home-stat:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--c-accent);
+}
+
+#workloadView .home-stat-label {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+#workloadView .home-stat-value {
+    font-size: 34px;
+    letter-spacing: -0.04em;
+}
+
+#workloadView .home-week {
+    margin-top: 10px;
+}
+
+/* ---- New for you: lighter, one line per item ---- */
+
+#workloadView .workload-news {
+    position: relative;
+    margin: 0 0 32px;
+    padding: 0;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl, 16px);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+/* An accent edge says "new" without tinting the whole box. */
+#workloadView .workload-news::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--c-accent);
+}
+
+#workloadView .workload-news-head {
+    padding: 14px 18px 0 22px;
+}
+
+#workloadView .workload-news-heading {
+    font-size: var(--t-base);
+}
+
+#workloadView .workload-news-heading .workload-count {
+    border: 0;
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    border-radius: var(--r-full);
+}
+
+#workloadView .workload-news-sub {
+    margin: 2px 18px 8px 22px;
+    font-size: var(--t-xs);
+}
+
+#workloadView .workload-news-dismiss {
+    height: 28px;
+    padding: 0 12px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--c-accent-2);
+}
+
+#workloadView .workload-news-dismiss:hover:not(:disabled) {
+    background: var(--c-accent-soft);
+    box-shadow: none;
+}
+
+#workloadView .workload-news-list {
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+    background: transparent;
+}
+
+#workloadView .workload-news-item {
+    padding: 9px 18px 9px 22px;
+}
+
+#workloadView .workload-news-body {
+    flex: 1;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+#workloadView .workload-news-title {
+    font-size: var(--t-sm);
+}
+
+#workloadView .workload-news-meta {
+    flex-shrink: 1;
+    font-size: var(--t-xs);
+    text-align: right;
+}
+
+#workloadView .workload-news-more {
+    margin: 0;
+    padding: 8px 22px 12px;
+    font-size: var(--t-xs);
+}
+
+@media (max-width: 700px) {
+    #workloadView .workload-news-body {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    #workloadView .workload-news-title,
+    #workloadView .workload-news-meta {
+        display: block;
+        max-width: 100%;
+        text-align: left;
+    }
+}
+
+/* ---- Sections: a quiet heading over a clean list ---- */
+
+#workloadView .workload-section {
+    margin: 0 0 28px;
+}
+
+#workloadView .workload-section-head {
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 0 4px;
+}
+
+#workloadView .workload-section-icon {
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    border-radius: 0;
+}
+
+#workloadView .workload-section-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+#workloadView .workload-section-title {
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+#workloadView .workload-count {
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-4, var(--c-ink-3));
+}
+
+#workloadView .workload-list {
+    border-radius: var(--r-xl, 16px);
+    border-color: var(--c-line);
+    box-shadow: var(--e-1);
+}
+
+/* ---- Rows ---- */
+
+#workloadView .workload-row,
+#workloadView div.workload-row {
+    min-height: 0;
+    padding: 0 16px;
+    border-bottom-color: var(--c-line-2);
+}
+
+#workloadView .workload-row-main {
+    padding: 11px 0;
+    gap: 12px;
+}
+
+#workloadView button.workload-row {
+    padding: 10px 16px;
+}
+
+#workloadView .workload-row-title {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+#workloadView .workload-row-context {
+    font-size: var(--t-xs);
+}
+
+#workloadView .workload-row-meta {
+    gap: 10px;
+}
+
+#workloadView .workload-due {
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+}
+
+#workloadView .workload-check {
+    width: 20px;
+    height: 20px;
+}
+
+/* Priority: a dot. */
+#workloadView .workload-pri {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--c-ink-4, var(--c-line-strong));
+}
+
+#workloadView .workload-pri--high { background: var(--c-danger); }
+#workloadView .workload-pri--medium { background: var(--c-warning); }
+
+/* The Drive button: the mark alone until hovered; the name is its tooltip
+   and the to-do's sheet. Keeps every row to one calm line. */
+#workloadView .workload-main .tlink-pill {
+    max-width: 180px;
+    height: 24px;
+    border-color: var(--c-line-2);
+}
+
+/* ---- To-do groups: plain words, not bands ---- */
+
+#workloadView .workload-group-label {
+    padding: 14px 16px 4px;
+    background: transparent;
+    border-bottom: 0;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    color: var(--c-ink-3);
+}
+
+#workloadView .workload-group-label:first-child {
+    padding-top: 12px;
+}
+
+#workloadView .workload-group-label + .workload-row {
+    border-top: 0;
+}
+
+/* The last row of a group needs no line before the next label. */
+#workloadView .workload-row:has(+ .workload-group-label) {
+    border-bottom: 0;
+}
+
+/* ---- The narrow column ---- */
+
+#workloadView .workload-side .workload-row {
+    min-height: 0;
+    padding: 9px 16px;
+}
+
+#workloadView .workload-side .workload-row-mark.is-icon,
+#workloadView .workload-side .workload-row-mark.is-initials {
+    width: 26px;
+    height: 26px;
+}
+
+/* ---- Completed: a quiet link-like fold ---- */
+
+#workloadView details.workload-done > summary {
+    padding: 2px 4px;
+    color: var(--c-ink-3);
+}
+
+#workloadView details.workload-done .workload-section-title {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 600px) {
+    #workloadView .workload-title {
+        font-size: 24px;
+    }
+
+    #workloadView .home-stat {
+        padding: 14px 16px;
+    }
+
+    #workloadView .home-stat-value {
+        font-size: 26px;
+    }
+
+    /* Two columns under the full-width week: the divider follows the grid. */
+    #workloadView .home-stat + .home-stat {
+        border-left: 0;
+        border-top: 1px solid var(--c-line-2);
+    }
+
+    #workloadView .home-stat.is-project {
+        border-left: 1px solid var(--c-line-2);
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   39. Home overview: three balanced columns
+   --------------------------------------------------------------------------
+   Every column has the same three rows - label, number, picture - and the
+   picture area has one height, so the week strip and the two bars sit on
+   the same line.
+   -------------------------------------------------------------------------- */
+
+#workloadView .home-stat {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    gap: 6px;
+    height: 100%;
+}
+
+#workloadView .home-stat-figure {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+}
+
+#workloadView .home-stat-value {
+    line-height: 1;
+}
+
+/* Overdue: a small red pill beside the number. */
+.home-stat-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: var(--r-full);
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.home-stat-flag::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: var(--r-full);
+    background: currentColor;
+}
+
+#workloadView .home-stat-visual {
+    align-self: end;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    width: 100%;
+    height: 50px;
+    margin-top: 8px;
+}
+
+#workloadView .home-stat-visual .home-week {
+    margin: 0;
+}
+
+/* ---- The bars ---- */
+
+.home-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.home-bar-track {
+    display: flex;
+    gap: 3px;
+    height: 8px;
+    border-radius: var(--r-full);
+    overflow: hidden;
+}
+
+.home-bar.is-empty .home-bar-track {
+    background: var(--c-tint-3);
+}
+
+.home-bar-part {
+    flex-basis: 0;
+    min-width: 6px;
+    background: var(--c-ink-4, var(--c-line-strong));
+}
+
+.home-bar-part[data-tone="high"] { background: var(--c-danger); }
+.home-bar-part[data-tone="medium"] { background: var(--c-warning); }
+.home-bar-part[data-tone="low"] { background: var(--c-ink-4, var(--c-line-strong)); }
+.home-bar-part[data-tone="none"] { background: var(--c-line-strong); }
+.home-bar-part[data-tone="progress"] { background: var(--stage-progress); }
+.home-bar-part[data-tone="proposal"] { background: var(--stage-proposal); }
+.home-bar-part[data-tone="negotiation"] { background: var(--stage-negotiation); }
+.home-bar-part[data-tone="lead"] { background: var(--stage-lead); }
+.home-bar-part[data-tone="complete"] { background: var(--stage-complete); }
+
+.home-bar-legend {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 14px;
+    overflow: hidden;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.home-stat-dot[data-tone="low"]::before { background: var(--c-ink-4, var(--c-line-strong)); }
+.home-stat-dot[data-tone="none"]::before { background: var(--c-line-strong); }
+.home-stat-dot[data-tone="lead"]::before { background: var(--stage-lead); }
+
+@media (max-width: 600px) {
+    #workloadView .home-stat-visual {
+        height: 46px;
+    }
+
+    /* Narrow columns: the bar alone, its first part named. */
+    .home-bar-legend .home-stat-dot:nth-child(n+2) {
+        display: none;
+    }
+}
+
+/* ---- Overview, tightened: the same three rows with less air ---- */
+
+#workloadView .workload-head {
+    margin-bottom: 20px;
+}
+
+#workloadView .home-stats {
+    margin-bottom: 24px;
+}
+
+#workloadView .home-stat {
+    gap: 2px;
+    padding: 14px 20px 16px;
+}
+
+#workloadView .home-stat-figure {
+    min-height: 34px;
+}
+
+#workloadView .home-stat-value {
+    font-size: 28px;
+}
+
+#workloadView .home-stat-visual {
+    height: 38px;
+    margin-top: 4px;
+}
+
+#workloadView .home-day {
+    gap: 2px;
+}
+
+#workloadView .home-day-count {
+    width: 20px;
+    height: 20px;
+}
+
+#workloadView .home-bar {
+    gap: 8px;
+}
+
+#workloadView .home-bar-track {
+    height: 6px;
+}
+
+@media (max-width: 600px) {
+    #workloadView .home-stat {
+        padding: 12px 16px 14px;
+    }
+
+    #workloadView .home-stat-value {
+        font-size: 24px;
+    }
+
+    #workloadView .home-stat-visual {
+        height: 38px;
+    }
 }

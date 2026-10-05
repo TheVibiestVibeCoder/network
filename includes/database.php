@@ -306,6 +306,57 @@ class Database
             )
         ");
 
+        // Links on a to-do - mostly Google Drive documents (see
+        // includes/TodoLink.php). They hang off the master to-do, so every
+        // mirrored copy of it shows the same links.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS todo_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                todo_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                title VARCHAR(255),
+                created_by INTEGER,
+                created_by_name VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todo_links_todo ON todo_links(todo_id, created_at)");
+
+        // Who was assigned what, and by whom - the home page's "New for you"
+        // (includes/AssignmentFeed.php). People are keyed as in assigned_to;
+        // assigned_by NULL is Claude or the system.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS assignment_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_type VARCHAR(16) NOT NULL,
+                record_id INTEGER NOT NULL,
+                assigned_to INTEGER NOT NULL,
+                assigned_by INTEGER,
+                assigned_by_name VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_assignment_events_to ON assignment_events(assigned_to, created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_assignment_events_record ON assignment_events(record_type, record_id)");
+
+        // Deleted projects, kept whole so they can be restored
+        // (includes/ProjectArchive.php). snapshot is JSON: every row the
+        // delete took with it, table by table.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS deleted_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                company VARCHAR(255),
+                stage VARCHAR(32),
+                deleted_by INTEGER,
+                deleted_by_name VARCHAR(255),
+                deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                snapshot TEXT NOT NULL
+            )
+        ");
+
         // Lightweight migration for existing databases that don't yet have parent_todo_id
         $todoColumns = $db->query("PRAGMA table_info(todos)")->fetchAll(PDO::FETCH_ASSOC);
         $hasParentTodoColumn = false;

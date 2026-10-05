@@ -193,7 +193,7 @@
         els.count.hidden = count === 0;
 
         els.list.innerHTML = count === 0
-            ? '<p class="empty-hint">No documents yet</p>'
+            ? ''
             : `<div class="pdoc-card">${state.documents.map(rowHtml).join('')}</div>`;
     }
 
@@ -203,22 +203,19 @@
         const review = window.CRMReview;
         const proposed = doc.review_status === 'pending' && !!review;
         const name = escapeHtml(doc.name);
-        const meta = [['size', formatSize(doc.size)], ['who', doc.uploaded_by_name], ['date', formatDay(doc.created_at)]]
-            .filter(([, text]) => text)
-            .map(([part, text]) => `<span class="pdoc-meta-part pdoc-meta-${part}">${escapeHtml(text)}</span>`)
-            .join('');
+        // One line per file: the date stays visible, size and who added it
+        // are in the tooltip.
+        const details = [doc.name, formatSize(doc.size), doc.uploaded_by_name && `added by ${doc.uploaded_by_name}`, formatDay(doc.created_at)]
+            .filter(Boolean)
+            .join(' · ');
 
         return `
-            <div class="pdoc-item${proposed ? ' is-proposed' : ''}" data-doc-id="${doc.id}">
+            <div class="pdoc-item${proposed ? ' is-proposed' : ''}" data-doc-id="${doc.id}" title="${escapeHtml(details)}">
                 <span class="pdoc-type" aria-hidden="true">${escapeHtml(extensionOf(doc.name))}</span>
-                <div class="pdoc-info">
-                    <a class="pdoc-name" href="${fileUrl(doc)}" data-doc-open="${doc.id}" title="${name}">${name}</a>
-                    <div class="pdoc-meta">
-                        ${labelSelect(doc)}
-                        ${meta}
-                        ${proposed ? review.badge(doc) : ''}
-                    </div>
-                </div>
+                <a class="pdoc-name" href="${fileUrl(doc)}" data-doc-open="${doc.id}">${name}</a>
+                ${proposed ? review.badge(doc) : ''}
+                ${labelSelect(doc)}
+                <span class="pdoc-date">${escapeHtml(formatDay(doc.created_at))}</span>
                 <div class="pdoc-tools">
                     ${proposed ? review.inlineActions('project_document', doc.id) : ''}
                     <a class="pdoc-act" href="${fileUrl(doc)}" download title="Download" aria-label="Download ${name}">${ICON_DOWNLOAD}</a>
@@ -251,12 +248,12 @@
             `<button type="button" class="pdoc-chip" data-doc-add="${escapeHtml(label)}" data-label-index="${index}">${escapeHtml(label)}</button>`
         ).join('');
 
+        // One line; what can be added is in the tooltip.
         els.add.innerHTML = `
-            <div class="pdoc-add-row">
-                <span class="pdoc-add-text">${ICON_UPLOAD}<span>Drag files in, or add as</span></span>
+            <div class="pdoc-add-row" title="PDF, Word, Excel, PowerPoint, text and images${escapeHtml(limit)}">
+                <span class="pdoc-add-text">${ICON_UPLOAD}<span>Drop files or add as</span></span>
                 <span class="pdoc-add-labels">${chips}</span>
-            </div>
-            <p class="pdoc-add-hint">PDF, Word, Excel, PowerPoint, text and images${escapeHtml(limit)}</p>`;
+            </div>`;
 
         els.input.accept = state.limits.extensions.map(extension => '.' + extension).join(',');
         setBusy(state.uploading);

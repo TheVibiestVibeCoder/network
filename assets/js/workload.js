@@ -24,6 +24,7 @@
         counts: {},   // assignee key -> { todos, projects, contacts, bookkeeping }
         loaded: false,
         doneOpen: false,  // whether the "Completed" fold is expanded
+        news: null,       // "New for you": { items, total }, only on your own home
         busy: new Set()   // to-do ids with a check-off request in flight
     };
 
@@ -137,33 +138,23 @@
         renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
         renderStats(openTodos, projects);
 
+        const news = newsBox();
+
         if (openTodos.length === 0 && doneTodos.length === 0
             && projects.length === 0 && contacts.length === 0 && bookkeeping.length === 0) {
-            els.body.innerHTML = emptyState();
+            els.body.innerHTML = news + emptyState();
             return;
         }
 
-        let html = '';
-
-        html += section('To-dos', openTodos.length, openTodos.map(todoRow).join(''),
+        // Two columns: the to-dos - the work itself - take the wide one;
+        // what you look after (bookkeeping, projects, contacts) sits beside
+        // them in a narrow one. One column on smaller screens.
+        let main = section('todo', 'To-dos', openTodos.length, todoGroups(openTodos),
             'Nothing open right now.');
-
-        if (bookkeeping.length) {
-            html += section('Bookkeeping', bookkeeping.length,
-                bookkeeping.map(bookkeepingRow).join(''), '');
-        }
-
-        if (projects.length) {
-            html += section('Projects', projects.length, projects.map(projectRow).join(''), '');
-        }
-
-        if (contacts.length) {
-            html += section('Contacts', contacts.length, contacts.map(contactRow).join(''), '');
-        }
 
         // Completed work is kept, but folded away - it is reference, not a task.
         if (doneTodos.length) {
-            html += `
+            main += `
                 <details class="workload-section workload-done"${state.doneOpen ? ' open' : ''}>
                     <summary class="workload-section-head">
                         <span class="workload-section-title">Completed</span>
@@ -173,6 +164,23 @@
                 </details>
             `;
         }
+
+        let side = '';
+        if (bookkeeping.length) {
+            side += section('bookkeeping', 'Bookkeeping', bookkeeping.length,
+                bookkeeping.map(bookkeepingRow).join(''), '');
+        }
+        if (projects.length) {
+            side += section('project', 'Projects', projects.length, projects.map(projectRow).join(''), '');
+        }
+        if (contacts.length) {
+            side += section('contact', 'Contacts', contacts.length, contacts.map(contactRow).join(''), '');
+        }
+
+        let html = news;
+        html += side
+            ? `<div class="workload-grid"><div class="workload-main">${main}</div><div class="workload-side">${side}</div></div>`
+            : `<div class="workload-grid is-single"><div class="workload-main">${main}</div></div>`;
 
         els.body.innerHTML = html;
     }
@@ -195,29 +203,27 @@
     ];
 
     /**
-     * The band across the top, as three small charts: what is due over the
-     * next seven days (and what is already late), how the open to-dos split
-     * by priority, and where this person's projects stand.
-     *
-     * Computed from the rows already loaded, so the band can never disagree
-     * with the list underneath it.
+     * Three cards across the top: what is due this week (and what is late),
+     * how many to-dos are open, and how many projects - each with one line of
+     * detail. Computed from the rows already loaded, so the cards can never
+     * disagree with the lists underneath. A card jumps to its list.
      */
     function renderStats(openTodos, projects) {
         const stats = $('workloadStats');
-        const C = window.CRMCharts;
-        if (!stats || !C) return;
+        if (!stats) return;
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Today and the six days after it; anything earlier is late.
-        const days = new Array(7).fill(0);
+        let dueThisWeek = 0;
         let overdue = 0;
-        const priorities = { high: 0, medium: 0, low: 0, none: 0 };
+        // Today and the six days after it: the to-dos due on each.
+        const days = Array.from({ length: 7 }, () => []);
+        const priorities = { high: 0, medium: 0, low: 0 };
 
         openTodos.forEach(todo => {
             const priority = (todo.priority || '').toLowerCase();
-            priorities[priority === 'high' || priority === 'medium' || priority === 'low' ? priority : 'none']++;
+            if (priority in priorities) priorities[priority]++;
 
             if (!todo.due_date) return;
             const due = new Date(todo.due_date + 'T00:00:00');
@@ -226,75 +232,90 @@
             // Rounded, so a daylight-saving day still counts as one day.
             const offset = Math.round((due - today) / 86400000);
             if (offset < 0) overdue++;
-            else if (offset < 7) days[offset]++;
+            else if (offset < 7) {
+                dueThisWeek++;
+                days[offset].push(todo.title || 'To-do');
+            }
         });
 
-        const dueThisWeek = days.reduce((sum, n) => sum + n, 0);
+        priorities.none = openTodos.length - priorities.high - priorities.medium - priorities.low;
 
-        // 1 - Due this week, day by day from today. What is already late is
-        //     not a day of the week: it is the red flag beside the number.
-        const cols = [];
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() + i);
-            const day = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-            cols.push({
-                letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }),
-                value: days[i],
-                current: i === 0,
-                title: `${i === 0 ? 'Today, ' : ''}${day}: ${days[i]} due`
-            });
-        }
-        const week = C.columns(cols, 'To-dos due per day, from today: '
-            + cols.map(col => col.title).join(', '), { min: 2 });
+        const dot = (tone, text) => `<span class="home-stat-dot" data-tone="${tone}">${escapeHtml(text)}</span>`;
 
-        const due = C.tile({
-            label: { long: 'Due this week', short: 'This week' },
-            value: String(dueThisWeek),
-            flag: overdue > 0 ? { long: `${overdue} overdue`, short: `${overdue} late` } : '',
-            key: week.axis,
-            chart: week.bars
-        });
+        /**
+         * A thin bar split into its parts, with the legend under it - the
+         * same height as the week strip, so the three columns line up.
+         */
+        const bar = (parts, emptyText) => {
+            const total = parts.reduce((sum, part) => sum + part.value, 0);
+            if (total === 0) {
+                return `<span class="home-bar is-empty"><span class="home-bar-track"></span><span class="home-bar-legend"><span>${escapeHtml(emptyText)}</span></span></span>`;
+            }
+            const segments = parts.map(part =>
+                `<span class="home-bar-part" data-tone="${part.tone}" style="flex-grow:${part.value}" title="${escapeHtml(part.label)}: ${part.value}"></span>`
+            ).join('');
+            const legend = parts.map(part => dot(part.tone, `${part.value} ${part.label.toLowerCase()}`)).join('');
+            return `<span class="home-bar"><span class="home-bar-track">${segments}</span><span class="home-bar-legend">${legend}</span></span>`;
+        };
 
-        // 2 - Open to-dos by priority
-        const byPriority = PRIORITY_TONES.filter(([key]) => priorities[key] > 0);
-        const open = C.tile({
-            label: { long: openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', short: 'Open' },
-            value: String(openTodos.length),
-            key: byPriority.length
-                ? C.legend(byPriority.map(([key, name]) => ({ tone: key, label: name, text: String(priorities[key]) })))
-                : C.note('Nothing open'),
-            chart: C.stack(
-                byPriority.map(([key, name]) => ({ tone: key, value: priorities[key], title: `${name}: ${priorities[key]}` })),
-                'Open to-dos by priority: ' + (byPriority.length
-                    ? byPriority.map(([key, name]) => `${name} ${priorities[key]}`).join(', ')
-                    : 'none')
-            )
-        });
+        // 1 - Due this week; what is already late sits beside the number.
+        const overdueFlag = overdue > 0
+            ? `<span class="home-stat-flag">${overdue} overdue</span>`
+            : '';
 
-        // 3 - Projects by stage
+        // 2 - Open to-dos, by priority.
+        const priorityBar = bar(
+            PRIORITY_TONES
+                .filter(([key]) => priorities[key] > 0)
+                .map(([key, name]) => ({ tone: key, value: priorities[key], label: key === 'none' ? 'No priority' : name })),
+            'Nothing open'
+        );
+
+        // 3 - Projects, by stage.
         const stageCounts = {};
         projects.forEach(project => {
             const stage = STAGE_TONES.some(([name]) => name === project.stage) ? project.stage : 'Lead';
             stageCounts[stage] = (stageCounts[stage] || 0) + 1;
         });
-        const byStage = STAGE_TONES.filter(([name]) => stageCounts[name] > 0);
+        const stageBar = bar(
+            STAGE_TONES
+                .filter(([name]) => stageCounts[name] > 0)
+                .map(([name, tone]) => ({ tone, value: stageCounts[name], label: name })),
+            'None assigned'
+        );
 
-        const work = C.tile({
-            label: projects.length === 1 ? 'Project' : 'Projects',
-            value: String(projects.length),
-            key: byStage.length
-                ? C.legend(byStage.map(([name, tone]) => ({ tone, label: name, text: String(stageCounts[name]) })))
-                : C.note('None assigned'),
-            chart: C.stack(
-                byStage.map(([name, tone]) => ({ tone, value: stageCounts[name], title: `${name}: ${stageCounts[name]}` })),
-                'Projects by stage: ' + (byStage.length
-                    ? byStage.map(([name]) => `${name} ${stageCounts[name]}`).join(', ')
-                    : 'none')
-            )
-        });
+        // The week, day by day: which days have something due, and how much.
+        const week = days.map((titles, i) => {
+            const date = new Date(today);
+            date.setDate(date.getDate() + i);
+            const name = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const tip = titles.length
+                ? `${i === 0 ? 'Today' : name}: ${titles.join(', ')}`
+                : `${i === 0 ? 'Today' : name}: nothing due`;
 
-        stats.innerHTML = `<div class="kpi-grid">${due}${open}${work}</div>`;
+            return `
+                <span class="home-day${i === 0 ? ' is-today' : ''}${titles.length ? ' has-due' : ''}" title="${escapeHtml(tip)}">
+                    <span class="home-day-name">${escapeHtml(i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }))}</span>
+                    <span class="home-day-count">${titles.length || ''}</span>
+                </span>`;
+        }).join('');
+
+        // Every column the same three rows: label, number, and a picture of
+        // equal height at the bottom.
+        const card = (type, target, label, value, flag, visual) => `
+            <button type="button" class="home-stat is-${type}" data-workload-jump="${target}">
+                <span class="home-stat-label">${escapeHtml(label)}</span>
+                <span class="home-stat-figure">
+                    <span class="home-stat-value">${value}</span>${flag}
+                </span>
+                <span class="home-stat-visual">${visual}</span>
+            </button>`;
+
+        stats.innerHTML =
+            card('due', 'todo', 'Due this week', dueThisWeek, overdueFlag,
+                `<span class="home-week" aria-label="Due per day">${week}</span>`)
+            + card('todo', 'todo', openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', openTodos.length, '', priorityBar)
+            + card('project', 'project', projects.length === 1 ? 'Project' : 'Projects', projects.length, '', stageBar);
         stats.hidden = false;
     }
 
@@ -303,9 +324,16 @@
         const isMe = state.who === 'me';
         const name = person.unassigned ? 'Unassigned' : (person.name || '');
 
+        // Your own page greets you; anyone else's is titled with their name.
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+        const firstName = String(name).trim().split(/\s+/)[0] || '';
         els.title.textContent = person.unassigned
             ? 'Unassigned'
-            : (isMe ? 'My Work' : name);
+            : (isMe ? (firstName ? `${greeting}, ${firstName}` : greeting) : name);
+
+        const head = els.face ? els.face.closest('.workload-head') : null;
+        if (head) head.classList.toggle('is-me', isMe && !person.unassigned);
 
         // The face is meaningless for the unassigned bucket.
         if (person.unassigned) {
@@ -344,18 +372,154 @@
             : (isMe ? today : (bits.length ? bits.join(' · ') : 'Nothing assigned yet'));
     }
 
-    function section(title, count, rows, emptyText) {
+    /**
+     * A section of the home page. Each kind of thing has its own colour and
+     * icon (--wl-type in design.css), on the heading and on every row's
+     * mark, so to-dos, projects, contacts and bookkeeping tell apart at a glance.
+     */
+    function section(type, title, count, rows, emptyText) {
         const body = rows || `<p class="workload-empty-line">${escapeHtml(emptyText)}</p>`;
 
         return `
-            <section class="workload-section">
+            <section class="workload-section is-${type}">
                 <div class="workload-section-head">
+                    <span class="workload-section-icon" aria-hidden="true">${TYPE_ICONS[type] || ''}</span>
                     <span class="workload-section-title">${escapeHtml(title)}</span>
                     <span class="workload-count">${count}</span>
                 </div>
                 <div class="workload-list">${body}</div>
             </section>
         `;
+    }
+
+    /**
+     * Open to-dos in one list, split by when they are due - what is late
+     * first - so the list reads top-down as "what now".
+     */
+    function todoGroups(openTodos) {
+        if (openTodos.length === 0) return '';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const groups = [
+            { key: 'overdue', label: 'Overdue', items: [] },
+            { key: 'week', label: 'This week', items: [] },
+            { key: 'later', label: 'Later', items: [] },
+            { key: 'none', label: 'No due date', items: [] }
+        ];
+
+        openTodos.forEach(todo => {
+            const due = todo.due_date ? new Date(todo.due_date + 'T00:00:00') : null;
+            if (!due || isNaN(due.getTime())) {
+                groups[3].items.push(todo);
+                return;
+            }
+            const offset = Math.round((due - today) / 86400000);
+            groups[offset < 0 ? 0 : (offset < 7 ? 1 : 2)].items.push(todo);
+        });
+
+        const used = groups.filter(group => group.items.length);
+        // One group needs no label: "This week" over every row says nothing.
+        if (used.length === 1 && used[0].key !== 'overdue') {
+            return used[0].items.map(todoRow).join('');
+        }
+
+        return used.map(group => `
+            <div class="workload-group-label is-${group.key}">
+                <span>${group.label}</span><span class="workload-group-count">${group.items.length}</span>
+            </div>
+            ${group.items.map(todoRow).join('')}
+        `).join('');
+    }
+
+    // ------------------------------------------------------------------
+    // New for you
+    // ------------------------------------------------------------------
+
+    const NEWS_LABELS = { todo: 'To-do', project: 'Project', contact: 'Contact', bookkeeping: 'Bookkeeping' };
+
+    function isNew(type, id) {
+        const items = state.news && state.news.items;
+        return !!items && items.some(item => item.type === type && item.id === Number(id));
+    }
+
+    function newTag(type, id) {
+        return isNew(type, id) ? '<span class="workload-new">New</span>' : '';
+    }
+
+    /**
+     * What has been assigned to you since you last looked: a box above the
+     * lists, each entry one click from its record. "Got it" clears it.
+     */
+    function newsBox() {
+        const news = state.news;
+        if (!news || !news.items || news.items.length === 0) return '';
+
+        const rows = news.items.map(item => {
+            const by = item.assigned_by_name ? `from ${escapeHtml(item.assigned_by_name)}` : '';
+            const when = describeWhen(item.assigned_at);
+            const meta = [escapeHtml(NEWS_LABELS[item.type] || ''), item.context ? escapeHtml(item.context) : '', by, when]
+                .filter(Boolean).join(' · ');
+
+            return `
+                <button type="button" class="workload-news-item" data-workload-open="${escapeHtml(item.type)}" data-id="${item.id}">
+                    <span class="workload-news-dot" aria-hidden="true"></span>
+                    <span class="workload-news-body">
+                        <span class="workload-news-title">${escapeHtml(item.title)}</span>
+                        <span class="workload-news-meta">${meta}</span>
+                    </span>
+                </button>`;
+        }).join('');
+
+        const more = news.total > news.items.length
+            ? `<p class="workload-news-more">and ${news.total - news.items.length} more</p>`
+            : '';
+        const count = news.total;
+
+        return `
+            <section class="workload-news" aria-label="New for you">
+                <div class="workload-news-head">
+                    <span class="workload-news-heading">
+                        New for you <span class="workload-count">${count}</span>
+                    </span>
+                    <button type="button" class="workload-news-dismiss" data-workload-news-seen>Got it</button>
+                </div>
+                <p class="workload-news-sub">Assigned to you since you last looked.</p>
+                <div class="workload-news-list">${rows}</div>
+                ${more}
+            </section>`;
+    }
+
+    /** "5 min ago", "Yesterday", "Oct 3" - for when something was assigned. */
+    function describeWhen(value) {
+        if (!value) return '';
+        const date = new Date(String(value).replace(' ', 'T') + 'Z');
+        if (isNaN(date.getTime())) return '';
+
+        const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return `${minutes} min ago`;
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return `${hours} h ago`;
+        if (hours < 48) return 'yesterday';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    async function markNewsSeen(button) {
+        if (button) button.disabled = true;
+        try {
+            const response = await fetch(API + '?action=news-seen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: '{}'
+            });
+            if (!response.ok) throw new Error('failed');
+            state.news = null;
+            render();
+        } catch (e) {
+            if (button) button.disabled = false;
+        }
     }
 
     function todoRow(todo) {
@@ -367,8 +531,10 @@
             : (todo.contact_name ? escapeHtml(todo.contact_name) : '');
 
         const priority = (todo.priority || '').toLowerCase();
+        // Priority as a coloured dot; the word is in its tooltip, and the
+        // cards at the top say how many of each there are.
         const priorityChip = ['high', 'medium', 'low'].includes(priority)
-            ? `<span class="workload-chip workload-chip--${priority}">${priority}</span>`
+            ? `<span class="workload-pri workload-pri--${priority}" title="${priority.charAt(0).toUpperCase() + priority.slice(1)} priority" aria-label="${priority} priority"></span>`
             : '';
 
         const title = escapeHtml(todo.title || '');
@@ -378,8 +544,8 @@
         const checkHint = done ? 'Mark as open' : 'Mark as done';
         const busy = state.busy.has(Number(todo.id));
 
-        // Two controls, not one: the mark checks the to-do off, the rest of the
-        // row still opens whatever the to-do hangs off.
+        // Three controls: the mark checks the to-do off, the row opens the
+        // to-do, and its first link (mostly a Drive document) opens directly.
         return `
             <div class="workload-row${done ? ' is-done' : ''}">
                 <button type="button" class="workload-row-mark workload-check${done ? ' is-done' : ''}"
@@ -389,10 +555,9 @@
                     ${done ? ICON_CHECK : `<span class="workload-check-hint">${ICON_CHECK}</span>`}
                 </button>
                 <button type="button" class="workload-row-main"
-                        data-workload-open="todo" data-id="${todo.id}"
-                        data-contact-id="${todo.contact_id || ''}" data-project-id="${todo.project_id || ''}">
+                        data-workload-open="todo" data-id="${todo.id}">
                     <span class="workload-row-body">
-                        <span class="workload-row-title">${title}</span>
+                        <span class="workload-row-title">${title}${newTag('todo', todo.id)}</span>
                         ${context ? `<span class="workload-row-context">${context}</span>` : ''}
                     </span>
                     <span class="workload-row-meta">
@@ -400,6 +565,7 @@
                         ${due.text ? `<span class="workload-due${due.overdue ? ' is-overdue' : ''}">${escapeHtml(due.text)}</span>` : ''}
                     </span>
                 </button>
+                ${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
             </div>
         `;
     }
@@ -421,7 +587,7 @@
                     data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
                 <span class="workload-row-mark is-icon">${ICON_RECEIPT}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}</span>
+                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}${newTag('bookkeeping', entry.id)}</span>
                     <span class="workload-row-context">${entry.no_pdf_needed ? 'Marked as needing no PDF' : 'PDF missing'}</span>
                 </span>
                 <span class="workload-row-meta">
@@ -439,11 +605,11 @@
             <button type="button" class="workload-row" data-workload-open="project" data-id="${project.id}">
                 <span class="workload-row-mark is-icon">${ICON_PROJECT}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(project.name || '')}</span>
+                    <span class="workload-row-title">${escapeHtml(project.name || '')}${newTag('project', project.id)}</span>
                     ${project.company ? `<span class="workload-row-context">${escapeHtml(project.company)}</span>` : ''}
                 </span>
                 <span class="workload-row-meta">
-                    <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stage)}</span>
+                    <span class="workload-stage" data-stage="${escapeHtml(stageClass)}">${escapeHtml(stage)}</span>
                 </span>
             </button>
         `;
@@ -456,7 +622,7 @@
             <button type="button" class="workload-row" data-workload-open="contact" data-id="${contact.id}">
                 <span class="workload-row-mark is-initials">${escapeHtml(getInitials(contact.name))}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(contact.name || '')}</span>
+                    <span class="workload-row-title">${escapeHtml(contact.name || '')}${newTag('contact', contact.id)}</span>
                     ${sub ? `<span class="workload-row-context">${escapeHtml(sub)}</span>` : ''}
                 </span>
                 <span class="workload-row-meta"></span>
@@ -483,6 +649,15 @@
             </div>
         `;
     }
+
+    // The section icons: one per kind of thing.
+    const TYPE_ICONS = {
+        due: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM7 12h5v5H7z"/></svg>',
+        todo: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+        project: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>',
+        contact: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
+        bookkeeping: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v20l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5V2l-1.5 1.5zM17 19H7V5h10v14zM8 13h8v2H8v-2zm0-4h8v2H8V9z"/></svg>'
+    };
 
     const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
     const ICON_PROJECT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>';
@@ -636,7 +811,7 @@
     // Loading
     // ------------------------------------------------------------------
 
-    async function load(who) {
+    async function load(who, quiet = false) {
         if (who) state.who = who;
 
         // No-op once it has run; here for the case where this is the first
@@ -644,7 +819,11 @@
         init();
         if (!els.body) return;
 
-        els.body.innerHTML = '<div class="workload-loading">Loading...</div>';
+        // A quiet reload (after a change made in a sheet) keeps what is on
+        // screen until the new list is ready, instead of flashing "Loading".
+        if (!quiet || !state.loaded) {
+            els.body.innerHTML = '<div class="workload-loading">Loading...</div>';
+        }
 
         try {
             // The directory drives both the switcher and the faces, so make
@@ -655,7 +834,14 @@
             await loadCounts();
             populateSwitcher();
 
+            // What was assigned to you since you last looked - only on your
+            // own home; a missing feed never stops the page from loading.
+            const newsRequest = state.who === 'me'
+                ? api('?action=news').then(r => r.data).catch(() => null)
+                : Promise.resolve(null);
+
             const result = await api('?action=workload&user=' + encodeURIComponent(state.who));
+            state.news = await newsRequest;
             state.data = result.data;
             state.person = result.person;
             state.loaded = true;
@@ -939,9 +1125,25 @@
             }
         }, true);
 
+        // A card at the top jumps to its list below.
+        const stats = $('workloadStats');
+        if (stats) {
+            stats.addEventListener('click', function (event) {
+                const card = event.target.closest('[data-workload-jump]');
+                const target = card && els.body.querySelector('.workload-section.is-' + card.getAttribute('data-workload-jump'));
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
         // Rows open the record they stand for, using the handles app.js exposes.
         els.body.addEventListener('click', function (event) {
             if (event.target.closest('[data-workload-toggle]')) return;
+
+            const seen = event.target.closest('[data-workload-news-seen]');
+            if (seen) {
+                markNewsSeen(seen);
+                return;
+            }
 
             const row = event.target.closest('[data-workload-open]');
             if (!row) return;
@@ -957,14 +1159,8 @@
             } else if (kind === 'bookkeeping') {
                 window.CRM.openBookkeepingRow(id);
             } else if (kind === 'todo') {
-                // A to-do has no page of its own, so open whatever it hangs off.
-                const projectId = Number(row.getAttribute('data-project-id'));
-                const contactId = Number(row.getAttribute('data-contact-id'));
-                if (projectId) {
-                    window.CRM.openProjectOverview(projectId);
-                } else if (contactId) {
-                    window.CRM.openOverview(contactId);
-                }
+                // The to-do's own sheet: its details, description and links.
+                window.CRM.openTodoDetail(id);
             }
         });
 
@@ -981,6 +1177,7 @@
     window.CRMWorkload = {
         open: open,
         load: load,
+        refresh: () => load(null, true),
         refreshBadge: refreshBadge
     };
 })();

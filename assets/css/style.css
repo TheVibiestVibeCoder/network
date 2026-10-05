@@ -4023,7 +4023,6 @@ textarea.form-input {
     }
 
     /* Project modals: match contact modal mobile spacing */
-    #projectModal .modal-content,
     #projectOverviewModal .modal-content {
         margin: var(--spacing-3);
         height: calc(100% - var(--spacing-3) * 2);
@@ -4031,12 +4030,10 @@ textarea.form-input {
         border-radius: var(--radius-lg);
     }
 
-    #projectModal .modal-body,
     #projectOverviewModal .modal-body {
         padding: var(--spacing-4) var(--spacing-5);
     }
 
-    #projectModal .modal-footer,
     #projectOverviewModal .modal-footer {
         padding: var(--spacing-3) var(--spacing-5);
     }
@@ -4057,7 +4054,6 @@ textarea.form-input {
 }
 
 @media (max-width: 480px) {
-    #projectModal .modal-content,
     #projectOverviewModal .modal-content {
         margin: 0;
         height: 100%;
@@ -4065,7 +4061,6 @@ textarea.form-input {
         border-radius: 0;
     }
 
-    #projectModal .modal-body,
     #projectOverviewModal .modal-body {
         padding: var(--spacing-4);
     }

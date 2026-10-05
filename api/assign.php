@@ -20,6 +20,8 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Project.php';
+require_once APP_ROOT . '/includes/TodoLink.php';
+require_once APP_ROOT . '/includes/AssignmentFeed.php';
 
 header('Content-Type: application/json');
 Auth::sendSecurityHeaders();
@@ -61,6 +63,13 @@ if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
 try {
     if ($method === 'GET' && $action === 'workload') {
         handleWorkload($_GET['user'] ?? 'me');
+    } elseif ($method === 'GET' && $action === 'news') {
+        $me = resolveWorkloadTarget('me');
+        respond(['success' => true, 'data' => AssignmentFeed::news(Database::getInstance(), (int) $me['id'])]);
+    } elseif ($method === 'POST' && $action === 'news-seen') {
+        $me = resolveWorkloadTarget('me');
+        AssignmentFeed::markSeen(Database::getInstance(), (int) $me['id']);
+        respond(['success' => true]);
     } elseif ($method === 'GET' && $action === 'summary') {
         handleSummary();
     } elseif ($method === 'POST') {
@@ -140,6 +149,13 @@ function handleAssign(): void
     ]);
 
     logAssignment($type, $spec['label'], (string) ($record['title'] ?? ''), $record, $assignee);
+
+    // For the assignee's "New for you" on the home page.
+    $before = $record['assigned_to'] === null ? null : (int) $record['assigned_to'];
+    if ($before !== $assignee['id']) {
+        $me = resolveWorkloadTarget('me');
+        AssignmentFeed::record($db, $type, $id, $assignee['id'], (int) $me['id'], $me['name']);
+    }
 
     respond([
         'success' => true,
@@ -268,6 +284,8 @@ function handleWorkload(string $who): void
     $bookkeeping = ($isUnassigned || !bookkeepingAssignable($db))
         ? []
         : fetchBookkeeping($db, $target['id']);
+
+    TodoLink::attach($db, $todos);
 
     $openTodos = 0;
     foreach ($todos as $todo) {

@@ -67,6 +67,12 @@ try {
  */
 function handleGet(Project $model, string $action, ?int $id): void
 {
+    // Deleted projects, newest first
+    if ($action === 'deleted') {
+        echo json_encode(['success' => true, 'data' => ProjectArchive::list(Database::getInstance())]);
+        return;
+    }
+
     // Get projects for a specific contact
     if ($action === 'contact' && isset($_GET['contact_id'])) {
         $contactId = (int) $_GET['contact_id'];
@@ -132,6 +138,35 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // Bring a deleted project back, or delete it for good: { id } of the
+    // deleted_projects entry.
+    if ($action === 'restore' || $action === 'purge') {
+        $input = Auth::getJsonInput();
+        $archiveId = is_array($input) ? parsePositiveId($input['id'] ?? null) : null;
+        if ($archiveId === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A deleted project id is required']);
+            return;
+        }
+
+        try {
+            $db = Database::getInstance();
+            if ($action === 'restore') {
+                $projectId = ProjectArchive::restore($db, $archiveId);
+                $project = $model->getById($projectId);
+                logProjectActivityEvent('restored', $project, null);
+                echo json_encode(['success' => true, 'data' => $project]);
+            } else {
+                ProjectArchive::purge($db, $archiveId);
+                echo json_encode(['success' => true]);
+            }
+        } catch (RuntimeException $e) {
+            http_response_code(409);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        return;
+    }
+
     // Assign contact to project
     if ($action === 'assign-contact') {
         $input = Auth::getJsonInput();
@@ -703,6 +738,10 @@ function buildProjectActivityContent(string $action, ?array $current, ?array $pr
 
     if ($action === 'deleted') {
         return 'Projekt gelöscht';
+    }
+
+    if ($action === 'restored') {
+        return 'Projekt wiederhergestellt';
     }
 
     $changedFields = detectProjectChangedFields($previous, $current);

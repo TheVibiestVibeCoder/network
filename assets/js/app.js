@@ -60,6 +60,15 @@
         editingProjectId: null,
         viewingProjectId: null,
         viewingProject: null,
+        // Project to-dos opened in the detail sheet, kept across redraws
+        expandedProjectTodos: new Set(),
+        // Whether the project sheet shows all notes or only the latest
+        showAllProjectNotes: false,
+        // Whether the project sheet lists completed to-dos too
+        showCompletedProjectTodos: false,
+        // The to-do shown in the to-do detail sheet
+        viewingTodoId: null,
+        viewingTodo: null,
         // To-do state
         todos: [],
         todoSearchQuery: '',
@@ -205,18 +214,6 @@
         projectSortOrderIcon: document.getElementById('projectSortOrderIcon'),
         addProjectBtn: document.getElementById('addProjectBtn'),
 
-        // Project modal
-        projectModal: document.getElementById('projectModal'),
-        projectModalTitle: document.getElementById('projectModalTitle'),
-        projectForm: document.getElementById('projectForm'),
-        projectId: document.getElementById('projectId'),
-        projectCompany: document.getElementById('projectCompany'),
-        projectCompanySuggestions: document.getElementById('projectCompanySuggestions'),
-        closeProjectModal: document.getElementById('closeProjectModal'),
-        cancelProjectBtn: document.getElementById('cancelProjectBtn'),
-        deleteProjectBtn: document.getElementById('deleteProjectBtn'),
-        saveProjectBtn: document.getElementById('saveProjectBtn'),
-
         // Delete project modal
         deleteProjectModal: document.getElementById('deleteProjectModal'),
         deleteProjectName: document.getElementById('deleteProjectName'),
@@ -249,13 +246,51 @@
         newProjectContactInput: document.getElementById('newProjectContactInput'),
         projectContactSuggestions: document.getElementById('projectContactSuggestions'),
         addProjectContactBtn: document.getElementById('addProjectContactBtn'),
+        projectTagPicker: document.getElementById('projectTagPicker'),
+        projectContactPicker: document.getElementById('projectContactPicker'),
+        projectNoteForm: document.getElementById('projectNoteForm'),
+        openProjectNoteFormBtn: document.getElementById('openProjectNoteFormBtn'),
+        cancelProjectNoteBtn: document.getElementById('cancelProjectNoteBtn'),
         closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
-        closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
         deleteProjectOverviewBtn: document.getElementById('deleteProjectOverviewBtn'),
         editProjectBtn: document.getElementById('editProjectBtn'),
+        cancelProjectEditBtn: document.getElementById('cancelProjectEditBtn'),
+        saveProjectEditBtn: document.getElementById('saveProjectEditBtn'),
+        projectEditName: document.getElementById('projectEditName'),
+        projectEditCompany: document.getElementById('projectEditCompany'),
+        projectEditCompanySuggestions: document.getElementById('projectEditCompanySuggestions'),
+        projectEditStartDate: document.getElementById('projectEditStartDate'),
+        projectEditStage: document.getElementById('projectEditStage'),
+        projectEditBudgetMin: document.getElementById('projectEditBudgetMin'),
+        projectEditBudgetMax: document.getElementById('projectEditBudgetMax'),
+        projectEditSuccessChance: document.getElementById('projectEditSuccessChance'),
+        projectEditEstCompletion: document.getElementById('projectEditEstCompletion'),
+        projectEditDescription: document.getElementById('projectEditDescription'),
 
         // To-do modal
         todoModal: document.getElementById('todoModal'),
+
+        // To-do detail sheet
+        todoDetailModal: document.getElementById('todoDetailModal'),
+        todoDetailTitle: document.getElementById('todoDetailTitle'),
+        todoDetailContext: document.getElementById('todoDetailContext'),
+        todoDetailEdited: document.getElementById('todoDetailEdited'),
+        todoDetailAssignee: document.getElementById('todoDetailAssignee'),
+        todoDetailStatus: document.getElementById('todoDetailStatus'),
+        todoDetailDue: document.getElementById('todoDetailDue'),
+        todoDetailPriority: document.getElementById('todoDetailPriority'),
+        todoDetailDescription: document.getElementById('todoDetailDescription'),
+        todoLinksList: document.getElementById('todoLinksList'),
+        todoLinkForm: document.getElementById('todoLinkForm'),
+        todoLinkUrl: document.getElementById('todoLinkUrl'),
+        todoLinkTitle: document.getElementById('todoLinkTitle'),
+        addTodoLinkBtn: document.getElementById('addTodoLinkBtn'),
+        cancelTodoLinkBtn: document.getElementById('cancelTodoLinkBtn'),
+        saveTodoLinkBtn: document.getElementById('saveTodoLinkBtn'),
+        closeTodoDetail: document.getElementById('closeTodoDetail'),
+        deleteTodoDetailBtn: document.getElementById('deleteTodoDetailBtn'),
+        toggleTodoDetailDoneBtn: document.getElementById('toggleTodoDetailDoneBtn'),
+        editTodoDetailBtn: document.getElementById('editTodoDetailBtn'),
         todoModalTitle: document.getElementById('todoModalTitle'),
         todoEdited: document.getElementById('todoEdited'),
         todoAssignee: document.getElementById('todoAssignee'),
@@ -610,6 +645,29 @@
             });
             return response.json();
         },
+        async getDeletedProjects() {
+            const response = await fetch('api/projects.php?action=deleted');
+            return response.json();
+        },
+
+        async restoreProject(archiveId) {
+            const response = await fetch('api/projects.php?action=restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: archiveId })
+            });
+            return response.json();
+        },
+
+        async purgeProject(archiveId) {
+            const response = await fetch('api/projects.php?action=purge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: archiveId })
+            });
+            return response.json();
+        },
+
         async createProject(data) {
             const response = await fetch('api/projects.php', {
                 method: 'POST',
@@ -714,6 +772,24 @@
             const response = await fetch(`api/todos.php?id=${id}`, {
                 method: 'DELETE',
                 headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
+        },
+
+        async addTodoLink(todoId, url, title) {
+            const response = await fetch('api/todos.php?action=add-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ todo_id: todoId, url, title })
+            });
+            return response.json();
+        },
+
+        async deleteTodoLink(linkId) {
+            const response = await fetch('api/todos.php?action=delete-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: linkId })
             });
             return response.json();
         }
@@ -1637,17 +1713,7 @@
 
         try {
             const result = await api.getTodos({ project_id: projectId, status: 'all' });
-            if (result.success) {
-                renderTodoCollection(elements.projectTodosList, result.data || [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet for this project'
-                });
-            } else {
-                renderTodoCollection(elements.projectTodosList, [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet for this project'
-                });
-            }
+            renderProjectTodos(result.success ? (result.data || []) : []);
         } catch (error) {
             console.error('Error loading project to-dos:', error);
         }
@@ -1934,6 +2000,7 @@
                             ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label)}</span>` : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
                             ${assigneeChip(todo)}
+                            ${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
                         </div>
                         ${openButtons}
                     </div>
@@ -1941,6 +2008,94 @@
                         <button type="button" class="btn btn-secondary btn-small todo-edit-btn" data-todo-edit="${todo.id}">
                             Bearbeiten
                         </button>
+                        <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * The to-dos in a project's detail sheet: open ones only, one line each
+     * (title, priority, due date, assignee). A row opens in place to show the
+     * description and the edit and delete buttons.
+     */
+    function renderProjectTodos(todos) {
+        const container = elements.projectTodosList;
+        if (!container) {
+            return;
+        }
+
+        const all = todos || [];
+        const open = all.filter(todo => Number(todo.is_completed) !== 1);
+        const done = all.filter(todo => Number(todo.is_completed) === 1);
+        const showDone = state.showCompletedProjectTodos;
+        const noun = done.length === 1 ? 'to-do' : 'to-dos';
+        const doneHint = done.length === 0 ? '' : `
+            <p class="ptodo-done-hint">
+                ${done.length} completed ${noun} ${showDone ? 'shown' : 'hidden'}.
+                <button type="button" class="ov-link-btn" data-ptodo-show-done>${showDone ? 'Hide' : 'Show'}</button>
+            </p>`;
+
+        // Open ones first; completed ones after them, when asked for.
+        const shown = showDone ? open.concat(done) : open;
+        if (shown.length === 0) {
+            container.innerHTML = `<p class="empty-hint">No open to-dos</p>${doneHint}`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="ptodo-card">${shown.map(createProjectTodoMarkup).join('')}</div>
+            ${doneHint}
+        `;
+    }
+
+    function createProjectTodoMarkup(todo) {
+        const isCompleted = Number(todo.is_completed) === 1;
+        const dueDate = parseTodoDueDate(todo.due_date);
+        const priorityMeta = getTodoPriorityMeta(todo.priority);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
+        const dueText = dueDate
+            ? dueDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: dueDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            })
+            : '';
+
+        const isProposed = todo.review_status === 'pending';
+        const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
+        const expanded = state.expandedProjectTodos.has(Number(todo.id));
+        const priorityWord = priorityMeta ? priorityMeta.label.replace(/ Priority$/, '') : '';
+
+        return `
+            <div class="todo-item ptodo${expanded ? ' is-expanded' : ''}${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
+                <div class="ptodo-row" data-todo-expand>
+                    <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
+                        <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
+                        <span class="todo-check-indicator"></span>
+                    </label>
+                    <button type="button" class="ptodo-title" data-todo-expand-btn aria-expanded="${expanded}">${escapeHtml(todo.title || '')}</button>
+                    ${isProposed ? reviewBadge(todo) : ''}
+                    <span class="ptodo-meta">
+                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
+                        ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
+                        ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
+                    </span>
+                    <svg class="ptodo-chevron" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                </div>
+                <div class="ptodo-detail">
+                    ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
+                    <div class="ptodo-actions">
+                        ${isProposed ? reviewInline('todo', proposalId) : ''}
+                        <button type="button" class="btn btn-secondary btn-small" data-todo-edit="${todo.id}">Bearbeiten</button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -2264,6 +2419,247 @@
         }
     }
 
+    // ---- To-do detail sheet --------------------------------------------------
+
+    /**
+     * A to-do's own sheet: facts, description and links. Opened from the
+     * home page; Edit opens the to-do form on top of it.
+     */
+    async function openTodoDetail(todoId) {
+        if (!Number.isInteger(todoId) || todoId <= 0 || !elements.todoDetailModal) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (!result.success) {
+                alert(result.error || 'Error loading to-do');
+                return;
+            }
+
+            if (state.viewingTodoId !== todoId) {
+                closeTodoLinkForm();
+            }
+            state.viewingTodoId = todoId;
+            state.viewingTodo = result.data;
+            renderTodoDetail(result.data);
+            elements.todoDetailModal.classList.add('active');
+        } catch (error) {
+            console.error('Error opening to-do:', error);
+            alert('Error loading to-do');
+        }
+    }
+
+    async function refreshTodoDetail() {
+        const todoId = state.viewingTodoId;
+        if (!todoId) return;
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (state.viewingTodoId !== todoId) return;
+            if (result.success) {
+                state.viewingTodo = result.data;
+                renderTodoDetail(result.data);
+            } else {
+                // Gone (deleted elsewhere): nothing left to show.
+                closeTodoDetail();
+            }
+        } catch (error) {
+            console.error('Error refreshing to-do:', error);
+        }
+    }
+
+    function renderTodoDetail(todo) {
+        const isCompleted = Number(todo.is_completed) === 1;
+
+        elements.todoDetailTitle.textContent = todo.title || 'To-do';
+
+        // What the to-do belongs to, one click away.
+        const parts = [];
+        if (todo.project_id) {
+            parts.push(`<button type="button" class="tdetail-context-link" data-todo-detail-project="${todo.project_id}">${escapeHtml(todo.project_name || `Project #${todo.project_id}`)}</button>`);
+        }
+        if (todo.contact_id) {
+            parts.push(`<button type="button" class="tdetail-context-link" data-todo-detail-contact="${todo.contact_id}">${escapeHtml(todo.contact_name || `Contact #${todo.contact_id}`)}</button>`);
+        }
+        elements.todoDetailContext.innerHTML = parts.join('<span class="tdetail-context-sep">·</span>');
+
+        setEditedLine(elements.todoDetailEdited, todo);
+        setAssigneeControl(elements.todoDetailAssignee, 'todo', todo);
+
+        elements.todoDetailStatus.innerHTML = isCompleted
+            ? '<span class="tdetail-status is-done">Done</span>'
+            : '<span class="tdetail-status">Open</span>';
+
+        const dueDate = parseTodoDueDate(todo.due_date);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
+        elements.todoDetailDue.innerHTML = dueDate
+            ? `<span class="${isOverdue ? 'todo-due-overdue' : ''}">${escapeHtml(dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}${isOverdue ? ' (overdue)' : ''}</span>`
+            : '<span class="tdetail-muted">No due date</span>';
+
+        const priorityMeta = getTodoPriorityMeta(todo.priority);
+        elements.todoDetailPriority.innerHTML = priorityMeta
+            ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>`
+            : '<span class="tdetail-muted">None</span>';
+
+        elements.todoDetailDescription.innerHTML = todo.description
+            ? escapeHtml(todo.description)
+            : '<span class="tdetail-muted">No description</span>';
+
+        renderTodoDetailLinks(todo.links || []);
+
+        elements.toggleTodoDetailDoneBtn.textContent = isCompleted ? 'Reopen' : 'Mark as done';
+    }
+
+    function renderTodoDetailLinks(links) {
+        if (!elements.todoLinksList) return;
+
+        elements.todoLinksList.innerHTML = links.length === 0
+            ? '<p class="empty-hint">No links yet</p>'
+            : `<div class="tlink-card">${links.map(link => window.TodoLinks.row(link)).join('')}</div>`;
+    }
+
+    function closeTodoDetail() {
+        if (!elements.todoDetailModal) return;
+        elements.todoDetailModal.classList.remove('active');
+        closeTodoLinkForm();
+        state.viewingTodoId = null;
+        state.viewingTodo = null;
+    }
+
+    function openTodoLinkForm() {
+        elements.todoLinkForm.hidden = false;
+        elements.addTodoLinkBtn.setAttribute('aria-expanded', 'true');
+        elements.todoLinkUrl.focus();
+    }
+
+    function closeTodoLinkForm() {
+        if (!elements.todoLinkForm) return;
+        elements.todoLinkForm.hidden = true;
+        elements.addTodoLinkBtn.setAttribute('aria-expanded', 'false');
+        elements.todoLinkForm.reset();
+        elements.todoLinkUrl.classList.remove('is-invalid');
+    }
+
+    async function saveTodoLink(e) {
+        e.preventDefault();
+        const todoId = state.viewingTodoId;
+        const url = elements.todoLinkUrl.value.trim();
+        if (!todoId) return;
+        if (!url) {
+            elements.todoLinkUrl.classList.add('is-invalid');
+            elements.todoLinkUrl.focus();
+            return;
+        }
+
+        // Reading a document's name from Google can take a moment.
+        elements.saveTodoLinkBtn.disabled = true;
+        elements.saveTodoLinkBtn.textContent = 'Adding…';
+        try {
+            const result = await api.addTodoLink(todoId, url, elements.todoLinkTitle.value.trim());
+            if (result.success) {
+                closeTodoLinkForm();
+                await refreshVisibleTodoLists();
+            } else {
+                elements.todoLinkUrl.classList.add('is-invalid');
+                alert(result.error || 'Error adding link');
+            }
+        } catch (error) {
+            console.error('Error adding link:', error);
+            alert('Error adding link');
+        } finally {
+            elements.saveTodoLinkBtn.disabled = false;
+            elements.saveTodoLinkBtn.textContent = 'Add link';
+        }
+    }
+
+    async function deleteTodoLink(linkId) {
+        if (!confirm('Remove this link?')) return;
+
+        try {
+            const result = await api.deleteTodoLink(linkId);
+            if (result.success) {
+                await refreshVisibleTodoLists();
+            } else {
+                alert(result.error || 'Error removing link');
+            }
+        } catch (error) {
+            console.error('Error removing link:', error);
+            alert('Error removing link');
+        }
+    }
+
+    function bindTodoDetail() {
+        if (!elements.todoDetailModal) return;
+
+        elements.closeTodoDetail.addEventListener('click', closeTodoDetail);
+        elements.todoDetailModal.querySelector('.modal-backdrop').addEventListener('click', closeTodoDetail);
+
+        elements.editTodoDetailBtn.addEventListener('click', () => {
+            if (state.viewingTodoId) openTodoEditModal(state.viewingTodoId);
+        });
+
+        elements.toggleTodoDetailDoneBtn.addEventListener('click', async () => {
+            const todo = state.viewingTodo;
+            if (!todo) return;
+            elements.toggleTodoDetailDoneBtn.disabled = true;
+            await setTodoCompletion(Number(todo.id), Number(todo.is_completed) !== 1);
+            elements.toggleTodoDetailDoneBtn.disabled = false;
+        });
+
+        elements.deleteTodoDetailBtn.addEventListener('click', async () => {
+            const todoId = state.viewingTodoId;
+            if (!todoId) return;
+            // Closed first, so the lists redrawn after the delete do not try
+            // to reload a to-do that is gone.
+            if (await removeTodo(todoId)) {
+                closeTodoDetail();
+            }
+        });
+
+        elements.todoDetailContext.addEventListener('click', (e) => {
+            const project = e.target.closest('[data-todo-detail-project]');
+            const contact = e.target.closest('[data-todo-detail-contact]');
+            if (project) {
+                closeTodoDetail();
+                openProjectOverview(Number(project.dataset.todoDetailProject));
+            } else if (contact) {
+                closeTodoDetail();
+                openOverviewModal(Number(contact.dataset.todoDetailContact));
+            }
+        });
+
+        elements.addTodoLinkBtn.addEventListener('click', () => {
+            if (elements.todoLinkForm.hidden) {
+                openTodoLinkForm();
+            } else {
+                closeTodoLinkForm();
+            }
+        });
+        elements.cancelTodoLinkBtn.addEventListener('click', closeTodoLinkForm);
+        elements.todoLinkForm.addEventListener('submit', saveTodoLink);
+        elements.todoLinkForm.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                // Close the form, not the whole sheet
+                e.stopPropagation();
+                closeTodoLinkForm();
+                elements.addTodoLinkBtn.focus();
+            }
+        });
+        elements.todoLinkUrl.addEventListener('input', () => {
+            elements.todoLinkUrl.classList.remove('is-invalid');
+        });
+
+        elements.todoLinksList.addEventListener('click', (e) => {
+            const remove = e.target.closest('[data-link-delete]');
+            if (remove) {
+                deleteTodoLink(Number(remove.dataset.linkDelete));
+            }
+        });
+    }
+
     async function refreshVisibleTodoLists() {
         const tasks = [];
 
@@ -2277,6 +2673,16 @@
 
         if (state.viewingProjectId) {
             tasks.push(loadProjectTodos(state.viewingProjectId));
+        }
+
+        if (state.viewingTodoId) {
+            tasks.push(refreshTodoDetail());
+        }
+
+        // The home page lists to-dos too; redrawn in place, without a
+        // loading state, so a change made in a sheet shows up behind it.
+        if (state.currentView === 'workload' && window.CRMWorkload && window.CRMWorkload.refresh) {
+            tasks.push(window.CRMWorkload.refresh());
         }
 
         if (tasks.length > 0) {
@@ -2308,6 +2714,26 @@
         });
 
         container.addEventListener('click', async (e) => {
+            // A compact row (project sheet) opens in place; its check and
+            // review buttons keep their own meaning.
+            const expandRow = e.target.closest('[data-todo-expand]');
+            if (expandRow) {
+                const control = e.target.closest('button, a, input, label, select, textarea');
+                if (!control || control.hasAttribute('data-todo-expand-btn')) {
+                    const item = expandRow.closest('.todo-item[data-todo-id]');
+                    const todoId = Number(item.dataset.todoId);
+                    const expanded = item.classList.toggle('is-expanded');
+                    if (expanded) {
+                        state.expandedProjectTodos.add(todoId);
+                    } else {
+                        state.expandedProjectTodos.delete(todoId);
+                    }
+                    const btn = item.querySelector('[data-todo-expand-btn]');
+                    if (btn) btn.setAttribute('aria-expanded', String(expanded));
+                    return;
+                }
+            }
+
             const editBtn = e.target.closest('[data-todo-edit]');
             if (editBtn) {
                 const todoId = parseInt(editBtn.dataset.todoEdit, 10);
@@ -4431,12 +4857,96 @@
                 state.projects = result.data;
                 renderProjects(state.projects);
                 updateProjectsDashboard(state.projects);
+                loadDeletedProjects();
             } else {
                 console.error('Failed to load projects:', result.error);
             }
         } catch (error) {
             console.error('Error loading projects:', error);
         }
+    }
+
+    // ---- Deleted projects ----------------------------------------------------
+
+    async function loadDeletedProjects() {
+        const section = document.getElementById('deletedProjects');
+        if (!section) return;
+
+        try {
+            const result = await api.getDeletedProjects();
+            renderDeletedProjects(result.success ? (result.data || []) : []);
+        } catch (error) {
+            console.error('Error loading deleted projects:', error);
+        }
+    }
+
+    function renderDeletedProjects(entries) {
+        const section = document.getElementById('deletedProjects');
+        const list = document.getElementById('deletedProjectsList');
+        const count = document.getElementById('deletedProjectsCount');
+
+        section.hidden = entries.length === 0;
+        count.textContent = String(entries.length);
+
+        const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+        list.innerHTML = entries.map(entry => {
+            // "Just now" / "Yesterday" read mid-sentence in lower case.
+            const when = (entry.deleted_at ? formatDate(new Date(entry.deleted_at.replace(' ', 'T') + 'Z')) : '')
+                .replace(/^(Just|Yesterday|Today)/, word => word.toLowerCase());
+            const holds = [
+                entry.counts.todos ? plural(entry.counts.todos, 'to-do', 'to-dos') : '',
+                entry.counts.notes ? plural(entry.counts.notes, 'note', 'notes') : '',
+                entry.counts.documents ? plural(entry.counts.documents, 'document', 'documents') : ''
+            ].filter(Boolean).join(' · ');
+            const meta = [entry.company, `Deleted ${when}${entry.deleted_by_name ? ` by ${entry.deleted_by_name}` : ''}`, holds]
+                .filter(Boolean).map(escapeHtml).join(' · ');
+
+            return `
+                <div class="deleted-project">
+                    <div class="deleted-project-body">
+                        <span class="deleted-project-name">${escapeHtml(entry.name)}</span>
+                        <span class="deleted-project-meta">${meta}</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-small" data-deleted-restore="${entry.id}">Restore</button>
+                    <button type="button" class="btn btn-small deleted-project-purge" data-deleted-purge="${entry.id}" data-name="${escapeHtml(entry.name)}">Delete permanently</button>
+                </div>`;
+        }).join('');
+    }
+
+    function bindDeletedProjects() {
+        const list = document.getElementById('deletedProjectsList');
+        if (!list) return;
+
+        list.addEventListener('click', async (e) => {
+            const restore = e.target.closest('[data-deleted-restore]');
+            const purge = e.target.closest('[data-deleted-purge]');
+            if (!restore && !purge) return;
+
+            const button = restore || purge;
+            if (purge && !confirm(`Delete "${purge.dataset.name}" permanently? Its to-dos, notes and documents are gone for good.`)) {
+                return;
+            }
+
+            button.disabled = true;
+            try {
+                const result = restore
+                    ? await api.restoreProject(Number(restore.dataset.deletedRestore))
+                    : await api.purgeProject(Number(purge.dataset.deletedPurge));
+                if (!result.success) {
+                    alert(result.error || 'Something went wrong');
+                    button.disabled = false;
+                    return;
+                }
+                await loadProjects();
+                if (restore && result.data && result.data.id) {
+                    openProjectOverview(Number(result.data.id));
+                }
+            } catch (error) {
+                console.error('Error with deleted project:', error);
+                alert('Something went wrong');
+                button.disabled = false;
+            }
+        });
     }
 
     /**
@@ -4685,85 +5195,6 @@
         `;
     }
 
-    function openProjectModal(project = null) {
-        state.editingProjectId = project && project.id ? project.id : null;
-
-        // Reset form
-        elements.projectForm.reset();
-
-        if (project && project.id) {
-            // Editing existing project
-            elements.projectModalTitle.textContent = 'Edit Project';
-            elements.deleteProjectBtn.style.display = 'block';
-
-            // Fill form fields
-            elements.projectId.value = project.id;
-            document.getElementById('projectName').value = project.name || '';
-            document.getElementById('projectStartDate').value = project.start_date || '';
-            document.getElementById('projectDescription').value = project.description || '';
-            document.getElementById('projectCompany').value = project.company || '';
-            document.getElementById('projectBudgetMin').value = project.budget_min || '';
-            document.getElementById('projectBudgetMax').value = project.budget_max || '';
-            document.getElementById('projectSuccessChance').value = project.success_chance || '';
-            document.getElementById('projectStage').value = project.stage || 'Lead';
-            document.getElementById('projectEstimatedCompletion').value = project.estimated_completion || '';
-        } else {
-            // Adding new project
-            elements.projectModalTitle.textContent = 'Add Project';
-            elements.deleteProjectBtn.style.display = 'none';
-            // Set default start date to today
-            document.getElementById('projectStartDate').value = new Date().toISOString().split('T')[0];
-        }
-
-        elements.projectModal.classList.add('active');
-    }
-
-    function closeProjectModal() {
-        elements.projectModal.classList.remove('active');
-        state.editingProjectId = null;
-    }
-
-    async function saveProject(e) {
-        e.preventDefault();
-
-        const formData = {
-            name: document.getElementById('projectName').value.trim(),
-            start_date: document.getElementById('projectStartDate').value,
-            description: document.getElementById('projectDescription').value.trim(),
-            company: document.getElementById('projectCompany').value.trim() || null,
-            budget_min: document.getElementById('projectBudgetMin').value || null,
-            budget_max: document.getElementById('projectBudgetMax').value || null,
-            success_chance: document.getElementById('projectSuccessChance').value || null,
-            stage: document.getElementById('projectStage').value,
-            estimated_completion: document.getElementById('projectEstimatedCompletion').value || null
-        };
-
-        try {
-            let result;
-            if (state.editingProjectId) {
-                result = await api.updateProject(state.editingProjectId, formData);
-            } else {
-                result = await api.createProject(formData);
-            }
-
-            if (result.success) {
-                closeProjectModal();
-                loadProjects();
-            } else {
-                alert('Error: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error saving project:', error);
-            alert('An error occurred while saving the project');
-        }
-    }
-
-    function openDeleteProjectModal() {
-        const projectName = document.getElementById('projectName').value;
-        elements.deleteProjectName.textContent = projectName;
-        elements.deleteProjectModal.classList.add('active');
-    }
-
     function closeDeleteProjectModal() {
         elements.deleteProjectModal.classList.remove('active');
     }
@@ -4774,10 +5205,6 @@
 
             if (result.success) {
                 closeDeleteProjectModal();
-                // Only close project modal if it's currently open
-                if (elements.projectModal.classList.contains('active')) {
-                    closeProjectModal();
-                }
                 state.editingProjectId = null;
                 loadProjects();
             } else {
@@ -4862,10 +5289,7 @@
         renderProjectContacts(contacts);
 
         // Render to-dos
-        renderTodoCollection(elements.projectTodosList, todos, {
-            showContext: false,
-            emptyMessage: 'No to-dos yet for this project'
-        });
+        renderProjectTodos(todos);
 
         // The files attached to this project (documents.js)
         if (window.ProjectDocuments) {
@@ -4877,8 +5301,11 @@
     }
 
     function renderProjectTags(tags) {
+        // What is already on the project is not suggested again.
+        state.viewingProjectTagIds = new Set((tags || []).map(tag => Number(tag.id)));
+
         if (!tags || tags.length === 0) {
-            elements.projectTags.innerHTML = '<p class="empty-hint">No tags assigned</p>';
+            elements.projectTags.innerHTML = '<p class="empty-hint">No tags</p>';
             return;
         }
 
@@ -4893,27 +5320,49 @@
     }
 
     function renderProjectContacts(contacts) {
+        state.viewingProjectContactIds = new Set((contacts || []).map(contact => Number(contact.id)));
+
         if (!contacts || contacts.length === 0) {
             elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts assigned</p>';
             return;
         }
 
+        // Small chips side by side; the company is in the tooltip.
         const html = contacts.map(contact => `
-            <div class="project-contact-item">
-                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
-                <div class="contact-info">
-                    <div class="contact-name">${escapeHtml(contact.name)}</div>
-                    ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
-                </div>
-                <button class="btn btn-icon btn-small" data-remove-contact="${contact.id}" title="Remove contact">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                    </svg>
-                </button>
-            </div>
+            <span class="pcontact-chip" data-open-contact="${contact.id}" title="${escapeHtml(contact.company ? `${contact.name} · ${contact.company}` : contact.name)}">
+                <span class="pcontact-avatar">${escapeHtml(getInitials(contact.name))}</span>
+                <button type="button" class="pcontact-name" data-open-contact="${contact.id}">${escapeHtml(contact.name)}</button>
+                <button type="button" class="pcontact-remove" data-remove-contact="${contact.id}" title="Remove contact" aria-label="Remove ${escapeHtml(contact.name)}">&times;</button>
+            </span>
         `).join('');
 
         elements.projectContacts.innerHTML = html;
+    }
+
+    /**
+     * The "Add" button of a section head opens a search field under it; the
+     * field is the whole add form - pick a suggestion or press Enter.
+     */
+    function openProjectPicker(picker, button, input) {
+        if (!picker) return;
+        picker.hidden = false;
+        if (button) button.setAttribute('aria-expanded', 'true');
+        if (input) input.focus();
+    }
+
+    function closeProjectPicker(picker, button, input, suggestions) {
+        if (!picker) return;
+        picker.hidden = true;
+        if (button) button.setAttribute('aria-expanded', 'false');
+        if (input) input.value = '';
+        if (suggestions) suggestions.style.display = 'none';
+    }
+
+    function closeProjectPickers() {
+        closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+            elements.newProjectTagInput, elements.projectTagSuggestions);
+        closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+            elements.newProjectContactInput, elements.projectContactSuggestions);
     }
 
     async function loadProjectNotes(projectId) {
@@ -4933,29 +5382,33 @@
         }
     }
 
+    /** How many notes the project sheet shows before "Show older notes". */
+    const PROJECT_NOTES_SHOWN = 3;
+
     function renderProjectNotesTimeline(notes) {
         if (!elements.projectNotesTimeline) {
             return;
         }
 
         if (!notes || notes.length === 0) {
-            elements.projectNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet for this project</p>
-                </div>
-            `;
+            elements.projectNotesTimeline.innerHTML = '<p class="empty-hint">No notes yet</p>';
             return;
         }
 
+        // Newest first. Proposed notes always show, so their decision is
+        // never hidden behind "Show older notes".
+        let hiddenCount = 0;
         let html = '';
-        notes.forEach(note => {
+        notes.forEach((note, index) => {
             const date = new Date(note.created_at);
             const formattedDate = formatDate(date);
 
             const isProposed = note.review_status === 'pending';
+            const isHidden = !state.showAllProjectNotes && index >= PROJECT_NOTES_SHOWN && !isProposed;
+            if (isHidden) {
+                hiddenCount++;
+                return;
+            }
 
             html += `
                 <div class="note-item${isProposed ? ' is-proposed' : ''}">
@@ -4970,11 +5423,30 @@
                         </button>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
+                    <button type="button" class="ov-link-btn note-more-btn" hidden>Show more</button>
                 </div>
             `;
         });
 
+        if (hiddenCount > 0) {
+            html += `<button type="button" class="ov-link-btn notes-older-btn" data-notes-show-all>Show ${hiddenCount} older ${hiddenCount === 1 ? 'note' : 'notes'}</button>`;
+        } else if (state.showAllProjectNotes && notes.length > PROJECT_NOTES_SHOWN) {
+            html += '<button type="button" class="ov-link-btn notes-older-btn" data-notes-show-less>Show fewer notes</button>';
+        }
+
         elements.projectNotesTimeline.innerHTML = html;
+
+        // Long notes are clamped to a few lines; "Show more" only where the
+        // clamp actually cut something off. Measured after layout.
+        requestAnimationFrame(() => {
+            elements.projectNotesTimeline.querySelectorAll('.note-item').forEach(item => {
+                const content = item.querySelector('.note-content');
+                const more = item.querySelector('.note-more-btn');
+                if (content && more && content.scrollHeight > content.clientHeight + 1) {
+                    more.hidden = false;
+                }
+            });
+        });
 
         elements.projectNotesTimeline.querySelectorAll('.project-note-delete-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
@@ -4983,6 +5455,28 @@
                 await deleteProjectNote(noteId);
             });
         });
+    }
+
+    function openProjectNoteForm() {
+        if (!elements.projectNoteForm) return;
+        elements.projectNoteForm.hidden = false;
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.setAttribute('aria-expanded', 'true');
+        }
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.focus();
+        }
+    }
+
+    function closeProjectNoteForm() {
+        if (!elements.projectNoteForm) return;
+        elements.projectNoteForm.hidden = true;
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.setAttribute('aria-expanded', 'false');
+        }
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.value = '';
+        }
     }
 
     async function addProjectNote() {
@@ -5003,7 +5497,7 @@
         try {
             const result = await api.createProjectNote(state.viewingProjectId, content);
             if (result.success) {
-                elements.newProjectNoteContent.value = '';
+                closeProjectNoteForm();
                 await loadProjectNotes(state.viewingProjectId);
             } else {
                 alert(result.error || 'Error adding note');
@@ -5014,12 +5508,7 @@
         } finally {
             if (elements.addProjectNoteBtn) {
                 elements.addProjectNoteBtn.disabled = false;
-                elements.addProjectNoteBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                    Add Note
-                `;
+                elements.addProjectNoteBtn.innerHTML = 'Add Note';
             }
         }
     }
@@ -5046,12 +5535,15 @@
 
     function closeProjectOverview() {
         elements.projectOverviewModal.classList.remove('active');
+        exitProjectEdit();
+        elements.projectOverviewModal.classList.remove('is-new');
+        closeProjectPickers();
+        closeProjectNoteForm();
         state.viewingProjectId = null;
         state.viewingProject = null;
-
-        if (elements.newProjectNoteContent) {
-            elements.newProjectNoteContent.value = '';
-        }
+        state.expandedProjectTodos.clear();
+        state.showAllProjectNotes = false;
+        state.showCompletedProjectTodos = false;
 
         if (elements.projectNotesTimeline) {
             elements.projectNotesTimeline.innerHTML = '';
@@ -5063,6 +5555,147 @@
 
         if (window.ProjectDocuments) {
             window.ProjectDocuments.reset();
+        }
+    }
+
+    /**
+     * A contact chip in the project sheet opens that contact. The contact
+     * sheet takes the project sheet's place; its related projects lead back.
+     */
+    function openContactFromProject(contactId) {
+        if (!Number.isInteger(contactId)) return;
+        closeProjectOverview();
+        openOverviewModal(contactId);
+    }
+
+    // ---- Editing a project in place ----------------------------------------
+
+    function isEditingProject() {
+        return elements.projectOverviewModal.classList.contains('is-editing');
+    }
+
+    function enterProjectEdit() {
+        const project = state.viewingProject;
+        if (!project) return;
+
+        elements.projectEditName.value = project.name || '';
+        elements.projectEditCompany.value = project.company || '';
+        elements.projectEditStartDate.value = project.start_date || '';
+        elements.projectEditStage.value = project.stage || 'Lead';
+        elements.projectEditBudgetMin.value = project.budget_min ?? '';
+        elements.projectEditBudgetMax.value = project.budget_max ?? '';
+        elements.projectEditSuccessChance.value = project.success_chance ?? '';
+        elements.projectEditEstCompletion.value = project.estimated_completion || '';
+        elements.projectEditDescription.value = project.description || '';
+
+        elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveProjectEditBtn.textContent = 'Save';
+        elements.projectOverviewModal.classList.add('is-editing');
+        elements.projectEditName.focus();
+    }
+
+    function isNewProject() {
+        return elements.projectOverviewModal.classList.contains('is-new');
+    }
+
+    /**
+     * A new project: the sheet in edit mode with empty fields. Tags, contacts,
+     * to-dos, documents and notes belong to a saved project, so they appear
+     * once it has been created.
+     */
+    function openNewProject() {
+        if (elements.projectOverviewModal.classList.contains('active')) {
+            closeProjectOverview();
+        }
+
+        state.viewingProjectId = null;
+        state.viewingProject = null;
+        if (window.ProjectDocuments) {
+            window.ProjectDocuments.reset();
+        }
+
+        elements.projectOverviewName.textContent = 'New Project';
+        setEditedLine(elements.projectOverviewEdited, null);
+        setAssigneeControl(elements.projectOverviewAssignee, 'project', null);
+        const review = document.getElementById('projectOverviewReview');
+        if (review) review.hidden = true;
+
+        [elements.projectEditName, elements.projectEditCompany, elements.projectEditBudgetMin,
+         elements.projectEditBudgetMax, elements.projectEditSuccessChance,
+         elements.projectEditEstCompletion, elements.projectEditDescription].forEach(input => { input.value = ''; });
+        elements.projectEditStartDate.value = new Date().toISOString().split('T')[0];
+        elements.projectEditStage.value = 'Lead';
+
+        elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveProjectEditBtn.textContent = 'Create';
+        elements.projectOverviewModal.classList.add('active', 'is-editing', 'is-new');
+        elements.projectOverviewModal.querySelector('.modal-body').scrollTop = 0;
+        elements.projectEditName.focus();
+    }
+
+    /** Cancel leaves edit mode; for a project not yet created, it closes the sheet. */
+    function cancelProjectEdit() {
+        if (isNewProject()) {
+            closeProjectOverview();
+        } else {
+            exitProjectEdit();
+        }
+    }
+
+    function exitProjectEdit() {
+        elements.projectOverviewModal.classList.remove('is-editing');
+        if (elements.projectEditCompanySuggestions) {
+            elements.projectEditCompanySuggestions.classList.remove('visible');
+        }
+    }
+
+    async function saveProjectEdit() {
+        const creating = isNewProject();
+        const projectId = state.viewingProjectId;
+        if (!isEditingProject() || (!creating && !projectId)) return;
+
+        // The same three fields the server insists on.
+        const required = [elements.projectEditName, elements.projectEditStartDate, elements.projectEditDescription];
+        const missing = required.filter(input => !input.value.trim());
+        required.forEach(input => input.classList.toggle('is-invalid', missing.includes(input)));
+        if (missing.length > 0) {
+            missing[0].focus();
+            return;
+        }
+
+        const data = {
+            name: elements.projectEditName.value.trim(),
+            start_date: elements.projectEditStartDate.value,
+            description: elements.projectEditDescription.value.trim(),
+            company: elements.projectEditCompany.value.trim() || null,
+            budget_min: elements.projectEditBudgetMin.value || null,
+            budget_max: elements.projectEditBudgetMax.value || null,
+            success_chance: elements.projectEditSuccessChance.value || null,
+            stage: elements.projectEditStage.value,
+            estimated_completion: elements.projectEditEstCompletion.value || null
+        };
+
+        elements.saveProjectEditBtn.disabled = true;
+        try {
+            const result = creating
+                ? await api.createProject(data)
+                : await api.updateProject(projectId, data);
+            if (result.success) {
+                // A created project opens as itself, ready for tags,
+                // contacts and the rest.
+                const savedId = creating ? result.data.id : projectId;
+                exitProjectEdit();
+                elements.projectOverviewModal.classList.remove('is-new');
+                await openProjectOverview(savedId);
+                loadProjects();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('An error occurred while saving the project');
+        } finally {
+            elements.saveProjectEditBtn.disabled = false;
         }
     }
 
@@ -5088,6 +5721,7 @@
                 }
                 elements.newProjectTagInput.value = '';
                 elements.projectTagSuggestions.style.display = 'none';
+                elements.newProjectTagInput.focus();
             } else {
                 alert('Error: ' + assignResult.error);
             }
@@ -5126,6 +5760,7 @@
                 }
                 elements.newProjectContactInput.value = '';
                 elements.projectContactSuggestions.style.display = 'none';
+                elements.newProjectContactInput.focus();
             } else {
                 alert('Error: ' + result.error);
             }
@@ -5154,8 +5789,9 @@
 
     function showProjectTagSuggestions(query) {
         const lowerQuery = query.toLowerCase();
+        const assigned = state.viewingProjectTagIds || new Set();
         const filtered = (state.allTags || []).filter(tag =>
-            tag.name.toLowerCase().includes(lowerQuery)
+            tag.name.toLowerCase().includes(lowerQuery) && !assigned.has(Number(tag.id))
         ).slice(0, 10);
 
         if (filtered.length === 0) {
@@ -5187,9 +5823,12 @@
         }
 
         const lowerQuery = query.toLowerCase();
+        const assigned = state.viewingProjectContactIds || new Set();
         const filtered = state.contacts.filter(contact =>
-            contact.name.toLowerCase().includes(lowerQuery) ||
-            (contact.company && contact.company.toLowerCase().includes(lowerQuery))
+            !assigned.has(Number(contact.id)) && (
+                contact.name.toLowerCase().includes(lowerQuery) ||
+                (contact.company && contact.company.toLowerCase().includes(lowerQuery))
+            )
         ).slice(0, 10);
 
         if (filtered.length === 0) {
@@ -5212,48 +5851,66 @@
         elements.projectContactSuggestions.style.display = 'block';
     }
 
-    function showCompanySuggestions(query) {
-        if (!state.contacts || state.contacts.length === 0) {
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+    /** Company suggestions under a company field. */
+    function showCompanySuggestions(query, box) {
+        if (!box) {
             return;
         }
 
         const lowerQuery = query.toLowerCase();
         // Get unique companies from contacts
-        const companies = [...new Set(state.contacts
+        const companies = [...new Set((state.contacts || [])
             .filter(c => c.company && c.company.toLowerCase().includes(lowerQuery))
             .map(c => c.company)
         )].slice(0, 10);
 
         if (companies.length === 0) {
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+            box.classList.remove('visible');
             return;
         }
 
         // Use data-company attributes instead of inline onclick
-        const html = companies.map(company => `
+        box.innerHTML = companies.map(company => `
             <div class="autocomplete-suggestion" data-company="${escapeHtml(company)}">
                 ${escapeHtml(company)}
             </div>
         `).join('');
-
-        if (elements.projectCompanySuggestions) {
-            elements.projectCompanySuggestions.innerHTML = html;
-            elements.projectCompanySuggestions.classList.add('visible');
-        }
+        box.classList.add('visible');
     }
 
-    function selectCompany(company) {
-        if (elements.projectCompany) {
-            elements.projectCompany.value = company;
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+    function bindCompanyAutocomplete(input, box) {
+        if (!input || !box) {
+            return;
         }
+
+        input.addEventListener('input', () => {
+            const query = input.value.trim();
+            if (query.length > 0) {
+                // Ensure contacts are loaded for company suggestions
+                if (!state.contacts || state.contacts.length === 0) {
+                    loadAllContacts().then(() => showCompanySuggestions(query, box));
+                } else {
+                    showCompanySuggestions(query, box);
+                }
+            } else {
+                box.classList.remove('visible');
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            // Small delay so mousedown on a suggestion can fire first
+            setTimeout(() => box.classList.remove('visible'), 150);
+        });
+
+        // Mousedown fires before blur and bypasses overflow clipping
+        box.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // prevent input blur
+            const item = e.target.closest('[data-company]');
+            if (item) {
+                input.value = item.dataset.company;
+                box.classList.remove('visible');
+            }
+        });
     }
 
     // ============================================
@@ -5534,6 +6191,11 @@
                 select.setAttribute('data-previous', select.value);
                 applyAssignmentLocally(type, Number(id), saved);
                 showAssignmentToast(saved.assigned_to_name);
+
+                // Reassigned from the to-do sheet: the lists behind it move too.
+                if (type === 'todo' && state.viewingTodoId === Number(id)) {
+                    refreshVisibleTodoLists();
+                }
 
                 // The nav badge counts open to-dos assigned to me, so it can
                 // change whether or not I was the one reassigned.
@@ -5976,23 +6638,7 @@
 
         // Add project button
         if (elements.addProjectBtn) {
-            elements.addProjectBtn.addEventListener('click', () => openProjectModal());
-        }
-
-        // Project modal close buttons
-        if (elements.closeProjectModal) {
-            elements.closeProjectModal.addEventListener('click', closeProjectModal);
-        }
-        if (elements.cancelProjectBtn) {
-            elements.cancelProjectBtn.addEventListener('click', closeProjectModal);
-        }
-        if (elements.projectModal) {
-            elements.projectModal.querySelector('.modal-backdrop').addEventListener('click', closeProjectModal);
-        }
-
-        // Project form submission
-        if (elements.projectForm) {
-            elements.projectForm.addEventListener('submit', saveProject);
+            elements.addProjectBtn.addEventListener('click', openNewProject);
         }
 
         // Pipeline band: the chevron opens and closes the breakdown
@@ -6008,11 +6654,6 @@
                 breakdownToggle.setAttribute('aria-label', label);
                 breakdownToggle.title = label;
             });
-        }
-
-        // Delete project button
-        if (elements.deleteProjectBtn) {
-            elements.deleteProjectBtn.addEventListener('click', openDeleteProjectModal);
         }
 
         // Delete project modal
@@ -6032,9 +6673,6 @@
         // Project overview modal
         if (elements.closeProjectOverviewModal) {
             elements.closeProjectOverviewModal.addEventListener('click', closeProjectOverview);
-        }
-        if (elements.closeProjectOverviewBtn) {
-            elements.closeProjectOverviewBtn.addEventListener('click', closeProjectOverview);
         }
         if (elements.projectOverviewModal) {
             const backdrop = elements.projectOverviewModal.querySelector('.modal-backdrop');
@@ -6061,6 +6699,41 @@
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     e.preventDefault();
                     addProjectNote();
+                } else if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    closeProjectNoteForm();
+                }
+            });
+        }
+
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.addEventListener('click', () => {
+                if (elements.projectNoteForm.hidden) {
+                    openProjectNoteForm();
+                } else {
+                    closeProjectNoteForm();
+                }
+            });
+        }
+        if (elements.cancelProjectNoteBtn) {
+            elements.cancelProjectNoteBtn.addEventListener('click', closeProjectNoteForm);
+        }
+
+        // Long notes open in place; older notes come in on request
+        if (elements.projectNotesTimeline) {
+            elements.projectNotesTimeline.addEventListener('click', (e) => {
+                const more = e.target.closest('.note-more-btn');
+                if (more) {
+                    const item = more.closest('.note-item');
+                    const open = item.classList.toggle('is-open');
+                    more.textContent = open ? 'Show less' : 'Show more';
+                    return;
+                }
+                if (e.target.closest('[data-notes-show-all], [data-notes-show-less]')) {
+                    state.showAllProjectNotes = !!e.target.closest('[data-notes-show-all]');
+                    if (state.viewingProjectId) {
+                        loadProjectNotes(state.viewingProjectId);
+                    }
                 }
             });
         }
@@ -6079,91 +6752,58 @@
             });
         }
 
+        // Editing happens in the sheet itself
         if (elements.editProjectBtn) {
-            elements.editProjectBtn.addEventListener('click', () => {
-                // Save project BEFORE closeProjectOverview() nulls it
-                const projectToEdit = state.viewingProject;
-                closeProjectOverview();
-                openProjectModal(projectToEdit);
+            elements.editProjectBtn.addEventListener('click', enterProjectEdit);
+        }
+        if (elements.cancelProjectEditBtn) {
+            elements.cancelProjectEditBtn.addEventListener('click', cancelProjectEdit);
+        }
+        if (elements.saveProjectEditBtn) {
+            elements.saveProjectEditBtn.addEventListener('click', saveProjectEdit);
+        }
+        if (elements.projectOverviewModal) {
+            // Enter in a one-line field saves; Cmd/Ctrl+Enter in the description
+            elements.projectOverviewModal.querySelector('.modal-content').addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' || !isEditingProject()) return;
+                const field = e.target.closest('[data-ov="edit"], [data-ov="edit"] *');
+                if (!field || !e.target.matches('input, textarea')) return;
+                if (e.target.tagName === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+                e.preventDefault();
+                saveProjectEdit();
+            });
+            elements.projectOverviewModal.addEventListener('input', (e) => {
+                if (e.target.classList.contains('is-invalid') && e.target.value.trim()) {
+                    e.target.classList.remove('is-invalid');
+                }
             });
         }
 
-        // Project tag add button
+        // Section-head "Add" buttons open a search field that is the whole form
         if (elements.addProjectTagBtn) {
             elements.addProjectTagBtn.addEventListener('click', () => {
-                const tagName = elements.newProjectTagInput.value.trim();
-                if (tagName) {
-                    addProjectTag(tagName);
+                if (elements.projectTagPicker.hidden) {
+                    openProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn, elements.newProjectTagInput);
+                } else {
+                    closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                        elements.newProjectTagInput, elements.projectTagSuggestions);
                 }
             });
         }
 
-        // Project contact add button — match first suggestion if any
         if (elements.addProjectContactBtn) {
             elements.addProjectContactBtn.addEventListener('click', () => {
-                const query = elements.newProjectContactInput.value.trim();
-                if (!query) return;
-
-                if (!state.contacts || state.contacts.length === 0) {
-                    alert('No contacts loaded. Please wait and try again.');
-                    return;
-                }
-
-                // First try exact match, then partial match
-                const exactMatch = state.contacts.find(c =>
-                    c.name.toLowerCase() === query.toLowerCase()
-                );
-                const partialMatch = state.contacts.find(c =>
-                    c.name.toLowerCase().includes(query.toLowerCase())
-                );
-                const contact = exactMatch || partialMatch;
-
-                if (contact) {
-                    addProjectContact(contact.id);
+                if (elements.projectContactPicker.hidden) {
+                    openProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn, elements.newProjectContactInput);
                 } else {
-                    alert('Contact not found. Please select from the suggestions dropdown.');
+                    closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                        elements.newProjectContactInput, elements.projectContactSuggestions);
                 }
             });
         }
 
-        // Company autocomplete
-        if (elements.projectCompany) {
-            elements.projectCompany.addEventListener('input', () => {
-                const query = elements.projectCompany.value.trim();
-                if (query.length > 0) {
-                    // Ensure contacts are loaded for company suggestions
-                    if (!state.contacts || state.contacts.length === 0) {
-                        loadAllContacts().then(() => showCompanySuggestions(query));
-                    } else {
-                        showCompanySuggestions(query);
-                    }
-                } else {
-                    if (elements.projectCompanySuggestions) {
-                        elements.projectCompanySuggestions.classList.remove('visible');
-                    }
-                }
-            });
-
-            elements.projectCompany.addEventListener('blur', () => {
-                // Small delay so mousedown on a suggestion can fire first
-                setTimeout(() => {
-                    if (elements.projectCompanySuggestions) {
-                        elements.projectCompanySuggestions.classList.remove('visible');
-                    }
-                }, 150);
-            });
-        }
-
-        // Mousedown on company suggestions (fires before blur, bypasses overflow clipping)
-        if (elements.projectCompanySuggestions) {
-            elements.projectCompanySuggestions.addEventListener('mousedown', (e) => {
-                e.preventDefault(); // prevent input blur
-                const item = e.target.closest('[data-company]');
-                if (item) {
-                    selectCompany(item.dataset.company);
-                }
-            });
-        }
+        // Company autocomplete in the sheet's edit mode
+        bindCompanyAutocomplete(elements.projectEditCompany, elements.projectEditCompanySuggestions);
 
         // Project tag input
         if (elements.newProjectTagInput) {
@@ -6180,7 +6820,21 @@
                 // Delay so mousedown on a suggestion fires first
                 setTimeout(() => {
                     elements.projectTagSuggestions.style.display = 'none';
+                    if (document.activeElement !== elements.newProjectTagInput && !elements.newProjectTagInput.value.trim()) {
+                        closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                            elements.newProjectTagInput, elements.projectTagSuggestions);
+                    }
                 }, 150);
+            });
+
+            elements.newProjectTagInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    // Close the field, not the whole sheet
+                    e.stopPropagation();
+                    closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                        elements.newProjectTagInput, elements.projectTagSuggestions);
+                    elements.addProjectTagBtn.focus();
+                }
             });
 
             elements.newProjectTagInput.addEventListener('keypress', (e) => {
@@ -6205,7 +6859,24 @@
                 }
             });
 
+            elements.newProjectContactInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    elements.projectContactSuggestions.style.display = 'none';
+                    if (document.activeElement !== elements.newProjectContactInput && !elements.newProjectContactInput.value.trim()) {
+                        closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                            elements.newProjectContactInput, elements.projectContactSuggestions);
+                    }
+                }, 150);
+            });
+
             elements.newProjectContactInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                        elements.newProjectContactInput, elements.projectContactSuggestions);
+                    elements.addProjectContactBtn.focus();
+                    return;
+                }
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     const first = elements.projectContactSuggestions.querySelector('[data-contact-id]');
@@ -6238,12 +6909,30 @@
             });
         }
 
-        // Delegation for contact remove buttons (rendered dynamically)
+        // Delegation for contact chips (rendered dynamically): the x removes,
+        // anywhere else on the chip opens the contact
         if (elements.projectContacts) {
             elements.projectContacts.addEventListener('click', (e) => {
                 const btn = e.target.closest('[data-remove-contact]');
                 if (btn) {
                     removeProjectContact(parseInt(btn.dataset.removeContact, 10));
+                    return;
+                }
+                const chip = e.target.closest('[data-open-contact]');
+                if (chip) {
+                    openContactFromProject(parseInt(chip.dataset.openContact, 10));
+                }
+            });
+        }
+
+        // "Show" / "Hide" for completed to-dos in the project sheet
+        if (elements.projectTodosList) {
+            elements.projectTodosList.addEventListener('click', (e) => {
+                if (e.target.closest('[data-ptodo-show-done]')) {
+                    state.showCompletedProjectTodos = !state.showCompletedProjectTodos;
+                    if (state.viewingProjectId) {
+                        loadProjectTodos(state.viewingProjectId);
+                    }
                 }
             });
         }
@@ -6262,6 +6951,8 @@
         bindTodoListInteractions(elements.todosList);
         bindTodoListInteractions(elements.contactTodosList);
         bindTodoListInteractions(elements.projectTodosList);
+        bindTodoDetail();
+        bindDeletedProjects();
 
         // To-do modal
         if (elements.closeTodoModal) {
@@ -6294,11 +6985,15 @@
                 } else if (elements.deleteProjectModal.classList.contains('active')) {
                     closeDeleteProjectModal();
                 } else if (elements.projectOverviewModal.classList.contains('active')) {
-                    closeProjectOverview();
-                } else if (elements.projectModal.classList.contains('active')) {
-                    closeProjectModal();
+                    if (isEditingProject()) {
+                        cancelProjectEdit();
+                    } else {
+                        closeProjectOverview();
+                    }
                 } else if (elements.todoModal.classList.contains('active')) {
                     closeTodoModal();
+                } else if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
+                    closeTodoDetail();
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
@@ -6382,13 +7077,13 @@
         editContact: editContact,
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
+        openTodoDetail: openTodoDetail,
         openBookkeepingRow: openBookkeepingRow,
         switchView: switchView,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,
-        removeProjectContact: removeProjectContact,
-        selectCompany: selectCompany
+        removeProjectContact: removeProjectContact
     };
 
     // Initialize when DOM is ready

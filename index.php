@@ -830,7 +830,7 @@ function assetUrl(string $path): string
                         </div>
 
                         <!-- At a glance: filled in by workload.js for whoever is shown -->
-                        <section class="kpi-band kpi-band--home" id="workloadStats" aria-label="At a glance" hidden></section>
+                        <section class="home-stats" id="workloadStats" aria-label="At a glance" hidden></section>
 
                         <div class="workload-body" id="workloadBody"></div>
                     </div>
@@ -1270,6 +1270,16 @@ function assetUrl(string $path): string
                     <div class="projects-list" id="projectsList">
                         <!-- Projects will be loaded here -->
                     </div>
+
+                    <!-- Deleted projects: kept whole, restorable (ProjectArchive) -->
+                    <details class="deleted-projects" id="deletedProjects" hidden>
+                        <summary class="deleted-projects-head">
+                            <span class="deleted-projects-title">Deleted projects</span>
+                            <span class="deleted-projects-count" id="deletedProjectsCount">0</span>
+                        </summary>
+                        <p class="deleted-projects-hint">Restoring brings a project back with its to-dos, notes, tags, contacts and documents.</p>
+                        <div class="deleted-projects-list" id="deletedProjectsList"></div>
+                    </details>
                 </div>
             </main>
             </div>
@@ -1706,93 +1716,6 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- Project Modal -->
-        <div class="modal" id="projectModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 id="projectModalTitle">Add Project</h2>
-                    <button type="button" class="modal-close" id="closeProjectModal">&times;</button>
-                </div>
-                <form id="projectForm">
-                    <input type="hidden" id="projectId" name="id">
-
-                    <div class="modal-body">
-                        <!-- Required Fields -->
-                        <div class="form-section">
-                            <h3>Basic Information</h3>
-
-                            <div class="form-group">
-                                <label for="projectName">Project Name *</label>
-                                <input type="text" id="projectName" name="name" required class="form-input">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="projectStartDate">Start Date *</label>
-                                <input type="date" id="projectStartDate" name="start_date" required class="form-input">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="projectDescription">Description *</label>
-                                <textarea id="projectDescription" name="description" required class="form-input" rows="3"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Optional Fields -->
-                        <div class="form-section">
-                            <h3>Additional Details</h3>
-
-                            <div class="form-group">
-                                <label for="projectCompany">Company</label>
-                                <div class="autocomplete-wrapper">
-                                    <input type="text" id="projectCompany" name="company" class="form-input" autocomplete="off" placeholder="Search or enter company name...">
-                                    <div class="autocomplete-suggestions" id="projectCompanySuggestions"></div>
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="projectBudgetMin">Budget Min</label>
-                                    <input type="number" id="projectBudgetMin" name="budget_min" class="form-input" step="0.01" placeholder="0.00">
-                                </div>
-                                <div class="form-group">
-                                    <label for="projectBudgetMax">Budget Max</label>
-                                    <input type="number" id="projectBudgetMax" name="budget_max" class="form-input" step="0.01" placeholder="0.00">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="projectSuccessChance">Success Chance (%)</label>
-                                <input type="number" id="projectSuccessChance" name="success_chance" class="form-input" min="0" max="100" placeholder="0-100">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="projectStage">Stage</label>
-                                <select id="projectStage" name="stage" class="form-select">
-                                    <option value="Lead">Lead</option>
-                                    <option value="Proposal">Proposal</option>
-                                    <option value="Negotiation">Negotiation</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Complete">Complete</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="projectEstimatedCompletion">Estimated Completion</label>
-                                <input type="date" id="projectEstimatedCompletion" name="estimated_completion" class="form-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" id="cancelProjectBtn">Cancel</button>
-                        <button type="button" class="btn btn-danger" id="deleteProjectBtn" style="display: none;">Delete</button>
-                        <button type="submit" class="btn btn-primary" id="saveProjectBtn">Save Project</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
         <!-- Delete Project Confirmation Modal -->
         <div class="modal" id="deleteProjectModal">
             <div class="modal-backdrop"></div>
@@ -1802,8 +1725,8 @@ function assetUrl(string $path): string
                     <button type="button" class="modal-close" id="closeDeleteProjectModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to delete <strong id="deleteProjectName"></strong>?</p>
-                    <p class="text-muted">This action cannot be undone.</p>
+                    <p>Delete <strong id="deleteProjectName"></strong>?</p>
+                    <p class="text-muted">It moves to &ldquo;Deleted projects&rdquo; at the bottom of the Projects page, where it can be restored with everything in it.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancelDeleteProjectBtn">Cancel</button>
@@ -1812,15 +1735,26 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- Project Overview Modal -->
+        <!-- Project Overview Modal.
+             Reading and editing share one layout: in edit mode (.is-editing)
+             each fact swaps its value for a field in the same place, so the
+             sheet does not jump to another form. [data-ov="view"] shows only
+             while reading, [data-ov="edit"] only while editing. A new project
+             is the same sheet in edit mode (.is-new), without the sections
+             that need a saved project. -->
         <div class="modal" id="projectOverviewModal">
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-large">
                 <div class="modal-header">
                     <div class="overview-header-info">
                         <div class="overview-title-info">
-                            <h2 id="projectOverviewName">Project Name</h2>
-                            <p class="overview-company" id="projectOverviewCompany"></p>
+                            <h2 id="projectOverviewName" data-ov="view">Project Name</h2>
+                            <input type="text" id="projectEditName" class="form-input ov-edit-title" data-ov="edit" aria-label="Project name" placeholder="Project name" required>
+                            <p class="overview-company" id="projectOverviewCompany" data-ov="view"></p>
+                            <div class="autocomplete-wrapper ov-edit-company" data-ov="edit">
+                                <input type="text" id="projectEditCompany" class="form-input" autocomplete="off" placeholder="Company" aria-label="Company">
+                                <div class="autocomplete-suggestions" id="projectEditCompanySuggestions"></div>
+                            </div>
                             <p class="overview-edited" id="projectOverviewEdited"></p>
                         </div>
                     </div>
@@ -1838,92 +1772,102 @@ function assetUrl(string $path): string
                         <h3 class="overview-section-title">Project Information</h3>
                         <div class="overview-details">
                             <div class="overview-detail-item">
-                                <span class="detail-label">Start Date</span>
-                                <span class="detail-value" id="projectOverviewStartDate"></span>
+                                <label class="detail-label" for="projectEditStartDate">Start Date</label>
+                                <span class="detail-value" id="projectOverviewStartDate" data-ov="view"></span>
+                                <input type="date" id="projectEditStartDate" class="form-input ov-field" data-ov="edit" required>
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Stage</span>
-                                <span class="detail-value" id="projectOverviewStage"></span>
+                                <label class="detail-label" for="projectEditStage">Stage</label>
+                                <span class="detail-value" id="projectOverviewStage" data-ov="view"></span>
+                                <select id="projectEditStage" class="form-select ov-field" data-ov="edit">
+                                    <option value="Lead">Lead</option>
+                                    <option value="Proposal">Proposal</option>
+                                    <option value="Negotiation">Negotiation</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Complete">Complete</option>
+                                </select>
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Budget</span>
-                                <span class="detail-value" id="projectOverviewBudget"></span>
+                                <label class="detail-label" for="projectEditBudgetMin">Budget</label>
+                                <span class="detail-value" id="projectOverviewBudget" data-ov="view"></span>
+                                <div class="ov-field-pair" data-ov="edit">
+                                    <input type="number" id="projectEditBudgetMin" class="form-input ov-field" step="0.01" placeholder="Min" aria-label="Budget min">
+                                    <input type="number" id="projectEditBudgetMax" class="form-input ov-field" step="0.01" placeholder="Max" aria-label="Budget max">
+                                </div>
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Success Chance</span>
-                                <span class="detail-value" id="projectOverviewSuccessChance"></span>
+                                <label class="detail-label" for="projectEditSuccessChance">Success Chance</label>
+                                <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
+                                <input type="number" id="projectEditSuccessChance" class="form-input ov-field" data-ov="edit" min="0" max="100" placeholder="0-100 %">
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Est. Completion</span>
-                                <span class="detail-value" id="projectOverviewEstCompletion"></span>
+                                <label class="detail-label" for="projectEditEstCompletion">Est. Completion</label>
+                                <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
+                                <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
                             </div>
                             <div class="overview-detail-item full-width">
-                                <span class="detail-label">Description</span>
-                                <span class="detail-value" id="projectOverviewDescription"></span>
+                                <label class="detail-label" for="projectEditDescription">Description</label>
+                                <span class="detail-value" id="projectOverviewDescription" data-ov="view"></span>
+                                <textarea id="projectEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="What the project is about" required></textarea>
                             </div>
                         </div>
                     </div>
 
                     <!-- Tags Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Tags</h3>
-                        <div class="tags-container" id="projectTags">
-                            <!-- Tags will be populated by JS -->
-                        </div>
-                        <div class="add-tag-form">
-                            <div class="tag-input-wrapper">
-                                <input type="text" id="newProjectTagInput" class="form-input" placeholder="Add or create tag..." autocomplete="off">
-                                <div class="tag-suggestions" id="projectTagSuggestions"></div>
-                            </div>
-                            <button type="button" class="btn btn-secondary" id="addProjectTagBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                </svg>
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Tags</h3>
+                            <button type="button" class="ov-add-btn" id="addProjectTagBtn" aria-expanded="false" aria-controls="projectTagPicker">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                 Add
                             </button>
+                        </div>
+                        <div class="ov-picker tag-input-wrapper" id="projectTagPicker" hidden>
+                            <input type="text" id="newProjectTagInput" class="form-input" placeholder="Find or create a tag…" autocomplete="off">
+                            <div class="tag-suggestions" id="projectTagSuggestions"></div>
+                        </div>
+                        <div class="tags-container" id="projectTags">
+                            <!-- Tags will be populated by JS -->
                         </div>
                     </div>
 
                     <!-- Assigned Contacts Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Assigned Contacts</h3>
-                        <div class="project-contacts-list" id="projectContacts">
-                            <!-- Contacts will be populated by JS -->
-                        </div>
-                        <div class="add-tag-form">
-                            <div class="tag-input-wrapper">
-                                <input type="text" id="newProjectContactInput" class="form-input" placeholder="Assign contact..." autocomplete="off">
-                                <div class="contact-suggestions" id="projectContactSuggestions"></div>
-                            </div>
-                            <button type="button" class="btn btn-secondary" id="addProjectContactBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                </svg>
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Assigned Contacts</h3>
+                            <button type="button" class="ov-add-btn" id="addProjectContactBtn" aria-expanded="false" aria-controls="projectContactPicker">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                 Add
                             </button>
                         </div>
+                        <div class="ov-picker tag-input-wrapper" id="projectContactPicker" hidden>
+                            <input type="text" id="newProjectContactInput" class="form-input" placeholder="Search contacts…" autocomplete="off">
+                            <div class="contact-suggestions" id="projectContactSuggestions"></div>
+                        </div>
+                        <div class="project-contacts-list" id="projectContacts">
+                            <!-- Contacts will be populated by JS -->
+                        </div>
                     </div>
 
-                    <!-- Project To-Dos Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Project To-Dos</h3>
-                        <div class="todo-list" id="projectTodosList">
-                            <!-- Project to-dos will be populated by JS -->
-                        </div>
-                        <div class="add-note-form">
-                            <button type="button" class="btn btn-secondary" id="addProjectTodoBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                </svg>
-                                New To-Do
+                    <!-- Project To-Dos Section: open ones only, one line each
+                         until opened. -->
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">To-Dos</h3>
+                            <button type="button" class="ov-add-btn" id="addProjectTodoBtn">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                New
                             </button>
+                        </div>
+                        <div class="ptodo-list" id="projectTodosList">
+                            <!-- Project to-dos will be populated by JS -->
                         </div>
                     </div>
 
                     <!-- Project Documents Section (assets/js/documents.js).
                          Dragging files over the sheet shows one drop target
                          per label, so a file is labelled as it is added. -->
-                    <div class="overview-section" id="projectDocuments">
+                    <div class="overview-section ov-section" id="projectDocuments">
                         <h3 class="overview-section-title">
                             Documents
                             <span class="pdoc-count" id="projectDocumentsCount" hidden></span>
@@ -1938,35 +1882,118 @@ function assetUrl(string $path): string
                     </div>
 
                     <!-- Project Notes Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Project Notes</h3>
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Notes</h3>
+                            <button type="button" class="ov-add-btn" id="openProjectNoteFormBtn" aria-expanded="false" aria-controls="projectNoteForm">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                Add note
+                            </button>
+                        </div>
+                        <div class="add-note-form ov-note-form" id="projectNoteForm" hidden>
+                            <textarea id="newProjectNoteContent" class="form-input" placeholder="Write a note…" rows="3"></textarea>
+                            <div class="ov-note-form-actions">
+                                <button type="button" class="btn btn-secondary btn-small" id="cancelProjectNoteBtn">Cancel</button>
+                                <button type="button" class="btn btn-primary btn-small" id="addProjectNoteBtn">Add Note</button>
+                            </div>
+                        </div>
                         <div class="notes-timeline" id="projectNotesTimeline">
                             <!-- Project notes will be populated by JS -->
                         </div>
-                        <div class="add-note-form">
-                            <textarea id="newProjectNoteContent" class="form-input" placeholder="Add a note..." rows="3"></textarea>
-                            <button type="button" class="btn btn-primary" id="addProjectNoteBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                                </svg>
-                                Add Note
-                            </button>
-                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="closeProjectOverviewBtn">Close</button>
-                    <button type="button" class="btn btn-danger" id="deleteProjectOverviewBtn">
+                <div class="modal-footer ov-footer">
+                    <button type="button" class="btn btn-secondary ov-delete-btn" id="deleteProjectOverviewBtn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                         </svg>
                         Delete
                     </button>
-                    <button type="button" class="btn btn-secondary" id="editProjectBtn">
+                    <button type="button" class="btn btn-secondary" id="editProjectBtn" data-ov="view">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                         </svg>
-                        Edit Project
+                        Edit
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="cancelProjectEditBtn" data-ov="edit">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveProjectEditBtn" data-ov="edit">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- To-Do Detail Sheet: what a to-do is about - its facts, its
+             description and its links (mostly Google Drive documents).
+             Editing opens the to-do form on top of it. -->
+        <div class="modal" id="todoDetailModal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="overview-title-info">
+                            <h2 id="todoDetailTitle">To-Do</h2>
+                            <p class="overview-company" id="todoDetailContext"></p>
+                            <p class="overview-edited" id="todoDetailEdited"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" id="closeTodoDetail">&times;</button>
+                </div>
+                <div class="modal-body overview-body">
+                    <div id="todoDetailAssignee"></div>
+
+                    <div class="overview-section">
+                        <div class="overview-details">
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Status</span>
+                                <span class="detail-value" id="todoDetailStatus"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Due</span>
+                                <span class="detail-value" id="todoDetailDue"></span>
+                            </div>
+                            <div class="overview-detail-item">
+                                <span class="detail-label">Priority</span>
+                                <span class="detail-value" id="todoDetailPriority"></span>
+                            </div>
+                            <div class="overview-detail-item full-width">
+                                <span class="detail-label">Description</span>
+                                <span class="detail-value tdetail-description" id="todoDetailDescription"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Links</h3>
+                            <button type="button" class="ov-add-btn" id="addTodoLinkBtn" aria-expanded="false" aria-controls="todoLinkForm">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                Add
+                            </button>
+                        </div>
+                        <form class="tlink-form" id="todoLinkForm" hidden novalidate>
+                            <input type="url" id="todoLinkUrl" class="form-input" placeholder="Paste a Google Drive link…" autocomplete="off" aria-label="Link">
+                            <input type="text" id="todoLinkTitle" class="form-input" placeholder="Name (optional)" maxlength="255" autocomplete="off" aria-label="Name">
+                            <p class="tlink-form-hint">Leave the name empty and it is read from Google, where the document is shared by link.</p>
+                            <div class="ov-note-form-actions">
+                                <button type="button" class="btn btn-secondary btn-small" id="cancelTodoLinkBtn">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-small" id="saveTodoLinkBtn">Add link</button>
+                            </div>
+                        </form>
+                        <div class="tlink-list" id="todoLinksList"></div>
+                    </div>
+                </div>
+                <div class="modal-footer ov-footer">
+                    <button type="button" class="btn btn-secondary ov-delete-btn" id="deleteTodoDetailBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                        Delete
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="toggleTodoDetailDoneBtn">Mark as done</button>
+                    <button type="button" class="btn btn-secondary" id="editTodoDetailBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                        Edit
                     </button>
                 </div>
             </div>
@@ -2238,6 +2265,7 @@ function assetUrl(string $path): string
         <meta name="current-user" content="<?= htmlspecialchars($currentUser['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
         <meta name="current-user-id" content="<?= htmlspecialchars((string) ($currentUser['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
         <meta name="current-user-role" content="<?= $isAdmin ? 'admin' : 'member' ?>">
+        <meta name="claude-actor-name" content="<?= htmlspecialchars(MCP_ACTOR_NAME, ENT_QUOTES, 'UTF-8') ?>">
 
         <!-- Leaflet JS -->
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -2248,6 +2276,7 @@ function assetUrl(string $path): string
         <!-- Application JS -->
         <script src="<?= assetUrl('assets/js/charts.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>
