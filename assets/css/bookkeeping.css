@@ -112,6 +112,12 @@
     box-shadow: var(--shadow-md);
 }
 
+/* An image shown in the same dialog (a project document): fitted, never upscaled. */
+.bk-preview-image {
+    max-width: 100%;
+    height: auto;
+}
+
 .bk-pdf-preview-status {
     margin: auto 0;
     font-size: var(--font-size-sm);

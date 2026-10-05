@@ -18,6 +18,10 @@
  *   X-CRM-Signature: hex(HMAC-SHA256(secret, "CRM-MCP-V1\n{timestamp}\n{nonce}\n{hex(SHA256(body))}"))
  *   body: base64( JSON {"action": "...", "params": {...}} )
  *
+ * The answer is JSON {"ok": ..., "data" | "error": ...} - except for the one
+ * action that hands over a project document, which answers with the file's
+ * bytes as application/octet-stream.
+ *
  * The base64 layer is there for the same reason as the contact form's payload
  * encoding: shared-hosting web application firewalls inspect JSON bodies and
  * block ordinary CRM text as if it were an attack.
@@ -68,6 +72,9 @@ Auth::actAs(null, MCP_ACTOR_NAME);
 
 try {
     $data = (new McpService())->handle($action, $params);
+    if ($data instanceof McpFile) {
+        mcpSendFile($data);
+    }
     mcpRespond(200, ['ok' => true, 'data' => $data]);
 } catch (ReviewException $e) {
     mcpRespond($e->status(), ['ok' => false, 'error' => $e->getMessage()]);
@@ -81,5 +88,26 @@ function mcpRespond(int $status, array $payload): void
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+/**
+ * Answer with a stored file's bytes instead of JSON.
+ *
+ * Streamed from disk, so a 25 MB document costs no memory here. The content
+ * type is deliberately the opaque one: the MCP server already knows what the
+ * file is from the document's details, and nothing else may call this.
+ */
+function mcpSendFile(McpFile $file): void
+{
+    // Anything still buffered would be sent ahead of the file and corrupt it.
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
+    http_response_code(200);
+    header('Content-Type: application/octet-stream');
+    header('Content-Length: ' . filesize($file->path));
+    readfile($file->path);
     exit;
 }

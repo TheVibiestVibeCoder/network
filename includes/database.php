@@ -261,6 +261,30 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_project ON project_tags(project_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_tags_tag ON project_tags(tag_id)");
 
+        // Create project_documents table: files attached to a project, each
+        // under one label (see includes/ProjectDocument.php). Only the row
+        // lives here - the file itself sits in DATA_DIR/project_documents
+        // under a generated name. review_status works as on the other
+        // tables: 'pending' for a file that arrived through the MCP API and
+        // has not been accepted yet, NULL for an ordinary one.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                label VARCHAR(32) NOT NULL,
+                original_name VARCHAR(255) NOT NULL,
+                stored_name VARCHAR(255) NOT NULL,
+                mime_type VARCHAR(127) NOT NULL,
+                file_size INTEGER NOT NULL DEFAULT 0,
+                uploaded_by INTEGER,
+                uploaded_by_name VARCHAR(255),
+                review_status VARCHAR(16),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_documents_project ON project_documents(project_id, created_at)");
+
         // Create todos table (can belong to a contact or a project)
         $db->exec("
             CREATE TABLE IF NOT EXISTS todos (

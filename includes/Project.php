@@ -16,6 +16,10 @@ if (!defined('APP_ROOT')) {
     exit;
 }
 
+// Deleting a project has to take its documents' files along, wherever the
+// delete is called from.
+require_once APP_ROOT . '/includes/ProjectDocument.php';
+
 class Project
 {
     private PDO $db;
@@ -180,8 +184,18 @@ class Project
      */
     public function delete(int $id): bool
     {
+        // The document rows go with the project (ON DELETE CASCADE); their
+        // files are removed here, and only once the project is really gone.
+        $files = ProjectDocument::filesOfProject($id);
+
         $stmt = $this->db->prepare("DELETE FROM projects WHERE id = :id");
-        return $stmt->execute(['id' => $id]);
+        $deleted = $stmt->execute(['id' => $id]);
+
+        if ($deleted) {
+            ProjectDocument::removeFiles($files);
+        }
+
+        return $deleted;
     }
 
     /**

@@ -5327,3 +5327,421 @@ details.import-instructions p {
     width: auto;
     justify-content: flex-end;
 }
+
+
+/* --------------------------------------------------------------------------
+   30. Project documents
+   --------------------------------------------------------------------------
+   The files attached to a project, in its detail sheet. One row per file, in
+   the same kind of card the other lists use: the name, and under it what the
+   file is. The label there is a small select, so it says what the file is and
+   changes it in one place. A file dragged over the sheet covers it with one
+   drop target per label, so it is labelled by where it is let go.
+   -------------------------------------------------------------------------- */
+
+/* One hue per label, by its position in the list (Angebot, Hintergrund,
+   Rechnung) and borrowed from the pipeline, so no new colour enters the
+   palette: amber for an offer, slate for background, green for an invoice.
+   The name is always written next to the dot - colour is never the only
+   signal - and a label added later simply gets the neutral dot. */
+:is(.pdoc-label, .pdoc-chip, .pdoc-drop-target)[data-label-index="0"] { --pdoc-hue: var(--stage-proposal); }
+:is(.pdoc-label, .pdoc-chip, .pdoc-drop-target)[data-label-index="1"] { --pdoc-hue: var(--stage-lead); }
+:is(.pdoc-label, .pdoc-chip, .pdoc-drop-target)[data-label-index="2"] { --pdoc-hue: var(--stage-complete); }
+
+.pdoc-count {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.pdoc-count[hidden] {
+    display: none;
+}
+
+/* ---- The list ---- */
+
+.pdoc-list {
+    margin-bottom: 12px;
+}
+
+.pdoc-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.pdoc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--c-line-2);
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.pdoc-item:last-child {
+    border-bottom: 0;
+}
+
+.pdoc-item:hover {
+    background: var(--c-tint-3);
+}
+
+/* What kind of file it is, written out: the extension says more at a glance
+   than one more document icon. */
+.pdoc-type {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+    font: 600 10px/1 var(--font);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.pdoc-item:hover .pdoc-type,
+.pdoc-item.is-proposed .pdoc-type {
+    background: var(--c-tint-2);
+}
+
+/* Two lines: the name, then what it is - its label first, the details after. */
+.pdoc-info {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pdoc-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-base);
+    font-weight: 500;
+    color: var(--c-ink);
+    text-decoration: none;
+}
+
+.pdoc-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.pdoc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 5px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+/* Size, who added it, when - separated by a dot, as on the other rows. */
+.pdoc-meta-part + .pdoc-meta-part::before {
+    content: "·";
+    margin-right: 5px;
+}
+
+@media (max-width: 480px) {
+    /* A phone has room for the label and one detail next to it. The date is
+       the one that tells two versions of a file apart. */
+    .pdoc-meta-size,
+    .pdoc-meta-who {
+        display: none;
+    }
+
+    .pdoc-meta-part + .pdoc-meta-part::before {
+        content: none;
+    }
+}
+
+.pdoc-tools {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 4px;
+}
+
+/* ---- The label: a pill that is also the control ---- */
+
+.pdoc-label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 3px;
+}
+
+.pdoc-label::before,
+.pdoc-chip::before,
+.pdoc-dot {
+    content: "";
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--pdoc-hue, var(--c-ink-4));
+}
+
+.pdoc-label::before {
+    position: absolute;
+    left: 9px;
+    width: 7px;
+    height: 7px;
+    pointer-events: none;
+}
+
+.pdoc-label-select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 24px;
+    max-width: 150px;
+    padding: 0 23px 0 22px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background-color: var(--c-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235E7190' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    color: var(--c-ink-2);
+    font: 500 var(--t-xs)/1 var(--font);
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+:root[data-theme="dark"] .pdoc-label-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393A2B8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.pdoc-label-select:hover {
+    border-color: var(--c-line-strong);
+    color: var(--c-ink);
+}
+
+.pdoc-label-select:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.pdoc-label-select:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* ---- Download and delete: always there, but quiet ----
+   Unlike a note's delete button these do not wait for the pointer: getting
+   the file is what a file list is for, and hiding the icons left a hole at
+   the end of every row. */
+
+.pdoc-act {
+    width: 30px;
+    height: 30px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-4);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.pdoc-item:hover .pdoc-act {
+    color: var(--c-ink-3);
+}
+
+.pdoc-act:hover,
+.pdoc-item:hover .pdoc-act:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+.pdoc-act--danger:hover,
+.pdoc-item:hover .pdoc-act--danger:hover {
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.pdoc-act:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+    color: var(--c-ink);
+}
+
+/* ---- Adding: one quiet strip, a button per label ---- */
+
+.pdoc-add {
+    padding: 12px 14px;
+    background: var(--c-tint-3);
+    border: 1.5px dashed var(--c-line-strong);
+    border-radius: var(--r-lg);
+    transition: opacity var(--dur-1) var(--ease);
+}
+
+.pdoc-add:empty {
+    display: none;
+}
+
+#projectDocuments.is-busy .pdoc-add {
+    opacity: 0.6;
+}
+
+.pdoc-add-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.pdoc-add-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.pdoc-add-text svg {
+    flex-shrink: 0;
+    color: var(--c-ink-4);
+}
+
+.pdoc-add-labels {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pdoc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 12px 0 10px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.pdoc-chip::before {
+    width: 7px;
+    height: 7px;
+}
+
+.pdoc-chip:hover:not(:disabled) {
+    border-color: var(--c-line-strong);
+    box-shadow: var(--e-1);
+}
+
+.pdoc-chip:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.pdoc-chip:disabled {
+    cursor: default;
+}
+
+.pdoc-add-hint {
+    margin: 8px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+/* ---- Dragging files over the sheet ---- */
+
+.pdoc-drop {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    /* Frosted rather than a faint tint, so the targets never sit on top of
+       the sheet's text - the same language as the CSV overlay in Bookkeeping. */
+    background: color-mix(in srgb, var(--c-surface) 93%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border-radius: inherit;
+}
+
+.pdoc-drop[hidden] {
+    display: none;
+}
+
+.pdoc-drop-title {
+    margin: 2px 2px 0;
+    font-size: var(--t-md);
+    font-weight: 500;
+    color: var(--c-ink-2);
+    /* Only the targets take the drop. */
+    pointer-events: none;
+}
+
+.pdoc-drop-title strong {
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.pdoc-drop-targets {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pdoc-drop-target {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    border: 2px dashed var(--c-line-strong);
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+
+/* The text and the dot must not become the drag's target themselves. */
+.pdoc-drop-target > * {
+    pointer-events: none;
+}
+
+.pdoc-drop-target.is-over {
+    border-color: var(--c-accent);
+    background: color-mix(in srgb, var(--c-accent) 9%, var(--c-surface));
+}
+
+.pdoc-dot {
+    width: 10px;
+    height: 10px;
+}

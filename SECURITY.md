@@ -27,6 +27,7 @@ is part of "working correctly", not optional polish.
    https://your-domain/.env
    https://your-domain/data/crm.db
    https://your-domain/data/bookkeeping_pdfs/
+   https://your-domain/data/project_documents/
    https://your-domain/config/config.php
    https://your-domain/includes/auth.php
    https://your-domain/.git/config
@@ -60,7 +61,7 @@ setup keeps secrets and data in a folder the web server has no URL for at all:
 /home/you/
 ├── crm-private/          <- not reachable from the web
 │   ├── .env
-│   ├── data/             <- crm.db, bookkeeping_pdfs/, avatars/
+│   ├── data/             <- crm.db, bookkeeping_pdfs/, project_documents/, avatars/
 │   └── logs/             <- php-error.log, created automatically
 └── your-web-root/        <- the app
 ```
@@ -84,8 +85,8 @@ Moving an existing install:
 3. Move `.env` into `crm-private/`.
 4. Test (sign in, open an invoice PDF, create and delete a contact). If
    anything is wrong, move `.env` back - the old data is still in place.
-5. Delete `crm.db*`, `bookkeeping_pdfs/` and `avatars/` from the web root's
-   `data/`. Keep its `.htaccess`.
+5. Delete `crm.db*`, `bookkeeping_pdfs/`, `project_documents/` and `avatars/`
+   from the web root's `data/`. Keep its `.htaccess`.
 
 A step-by-step walkthrough for cPanel is in `db_migration_to_do.md`.
 
@@ -120,11 +121,21 @@ listing the drop zone and putting invoice PDFs into it: Claude cannot read
 bank entries or invoices, and filing an invoice on its entry is left to a
 person (doing so also accepts the upload).
 
+Project documents are the deliberate exception to "cannot read files": they
+are attached to a project so that whoever works on it has the context, and
+that includes Claude. Through the API it can list a project's documents and
+fetch one (`projects.document_file` answers with the file's bytes instead of
+JSON; the MCP server turns them into text for Claude). So anything attached to
+a project - also an invoice filed there under "Rechnung" - is readable by
+Claude, while the invoices in Bookkeeping are not. Adding a document through
+the API is a write like any other: it arrives as a proposal.
+
 **Human in the loop.** Nothing written through the API is settled:
 
-- A new contact, project, to-do, note or invoice PDF is stored with
-  `review_status = 'pending'`. It shows up in the CRM marked "Claude", can be
-  edited with the normal forms, and is deleted if rejected.
+- A new contact, project, to-do, note, invoice PDF or project document is
+  stored with `review_status = 'pending'`. It shows up in the CRM marked
+  "Claude", can be edited with the normal forms, and is deleted if rejected -
+  for a file, together with the file.
 - A change to an existing record (fields, links, tags, assignment, deletion)
   is not written at all. It waits in `review_items` with
   the proposed values and a snapshot of what was there, until somebody accepts.
@@ -138,10 +149,11 @@ Every signed-in user may accept, edit or reject ("From Claude" in the sidebar,
 or the buttons on a proposed record). `api/review.php` requires a session and
 the CSRF token like every other endpoint.
 
-**Prompt injection.** Text in the CRM (notes, imported rows) reaches Claude.
-Someone who can write into the CRM could try to steer Claude with it. The
-review queue is the answer: whatever Claude is talked into, it can only
-propose, and a person decides.
+**Prompt injection.** Text in the CRM (notes, imported rows, and now the
+content of project documents - which often come from outside: a client's
+briefing, a forwarded PDF) reaches Claude. Someone who can get text into the
+CRM could try to steer Claude with it. The review queue is the answer:
+whatever Claude is talked into, it can only propose, and a person decides.
 
 **Where the key lives.** `MCP_API_SECRET` sits in `.env` here (outside the web
 root when `crm-private/` is used) and in the MCP server's `.env`. Rotate it by
@@ -272,7 +284,7 @@ level of access - see the trade-off note below about all members seeing all data
 | CSRF tokens | `Auth::validateCsrfToken()` | Cross-site state changes; required on POST/PUT/PATCH/DELETE |
 | Login lockout | `login_attempts` table | Password brute force (per IP) |
 | CSP + output escaping | `Auth::sendSecurityHeaders()`, `escapeHtml()` | Stored XSS from contact/company/tag/file names |
-| Upload validation | `api/bookkeeping.php`, `api/import-export.php` | Web shells uploaded as invoices or spreadsheets |
+| Upload validation | `api/bookkeeping.php`, `api/import-export.php`, `includes/ProjectDocument.php` | Web shells uploaded as invoices, spreadsheets or project documents |
 | Image re-encoding | `api/profile.php` | Polyglot files, EXIF leakage and decompression bombs in profile pictures |
 | Role gate | `Auth::requireAdmin()` | Non-admins reaching `api/users.php` |
 | Type whitelist | `api/assign.php` | A caller choosing which table an assignment writes to |
@@ -297,6 +309,32 @@ caller's own identity, so it cannot be aimed at another account.
 Profile pictures need the PHP **GD** extension. Without it the upload returns a
 clear message and everything else keeps working - people just keep their
 initials.
+
+## Project documents
+
+Files attached to a project (`includes/ProjectDocument.php`,
+`api/documents.php`) are stored as they arrive - they are documents, not
+pictures to redraw - so the safety comes from never taking an upload's word
+for what it is:
+
+- **A short list of types.** PDF, Word, Excel, PowerPoint, plain text
+  (`txt`, `md`, `csv`) and images (`png`, `jpg`, `webp`, `gif`). No HTML, no
+  SVG, no scripts, no archives. The extension picks the rule and the content
+  has to satisfy it; the content type a browser claimed is never looked at.
+- **A generated name.** A file is stored as `<date>_<random>.<extension>` in
+  `data/project_documents/`, with the extension taken from the list above. The
+  name it was uploaded under is only ever a label in the database.
+- **Out of the web server's reach.** The folder is denied like the invoice
+  folder, and lies outside the web root when `crm-private/` is used.
+- **Served as a download.** A file leaves through `api/documents.php` after a
+  session check, with the content type from the list, `nosniff`, and a CSP that
+  sandboxes it. Only PDFs and images are ever shown in place, and only when the
+  preview asks for it - a browser never renders an uploaded Word or text file.
+
+Deleting a document removes the row and then the file; deleting a project
+(or rejecting a project Claude proposed) removes the files of its documents
+too. A browser upload may be as large as the server allows, up to 25 MB;
+through the MCP API the limit is 10 MB.
 
 ## nginx
 
@@ -357,8 +395,9 @@ server {
 `try_files $uri =404;` in the PHP location is important: without it, nginx can
 be tricked into executing an uploaded file that is not a `.php` script.
 
-The `^/(data|includes|config|vendor)/` rule already covers the invoice store and
-`data/avatars/`, so uploaded files stay reachable only through their endpoints.
+The `^/(data|includes|config|vendor)/` rule already covers the invoice store,
+`data/project_documents/` and `data/avatars/`, so uploaded files stay reachable
+only through their endpoints.
 
 ## Known trade-offs
 

@@ -8,8 +8,9 @@
  *     lists in the CRM, with accept and reject at the end of the row and the
  *     details (before/after, Claude's note, edit) one click away; plus a
  *     history of what was decided and by whom;
- *   - the small "Claude" marks and accept/reject buttons that app.js and
- *     bookkeeping.js put on proposed records where they are listed;
+ *   - the small "Claude" marks and accept/reject buttons that app.js,
+ *     bookkeeping.js and documents.js put on proposed records where they are
+ *     listed;
  *   - the box in a contact's or project's detail view listing the open
  *     proposals about it.
  *
@@ -32,7 +33,8 @@
         todo: 'to-do',
         contact_note: 'note',
         project_note: 'project note',
-        bookkeeping_pdf: 'invoice'
+        bookkeeping_pdf: 'invoice',
+        project_document: 'document'
     };
 
     const FIELD_LABEL = {
@@ -250,6 +252,8 @@
                 return r.project_name || label.split(':')[0];
             case 'bookkeeping_pdf':
                 return r.original_name || label;
+            case 'project_document':
+                return r.original_name || (item.payload || {}).name || label;
             default:
                 return label;
         }
@@ -274,6 +278,11 @@
                     case 'contact_note':
                     case 'project_note': return excerpt(s.content);
                     case 'bookkeeping_pdf': return joinParts([formatBytes(r.file_size || p.size), 'Bookkeeping drop zone']);
+                    case 'project_document': return joinParts([
+                        s.label,
+                        formatBytes(r.file_size || p.size),
+                        r.project_name ? 'Project ' + r.project_name : ''
+                    ]);
                     default: return '';
                 }
             case 'update':
@@ -316,6 +325,11 @@
         return `<a class="review-link" href="api/bookkeeping.php?action=download-pdf&id=${encodeURIComponent(pdfId)}" target="_blank" rel="noopener">${escapeHtml(label || 'View PDF')}</a>`;
     }
 
+    /** A project document: PDFs and images open in the tab, anything else downloads. */
+    function documentLink(documentId) {
+        return `<a class="review-link" href="api/documents.php?action=download&id=${encodeURIComponent(documentId)}&inline=1" target="_blank" rel="noopener">View document</a>`;
+    }
+
     /** The details behind the row: every field, the before/after, the warnings. */
     function detailFor(item) {
         const s = source(item);
@@ -349,6 +363,11 @@
                 if (item.entity_type === 'bookkeeping_pdf') {
                     return item.record
                         ? `<p class="review-line">${pdfLink(item.entity_id)} <span class="review-muted">· Filing it on its bank entry accepts it too.</span></p>`
+                        : '';
+                }
+                if (item.entity_type === 'project_document') {
+                    return item.record
+                        ? `<p class="review-line">${documentLink(item.entity_id)} <span class="review-muted">· Attached to ${escapeHtml(r.project_name || 'the project')} as ${escapeHtml(r.label || '')}.</span></p>`
                         : '';
                 }
                 return '';
@@ -408,7 +427,7 @@
 
     function canOpen(item) {
         return !!item.record && item.status !== 'obsolete'
-            && ['contact', 'project', 'todo', 'contact_note', 'project_note', 'bookkeeping_pdf'].includes(item.entity_type);
+            && ['contact', 'project', 'todo', 'contact_note', 'project_note', 'bookkeeping_pdf', 'project_document'].includes(item.entity_type);
     }
 
     // ------------------------------------------------------------------
@@ -536,6 +555,7 @@
         { title: 'New to-dos', match: i => i.kind === 'create' && i.entity_type === 'todo' },
         { title: 'New notes', match: i => i.kind === 'create' && (i.entity_type === 'contact_note' || i.entity_type === 'project_note') },
         { title: 'Invoices', match: i => i.entity_type === 'bookkeeping_pdf' },
+        { title: 'Project documents', match: i => i.entity_type === 'project_document' },
         { title: 'Changes to existing records', match: () => true }
     ];
 
@@ -1018,7 +1038,9 @@
                 if (r.project_id && crm.openProjectOverview) return crm.openProjectOverview(r.project_id);
                 return null;
             case 'contact_note': return r.contact_id && crm.openOverview && crm.openOverview(r.contact_id);
-            case 'project_note': return r.project_id && crm.openProjectOverview && crm.openProjectOverview(r.project_id);
+            case 'project_note':
+            case 'project_document':
+                return r.project_id && crm.openProjectOverview && crm.openProjectOverview(r.project_id);
             case 'bookkeeping_pdf':
                 if (r.row_id && crm.openBookkeepingRow) return crm.openBookkeepingRow(r.row_id);
                 return crm.switchView && crm.switchView('bookkeeping');
@@ -1062,7 +1084,7 @@
         return `<span class="review-badge" title="Proposed by Claude - not accepted yet">${ICON_SPARK}<span>Awaiting review</span></span>`;
     }
 
-    /** Accept / reject buttons for a proposed note, to-do or invoice, where it is listed. */
+    /** Accept / reject buttons for a proposed note, to-do, invoice or document, where it is listed. */
     function inlineActions(entityType, id) {
         return `
             <span class="review-inline" data-review-inline-type="${escapeHtml(entityType)}" data-review-inline-id="${Number(id)}">
