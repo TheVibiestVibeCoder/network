@@ -6642,134 +6642,6 @@ details.import-instructions p {
    in the accent so it is seen first, and gone once acknowledged.
    -------------------------------------------------------------------------- */
 
-#workloadView .workload-news {
-    margin: 0 0 24px;
-    padding: 14px 14px 10px;
-    background: var(--c-accent-soft);
-    border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
-    border-radius: var(--r-lg);
-}
-
-.workload-news-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0 2px;
-}
-
-.workload-news-heading {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: var(--t-md);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--c-ink);
-}
-
-.workload-news-sub {
-    margin: 2px 2px 10px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.workload-news-dismiss {
-    height: 30px;
-    padding: 0 14px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-full);
-    background: var(--c-surface);
-    color: var(--c-ink);
-    font: 500 var(--t-sm)/1 var(--font);
-    cursor: pointer;
-    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
-}
-
-.workload-news-dismiss:hover:not(:disabled) {
-    border-color: var(--c-line-strong);
-    box-shadow: var(--e-1);
-}
-
-.workload-news-dismiss:focus-visible {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px var(--c-accent-soft);
-}
-
-.workload-news-list {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
-    overflow: hidden;
-}
-
-.workload-news-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 10px 14px;
-    border: 0;
-    border-bottom: 1px solid var(--c-line-2);
-    background: transparent;
-    text-align: left;
-    font: inherit;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease);
-}
-
-.workload-news-item:last-child {
-    border-bottom: 0;
-}
-
-.workload-news-item:hover {
-    background: var(--c-tint-3);
-}
-
-.workload-news-item:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 2px var(--c-accent);
-}
-
-.workload-news-dot {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: var(--c-accent);
-}
-
-.workload-news-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.workload-news-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--t-base);
-    font-weight: 600;
-    color: var(--c-ink);
-}
-
-.workload-news-meta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.workload-news-more {
-    margin: 8px 2px 2px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
 /* The same news in the lists below: a small tag after the title. */
 .workload-new {
     display: inline-flex;
@@ -7444,14 +7316,17 @@ details.import-instructions p {
     letter-spacing: -0.03em;
 }
 
-/* On your own page the greeting is enough; someone else's keeps their face. */
-#workloadView .workload-head.is-me .workload-person-face {
-    display: none;
+/* Your face (or the teammate's) beside the greeting, as tall as the
+   date line and the greeting together. */
+#workloadView .workload-person {
+    align-items: center;
+    gap: 16px;
 }
 
 #workloadView .workload-person-face {
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
 }
 
 #workloadView .workload-switch-label {
@@ -7516,112 +7391,6 @@ details.import-instructions p {
 
 #workloadView .home-week {
     margin-top: 10px;
-}
-
-/* ---- New for you: lighter, one line per item ---- */
-
-#workloadView .workload-news {
-    position: relative;
-    margin: 0 0 32px;
-    padding: 0;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-xl, 16px);
-    box-shadow: var(--e-1);
-    overflow: hidden;
-}
-
-/* An accent edge says "new" without tinting the whole box. */
-#workloadView .workload-news::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
-    background: var(--c-accent);
-}
-
-#workloadView .workload-news-head {
-    padding: 14px 18px 0 22px;
-}
-
-#workloadView .workload-news-heading {
-    font-size: var(--t-base);
-}
-
-#workloadView .workload-news-heading .workload-count {
-    border: 0;
-    background: var(--c-accent-soft);
-    color: var(--c-accent-2);
-    border-radius: var(--r-full);
-}
-
-#workloadView .workload-news-sub {
-    margin: 2px 18px 8px 22px;
-    font-size: var(--t-xs);
-}
-
-#workloadView .workload-news-dismiss {
-    height: 28px;
-    padding: 0 12px;
-    border-color: transparent;
-    background: transparent;
-    color: var(--c-accent-2);
-}
-
-#workloadView .workload-news-dismiss:hover:not(:disabled) {
-    background: var(--c-accent-soft);
-    box-shadow: none;
-}
-
-#workloadView .workload-news-list {
-    border: 0;
-    border-top: 1px solid var(--c-line-2);
-    border-radius: 0;
-    background: transparent;
-}
-
-#workloadView .workload-news-item {
-    padding: 9px 18px 9px 22px;
-}
-
-#workloadView .workload-news-body {
-    flex: 1;
-    flex-direction: row;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-#workloadView .workload-news-title {
-    font-size: var(--t-sm);
-}
-
-#workloadView .workload-news-meta {
-    flex-shrink: 1;
-    font-size: var(--t-xs);
-    text-align: right;
-}
-
-#workloadView .workload-news-more {
-    margin: 0;
-    padding: 8px 22px 12px;
-    font-size: var(--t-xs);
-}
-
-@media (max-width: 700px) {
-    #workloadView .workload-news-body {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 2px;
-        min-width: 0;
-    }
-
-    #workloadView .workload-news-title,
-    #workloadView .workload-news-meta {
-        display: block;
-        max-width: 100%;
-        text-align: left;
-    }
 }
 
 /* ---- Sections: a quiet heading over a clean list ---- */
@@ -7991,4 +7760,149 @@ details.import-instructions p {
     #workloadView .home-stat-visual {
         height: 38px;
     }
+}
+
+
+/* --------------------------------------------------------------------------
+   40. Home: new for you, as one of the sections
+   --------------------------------------------------------------------------
+   The same heading and list card as everything below it. Each row carries
+   the colour and icon of what it is - a to-do, a project, a contact, a
+   bookkeeping row - and who handed it over, and when, on the right.
+   -------------------------------------------------------------------------- */
+
+#workloadView .workload-section.is-news {
+    --wl-type: var(--c-accent);
+}
+
+#workloadView .workload-news-row.is-todo { --wl-type: var(--type-todo); }
+#workloadView .workload-news-row.is-project { --wl-type: var(--type-project); }
+#workloadView .workload-news-row.is-contact { --wl-type: var(--type-contact); }
+#workloadView .workload-news-row.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
+
+#workloadView .is-news .workload-section-head {
+    align-items: center;
+}
+
+/* "Got it": the section's one action, quiet, on the right. */
+.workload-news-dismiss {
+    margin-left: auto;
+    height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-accent-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.workload-news-dismiss:hover:not(:disabled) {
+    background: var(--c-accent-soft);
+}
+
+.workload-news-dismiss:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+#workloadView .workload-news-row .workload-row-mark.is-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-md);
+}
+
+#workloadView .workload-news-row .workload-row-body {
+    min-width: 0;
+}
+
+#workloadView .workload-news-row .workload-row-title,
+#workloadView .workload-news-row .workload-row-context {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workload-news-from {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.workload-news-more {
+    margin: 8px 4px 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 600px) {
+    /* On a phone, who and when move under the title. */
+    #workloadView .workload-news-row .workload-row-meta {
+        display: none;
+    }
+}
+
+.workload-news-phone {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .workload-news-phone {
+        display: inline;
+    }
+}
+
+/* ---- New for you: one card with an accent border, so it stands out ---- */
+
+#workloadView .workload-section.is-news {
+    padding: 12px 0 0;
+    background: var(--c-surface);
+    border: 1.5px solid color-mix(in srgb, var(--c-accent) 55%, transparent);
+    border-radius: var(--r-xl, 16px);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 8%, transparent), var(--e-1);
+    overflow: hidden;
+}
+
+#workloadView .is-news .workload-section-head {
+    margin: 0;
+    padding: 0 12px 10px 18px;
+}
+
+#workloadView .is-news .workload-section-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+/* The rows sit straight in the card: no second outline inside it. */
+#workloadView .is-news .workload-list {
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#workloadView .is-news .workload-news-more {
+    margin: 0;
+    padding: 8px 18px 12px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+/* The border in the full accent, so it reads in both themes. */
+#workloadView .workload-section.is-news {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 12%, transparent), var(--e-1);
+}
+
+/* On someone else's page the line above the name is a summary, not a date:
+   normal case, so it reads as a sentence. */
+#workloadView .workload-head:not(.is-me) .workload-subtitle {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
 }

@@ -1437,6 +1437,12 @@
             btn.classList.toggle('active', btn.dataset.view === view);
         });
 
+        // On Home, the sidebar lights the teammate whose work is shown
+        // instead of Home itself (workload.js).
+        if (window.CRMWorkload && window.CRMWorkload.syncNav) {
+            window.CRMWorkload.syncNav(view);
+        }
+
         // Update view panels
         if (elements.workloadView) {
             elements.workloadView.classList.toggle('active', view === 'workload');

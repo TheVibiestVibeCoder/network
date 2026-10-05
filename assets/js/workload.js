@@ -457,36 +457,38 @@
         if (!news || !news.items || news.items.length === 0) return '';
 
         const rows = news.items.map(item => {
+            const type = NEWS_LABELS[item.type] ? item.type : 'todo';
             const by = item.assigned_by_name ? `from ${escapeHtml(item.assigned_by_name)}` : '';
             const when = describeWhen(item.assigned_at);
-            const meta = [escapeHtml(NEWS_LABELS[item.type] || ''), item.context ? escapeHtml(item.context) : '', by, when]
-                .filter(Boolean).join(' · ');
+            const from = [by, when].filter(Boolean).join(' · ');
+            const context = [escapeHtml(NEWS_LABELS[type]), item.context ? escapeHtml(item.context) : ''].filter(Boolean).join(' · ');
+            // On a phone the right-hand side is hidden; who and when join the line under the title.
+            const phoneFrom = from ? `<span class="workload-news-phone"> · ${from}</span>` : '';
 
             return `
-                <button type="button" class="workload-news-item" data-workload-open="${escapeHtml(item.type)}" data-id="${item.id}">
-                    <span class="workload-news-dot" aria-hidden="true"></span>
-                    <span class="workload-news-body">
-                        <span class="workload-news-title">${escapeHtml(item.title)}</span>
-                        <span class="workload-news-meta">${meta}</span>
+                <button type="button" class="workload-row workload-news-row is-${type}" data-workload-open="${type}" data-id="${item.id}">
+                    <span class="workload-row-mark is-icon">${TYPE_ICONS[type]}</span>
+                    <span class="workload-row-body">
+                        <span class="workload-row-title">${escapeHtml(item.title)}</span>
+                        <span class="workload-row-context">${context}${phoneFrom}</span>
                     </span>
+                    <span class="workload-row-meta"><span class="workload-news-from">${from}</span></span>
                 </button>`;
         }).join('');
 
         const more = news.total > news.items.length
             ? `<p class="workload-news-more">and ${news.total - news.items.length} more</p>`
             : '';
-        const count = news.total;
 
         return `
-            <section class="workload-news" aria-label="New for you">
-                <div class="workload-news-head">
-                    <span class="workload-news-heading">
-                        New for you <span class="workload-count">${count}</span>
-                    </span>
+            <section class="workload-section is-news" aria-label="New for you">
+                <div class="workload-section-head" title="Assigned to you since you last looked">
+                    <span class="workload-section-icon" aria-hidden="true">${ICON_NEW}</span>
+                    <span class="workload-section-title">New for you</span>
+                    <span class="workload-count">${news.total}</span>
                     <button type="button" class="workload-news-dismiss" data-workload-news-seen>Got it</button>
                 </div>
-                <p class="workload-news-sub">Assigned to you since you last looked.</p>
-                <div class="workload-news-list">${rows}</div>
+                <div class="workload-list">${rows}</div>
                 ${more}
             </section>`;
     }
@@ -649,6 +651,9 @@
             </div>
         `;
     }
+
+    // "New for you": a bell.
+    const ICON_NEW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>';
 
     // The section icons: one per kind of thing.
     const TYPE_ICONS = {
@@ -847,6 +852,7 @@
             state.loaded = true;
 
             render();
+            syncNav();
         } catch (error) {
             els.body.innerHTML = `<div class="workload-empty"><p class="workload-empty-text">${escapeHtml(error.message)}</p></div>`;
         }
@@ -939,6 +945,35 @@
     async function refreshTeam() {
         await loadCounts();
         renderTeam();
+        syncNav();
+    }
+
+    /**
+     * Which sidebar entry is lit: Home on your own page, the teammate when
+     * you are looking at theirs. app.js calls this on every view change.
+     */
+    let shownView = 'workload';
+    function syncNav(view) {
+        if (view) shownView = view;
+
+        const onHome = shownView === 'workload';
+        const meKey = window.CRMPeople && window.CRMPeople.meKey ? window.CRMPeople.meKey() : null;
+        const who = String(state.who);
+        const teammate = onHome && who !== 'me' && who !== meKey
+            ? document.querySelector('[data-team-person="' + (window.CSS && CSS.escape ? CSS.escape(who) : who) + '"]')
+            : null;
+
+        document.querySelectorAll('[data-team-person]').forEach(item => {
+            item.classList.toggle('active', item === teammate);
+            if (item === teammate) item.setAttribute('aria-current', 'page');
+            else item.removeAttribute('aria-current');
+        });
+
+        // Home stays lit for your own page and for "Unassigned", which has
+        // no entry of its own in the sidebar.
+        document.querySelectorAll('.toggle-btn[data-view="workload"]').forEach(btn => {
+            btn.classList.toggle('active', onHome && !teammate);
+        });
     }
 
     /**
@@ -1178,6 +1213,7 @@
         open: open,
         load: load,
         refresh: () => load(null, true),
+        syncNav: syncNav,
         refreshBadge: refreshBadge
     };
 })();

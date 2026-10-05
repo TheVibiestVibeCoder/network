@@ -130,6 +130,27 @@ class AssignmentFeed
      *
      * @return array{title: string, context: ?string}|null
      */
+    /**
+     * A bank entry in words, as the home page's Bookkeeping list shows it:
+     * its first three filled columns ("28.09.2026 · Alpenblick · 9600,00").
+     */
+    private static function bookkeepingSummary(PDO $db, string $json, string $date): string
+    {
+        $data = json_decode($json, true);
+        $parts = [];
+        if (is_array($data)) {
+            $columns = $db->query('SELECT name FROM bookkeeping_columns ORDER BY position, id')->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($columns as $column) {
+                $value = trim((string) ($data[$column] ?? ''));
+                if ($value !== '' && count($parts) < 3) {
+                    $parts[] = $value;
+                }
+            }
+        }
+
+        return $parts ? implode(' · ', $parts) : ('Bank entry' . ($date !== '' ? ' · ' . $date : ''));
+    }
+
     private static function currentRecord(PDO $db, string $type, int $id, int $person): ?array
     {
         switch ($type) {
@@ -150,7 +171,7 @@ class AssignmentFeed
                 $stmt = $db->prepare("SELECT name AS title, assigned_to, review_status, company AS context FROM contacts WHERE id = :id");
                 break;
             case 'bookkeeping':
-                $stmt = $db->prepare("SELECT row_date AS title, assigned_to, NULL AS context FROM bookkeeping_rows WHERE id = :id");
+                $stmt = $db->prepare("SELECT row_date AS title, data, assigned_to, 'PDF missing' AS context FROM bookkeeping_rows WHERE id = :id");
                 break;
             default:
                 return null;
@@ -168,7 +189,7 @@ class AssignmentFeed
 
         $title = (string) $row['title'];
         if ($type === 'bookkeeping') {
-            $title = 'Bookkeeping row' . ($title !== '' ? ' · ' . $title : '');
+            $title = self::bookkeepingSummary($db, (string) ($row['data'] ?? ''), $title);
         }
 
         return ['title' => $title, 'context' => $row['context'] ?? null];
