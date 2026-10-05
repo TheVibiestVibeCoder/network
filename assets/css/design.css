@@ -7906,3 +7906,22 @@ details.import-instructions p {
     letter-spacing: 0;
     text-transform: none;
 }
+
+
+/* --------------------------------------------------------------------------
+   41. Sidebar labels: room for descenders
+   --------------------------------------------------------------------------
+   Nav items set line-height 1, and the labels clip their overflow for the
+   ellipsis - together they cut the tail off a g, j, p or y ("Bookkeeping").
+   A normal line height gives the letters room; the rows centre their
+   content, so nothing shifts.
+   -------------------------------------------------------------------------- */
+
+.sidebar .nav-label,
+.sidebar .team-name,
+.sidebar .user-chip-name,
+.sidebar .user-chip-role,
+.sidebar .theme-toggle-label,
+.sidebar .header-btn-label {
+    line-height: 1.35;
+}
