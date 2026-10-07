@@ -10,11 +10,14 @@
  *
  *     budget   = Low -> min | Mid -> (min + max) / 2 | High -> max
  *     factor   = "As set" -> chance / 100 | "All 100%" -> 1
- *     perMonth = budget x factor / months from start to end, inclusive
+ *     perMonth = budget x factor / months still to come, from the later of
+ *                start and this month to end, inclusive
  *
- * Months before the current one are dropped (that money is already in) and
- * the current month counts in full. Months are carried as an offset from the
- * current month: 0 is this month, -3 three months ago, 12 a year from now.
+ * The whole budget is always counted: a project that started in the past
+ * spreads all of it over the months it has left, and one still open past its
+ * end month is due now, so all of it lands in this month. Months are carried
+ * as an offset from the current month: 0 is this month, -3 three months ago,
+ * 12 a year from now.
  */
 (function (root) {
     'use strict';
@@ -210,8 +213,10 @@
             let value = 0;
             if (counted) {
                 const factor = settings.chance === 'all' ? 1 : p.chance / 100;
-                const perMonth = budgetFor(p, settings.budget) * factor / (p.e - p.s + 1);
-                for (let i = Math.max(p.s, 0); i <= p.e && i < months; i++) {
+                const first = Math.max(p.s, 0);
+                const last = Math.max(p.e, 0);
+                const perMonth = budgetFor(p, settings.budget) * factor / (last - first + 1);
+                for (let i = first; i <= last && i < months; i++) {
                     byStage[p.stage][i] += perMonth;
                     value += perMonth;
                 }

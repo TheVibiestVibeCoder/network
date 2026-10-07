@@ -320,7 +320,7 @@
                     </table>
                 </div>` : ''}
                 ${missingNote(ctx)}
-                <p class="rf-foot">Each budget is spread evenly over the months a project runs; months already passed are left out.
+                <p class="rf-foot">The full budget counts, spread evenly over the months a project has left; one past its end date counts in this month.
                     <strong>Worst</strong>: only projects in progress, low end of the budget.
                     <strong>Realistic</strong>: all projects, middle of the budget × chance.
                     <strong>Best</strong>: every project won, high end of the budget.</p>

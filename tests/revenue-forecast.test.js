@@ -81,12 +81,12 @@
     // Worked examples
     // ------------------------------------------------------------------
 
-    test('A: €4.8k a month, only October to March counted -> €28.8k', () => {
+    test('A: started in June, the full €48k spread over October to March -> €8k a month', () => {
         const f = run([examples()[0]]);
-        near(f.current.totals[0], 4800, 'Oct');
-        near(f.current.totals[5], 4800, 'Mar');
+        near(f.current.totals[0], 8000, 'Oct');
+        near(f.current.totals[5], 8000, 'Mar');
         near(f.current.totals[6], 0, 'Apr');
-        near(f.current.total, 28800, 'total');
+        near(f.current.total, 48000, 'total');
     });
 
     test('B: €27k x 0.7 = €18.9k, €3.15k a month December to May', () => {
@@ -106,9 +106,9 @@
 
     test('A + B + C stack per stage in the same month', () => {
         const f = run(examples());
-        near(f.current.byStage['In Progress'][2], 4800, 'Dec in progress');
+        near(f.current.byStage['In Progress'][2], 8000, 'Dec in progress');
         near(f.current.byStage.Proposal[2], 3150, 'Dec proposal');
-        near(f.current.total, 28800 + 18900 + 1700, 'total');
+        near(f.current.total, 48000 + 18900 + 1700, 'total');
     });
 
     // ------------------------------------------------------------------
@@ -118,32 +118,31 @@
     test('preset totals for the worked examples', () => {
         const f = run(examples());
         // Worst: in progress only, low end -> A only.
-        near(f.presets.worst.total, 28800, 'worst');
-        near(f.presets.realistic.total, 49400, 'realistic');
-        // Best: 100%, high end: A 28.8k + B 30k + C 5k.
-        near(f.presets.best.total, 63800, 'best');
+        near(f.presets.worst.total, 48000, 'worst');
+        near(f.presets.realistic.total, 68600, 'realistic');
+        // Best: 100%, high end: A 48k + B 30k + C 5k.
+        near(f.presets.best.total, 83000, 'best');
     });
 
     test('preset totals for the busy pipeline', () => {
         const f = run(busy());
-        // Worst: 28.8k + 4 of 5 workshop months (14.4k) + 9.5k.
-        near(f.presets.worst.total, 52700, 'worst');
-        near(f.presets.realistic.total, 140900, 'realistic');
-        near(f.presets.best.total, 287900, 'best');
-        eq(RF.money(f.presets.realistic.total), '€141k', 'realistic label');
+        // Worst: the three in-progress budgets in full, 48k + 18k + 9.5k.
+        near(f.presets.worst.total, 75500, 'worst');
+        near(f.presets.realistic.total, 164100, 'realistic');
+        near(f.presets.best.total, 311500, 'best');
+        eq(RF.money(f.presets.realistic.total), '€164k', 'realistic label');
     });
 
-    test('busiest month and hover readout numbers match the brief', () => {
+    test('busiest month and hover readout numbers', () => {
         const f = run(busy());
         eq(RF.monthName(f.busiest, NOW), 'Jan 2027', 'busiest');
-        eq(RF.money(f.current.totals[f.busiest]), '€16.6k', 'busiest value');
-        // Feb 2027 = offset 4
-        // Feb 2027: A 4.8k | BfS 3.125k + Krisen 3.15k + Pflege 2.1k | Social 1.56k
-        eq(RF.money(f.current.totals[4]), '€14.7k', 'Feb total');
-        eq(RF.money(f.current.byStage['In Progress'][4]), '€4.8k', 'Feb in progress');
+        eq(RF.money(f.current.totals[f.busiest]), '€20.8k', 'busiest value');
+        // Feb 2027 = offset 4: A 8k | BfS 3.125k + Krisen 3.15k + Pflege 2.1k | Social 1.56k
+        eq(RF.money(f.current.totals[4]), '€17.9k', 'Feb total');
+        eq(RF.money(f.current.byStage['In Progress'][4]), '€8k', 'Feb in progress');
         eq(RF.money(f.current.byStage.Proposal[4]), '€8.4k', 'Feb proposal');
         eq(RF.money(f.current.byStage.Negotiation[4]), '€1.6k', 'Feb negotiation');
-        eq(RF.money(f.ceiling.totals[4]), '€26.3k', 'Feb ceiling');
+        eq(RF.money(f.ceiling.totals[4]), '€29.5k', 'Feb ceiling');
     });
 
     test('picking a preset gives exactly its controls and clears switches', () => {
@@ -192,7 +191,7 @@
         const s = RF.settingsFor('realistic');
         s.stages = ['In Progress', 'Negotiation'];
         const f = run(examples(), s);
-        near(f.current.total, 28800 + 1700, 'total');
+        near(f.current.total, 48000 + 1700, 'total');
         eq(f.counted, 2, 'counted');
         eq(f.current.perProject[2].counted, false, 'B not counted');
     });
@@ -202,7 +201,7 @@
         s.excluded = { 1: true };
         const f = run(examples(), s);
         near(f.current.total, 18900 + 1700, 'scenario');
-        near(f.presets.realistic.total, 49400, 'preset for comparison');
+        near(f.presets.realistic.total, 68600, 'preset for comparison');
         eq(f.counted, 2, 'counted');
     });
 
@@ -216,17 +215,24 @@
     // Past months and the axis
     // ------------------------------------------------------------------
 
-    test('a project that ended before this month counts nothing', () => {
+    test('a project still open past its end month is due now, all of it this month', () => {
         nextId = 1;
         const f = run([project('In Progress', 12000, 12000, 100, '2026-01-01', '2026-09-30')]);
-        near(f.current.total, 0);
+        near(f.current.totals[0], 12000, 'Oct');
+        near(f.current.total, 12000, 'total');
     });
 
-    test('the current month counts in full', () => {
+    test('a project ending this month that started earlier counts its full budget now', () => {
         nextId = 1;
         const f = run([project('In Progress', 3000, 3000, 100, '2026-08-01', '2026-10-31')]);
-        near(f.current.totals[0], 1000, 'Oct');
-        near(f.current.total, 1000, 'total');
+        near(f.current.totals[0], 3000, 'Oct');
+        near(f.current.total, 3000, 'total');
+    });
+
+    test('a project starting later is spread over its own months only', () => {
+        const f = run([examples()[1]]);
+        near(f.current.totals[1], 0, 'Nov, before it starts');
+        near(f.current.totals[2], 3150, 'Dec');
     });
 
     test('the axis runs at least 12 months, longer when a project ends later', () => {
