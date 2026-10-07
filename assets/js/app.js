@@ -7078,6 +7078,31 @@
         switchView(readStoredView());
     }
 
+    /**
+     * Open the To-dos tab on one person's open or completed to-dos - the
+     * home page's "View all" and "Completed" links. Other filters are
+     * cleared, so the list is the whole of what was asked for.
+     *
+     * @param {{status?: string, assigned?: string}} options  status: open,
+     *        completed or all; assigned: 'me', a user key, 'owner' or 'unassigned'.
+     */
+    function openTodos(options) {
+        const opts = options || {};
+
+        state.todoStatusFilter = opts.status || 'open';
+        state.todoAssignedFilter = opts.assigned || '';
+        state.todoContactFilterId = '';
+        state.todoProjectFilterId = '';
+        state.todoSearchQuery = '';
+
+        if (elements.todoStatusFilter) elements.todoStatusFilter.value = state.todoStatusFilter;
+        if (elements.searchTodosInput) elements.searchTodosInput.value = '';
+        // The assigned, contact and project selects are refilled from state
+        // when the list loads.
+
+        switchView('todos');
+    }
+
     // Expose functions globally for map popup buttons and onclick handlers
     window.CRM = {
         editContact: editContact,
@@ -7086,6 +7111,7 @@
         openTodoDetail: openTodoDetail,
         openBookkeepingRow: openBookkeepingRow,
         switchView: switchView,
+        openTodos: openTodos,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,

@@ -254,16 +254,21 @@ function handleWorkload(string $who): void
 
     $projects = fetchAssigned(
         $db,
+        // open_todos counts every open to-do on the project, whoever it is
+        // assigned to: the home page shows how much is left on it.
         "SELECT id, name, company, stage, start_date, estimated_completion,
-                success_chance, assigned_to, assigned_to_name
+                success_chance, assigned_to, assigned_to_name,
+                (SELECT COUNT(*) FROM todos ot
+                 WHERE ot.project_id = projects.id AND ot.parent_todo_id IS NULL
+                   AND ot.is_completed = 0) AS open_todos
          FROM projects
-         WHERE IFNULL(stage, '') <> 'Complete' AND ",
+         WHERE " . Project::activeStageSql() . " AND ",
         'assigned_to',
         $isUnassigned,
         $target['id'],
-        // Finished projects are left out: they are not work any more. The rest
-        // keep the Projects view's pipeline order - what is running first,
-        // then what is being won, then leads.
+        // Only live work: leads are not work yet, finished projects no longer
+        // are. The rest keep the Projects view's pipeline order - what is
+        // running first, then what is being won.
         "ORDER BY " . Project::stageRankSql() . " ASC, name COLLATE NOCASE ASC"
     );
 
@@ -436,8 +441,8 @@ function handleSummary(): void
         if ($table === 'todos') {
             $extra = ' AND parent_todo_id IS NULL AND is_completed = 0';
         } elseif ($table === 'projects') {
-            // Same rule as the workload list: a finished project is not work.
-            $extra = " AND IFNULL(stage, '') <> 'Complete'";
+            // Same rule as the workload list: only projects in an active stage.
+            $extra = ' AND ' . Project::activeStageSql();
         } elseif ($table === 'bookkeeping_rows') {
             // Same rule as the workload list: a row with its invoice attached
             // is no longer work, whatever its assignee column still says.

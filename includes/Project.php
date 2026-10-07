@@ -93,6 +93,25 @@ class Project
     }
 
     /**
+     * The stages that count as live work on the home page: being run or being
+     * won. A lead is not work yet and a complete project no longer is.
+     */
+    public const ACTIVE_STAGES = ['In Progress', 'Proposal', 'Negotiation'];
+
+    /**
+     * "stage IN (...)" for ACTIVE_STAGES, so the home page's list and the
+     * per-person counts in its switcher use one rule.
+     */
+    public static function activeStageSql(string $column = 'stage'): string
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_.]*$/', $column)) {
+            $column = 'stage';
+        }
+
+        return $column . " IN ('" . implode("', '", self::ACTIVE_STAGES) . "')";
+    }
+
+    /**
      * Get a single project by ID
      */
     public function getById(int $id): ?array

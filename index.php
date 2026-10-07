@@ -819,7 +819,7 @@ function assetUrl(string $path): string
                             <div class="workload-person">
                                 <span class="workload-person-face" id="workloadFace"></span>
                                 <div class="workload-person-text">
-                                    <h2 class="workload-title" id="workloadTitle">My Work</h2>
+                                    <h1 class="workload-title" id="workloadTitle">My Work</h1>
                                     <p class="workload-subtitle" id="workloadSummary">Nothing assigned yet</p>
                                 </div>
                             </div>
@@ -828,9 +828,6 @@ function assetUrl(string $path): string
                                 <select id="workloadWho" class="form-select"></select>
                             </div>
                         </div>
-
-                        <!-- At a glance: filled in by workload.js for whoever is shown -->
-                        <section class="home-stats" id="workloadStats" aria-label="At a glance" hidden></section>
 
                         <div class="workload-body" id="workloadBody"></div>
                     </div>
@@ -2281,6 +2278,7 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/profile.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/home-dashboard.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/workload.js') ?>"></script>
         <?php if ($isAdmin): ?>
         <script src="<?= assetUrl('assets/js/users.js') ?>"></script>

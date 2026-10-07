@@ -148,6 +148,12 @@
     --stage-progress: #2F6FD0;
     --stage-complete: #2E8A5C;
 
+    /* Medium priority: a light orange of its own, apart from the warning
+       colour. -ink is the same hue deep enough for text on -soft (AA). */
+    --pri-medium: #E8973A;
+    --pri-medium-ink: #9A5A12;
+    --pri-medium-soft: rgba(232, 151, 58, 0.16);
+
     --e-1: 0 1px 2px rgba(17, 45, 78, 0.05);
     --e-2: 0 1px 2px rgba(17, 45, 78, 0.04), 0 6px 16px -6px rgba(17, 45, 78, 0.10);
     --e-3: 0 2px 6px rgba(17, 45, 78, 0.05), 0 18px 40px -14px rgba(17, 45, 78, 0.22);
@@ -198,6 +204,10 @@
     --stage-negotiation: #A890E8;
     --stage-progress: #6FA2F2;
     --stage-complete: #6CCB97;
+
+    --pri-medium: #F2B46E;
+    --pri-medium-ink: #F5C58D;
+    --pri-medium-soft: rgba(242, 180, 110, 0.16);
 
     --e-1: 0 1px 2px rgba(0, 0, 0, 0.30);
     --e-2: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 20px -8px rgba(0, 0, 0, 0.45);
@@ -1828,7 +1838,7 @@ input[type="checkbox"] {
 .kc-tone-lead        { --kc: var(--stage-lead); }
 .kc-tone-complete    { --kc: var(--stage-complete); }
 .kc-tone-high        { --kc: var(--c-danger); }
-.kc-tone-medium      { --kc: var(--c-warning); }
+.kc-tone-medium      { --kc: var(--pri-medium); }
 .kc-tone-low         { --kc: var(--c-ink-4); }
 .kc-tone-none        { --kc: var(--kc-quiet); }
 .kc-tone-accent      { --kc: var(--c-accent); }
@@ -2596,7 +2606,7 @@ input[type="checkbox"] {
 }
 
 .todo-priority--high::before { background: var(--c-danger); }
-.todo-priority--medium::before { background: var(--c-warning); }
+.todo-priority--medium::before { background: var(--pri-medium); }
 .todo-priority--low::before { background: var(--c-ink-4); }
 
 .todo-due-overdue {
@@ -2826,7 +2836,7 @@ input[type="checkbox"] {
 }
 
 #workloadView .workload-chip--high::before { background: var(--c-danger); }
-#workloadView .workload-chip--medium::before { background: var(--c-warning); }
+#workloadView .workload-chip--medium::before { background: var(--pri-medium); }
 
 #workloadView details.workload-done > summary {
     padding: 4px 2px;
@@ -6415,8 +6425,9 @@ details.import-instructions p {
 }
 
 /* Home rows: the pill sits at the end, outside the row's own button. */
-#workloadView div.workload-row > .tlink-quick {
-    margin-left: -4px;
+#workloadView .home-todo-titleline .tlink-quick {
+    margin-left: 6px;
+    vertical-align: middle;
 }
 
 @media (max-width: 768px) {
@@ -6661,10 +6672,8 @@ details.import-instructions p {
 /* --------------------------------------------------------------------------
    34. Home: the layout
    --------------------------------------------------------------------------
-   Two columns: to-dos - the work itself - in the wide one; bookkeeping,
-   projects and contacts beside them in a narrow one. Every kind of thing has
-   its own colour, on the section's icon and on each row's mark, so the page
-   sorts itself at a glance.
+   The page width and the colour of each kind of thing a person can be
+   handed. The dashboard itself is section 42.
    -------------------------------------------------------------------------- */
 
 :root {
@@ -6683,403 +6692,6 @@ details.import-instructions p {
 
 #workloadView .workload-wrap {
     max-width: 1180px;
-}
-
-#workloadView .workload-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-    gap: 0 24px;
-    align-items: start;
-}
-
-#workloadView .workload-grid.is-single {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-@media (max-width: 1100px) {
-    #workloadView .workload-grid {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-/* ---- Type colours ---- */
-
-#workloadView .workload-section.is-todo { --wl-type: var(--type-todo); }
-#workloadView .workload-section.is-project { --wl-type: var(--type-project); }
-#workloadView .workload-section.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
-#workloadView .workload-section.is-contact { --wl-type: var(--type-contact); }
-
-#workloadView .workload-section-icon {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--wl-type, var(--c-ink-3)) 14%, var(--c-surface));
-    color: var(--wl-type, var(--c-ink-3));
-}
-
-#workloadView .workload-section-head {
-    gap: 10px;
-}
-
-/* Each row's mark carries its section's colour. */
-#workloadView .workload-section[class*="is-"] .workload-row-mark.is-icon,
-#workloadView .workload-section[class*="is-"] .workload-row-mark.is-initials {
-    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
-    color: var(--wl-type);
-}
-
-#workloadView .workload-section.is-todo .workload-check:not(.is-done) {
-    border-color: color-mix(in srgb, var(--wl-type) 45%, var(--c-line-strong));
-}
-
-#workloadView .workload-section.is-todo .workload-check:not(.is-done):hover {
-    border-color: var(--c-success);
-}
-
-/* ---- To-dos: grouped by when they are due ---- */
-
-#workloadView .workload-group-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 9px 16px 7px;
-    background: var(--c-tint-3);
-    border-bottom: 1px solid var(--c-line-2);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--c-ink-3);
-}
-
-#workloadView .workload-group-label + .workload-row,
-#workloadView .workload-row + .workload-group-label {
-    border-top: 0;
-}
-
-#workloadView .workload-group-label.is-overdue {
-    color: var(--c-danger);
-}
-
-#workloadView .workload-group-count {
-    font-weight: 500;
-    letter-spacing: 0;
-    opacity: 0.8;
-}
-
-/* ---- The narrow column: compact rows ---- */
-
-#workloadView .workload-side .workload-row {
-    min-height: 50px;
-    padding: 8px 14px;
-    gap: 10px;
-}
-
-#workloadView .workload-side .workload-row-mark.is-icon,
-#workloadView .workload-side .workload-row-mark.is-initials {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--r-md);
-}
-
-#workloadView .workload-side .workload-row-mark.is-initials {
-    border-radius: var(--r-full);
-}
-
-#workloadView .workload-side .workload-row-title {
-    font-size: var(--t-sm);
-}
-
-#workloadView .workload-side .workload-row-context,
-#workloadView .workload-side .workload-due {
-    font-size: var(--t-xs);
-}
-
-#workloadView .workload-side .workload-row-body {
-    min-width: 0;
-}
-
-#workloadView .workload-side .workload-row-title,
-#workloadView .workload-side .workload-row-context {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* A project's stage: its word and a dot, quieter than the type colour. */
-#workloadView .workload-stage {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: var(--t-xs);
-    font-weight: 500;
-    color: var(--c-ink-3);
-    white-space: nowrap;
-}
-
-#workloadView .workload-stage::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--r-full);
-    background: var(--stage-lead);
-}
-
-#workloadView .workload-stage[data-stage="proposal"]::before { background: var(--stage-proposal); }
-#workloadView .workload-stage[data-stage="negotiation"]::before { background: var(--stage-negotiation); }
-#workloadView .workload-stage[data-stage="in-progress"]::before { background: var(--stage-progress); }
-#workloadView .workload-stage[data-stage="complete"]::before { background: var(--stage-complete); }
-
-/* A to-do row is a wrapper; its padding lives on the button inside, so the
-   whole height opens the to-do - and is not padded twice. */
-#workloadView div.workload-row {
-    min-height: 56px;
-    padding-top: 0;
-    padding-bottom: 0;
-}
-
-#workloadView .workload-row-main {
-    padding: 9px 0;
-}
-
-
-/* --------------------------------------------------------------------------
-   35. Home: the cards at the top
-   --------------------------------------------------------------------------
-   Three plain cards - due this week, open to-dos, projects - each a number
-   and one line of detail. The icon carries the type colour of the lists
-   below; a card jumps to its list.
-   -------------------------------------------------------------------------- */
-
-#workloadView .home-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin: 0 0 24px;
-}
-
-#workloadView .home-stats[hidden] {
-    display: none;
-}
-
-#workloadView .home-stat {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    min-width: 0;
-    padding: 16px 18px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e-1);
-    color: var(--c-ink);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
-}
-
-#workloadView .home-stat:hover {
-    border-color: var(--c-line-strong);
-    box-shadow: var(--e-2, var(--e-1));
-}
-
-#workloadView .home-stat:focus-visible {
-    outline: none;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px var(--c-accent-soft);
-}
-
-#workloadView .home-stat.is-due { --wl-type: var(--type-todo); }
-#workloadView .home-stat.is-todo { --wl-type: var(--type-todo); }
-#workloadView .home-stat.is-project { --wl-type: var(--type-project); }
-
-.home-stat-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.home-stat-icon {
-    width: 24px;
-    height: 24px;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
-    color: var(--wl-type);
-}
-
-.home-stat-label {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
-}
-
-.home-stat-value {
-    font-size: 30px;
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-    color: var(--c-ink);
-}
-
-.home-stat-detail {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 12px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.home-stat-alert {
-    color: var(--c-danger);
-    font-weight: 600;
-}
-
-.home-stat-dot {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-}
-
-.home-stat-dot::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: var(--r-full);
-    background: var(--c-ink-4);
-}
-
-.home-stat-dot[data-tone="high"]::before { background: var(--c-danger); }
-.home-stat-dot[data-tone="medium"]::before { background: var(--c-warning); }
-.home-stat-dot[data-tone="progress"]::before { background: var(--stage-progress); }
-.home-stat-dot[data-tone="proposal"]::before { background: var(--stage-proposal); }
-.home-stat-dot[data-tone="negotiation"]::before { background: var(--stage-negotiation); }
-.home-stat-dot[data-tone="complete"]::before { background: var(--stage-complete); }
-
-/* A card's jump lands with a little air above the section. */
-#workloadView .workload-section {
-    scroll-margin-top: 16px;
-}
-
-@media (max-width: 600px) {
-    #workloadView .home-stats {
-        gap: 8px;
-    }
-
-    #workloadView .home-stat {
-        padding: 12px;
-        gap: 4px;
-    }
-
-    /* On a phone each card keeps its number and its one most useful word. */
-    .home-stat-icon {
-        display: none;
-    }
-
-    .home-stat-label {
-        font-size: var(--t-xs);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-    }
-
-    .home-stat-value {
-        font-size: 24px;
-    }
-
-    .home-stat-detail {
-        font-size: var(--t-xs);
-    }
-
-    .home-stat-detail .home-stat-dot:nth-child(n+2) {
-        display: none;
-    }
-}
-
-/* ---- The week in the "Due this week" card ---- */
-
-#workloadView .home-stat.is-due {
-    gap: 6px;
-}
-
-.home-week {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 4px;
-    width: 100%;
-    margin-top: 6px;
-}
-
-.home-day {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-}
-
-.home-day-name {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--c-ink-3);
-    white-space: nowrap;
-}
-
-.home-day.is-today .home-day-name {
-    color: var(--c-ink);
-    font-weight: 600;
-}
-
-/* A faint dot for a free day; the count, in the to-do colour, for a busy one. */
-.home-day-count {
-    width: 22px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-full);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-
-.home-day:not(.has-due) .home-day-count::before {
-    content: "";
-    width: 4px;
-    height: 4px;
-    border-radius: var(--r-full);
-    background: var(--c-line-strong);
-}
-
-.home-day.has-due .home-day-count {
-    background: color-mix(in srgb, var(--type-todo) 16%, var(--c-surface));
-    color: var(--type-todo);
-}
-
-.home-day.is-today.has-due .home-day-count {
-    background: var(--type-todo);
-    color: var(--c-surface);
-}
-
-@media (max-width: 600px) {
-    /* The week needs the width: the due card takes a row of its own. */
-    #workloadView .home-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    #workloadView .home-stat.is-due {
-        grid-column: 1 / -1;
-    }
 }
 
 /* --------------------------------------------------------------------------
@@ -7342,116 +6954,13 @@ details.import-instructions p {
     font-size: var(--t-sm);
 }
 
-/* ---- Overview: one card, three columns ---- */
-
-#workloadView .home-stats {
-    gap: 0;
-    margin: 0 0 28px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-xl, 16px);
-    box-shadow: var(--e-1);
-    overflow: hidden;
-}
-
-#workloadView .home-stat {
-    gap: 4px;
-    padding: 20px 24px;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: transparent;
-    transition: background-color var(--dur-1) var(--ease);
-}
-
-#workloadView .home-stat + .home-stat {
-    border-left: 1px solid var(--c-line-2);
-}
-
-#workloadView .home-stat:hover {
-    border-color: var(--c-line-2);
-    box-shadow: none;
-    background: var(--c-tint-3);
-}
-
-#workloadView .home-stat:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--c-accent);
-}
-
-#workloadView .home-stat-label {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
-}
-
-#workloadView .home-stat-value {
-    font-size: 34px;
-    letter-spacing: -0.04em;
-}
-
-#workloadView .home-week {
-    margin-top: 10px;
-}
-
-/* ---- Sections: a quiet heading over a clean list ---- */
-
-#workloadView .workload-section {
-    margin: 0 0 28px;
-}
-
-#workloadView .workload-section-head {
-    gap: 8px;
-    margin: 0 0 10px;
-    padding: 0 4px;
-}
-
-#workloadView .workload-section-icon {
-    width: 18px;
-    height: 18px;
-    background: transparent;
-    border-radius: 0;
-}
-
-#workloadView .workload-section-icon svg {
-    width: 16px;
-    height: 16px;
-}
-
-#workloadView .workload-section-title {
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-}
-
-#workloadView .workload-count {
-    min-width: 0;
-    height: auto;
-    padding: 0;
-    border: 0;
-    background: none;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-4, var(--c-ink-3));
-}
-
-#workloadView .workload-list {
-    border-radius: var(--r-xl, 16px);
-    border-color: var(--c-line);
-    box-shadow: var(--e-1);
-}
-
-/* ---- Rows ---- */
+/* ---- Rows: bookkeeping and contacts in their small cards ---- */
 
 #workloadView .workload-row,
 #workloadView div.workload-row {
     min-height: 0;
     padding: 0 16px;
     border-bottom-color: var(--c-line-2);
-}
-
-#workloadView .workload-row-main {
-    padding: 11px 0;
-    gap: 12px;
 }
 
 #workloadView button.workload-row {
@@ -7477,426 +6986,12 @@ details.import-instructions p {
     font-variant-numeric: tabular-nums;
 }
 
-#workloadView .workload-check {
-    width: 20px;
-    height: 20px;
-}
-
-/* Priority: a dot. */
-#workloadView .workload-pri {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: var(--c-ink-4, var(--c-line-strong));
-}
-
-#workloadView .workload-pri--high { background: var(--c-danger); }
-#workloadView .workload-pri--medium { background: var(--c-warning); }
-
-/* The Drive button: the mark alone until hovered; the name is its tooltip
-   and the to-do's sheet. Keeps every row to one calm line. */
-#workloadView .workload-main .tlink-pill {
-    max-width: 180px;
-    height: 24px;
-    border-color: var(--c-line-2);
-}
-
-/* ---- To-do groups: plain words, not bands ---- */
-
-#workloadView .workload-group-label {
-    padding: 14px 16px 4px;
-    background: transparent;
-    border-bottom: 0;
-    font-size: 11px;
-    letter-spacing: 0.07em;
-    color: var(--c-ink-3);
-}
-
-#workloadView .workload-group-label:first-child {
-    padding-top: 12px;
-}
-
-#workloadView .workload-group-label + .workload-row {
-    border-top: 0;
-}
-
-/* The last row of a group needs no line before the next label. */
-#workloadView .workload-row:has(+ .workload-group-label) {
-    border-bottom: 0;
-}
-
-/* ---- The narrow column ---- */
-
-#workloadView .workload-side .workload-row {
-    min-height: 0;
-    padding: 9px 16px;
-}
-
-#workloadView .workload-side .workload-row-mark.is-icon,
-#workloadView .workload-side .workload-row-mark.is-initials {
-    width: 26px;
-    height: 26px;
-}
-
-/* ---- Completed: a quiet link-like fold ---- */
-
-#workloadView details.workload-done > summary {
-    padding: 2px 4px;
-    color: var(--c-ink-3);
-}
-
-#workloadView details.workload-done .workload-section-title {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
-}
-
 @media (max-width: 600px) {
     #workloadView .workload-title {
         font-size: 24px;
     }
-
-    #workloadView .home-stat {
-        padding: 14px 16px;
-    }
-
-    #workloadView .home-stat-value {
-        font-size: 26px;
-    }
-
-    /* Two columns under the full-width week: the divider follows the grid. */
-    #workloadView .home-stat + .home-stat {
-        border-left: 0;
-        border-top: 1px solid var(--c-line-2);
-    }
-
-    #workloadView .home-stat.is-project {
-        border-left: 1px solid var(--c-line-2);
-    }
 }
 
-
-/* --------------------------------------------------------------------------
-   39. Home overview: three balanced columns
-   --------------------------------------------------------------------------
-   Every column has the same three rows - label, number, picture - and the
-   picture area has one height, so the week strip and the two bars sit on
-   the same line.
-   -------------------------------------------------------------------------- */
-
-#workloadView .home-stat {
-    display: grid;
-    grid-template-rows: auto auto 1fr;
-    align-items: start;
-    gap: 6px;
-    height: 100%;
-}
-
-#workloadView .home-stat-figure {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 40px;
-}
-
-#workloadView .home-stat-value {
-    line-height: 1;
-}
-
-/* Overdue: a small red pill beside the number. */
-.home-stat-flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 22px;
-    padding: 0 9px;
-    border-radius: var(--r-full);
-    background: var(--c-danger-soft);
-    color: var(--c-danger);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.home-stat-flag::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--r-full);
-    background: currentColor;
-}
-
-#workloadView .home-stat-visual {
-    align-self: end;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    width: 100%;
-    height: 50px;
-    margin-top: 8px;
-}
-
-#workloadView .home-stat-visual .home-week {
-    margin: 0;
-}
-
-/* ---- The bars ---- */
-
-.home-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-}
-
-.home-bar-track {
-    display: flex;
-    gap: 3px;
-    height: 8px;
-    border-radius: var(--r-full);
-    overflow: hidden;
-}
-
-.home-bar.is-empty .home-bar-track {
-    background: var(--c-tint-3);
-}
-
-.home-bar-part {
-    flex-basis: 0;
-    min-width: 6px;
-    background: var(--c-ink-4, var(--c-line-strong));
-}
-
-.home-bar-part[data-tone="high"] { background: var(--c-danger); }
-.home-bar-part[data-tone="medium"] { background: var(--c-warning); }
-.home-bar-part[data-tone="low"] { background: var(--c-ink-4, var(--c-line-strong)); }
-.home-bar-part[data-tone="none"] { background: var(--c-line-strong); }
-.home-bar-part[data-tone="progress"] { background: var(--stage-progress); }
-.home-bar-part[data-tone="proposal"] { background: var(--stage-proposal); }
-.home-bar-part[data-tone="negotiation"] { background: var(--stage-negotiation); }
-.home-bar-part[data-tone="lead"] { background: var(--stage-lead); }
-.home-bar-part[data-tone="complete"] { background: var(--stage-complete); }
-
-.home-bar-legend {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 14px;
-    overflow: hidden;
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-    white-space: nowrap;
-}
-
-.home-stat-dot[data-tone="low"]::before { background: var(--c-ink-4, var(--c-line-strong)); }
-.home-stat-dot[data-tone="none"]::before { background: var(--c-line-strong); }
-.home-stat-dot[data-tone="lead"]::before { background: var(--stage-lead); }
-
-@media (max-width: 600px) {
-    #workloadView .home-stat-visual {
-        height: 46px;
-    }
-
-    /* Narrow columns: the bar alone, its first part named. */
-    .home-bar-legend .home-stat-dot:nth-child(n+2) {
-        display: none;
-    }
-}
-
-/* ---- Overview, tightened: the same three rows with less air ---- */
-
-#workloadView .workload-head {
-    margin-bottom: 20px;
-}
-
-#workloadView .home-stats {
-    margin-bottom: 24px;
-}
-
-#workloadView .home-stat {
-    gap: 2px;
-    padding: 14px 20px 16px;
-}
-
-#workloadView .home-stat-figure {
-    min-height: 34px;
-}
-
-#workloadView .home-stat-value {
-    font-size: 28px;
-}
-
-#workloadView .home-stat-visual {
-    height: 38px;
-    margin-top: 4px;
-}
-
-#workloadView .home-day {
-    gap: 2px;
-}
-
-#workloadView .home-day-count {
-    width: 20px;
-    height: 20px;
-}
-
-#workloadView .home-bar {
-    gap: 8px;
-}
-
-#workloadView .home-bar-track {
-    height: 6px;
-}
-
-@media (max-width: 600px) {
-    #workloadView .home-stat {
-        padding: 12px 16px 14px;
-    }
-
-    #workloadView .home-stat-value {
-        font-size: 24px;
-    }
-
-    #workloadView .home-stat-visual {
-        height: 38px;
-    }
-}
-
-
-/* --------------------------------------------------------------------------
-   40. Home: new for you, as one of the sections
-   --------------------------------------------------------------------------
-   The same heading and list card as everything below it. Each row carries
-   the colour and icon of what it is - a to-do, a project, a contact, a
-   bookkeeping row - and who handed it over, and when, on the right.
-   -------------------------------------------------------------------------- */
-
-#workloadView .workload-section.is-news {
-    --wl-type: var(--c-accent);
-}
-
-#workloadView .workload-news-row.is-todo { --wl-type: var(--type-todo); }
-#workloadView .workload-news-row.is-project { --wl-type: var(--type-project); }
-#workloadView .workload-news-row.is-contact { --wl-type: var(--type-contact); }
-#workloadView .workload-news-row.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
-
-#workloadView .is-news .workload-section-head {
-    align-items: center;
-}
-
-/* "Got it": the section's one action, quiet, on the right. */
-.workload-news-dismiss {
-    margin-left: auto;
-    height: 28px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: var(--r-full);
-    background: transparent;
-    color: var(--c-accent-2);
-    font: 500 var(--t-sm)/1 var(--font);
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease);
-}
-
-.workload-news-dismiss:hover:not(:disabled) {
-    background: var(--c-accent-soft);
-}
-
-.workload-news-dismiss:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--c-accent-soft);
-}
-
-#workloadView .workload-news-row .workload-row-mark.is-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--r-md);
-}
-
-#workloadView .workload-news-row .workload-row-body {
-    min-width: 0;
-}
-
-#workloadView .workload-news-row .workload-row-title,
-#workloadView .workload-news-row .workload-row-context {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.workload-news-from {
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-    white-space: nowrap;
-}
-
-.workload-news-more {
-    margin: 8px 4px 0;
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-}
-
-@media (max-width: 600px) {
-    /* On a phone, who and when move under the title. */
-    #workloadView .workload-news-row .workload-row-meta {
-        display: none;
-    }
-}
-
-.workload-news-phone {
-    display: none;
-}
-
-@media (max-width: 600px) {
-    .workload-news-phone {
-        display: inline;
-    }
-}
-
-/* ---- New for you: one card with an accent border, so it stands out ---- */
-
-#workloadView .workload-section.is-news {
-    padding: 12px 0 0;
-    background: var(--c-surface);
-    border: 1.5px solid color-mix(in srgb, var(--c-accent) 55%, transparent);
-    border-radius: var(--r-xl, 16px);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 8%, transparent), var(--e-1);
-    overflow: hidden;
-}
-
-#workloadView .is-news .workload-section-head {
-    margin: 0;
-    padding: 0 12px 10px 18px;
-}
-
-#workloadView .is-news .workload-section-icon {
-    width: 26px;
-    height: 26px;
-    border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
-}
-
-/* The rows sit straight in the card: no second outline inside it. */
-#workloadView .is-news .workload-list {
-    border: 0;
-    border-top: 1px solid var(--c-line-2);
-    border-radius: 0;
-    box-shadow: none;
-}
-
-#workloadView .is-news .workload-news-more {
-    margin: 0;
-    padding: 8px 18px 12px;
-    border-top: 1px solid var(--c-line-2);
-}
-
-/* The border in the full accent, so it reads in both themes. */
-#workloadView .workload-section.is-news {
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 12%, transparent), var(--e-1);
-}
 
 /* On someone else's page the line above the name is a summary, not a date:
    normal case, so it reads as a sentence. */
@@ -7924,4 +7019,954 @@ details.import-instructions p {
 .sidebar .theme-toggle-label,
 .sidebar .header-btn-label {
     line-height: 1.35;
+}
+
+
+/* --------------------------------------------------------------------------
+   42. Home: the dashboard
+   --------------------------------------------------------------------------
+   A slim "New for you" line, then two cards side by side: To-dos (wide) and
+   Projects (narrow), each a summary on top - a ring and its legend, and for
+   to-dos the week - with its own list underneath. The legend entries and
+   days are filters. Bookkeeping and contacts follow in small cards under
+   Projects. The cards stack on narrow screens.
+
+   Colours are the system's own: priorities in danger / warning / ink-4,
+   stages in the pipeline hues, the accent only for links and selection.
+   -------------------------------------------------------------------------- */
+
+#workloadView .workload-head {
+    margin-bottom: 24px;
+}
+
+/* ---- New for you: one line per item in an accent-ringed card ---- */
+
+#workloadView .home-news {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin: 0 0 24px;
+    padding: 10px 14px 10px 18px;
+    background: var(--c-surface);
+    border: 1.5px solid var(--c-accent);
+    border-radius: var(--r-lg);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 12%, transparent), var(--e-1);
+}
+
+.home-news-icon {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.home-news-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.home-news-list {
+    flex: 1 1 320px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-news-row {
+    display: block;
+    width: 100%;
+    padding: 3px 0;
+    border: 0;
+    background: none;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-md);
+    line-height: 1.4;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.home-news-row:hover .home-news-title {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.home-news-title {
+    font-weight: 600;
+}
+
+.home-news-meta {
+    color: var(--c-ink-3);
+}
+
+.home-news-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.home-news-rest {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.home-news-more,
+.home-news-dismiss {
+    height: 30px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-accent-2);
+    font: 600 var(--t-md)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-news-more {
+    font-weight: 500;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.home-news-more:hover,
+.home-news-dismiss:hover:not(:disabled) {
+    background: var(--c-accent-soft);
+}
+
+/* ---- The two columns ---- */
+
+#workloadView .home-dash {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+#workloadView .home-todos {
+    flex: 1.7 1 560px;
+    min-width: 0;
+}
+
+#workloadView .home-side {
+    flex: 1 1 340px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ---- Cards ---- */
+
+#workloadView .home-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.home-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 22px 18px;
+    container-type: inline-size;
+}
+
+.home-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#workloadView .home-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+.home-link,
+.home-clear,
+.home-more,
+.home-foot-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+}
+
+.home-link {
+    font-size: var(--t-base);
+    font-weight: 500;
+    color: var(--c-accent-2);
+}
+
+.home-link:hover,
+.home-clear:hover,
+.home-more:hover,
+.home-foot-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Every control on the dashboard shows where the keyboard is. */
+#workloadView .home-dash :is(button, a):focus-visible,
+#workloadView .home-news :is(button, a):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+/* ---- Summary: ring + legend, and the week ---- */
+
+.home-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 20px 28px;
+}
+
+.home-breakdown {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+/* Beside the week on the To-dos card. On Projects the breakdown stands
+   alone in the card's column, where a flex basis would set its height. */
+.home-summary > .home-breakdown {
+    flex: 1 1 250px;
+}
+
+.home-donut {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+}
+
+.home-donut svg {
+    display: block;
+    transform: rotate(-90deg);
+}
+
+.home-donut circle {
+    fill: none;
+    stroke-width: 10;
+}
+
+.home-donut-track {
+    stroke: var(--c-line-2);
+}
+
+.home-donut-arc {
+    stroke: var(--c-line-strong);
+    transition: stroke-opacity var(--dur-2) var(--ease);
+}
+
+.home-donut-arc.is-dim {
+    stroke-opacity: 0.25;
+}
+
+.home-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.home-donut-value {
+    font-size: var(--t-2xl);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.home-donut-label {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--c-ink-3);
+}
+
+/* Fixed-height rows, and always room for four (High, Medium, Low, No
+   priority): the summaries of both cards are then the same height, so the
+   filter bars under them line up whether there are three entries or four. */
+.home-legend {
+    --legend-row: 32px;
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-auto-rows: var(--legend-row);
+    align-content: center;
+    gap: 2px;
+    min-height: calc(4 * var(--legend-row) + 3 * 2px);
+}
+
+.home-legend-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-base);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.home-legend-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-legend-count {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Selected: a tinted chip with a hairline ring. The rest step back. */
+.home-legend-btn:hover,
+.home-day-btn:hover {
+    background: var(--c-tint-3);
+}
+
+.home-legend-btn.is-active,
+.home-day-btn.is-active {
+    background: var(--c-tint-2);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+}
+
+.home-legend-btn.is-dim,
+.home-day-btn.is-dim {
+    opacity: 0.45;
+}
+
+/* One dot vocabulary for priorities and stages. */
+.home-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+}
+
+:is(.home-dot, .home-project-bar)[data-tone="high"] { background: var(--c-danger); }
+:is(.home-dot, .home-project-bar)[data-tone="medium"] { background: var(--pri-medium); }
+:is(.home-dot, .home-project-bar)[data-tone="low"] { background: var(--c-success); }
+:is(.home-dot, .home-project-bar)[data-tone="none"] { background: var(--c-line-strong); }
+:is(.home-dot, .home-project-bar)[data-tone="progress"] { background: var(--stage-progress); }
+:is(.home-dot, .home-project-bar)[data-tone="proposal"] { background: var(--stage-proposal); }
+:is(.home-dot, .home-project-bar)[data-tone="negotiation"] { background: var(--stage-negotiation); }
+
+.home-donut-arc[data-tone="high"] { stroke: var(--c-danger); }
+.home-donut-arc[data-tone="medium"] { stroke: var(--pri-medium); }
+.home-donut-arc[data-tone="low"] { stroke: var(--c-success); }
+.home-donut-arc[data-tone="none"] { stroke: var(--c-line-strong); }
+.home-donut-arc[data-tone="progress"] { stroke: var(--stage-progress); }
+.home-donut-arc[data-tone="proposal"] { stroke: var(--stage-proposal); }
+.home-donut-arc[data-tone="negotiation"] { stroke: var(--stage-negotiation); }
+
+/* The week: today and the six days after it, each a filter. */
+.home-week {
+    flex: 1.3 1 300px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 28px;
+    border-left: 1px solid var(--c-line-2);
+}
+
+/* Once the week wraps under the ring, the divider has nothing to divide. */
+@container (max-width: 600px) {
+    .home-week {
+        flex-basis: 100%;
+        padding-left: 0;
+        border-left: 0;
+    }
+}
+
+.home-week-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--t-sm);
+}
+
+.home-week-title {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.home-week-due {
+    color: var(--c-ink-3);
+}
+
+.home-week-due strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.home-week-overdue {
+    color: var(--c-danger);
+    font-weight: 600;
+}
+
+.home-week-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.home-day-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 7px 0;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.home-day-initial {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--c-ink-3);
+}
+
+.home-day-num {
+    font-size: var(--t-md);
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-day-btn.is-today .home-day-initial {
+    color: var(--c-danger);
+}
+
+.home-day-btn.is-today .home-day-num {
+    font-weight: 700;
+}
+
+/* A faint dot for a free day; the count, in red on its tint, for a busy one. */
+.home-day-badge {
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-day-badge:not(.has-due)::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+}
+
+.home-day-badge.has-due {
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+/* ---- Filter bar ---- */
+
+.home-filterbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 38px;
+    padding: 8px 22px;
+    background: var(--c-tint-3);
+    border-top: 1px solid var(--c-line-2);
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.home-filterbar-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--c-ink-2);
+}
+
+.home-clear {
+    flex-shrink: 0;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-accent-2);
+}
+
+/* ---- Lists ---- */
+
+.home-list-wrap {
+    padding: 2px 0 6px;
+}
+
+.home-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 22px 2px;
+}
+
+.home-group-name {
+    font-size: var(--t-sm);
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.home-group-head.is-urgent .home-group-name {
+    color: var(--c-danger);
+}
+
+.home-group-date {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.home-row-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.home-row-title {
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--c-ink);
+}
+
+.home-row-context {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+/* A to-do: the circle ticks it off, the rest of the row opens it. */
+.home-todo {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 22px;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-todo:hover {
+    background: var(--c-tint-3);
+}
+
+.home-check {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    margin-top: 10px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 2px solid var(--c-line-strong);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: transparent;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+/* A larger target than the drawn circle, for thumbs. */
+.home-check::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+.home-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+.home-check:hover:not(.is-done) {
+    border-color: var(--c-success);
+    color: color-mix(in srgb, var(--c-success) 60%, transparent);
+}
+
+.home-check.is-done {
+    border-color: var(--c-success);
+    background: var(--c-success);
+    color: var(--c-surface);
+}
+
+.home-check:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.home-todo-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 9px 0;
+}
+
+/* The title, then its Drive / link button right after the text - inline,
+   so on a long title it follows the last word. */
+.home-todo-titleline {
+    display: block;
+    min-width: 0;
+}
+
+.home-todo-open {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+#workloadView .home-todo-titleline .tlink-pill {
+    width: 22px;
+    height: 22px;
+}
+
+/* Priority: a pill in its colour, centred on the row. */
+.home-prio-pill {
+    align-self: center;
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.home-prio-pill[data-tone="high"] {
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+.home-prio-pill[data-tone="medium"] {
+    background: var(--pri-medium-soft);
+    color: var(--pri-medium-ink);
+}
+
+.home-prio-pill[data-tone="low"] {
+    background: var(--c-success-soft);
+    color: var(--c-success);
+}
+
+/* Just ticked off: greyed and struck through until the next refresh. */
+.home-todo.is-done .home-row-title {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+}
+
+.home-todo.is-done .home-prio-pill {
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+}
+
+/* A project: its stage as a bar, then name and client, then its to-dos. */
+.home-project {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 22px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-project:hover {
+    background: var(--c-tint-3);
+}
+
+.home-project .home-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-project-bar {
+    width: 4px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.home-pill {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--c-ink-3);
+}
+
+.home-pill.has-todos {
+    background: var(--c-tint-2);
+    color: var(--c-accent-2);
+}
+
+.home-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 18px 22px;
+    font-size: var(--t-base);
+    color: var(--c-ink-3);
+}
+
+.home-empty svg {
+    flex-shrink: 0;
+    color: var(--c-accent);
+}
+
+/* ---- Card footer ---- */
+
+.home-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 22px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.home-more,
+.home-foot-link {
+    padding: 12px 0;
+    font-size: var(--t-base);
+}
+
+.home-more {
+    font-weight: 600;
+    color: var(--c-accent-2);
+}
+
+.home-foot-link {
+    margin-left: auto;
+    color: var(--c-ink-3);
+}
+
+/* ---- Bookkeeping and contacts: small cards ---- */
+
+#workloadView .home-mini.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
+#workloadView .home-mini.is-contact { --wl-type: var(--type-contact); }
+
+#workloadView .home-mini .home-card-head {
+    padding: 16px 22px 12px;
+}
+
+#workloadView .home-mini .home-card-title {
+    font-size: var(--t-md);
+}
+
+.home-mini-icon {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+.home-mini-count {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+/* The rows sit straight in the card: no second outline inside it. */
+#workloadView .home-mini .workload-list {
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#workloadView .home-mini .workload-row {
+    padding: 9px 22px;
+    gap: 10px;
+}
+
+#workloadView .home-mini .workload-row-mark.is-icon,
+#workloadView .home-mini .workload-row-mark.is-initials {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+#workloadView .home-mini .workload-row-mark.is-initials {
+    border-radius: var(--r-full);
+}
+
+#workloadView .home-mini .workload-row-body {
+    min-width: 0;
+}
+
+#workloadView .home-mini .workload-row-title,
+#workloadView .home-mini .workload-row-context {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Loading: the cards' shape in placeholders ---- */
+
+.home-skel {
+    display: block;
+    height: 12px;
+    border-radius: var(--r-xs);
+    background: var(--c-tint-2);
+    animation: home-skel-pulse 1.4s var(--ease) infinite alternate;
+}
+
+.home-skel.is-title { height: 18px; }
+.home-skel.is-small { height: 10px; }
+.home-skel.is-line { height: 14px; margin: 7px 0; }
+.home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); }
+.home-skel.is-day { height: 52px; border-radius: var(--r-md); }
+
+.home-skel.is-donut {
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: none;
+    border: 10px solid var(--c-tint-2);
+}
+
+.home-skel-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 22px;
+}
+
+.home-skel-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 2px;
+}
+
+@keyframes home-skel-pulse {
+    from { opacity: 1; }
+    to { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-skel {
+        animation: none;
+    }
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 600px) {
+    .home-card-top {
+        padding: 16px 16px 14px;
+    }
+
+    .home-filterbar,
+    .home-group-head,
+    .home-todo,
+    .home-project,
+    .home-empty,
+    .home-skel-row,
+    .home-card-foot,
+    #workloadView .home-mini .home-card-head,
+    #workloadView .home-mini .workload-row {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    #workloadView .home-news {
+        padding: 10px 12px 10px 14px;
+    }
+
+    .home-news-row {
+        white-space: normal;
+        font-size: var(--t-base);
+    }
 }
