@@ -1526,624 +1526,832 @@ input[type="checkbox"] {
    10. Projects
    -------------------------------------------------------------------------- */
 
-/* ---- Summary bands (Home and Projects) ---------------------------------- */
-/* One quiet mist band per page, three equal tiles. Every tile has the same
-   four rows, each of a fixed height, so the tiles line up whatever they
-   show:
+/* ---- Revenue forecast --------------------------------------------------- */
+/* One card above the project list (revenue-forecast-card.js): what the open
+   pipeline should bring in, month by month, under a chosen scenario.
 
-       label        what it is
-       number       the figure, the only large type on the band
-       key          the legend or the axis letters for the chart below
-       chart        resting on the floor of the band
+   The controls have two levels, and they look it:
+       Scenario      Worst / Realistic / Best - sets everything below at once;
+                     the selected one is filled in primary, the strongest
+                     control on the card
+       Assumptions   chance, budget, stages - fine-tune the scenario; quieter,
+                     smaller, on the plain card surface under it
 
-   Every word on the band is one size (--t-sm); only the number is larger.
-   Narrow tiles keep the rows and swap in shorter words (.kc-short). */
+   Stage colours are the pipeline's own (--stage-*); the stage pills double as
+   the chart's legend. */
 
-.kpi-band {
-    --kpi-pad-x: 22px;
-    --kpi-pad-y: 16px;
-    --kpi-gutter: 20px;
-    --kpi-number: 24px;
-    --kpi-chart: 22px;
-    --kpi-rule: rgba(17, 45, 78, 0.10);
-    --kc-track: rgba(17, 45, 78, 0.10);
-    --kc-quiet: rgba(17, 45, 78, 0.22);
-    position: relative;
-    container: kpiband / inline-size;
-    margin: 0 0 24px;
-    padding: var(--kpi-pad-y) var(--kpi-pad-x);
-    background: var(--c-tint);
-    border-radius: var(--r-xl);
-    font-size: var(--t-sm);
-    line-height: 16px;
-    color: var(--c-ink-2);
-}
-
-:root[data-theme="dark"] .kpi-band {
-    --kpi-rule: rgba(219, 226, 239, 0.12);
-    --kc-track: rgba(219, 226, 239, 0.12);
-    --kc-quiet: rgba(219, 226, 239, 0.28);
-}
-
-.kpi-band--projects {
-    margin-bottom: 8px;
-}
-
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: calc(var(--kpi-gutter) * 2 + 1px);
-}
-
-/* Equal tiles: the dividers sit in the gaps, so no tile loses width to
-   padding its neighbours do not have. */
-.kpi {
-    container: kpi / inline-size;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.kpi + .kpi::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(-1 * var(--kpi-gutter) - 1px);
-    width: 1px;
-    background: var(--kpi-rule);
-}
-
-/* Row 1 - label */
-.kpi-head {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    height: 16px;
-    min-width: 0;
-    overflow: hidden;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.kpi-label {
-    flex-shrink: 0;
-}
-
-.kpi-meta {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 400;
-}
-
-.kpi-meta::before {
-    content: "\00B7";
-    margin-right: 6px;
-}
-
-/* Room for the chevron in the corner it sits in. */
-.kpi-band--projects .kpi:last-child .kpi-head {
-    padding-right: 30px;
-}
-
-/* Row 2 - number */
-.kpi-value {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    height: 30px;
-    margin-top: 4px;
-    min-width: 0;
-    white-space: nowrap;
-}
-
-.kpi-number {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: var(--kpi-number);
-    font-weight: 600;
-    line-height: 30px;
-    letter-spacing: -0.02em;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.kpi-unit {
-    flex-shrink: 0;
-    font-weight: 500;
-}
-
-/* "1 overdue": the one thing allowed to raise its voice. A white pill, so
-   the red stays legible on the mist. Same type size as everything else. */
-.kpi-flag {
-    align-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-    height: 20px;
-    padding: 0 8px 0 7px;
-    font-weight: 600;
-    color: var(--c-danger);
+.rf-card {
+    margin: 0 0 16px;
     background: var(--c-surface);
-    border-radius: 999px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+    color: var(--c-ink);
 }
 
-.kpi-flag::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
+.rf-card :is(button, a, summary):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
 }
 
-/* Row 3 - key */
-.kpi-key {
-    height: 16px;
-    margin-top: 8px;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-/* Row 4 - chart, on the floor */
-.kpi-chart {
+.rf-top {
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
-    height: var(--kpi-chart);
-    margin-top: 6px;
+    gap: 16px;
+    padding: 20px 22px 22px;
 }
 
-/* ---- The charts --------------------------------------------------------- */
-
-/* A split bar: one whole, parts in proportion; 2px gaps keep neighbouring
-   colours apart. */
-.kc-stack {
+.rf-head {
     display: flex;
-    gap: 2px;
-    height: 6px;
-    border-radius: 999px;
-    overflow: hidden;
-}
-
-.kc-stack.is-empty {
-    background: var(--kc-track);
-}
-
-.kc-seg {
-    flex: 1 1 0;
-    min-width: 3px;
-    background: var(--kc);
-}
-
-/* A meter: one share of a whole. */
-.kc-meter {
-    height: 6px;
-    border-radius: 999px;
-    background: var(--kc-track);
-    overflow: hidden;
-}
-
-.kc-meter-fill {
-    display: block;
-    width: calc(var(--f, 0) * 100%);
-    height: 100%;
-    border-radius: inherit;
-    background: var(--c-accent);
-}
-
-/* Columns over time, and the letters over them, on one shared grid. */
-.kc-axis,
-.kc-cols {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-}
-
-.kc-axis span {
-    text-align: center;
-}
-
-.kc-axis .is-current {
-    font-weight: 600;
-    color: var(--c-ink);
-}
-
-.kc-cols {
-    height: 100%;
-    align-items: end;
-}
-
-.kc-col {
-    --kc: var(--c-accent);
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    height: 100%;
-}
-
-.kc-col-bar {
-    width: 100%;
-    max-width: 14px;
-    height: max(2px, calc(var(--h, 0) * var(--kpi-chart)));
-    border-radius: 3px;
-    background: var(--kc);
-}
-
-.kc-col.is-zero .kc-col-bar {
-    height: 2px;
-    border-radius: 1px;
-    background: var(--kc-track);
-}
-
-/* Today: the one navy column. */
-.kc-col.is-current .kc-col-bar {
-    background: var(--c-primary);
-}
-
-/* The key: dot, name, figure - on one line. Entries that do not fit wrap
-   onto a second line the row hides, so an entry is shown whole or not at
-   all; the chart's own label and the breakdown still name every part. */
-.kc-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 12px;
-    height: 16px;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    list-style: none;
-}
-
-.kc-legend li {
-    display: inline-flex;
     align-items: center;
-    gap: 5px;
-    height: 16px;
-    white-space: nowrap;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
 }
 
-.kc-legend b {
+#projectsView .rf-title {
+    margin: 0 auto 0 0;
+    font-size: var(--t-lg);
     font-weight: 600;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.kc-dot {
-    display: inline-block;
-    flex-shrink: 0;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--kc);
-}
-
-.kc-note {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.kc-short {
-    display: none;
-}
-
-/* Tones, after .kc-col so a tone wins over a column's default. */
-.kc-tone-progress    { --kc: var(--stage-progress); }
-.kc-tone-proposal    { --kc: var(--stage-proposal); }
-.kc-tone-negotiation { --kc: var(--stage-negotiation); }
-.kc-tone-lead        { --kc: var(--stage-lead); }
-.kc-tone-complete    { --kc: var(--stage-complete); }
-.kc-tone-high        { --kc: var(--c-danger); }
-.kc-tone-medium      { --kc: var(--pri-medium); }
-.kc-tone-low         { --kc: var(--c-ink-4); }
-.kc-tone-none        { --kc: var(--kc-quiet); }
-.kc-tone-accent      { --kc: var(--c-accent); }
-
-/* ---- Narrow tiles ------------------------------------------------------- */
-/* Same rows, shorter words: short labels and figures, and a key of dots and
-   figures without the names. */
-
-@container kpi (max-width: 190px) {
-    .kpi-number {
-        font-size: 20px;
-    }
-
-    .kc-long,
-    .kpi-meta,
-    .kpi-unit,
-    .kc-legend-name {
-        display: none;
-    }
-
-    .kc-short {
-        display: inline;
-    }
-
-    .kc-legend {
-        gap: 0 9px;
-    }
-
-    .kc-legend li {
-        gap: 4px;
-    }
-}
-
-@container kpi (max-width: 118px) {
-    .kpi-number {
-        font-size: 18px;
-    }
-
-    .kpi-flag {
-        padding: 0 6px;
-    }
-
-    .kpi-flag::before {
-        display: none;
-    }
-}
-
-/* ---- The breakdown behind the chevron (Projects) ------------------------ */
-
-.kpi-toggle {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--c-ink-2);
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-
-.kpi-toggle:hover {
-    background: rgba(17, 45, 78, 0.07);
+    letter-spacing: -0.01em;
     color: var(--c-ink);
 }
 
-:root[data-theme="dark"] .kpi-toggle:hover {
-    background: rgba(219, 226, 239, 0.08);
+/* One width for "Expand" and "Collapse", so nothing beside it moves. */
+.rf-expand.btn {
+    width: 108px;
+    border-radius: var(--r-full);
+    gap: 6px;
+    padding: 0 12px 0 14px;
 }
 
-.kpi-toggle svg {
+.rf-expand svg {
+    width: 15px;
+    height: 15px;
     transition: transform var(--dur-2) var(--ease);
 }
 
-.kpi-toggle[aria-expanded="true"] svg {
+.rf-expand[aria-expanded="true"] svg {
     transform: rotate(180deg);
 }
 
-.kpi-detail {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    gap: 36px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--kpi-rule);
-    line-height: 18px;
+/* ---- Controls: scenario in the header, assumptions behind "Adjust" ----
+   "Adjust" opens a slim panel under the header that pushes the chart down,
+   so no month is ever covered. */
+
+.rf-head {
+    flex-wrap: wrap;
 }
 
-.kb-block {
-    min-width: 0;
+.rf-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.kb-title {
-    margin: 0 0 8px;
-    font-size: var(--t-sm);
+.rf-presets .segmented-btn {
+    height: 30px;
+    padding: 0 14px;
+}
+
+.rf-presets .segmented-btn.active {
     font-weight: 600;
-    line-height: 18px;
+}
+
+.rf-adjust {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rf-adjust:hover,
+.rf-adjust[aria-expanded="true"] {
+    background: var(--c-tint-3);
+    border-color: var(--c-line-strong);
     color: var(--c-ink);
 }
 
-.kb-table {
-    width: 100%;
-    border-collapse: collapse;
+/* A custom scenario shows on the button that made it. */
+.rf-adjust.is-custom {
+    border-color: transparent;
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font-weight: 600;
+}
+
+.rf-seg-sm .segmented-btn {
+    height: 28px;
+    padding: 0 10px;
     font-size: var(--t-sm);
+}
+
+.rf-seg-sm .segmented-btn.active {
+    font-weight: 600;
+}
+
+.rf-adjust-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    margin-top: -4px;
+    padding: 8px 12px;
+    border-radius: var(--r-lg);
+    background: var(--c-tint-3);
+    animation: rf-panel-in var(--dur-2) var(--ease);
+}
+
+@keyframes rf-panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rf-adjust-panel { animation: none; }
+}
+
+.rf-adj-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rf-adj-label {
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.rf-adj-reset {
+    margin-left: auto;
+}
+
+/* ---- Stages: switches in the Adjust panel, a plain key under the chart ---- */
+
+.rf-adj-stages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.rf-stage {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    padding: 0 9px;
+    border: 1px dashed var(--c-line-strong);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-4);
+    font: 500 var(--t-sm)/1 var(--font);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rf-stage:hover:not(:disabled) {
+    background: var(--c-tint-3);
+    color: var(--c-ink-2);
+}
+
+.rf-stage.is-on {
+    border-style: solid;
+    border-color: var(--c-line);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    font-weight: 600;
+    box-shadow: var(--e-1);
+}
+
+.rf-stage:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.rf-stage-count {
+    font-weight: 500;
+    color: var(--c-ink-4);
     font-variant-numeric: tabular-nums;
 }
 
-.kb-table th,
-.kb-table td {
-    padding: 5px 0;
-    border: 0;
-    background: transparent;
-    text-align: left;
-    vertical-align: middle;
+.rf-stage-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1.5px var(--c-line-strong);
+}
+
+:is(.rf-stage, .rf-key).is-on .rf-stage-dot {
+    box-shadow: none;
+}
+
+.rf-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 6px;
+}
+
+.rf-body.is-expanded .rf-legend {
+    margin-left: 48px;
+}
+
+.rf-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+    text-decoration: line-through;
+}
+
+.rf-key.is-on {
+    color: var(--c-ink-2);
+    text-decoration: none;
+}
+
+/* ---- Stage colours ---- */
+
+:is(.rf-stage.is-on .rf-stage-dot, .rf-key.is-on .rf-stage-dot, .rf-seg, .rf-row-bar, .rf-value-bar) { background: var(--rf-tone, var(--stage-lead)); }
+.rf-card [data-tone="progress"]    { --rf-tone: var(--stage-progress); }
+.rf-card [data-tone="proposal"]    { --rf-tone: var(--stage-proposal); }
+.rf-card [data-tone="negotiation"] { --rf-tone: var(--stage-negotiation); }
+.rf-card [data-tone="lead"]        { --rf-tone: var(--stage-lead); }
+
+/* ---- Body: the total, and the months ---- */
+
+.rf-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 20px 40px;
+}
+
+.rf-summary {
+    flex: 0 1 260px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+}
+
+.rf-summary-label {
     font-size: var(--t-sm);
-    font-weight: 400;
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.rf-hero {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
     color: var(--c-ink);
 }
 
-.kb-table thead th {
-    padding: 0 0 4px;
-    font-weight: 500;
-    color: var(--c-ink-2);
+.rf-hero-sub {
+    font-size: var(--t-base);
+    color: var(--c-ink-3);
 }
 
-.kb-table tbody th {
-    padding-right: 16px;
+.rf-compare {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 8px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.rf-compare strong {
+    font-weight: 700;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-compare-item.is-active {
+    color: var(--c-ink);
+    font-weight: 600;
+}
+
+.rf-chart {
+    flex: 1 1 440px;
+    min-width: 0;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rf-readout {
+    min-height: 20px;
+    font-size: var(--t-sm);
+    line-height: 20px;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-readout strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.rf-key-ghost {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin: 0 5px 0 1px;
+    border-radius: 2px;
+    background: var(--c-tint);
+    vertical-align: 0;
+}
+
+.rf-plot-wrap {
+    position: relative;
+}
+
+.rf-body.is-expanded .rf-plot-wrap {
+    margin-top: 8px;
+    padding-left: 48px;
+}
+
+.rf-plot {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.rf-tick {
+    position: absolute;
+    left: 48px;
+    right: 0;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.rf-tick.is-base {
+    border-top-color: var(--c-line-strong);
+}
+
+.rf-tick span {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: -8px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--c-ink-4);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-.kb-table tbody th .kc-dot {
-    margin-right: 8px;
-    vertical-align: 1px;
+.rf-col {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xs) var(--r-xs) 0 0;
+    background: transparent;
+    cursor: default;
+    transition: background-color var(--dur-1) var(--ease);
 }
 
-.kb-table .kb-bar-cell {
+.rf-col.is-hover {
+    background: var(--c-accent-softer);
+}
+
+.rf-ghost,
+.rf-stack {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(18px, 66%);
+}
+
+.rf-body.is-expanded :is(.rf-ghost, .rf-stack) {
+    width: min(24px, 62%);
+}
+
+.rf-ghost {
+    border-radius: 4px 4px 0 0;
+    background: var(--c-tint-2);
+}
+
+:root[data-theme="dark"] .rf-ghost {
+    background: var(--c-tint);
+}
+
+.rf-stack {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+}
+
+.rf-seg {
+    display: block;
     width: 100%;
+    flex-shrink: 0;
 }
 
-.kb-table .kb-num {
-    padding-left: 16px;
-    text-align: right;
-    white-space: nowrap;
+.rf-seg:last-child {
+    border-radius: 4px 4px 0 0;
 }
 
-.kb-table tbody td.kb-num:nth-last-child(2) {
+.rf-axis {
+    display: flex;
+    gap: 2px;
+}
+
+.rf-body.is-expanded .rf-axis {
+    padding-left: 48px;
+}
+
+.rf-axis-label {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.rf-body.is-expanded .rf-axis-label {
+    font-size: var(--t-xs);
+}
+
+.rf-axis-label.is-now,
+.rf-axis-label.is-hover {
+    font-weight: 700;
+}
+
+.rf-axis-label.is-hover {
+    color: var(--c-ink);
+}
+
+.rf-m-short {
+    display: none;
+}
+
+@container (max-width: 560px) {
+    .rf-m-long { display: none; }
+    .rf-m-short { display: inline; }
+}
+
+.rf-axis-year {
+    display: block;
+    min-height: 12px;
+    font-size: 10px;
+    color: var(--c-ink-4);
+}
+
+/* ---- Expanded: one row per project ---- */
+
+.rf-detail-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 22px;
+    border-top: 1px solid var(--c-line-2);
+    border-bottom: 1px solid var(--c-line-2);
+    background: var(--c-tint-3);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--c-ink-2);
 }
 
-.kb-sr {
+.rf-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: 600 var(--t-xs)/1.4 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-accent-2);
+    cursor: pointer;
+}
+
+.rf-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.rf-table-scroll {
+    overflow-x: auto;
+}
+
+.rf-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: var(--t-base);
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.rf-table th {
+    padding: 10px 7px 4px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    text-align: left;
+    color: var(--c-ink-4);
+}
+
+.rf-table td {
+    padding: 10px 7px;
+    border-top: 1px solid var(--c-line-2);
+    vertical-align: middle;
+}
+
+.rf-table :is(th, td):first-child { padding-left: 22px; width: 34px; }
+.rf-table :is(th, td):last-child { padding-right: 22px; width: 26%; }
+
+.rf-row:hover {
+    background: var(--c-tint-3);
+}
+
+.rf-row.is-off :is(td:not(:first-child)) {
+    opacity: 0.5;
+}
+
+/* max-width: 0 lets a long name ellipsise instead of widening the table. */
+.rf-cell-project {
+    max-width: 0;
+    width: 40%;
+    white-space: nowrap;
+}
+
+.rf-cell-project > * {
+    vertical-align: middle;
+}
+
+.rf-row-bar {
+    display: inline-block;
+    width: 4px;
+    height: 34px;
+    margin-right: 12px;
+    border-radius: 2px;
+}
+
+.rf-row-text {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: calc(100% - 20px);
+}
+
+.rf-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--c-ink);
+    text-decoration: none;
+}
+
+.rf-row-name:hover {
+    color: var(--c-accent-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.rf-row-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.rf-cell-runs {
+    white-space: nowrap;
+    color: var(--c-ink-3);
+}
+
+.rf-cell-value {
+    white-space: nowrap;
+}
+
+.rf-value-track {
+    display: inline-block;
+    width: calc(100% - 76px);
+    height: 8px;
+    margin-right: 10px;
+    border-radius: 4px;
+    background: var(--c-line-2);
+    overflow: hidden;
+    vertical-align: middle;
+}
+
+.rf-value-bar {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+}
+
+.rf-value {
+    display: inline-block;
+    width: 64px;
+    text-align: right;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.rf-row.is-off .rf-value {
+    color: var(--c-ink-3);
+}
+
+.rf-switch {
+    position: relative;
+    display: block;
+    width: 34px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.rf-switch[aria-checked="true"] {
+    background: var(--c-accent);
+}
+
+.rf-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.rf-switch[aria-checked="true"] .rf-switch-knob {
+    transform: translateX(14px);
+}
+
+.rf-missing {
+    margin: 0;
+    padding: 12px 22px;
+    border-top: 1px solid var(--c-line-2);
+    font-size: var(--t-sm);
+    color: var(--c-warning);
+}
+
+.rf-missing summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.rf-missing ul {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rf-missing li {
+    color: var(--c-ink-3);
+}
+
+.rf-missing li a {
+    margin-right: 6px;
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.rf-empty-missing .rf-missing {
+    padding: 0;
+    border: 0;
+}
+
+.rf-foot {
+    margin: 0;
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.rf-foot strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.rf-empty {
+    margin: 0;
+    padding: 24px 0 8px;
+    font-size: var(--t-base);
+    color: var(--c-ink-3);
+}
+
+.rf-sr {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
-    clip-path: inset(50%);
     white-space: nowrap;
 }
 
-/* Per stage: the solid part is the sum of the minimum budgets, the pale
-   part runs on to the sum of the maximums - the range, drawn. */
-.kb-bar {
-    position: relative;
+/* ---- Loading ---- */
+
+.rf-skel {
     display: block;
-    height: 6px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--kc-track);
+    border-radius: var(--r-sm);
+    background: linear-gradient(90deg, var(--c-tint-2) 25%, var(--c-tint-3) 50%, var(--c-tint-2) 75%);
+    background-size: 200% 100%;
+    animation: rf-shimmer 1.4s ease-in-out infinite;
 }
 
-.kb-bar-high,
-.kb-bar-low {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: calc(var(--f, 0) * 100%);
-    border-radius: inherit;
-    background: var(--kc);
+.rf-skel--line { width: 70%; height: 14px; }
+.rf-skel--hero { width: 55%; height: 44px; }
+.rf-skel--chart { height: 140px; }
+
+@keyframes rf-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
 }
 
-.kb-bar-high {
-    opacity: 0.38;
+@media (prefers-reduced-motion: reduce) {
+    .rf-skel { animation: none; }
 }
 
-.kb-scenarios {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.kb-scenario {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.kb-scenario span {
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
-}
-
-.kb-scenario b {
-    font-size: var(--t-lg);
-    font-weight: 600;
-    line-height: 22px;
-    letter-spacing: -0.01em;
-    color: var(--c-ink-2);
-    font-variant-numeric: tabular-nums;
-}
-
-.kb-scenario.is-main b {
-    color: var(--c-ink);
-}
-
-/* The likely range on the scale of the open pipeline, with the realistic
-   figure as a mark inside it. */
-.kb-range {
-    position: relative;
-    height: 6px;
-    margin: 16px 0 8px;
-    border-radius: 999px;
-    background: var(--kc-track);
-}
-
-.kb-range-band {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(var(--a, 0) * 100%);
-    width: calc((var(--b, 0) - var(--a, 0)) * 100%);
-    min-width: 4px;
-    border-radius: 999px;
-    background: var(--c-accent);
-    opacity: 0.45;
-}
-
-.kb-range-mark {
-    position: absolute;
-    top: -5px;
-    bottom: -5px;
-    left: calc(var(--m, 0) * 100%);
-    width: 3px;
-    margin-left: -1.5px;
-    border-radius: 2px;
-    background: var(--c-primary);
-}
-
-.kb-axis {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
-}
-
-.kb-note {
-    margin: 10px 0 0;
-    font-size: var(--t-sm);
-    line-height: 18px;
-    color: var(--c-ink-2);
-}
-
-.kb-note + .kb-note {
-    margin-top: 2px;
-}
-
-@container kpiband (max-width: 640px) {
-    .kpi-detail {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 22px;
-    }
-}
-
-/* ---- Phones ------------------------------------------------------------- */
+/* ---- Phones ---- */
 
 @media (max-width: 768px) {
-    .kpi-band {
-        --kpi-pad-x: 14px;
-        --kpi-pad-y: 14px;
-        --kpi-gutter: 11px;
-        --kpi-chart: 20px;
-        margin-bottom: 20px;
+    .rf-card {
+        margin-bottom: 12px;
     }
 
-    .kpi-band--projects {
-        margin-bottom: 4px;
+    .rf-top {
+        padding: 16px 14px 18px;
     }
 
-    .kpi-toggle {
-        top: 8px;
-        right: 6px;
-        width: 28px;
-        height: 28px;
+    .rf-hero {
+        font-size: 36px;
     }
 
-    .kpi-band--projects .kpi:last-child .kpi-head {
-        padding-right: 22px;
+    .rf-tools {
+        order: 3;
+        flex-basis: 100%;
     }
+
+    /* The scenario switch takes what the row has left. */
+    .rf-presets.segmented {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .rf-presets .segmented-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 0 8px;
+    }
+
+    .rf-adj-field {
+        flex-wrap: wrap;
+    }
+
+    .rf-adj-reset {
+        margin-left: 0;
+    }
+
+    .rf-detail-bar,
+    .rf-missing,
+    .rf-foot {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .rf-table :is(th, td):first-child { padding-left: 14px; }
+    .rf-table :is(th, td):last-child { padding-right: 14px; }
 }
 
 /* ---- Toolbar ------------------------------------------------------------ */

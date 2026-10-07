@@ -1204,19 +1204,22 @@ function assetUrl(string $path): string
                     </div>
 
                     <!--
-                        Pipeline summary: three small charts drawn by app.js from
-                        the projects on screen. The chevron opens the breakdown.
+                        Revenue forecast: drawn by revenue-forecast-card.js from
+                        every open project. Until the projects arrive it shows
+                        a skeleton in the card's shape.
                     -->
-                    <section class="kpi-band kpi-band--projects" id="projectsSummary" aria-label="Pipeline summary" hidden>
-                        <div class="kpi-grid" id="projectsKpis"></div>
-                        <button type="button" class="kpi-toggle" id="projectsBreakdownToggle"
-                                aria-expanded="false" aria-controls="projectsBreakdown"
-                                aria-label="Show breakdown" title="Show breakdown">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="m6 9 6 6 6-6"/>
-                            </svg>
-                        </button>
-                        <div class="kpi-detail" id="projectsBreakdown" hidden></div>
+                    <section class="rf-card" id="revenueForecast" aria-label="Revenue forecast" aria-busy="true">
+                        <div class="rf-top">
+                            <div class="rf-head"><h2 class="rf-title">Revenue forecast</h2></div>
+                            <div class="rf-body">
+                                <div class="rf-summary">
+                                    <span class="rf-skel rf-skel--line"></span>
+                                    <span class="rf-skel rf-skel--hero"></span>
+                                    <span class="rf-skel rf-skel--line"></span>
+                                </div>
+                                <div class="rf-chart"><div class="rf-skel rf-skel--chart"></div></div>
+                            </div>
+                        </div>
                     </section>
 
                     <div class="list-header">
@@ -2222,7 +2225,8 @@ function assetUrl(string $path): string
         <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
-        <script src="<?= assetUrl('assets/js/charts.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/revenue-forecast.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/revenue-forecast-card.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
