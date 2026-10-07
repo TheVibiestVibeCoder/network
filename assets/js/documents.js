@@ -6,7 +6,9 @@
  * drop to add more.
  *
  * Self-contained module; app.js only calls window.ProjectDocuments.load() when
- * a project's detail view is drawn and .reset() when it closes.
+ * a project's detail view is drawn and .reset() when it closes. For a project
+ * being created, .startDraft() holds the files in the sheet and
+ * .commitDraft() uploads them once the project exists.
  */
 (function () {
     'use strict';
@@ -25,7 +27,11 @@
         // The label the file picker was opened for.
         pickerLabel: null,
         // Guards against a slow answer for a project that is no longer on screen.
-        token: 0
+        token: 0,
+        // A project being created: files wait here, { key, file, label }.
+        draft: false,
+        pending: [],
+        pendingKey: 0
     };
 
     const els = {};
@@ -148,13 +154,24 @@
         return refresh();
     }
 
+    /** A project being created: no documents yet, files are held until it exists. */
+    function startDraft() {
+        reset();
+        if (!els.section) return Promise.resolve();
+        state.draft = true;
+        state.projectName = 'the new project';
+        return refresh();
+    }
+
     async function refresh() {
         const projectId = state.projectId;
-        if (!projectId) return;
+        if (!projectId && !state.draft) return;
         const token = ++state.token;
 
         try {
-            const result = await request('list', { query: { project_id: projectId } });
+            const result = projectId
+                ? await request('list', { query: { project_id: projectId } })
+                : await request('meta');
             if (token !== state.token || state.projectId !== projectId) return;
 
             const data = result.data || {};
@@ -176,6 +193,8 @@
         state.projectId = null;
         state.projectName = '';
         state.documents = [];
+        state.draft = false;
+        state.pending = [];
         state.token++;
         hideDrop();
         if (els.list) els.list.innerHTML = '';
@@ -188,13 +207,28 @@
     }
 
     function renderList() {
-        const count = state.documents.length;
+        const count = state.draft ? state.pending.length : state.documents.length;
         els.count.textContent = String(count);
         els.count.hidden = count === 0;
 
         els.list.innerHTML = count === 0
             ? ''
-            : `<div class="pdoc-card">${state.documents.map(rowHtml).join('')}</div>`;
+            : `<div class="pdoc-card">${(state.draft ? state.pending.map(pendingRowHtml) : state.documents.map(rowHtml)).join('')}</div>`;
+    }
+
+    /** A file waiting for its project: the same row, uploaded on Create. */
+    function pendingRowHtml(item) {
+        const name = escapeHtml(item.file.name);
+        return `
+            <div class="pdoc-item" title="${escapeHtml(item.file.name + ' · ' + formatSize(item.file.size) + ' · added when the project is created')}">
+                <span class="pdoc-type" aria-hidden="true">${escapeHtml(extensionOf(item.file.name))}</span>
+                <span class="pdoc-name">${name}</span>
+                ${labelSelect({ id: 'p' + item.key, label: item.label, name: item.file.name })}
+                <span class="pdoc-date">${escapeHtml(formatSize(item.file.size))}</span>
+                <div class="pdoc-tools">
+                    <button type="button" class="pdoc-act pdoc-act--danger" data-doc-pending-remove="${item.key}" title="Remove" aria-label="Remove ${name}">${ICON_TRASH}</button>
+                </div>
+            </div>`;
     }
 
     function rowHtml(doc) {
@@ -285,7 +319,7 @@
     async function upload(fileList, label) {
         const projectId = state.projectId;
         const files = Array.from(fileList || []);
-        if (!projectId || !label || files.length === 0 || state.uploading) return;
+        if ((!projectId && !state.draft) || !label || files.length === 0 || state.uploading) return;
 
         const problems = [];
         const ready = [];
@@ -295,15 +329,44 @@
             else ready.push(file);
         });
 
+        // Not created yet: the files wait in the sheet.
+        if (state.draft) {
+            ready.forEach(file => state.pending.push({ key: ++state.pendingKey, file, label }));
+            renderList();
+            if (problems.length > 0) toast(problems.join(' / '), true);
+            return;
+        }
+
         state.uploading = true;
         setBusy(true);
+        const sent = await send(projectId, ready.map(file => ({ file, label })));
+        const added = sent.added;
+        problems.push(...sent.problems);
+        state.uploading = false;
+        setBusy(false);
 
-        // One request per file. Several large files in a single POST would
-        // run into post_max_size, which PHP reports by discarding all of it.
+        // The sheet may show another project by now; its list is not ours to redraw.
+        if (added > 0 && state.projectId === projectId) {
+            await refresh();
+        }
+
+        if (problems.length > 0) {
+            toast((added > 0 ? `${added} added. ` : '') + problems.join(' / '), true);
+        } else {
+            toast(`${added} document${added === 1 ? '' : 's'} added as ${label}`);
+        }
+    }
+
+    /**
+     * One request per file. Several large files in a single POST would run
+     * into post_max_size, which PHP reports by discarding all of it.
+     */
+    async function send(projectId, items) {
         let added = 0;
-        for (let i = 0; i < ready.length; i++) {
-            const file = ready[i];
-            toast(ready.length > 1 ? `Uploading ${i + 1} of ${ready.length}: ${file.name}` : `Uploading ${file.name}…`);
+        const problems = [];
+        for (let i = 0; i < items.length; i++) {
+            const { file, label } = items[i];
+            toast(items.length > 1 ? `Uploading ${i + 1} of ${items.length}: ${file.name}` : `Uploading ${file.name}…`);
 
             const form = new FormData();
             form.append('project_id', String(projectId));
@@ -318,20 +381,20 @@
                 problems.push(`${file.name}: ${error.message}`);
             }
         }
+        return { added, problems };
+    }
 
-        state.uploading = false;
-        setBusy(false);
-
-        // The sheet may show another project by now; its list is not ours to redraw.
-        if (added > 0 && state.projectId === projectId) {
-            await refresh();
-        }
-
-        if (problems.length > 0) {
-            toast((added > 0 ? `${added} added. ` : '') + problems.join(' / '), true);
-        } else {
-            toast(`${added} document${added === 1 ? '' : 's'} added as ${label}`);
-        }
+    /**
+     * The project now exists: upload the files held for it. Resolves to the
+     * problems, if any, so the caller can report them with the rest.
+     */
+    async function commitDraft(projectId) {
+        const items = state.draft ? state.pending.slice() : [];
+        state.draft = false;
+        state.pending = [];
+        if (items.length === 0) return [];
+        const { problems } = await send(projectId, items);
+        return problems;
     }
 
     // ------------------------------------------------------------------
@@ -432,7 +495,7 @@
 
     function bindDrops() {
         const onDrag = event => {
-            if (!isFileDrag(event) || !state.projectId || state.labels.length === 0) return;
+            if (!isFileDrag(event) || (!state.projectId && !state.draft) || state.labels.length === 0) return;
 
             // Always claimed while files are over the sheet: left alone, the
             // browser would open a file dropped beside a target and navigate
@@ -501,6 +564,14 @@
                 return;
             }
 
+            const pendingRemove = event.target.closest('[data-doc-pending-remove]');
+            if (pendingRemove) {
+                const key = Number(pendingRemove.dataset.docPendingRemove);
+                state.pending = state.pending.filter(item => item.key !== key);
+                renderList();
+                return;
+            }
+
             const deleteButton = event.target.closest('[data-doc-delete]');
             if (deleteButton) {
                 remove(deleteButton.dataset.docDelete);
@@ -514,7 +585,15 @@
 
         els.section.addEventListener('change', event => {
             const select = event.target.closest('[data-doc-label]');
-            if (select) setLabel(select);
+            if (!select) return;
+            // A held file: its label is only remembered.
+            if (select.dataset.docLabel.startsWith('p')) {
+                const key = Number(select.dataset.docLabel.slice(1));
+                const item = state.pending.find(entry => entry.key === key);
+                if (item) item.label = select.value;
+                return;
+            }
+            setLabel(select);
         });
 
         els.input.addEventListener('change', () => {
@@ -528,7 +607,7 @@
         bindDrops();
     }
 
-    window.ProjectDocuments = { load, reset };
+    window.ProjectDocuments = { load, reset, startDraft, commitDraft };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bind);

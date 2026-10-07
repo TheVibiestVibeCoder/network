@@ -204,11 +204,12 @@
         return first + (/s$/i.test(first) ? '\u2019 ' : '\u2019s ') + what;
     }
 
-    function cardHead(title, go) {
+    /** A card's title, with "Create new" opening the same sheet as everywhere else. */
+    function cardHead(title, create) {
         return `
             <div class="home-card-head">
                 <h2 class="home-card-title">${escapeHtml(title)}</h2>
-                ${go ? `<button type="button" class="home-link" data-home-go="${go}">View all</button>` : ''}
+                ${create ? `<button type="button" class="home-link" data-home-create="${create}">Create new</button>` : ''}
             </div>`;
     }
 
@@ -334,7 +335,7 @@
         return `
             <article class="home-card home-todos" aria-label="${escapeHtml(cardTitle('to-dos'))}">
                 <div class="home-card-top">
-                    ${cardHead(cardTitle('to-dos'), 'todos')}
+                    ${cardHead(cardTitle('to-dos'), 'todo')}
                     <div class="home-summary">
                         <div class="home-breakdown">
                             ${donut(segments, priorities.map(p => p.key), summary.open, 'open')}
@@ -358,10 +359,25 @@
             </article>`;
     }
 
+    /**
+     * Claude's proposal, marked as on the other pages (review.js): the badge,
+     * and for a to-do the accept / reject buttons beside it.
+     */
+    function isProposed(record) {
+        return !!record && record.review_status === 'pending';
+    }
+
+    function reviewMarks(type, record) {
+        const review = window.CRMReview;
+        if (!review || !isProposed(record)) return '';
+        return review.badge(record) + (type === 'todo' ? review.inlineActions('todo', Number(record.id)) : '');
+    }
+
     function todoRow(entry) {
         const todo = entry.todo;
         const id = Number(todo.id);
         const done = !HD.isOpen(todo);
+        const proposed = isProposed(todo);
         const busy = state.busy.has(id);
         const title = escapeHtml(todo.title || '');
 
@@ -377,7 +393,7 @@
         // title is the button; the rest of the row opens the to-do too, for
         // the mouse (the row carries data-workload-open as well).
         return `
-            <li class="home-todo${done ? ' is-done' : ''}" data-workload-open="todo" data-id="${id}">
+            <li class="home-todo${done ? ' is-done' : ''}${proposed ? ' is-proposed' : ''}" data-workload-open="todo" data-id="${id}">
                 <button type="button" class="home-check${done ? ' is-done' : ''}"
                         data-workload-toggle="${id}" data-done="${done ? 1 : 0}" data-fk="check-${id}"
                         aria-label="${done ? 'Mark as open' : 'Mark as done'}: ${title || 'To-do'}"
@@ -389,7 +405,7 @@
                         <span class="home-todo-titleline">
                             <button type="button" class="home-todo-open" data-workload-open="todo" data-id="${id}">
                                 <span class="home-row-title">${title}</span>
-                            </button>${newTag('todo', id)}${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
+                            </button>${newTag('todo', id)}${proposed ? reviewMarks('todo', todo) : ''}${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
                         </span>
                         ${context ? `<span class="home-row-context">${context}</span>` : ''}
                     </span>
@@ -424,7 +440,7 @@
         return `
             <article class="home-card home-projects" aria-label="${escapeHtml(cardTitle('projects'))}">
                 <div class="home-card-top">
-                    ${cardHead(cardTitle('projects'), 'projects')}
+                    ${cardHead(cardTitle('projects'), 'project')}
                     <div class="home-breakdown">
                         ${donut(segments, HD.STAGES.map(s => s.tone), active.length, 'active')}
                         <div class="home-legend">${legend}</div>
@@ -445,10 +461,10 @@
 
         return `
             <li>
-                <button type="button" class="home-project" data-workload-open="project" data-id="${project.id}">
+                <button type="button" class="home-project${isProposed(project) ? ' is-proposed' : ''}" data-workload-open="project" data-id="${project.id}">
                     <span class="home-project-bar" data-tone="${stage.tone}"></span>
                     <span class="home-row-body">
-                        <span class="home-row-title">${escapeHtml(project.name || '')}${newTag('project', project.id)}</span>
+                        <span class="home-row-title">${escapeHtml(project.name || '')}${newTag('project', project.id)}${reviewMarks('project', project)}</span>
                         <span class="home-row-context">${context}</span>
                     </span>
                     <span class="home-pill${open ? ' has-todos' : ''}">${open ? open + (open === 1 ? ' to-do' : ' to-dos') : 'No to-dos'}</span>
@@ -535,7 +551,7 @@
     // New for you
     // ------------------------------------------------------------------
 
-    const NEWS_LABELS = { todo: 'to-do', project: 'project', contact: 'contact', bookkeeping: 'bookkeeping row' };
+    const NEWS_LABELS = { todo: 'To-do', project: 'Project', contact: 'Contact', bookkeeping: 'Bookkeeping' };
 
     function isNew(type, id) {
         const items = state.news && state.news.items;
@@ -547,10 +563,11 @@
     }
 
     /**
-     * What has been assigned to you since you last looked: one slim line per
-     * item - the title, then who handed it over, on what, and when - each one
-     * click from its record. The first few show; "+N more" opens the rest.
-     * "Got it" clears it.
+     * What has been assigned to you since you last looked. A small card: a
+     * head with the count and "Mark as seen", then one row per item - its
+     * kind, its title and what it belongs to, and who handed it over when -
+     * each one click from its record. The first few show; "+N more" opens
+     * the rest.
      */
     function newsBox() {
         const news = state.news;
@@ -560,17 +577,18 @@
 
         const rows = items.map(item => {
             const type = NEWS_LABELS[item.type] ? item.type : 'todo';
-            let meta = 'new ' + NEWS_LABELS[type];
-            if (item.assigned_by_name) meta += ' from ' + item.assigned_by_name;
-            if (item.context) meta += (type === 'todo' ? ' on ' : ' · ') + item.context;
-            const when = describeWhen(item.assigned_at);
-            if (when) meta += ' · ' + when;
+            const by = item.assigned_by_name ? 'from ' + item.assigned_by_name : '';
+            const meta = [by, describeWhen(item.assigned_at)].filter(Boolean).join(' · ');
 
             return `
                 <li>
                     <button type="button" class="home-news-row" data-workload-open="${type}" data-id="${item.id}">
-                        <strong class="home-news-title">${escapeHtml(item.title)}</strong>
-                        <span class="home-news-meta">· ${escapeHtml(meta)}</span>
+                        <span class="home-news-type" data-type="${type}">${NEWS_LABELS[type]}</span>
+                        <span class="home-news-main">
+                            <span class="home-news-title">${escapeHtml(item.title)}</span>
+                            ${item.context ? `<span class="home-news-context">${escapeHtml(item.context)}</span>` : ''}
+                        </span>
+                        ${meta ? `<span class="home-news-meta">${escapeHtml(meta)}</span>` : ''}
                     </button>
                 </li>`;
         }).join('');
@@ -580,20 +598,22 @@
         let more = '';
         if (news.items.length > NEWS_LIMIT) {
             more = `<button type="button" class="home-news-more" data-home-more="news" data-fk="more-news" aria-expanded="${state.ui.allNews}">
-                        ${state.ui.allNews ? 'Show less' : `+${hidden} more`}
+                        ${state.ui.allNews ? 'Show less' : `Show ${hidden} more`}
                     </button>`;
         } else if (hidden > 0) {
             more = `<span class="home-news-rest">and ${hidden} more</span>`;
         }
 
         return `
-            <section class="home-news" aria-label="New for you" title="Assigned to you since you last looked">
-                <span class="home-news-icon" aria-hidden="true">${ICON_NEW}</span>
+            <section class="home-news" aria-labelledby="homeNewsHeading">
+                <div class="home-news-head">
+                    <span class="home-news-icon" aria-hidden="true">${ICON_NEW}</span>
+                    <h2 class="home-news-heading" id="homeNewsHeading">New for you</h2>
+                    <span class="home-news-count" title="Assigned to you since you last looked">${news.total}</span>
+                    <button type="button" class="home-news-dismiss" data-workload-news-seen>Mark as seen</button>
+                </div>
                 <ul class="home-news-list">${rows}</ul>
-                <span class="home-news-actions">
-                    ${more}
-                    <button type="button" class="home-news-dismiss" data-workload-news-seen>Got it</button>
-                </span>
+                ${more ? `<div class="home-news-foot">${more}</div>` : ''}
             </section>`;
     }
 
@@ -659,10 +679,10 @@
         const sub = contact.company || contact.location || contact.email || '';
 
         return `
-            <button type="button" class="workload-row" data-workload-open="contact" data-id="${contact.id}">
+            <button type="button" class="workload-row${isProposed(contact) ? ' is-proposed' : ''}" data-workload-open="contact" data-id="${contact.id}">
                 <span class="workload-row-mark is-initials">${escapeHtml(getInitials(contact.name))}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(contact.name || '')}${newTag('contact', contact.id)}</span>
+                    <span class="workload-row-title">${escapeHtml(contact.name || '')}${newTag('contact', contact.id)}${reviewMarks('contact', contact)}</span>
                     ${sub ? `<span class="workload-row-context">${escapeHtml(sub)}</span>` : ''}
                 </span>
                 <span class="workload-row-meta"></span>
@@ -787,6 +807,8 @@
             const key = el.getAttribute('data-home-more');
             const prop = key === 'news' ? 'allNews' : (key === 'projects' ? 'allProjects' : 'allTodos');
             setUi({ [prop]: !ui[prop] });
+        } else if ((el = t.closest('[data-home-create]'))) {
+            create(el.getAttribute('data-home-create'));
         } else if ((el = t.closest('[data-home-go]'))) {
             goTo(el.getAttribute('data-home-go'));
         } else {
@@ -796,14 +818,24 @@
         event.stopPropagation();
     }
 
-    /** "View all" and "Completed": the full lists, for the person shown. */
+    /** "Create new": the project or to-do sheet, ready to fill in. */
+    function create(what) {
+        const crm = window.CRM;
+        if (!crm) return;
+
+        if (what === 'project' && crm.openNewProject) {
+            crm.openNewProject();
+        } else if (what === 'todo' && crm.openNewTodo) {
+            crm.openNewTodo();
+        }
+    }
+
+    /** "Completed": the full list, for the person shown. */
     function goTo(where) {
         const crm = window.CRM;
         if (!crm) return;
 
-        if (where === 'projects') {
-            crm.switchView('projects');
-        } else if (crm.openTodos) {
+        if (crm.openTodos) {
             crm.openTodos({ status: where === 'completed' ? 'completed' : 'open', assigned: state.who });
         } else {
             crm.switchView('todos');
@@ -1319,7 +1351,7 @@
             if (todoId) setCompletion(todoId, check.getAttribute('data-done') !== '1');
         });
 
-        // The dashboard's filters, folds and "View all" links.
+        // The dashboard's filters, folds and "Create new" / "Completed" links.
         els.body.addEventListener('click', handleDashboardClick);
 
         // Rows open the record they stand for, using the handles app.js exposes.

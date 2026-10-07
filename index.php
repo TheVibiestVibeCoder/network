@@ -1918,42 +1918,60 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- To-Do Detail Sheet: what a to-do is about - its facts, its
-             description and its links (mostly Google Drive documents).
-             Editing opens the to-do form on top of it. -->
+        <!-- To-Do Sheet: what a to-do is about - its facts, its description
+             and its links (mostly Google Drive documents). Viewing, editing
+             and creating share this one layout, as on the project sheet. -->
         <div class="modal" id="todoDetailModal">
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-large">
                 <div class="modal-header">
                     <div class="overview-header-info">
                         <div class="overview-title-info">
-                            <h2 id="todoDetailTitle">To-Do</h2>
-                            <p class="overview-company" id="todoDetailContext"></p>
+                            <h2 id="todoDetailTitle" data-ov="view">To-Do</h2>
+                            <input type="text" id="todoEditTitle" class="form-input ov-edit-title" data-ov="edit" aria-label="Title" placeholder="What needs doing" maxlength="255" required>
+                            <p class="overview-company" id="todoDetailContext" data-ov="view"></p>
+                            <div class="ov-field-pair ov-edit-context" data-ov="edit">
+                                <select id="todoEditAssignType" class="form-select" aria-label="Belongs to">
+                                    <option value="contact">Contact</option>
+                                    <option value="project">Project</option>
+                                </select>
+                                <select id="todoEditAssigneeId" class="form-select" aria-label="Contact or project" required></select>
+                            </div>
                             <p class="overview-edited" id="todoDetailEdited"></p>
                         </div>
                     </div>
                     <button type="button" class="modal-close" id="closeTodoDetail">&times;</button>
                 </div>
                 <div class="modal-body overview-body">
+                    <!-- On a new to-do the choice is applied right after it
+                         is created (saveTodoEdit in app.js). -->
                     <div id="todoDetailAssignee"></div>
 
                     <div class="overview-section">
                         <div class="overview-details">
-                            <div class="overview-detail-item">
+                            <div class="overview-detail-item tdetail-status-item">
                                 <span class="detail-label">Status</span>
                                 <span class="detail-value" id="todoDetailStatus"></span>
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Due</span>
-                                <span class="detail-value" id="todoDetailDue"></span>
+                                <label class="detail-label" for="todoEditDueDate">Due</label>
+                                <span class="detail-value" id="todoDetailDue" data-ov="view"></span>
+                                <input type="date" id="todoEditDueDate" class="form-input ov-field" data-ov="edit">
                             </div>
                             <div class="overview-detail-item">
-                                <span class="detail-label">Priority</span>
-                                <span class="detail-value" id="todoDetailPriority"></span>
+                                <label class="detail-label" for="todoEditPriority">Priority</label>
+                                <span class="detail-value" id="todoDetailPriority" data-ov="view"></span>
+                                <select id="todoEditPriority" class="form-select ov-field" data-ov="edit">
+                                    <option value="">No priority</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
                             </div>
                             <div class="overview-detail-item full-width">
-                                <span class="detail-label">Description</span>
-                                <span class="detail-value tdetail-description" id="todoDetailDescription"></span>
+                                <label class="detail-label" for="todoEditDescription">Description</label>
+                                <span class="detail-value tdetail-description" id="todoDetailDescription" data-ov="view"></span>
+                                <textarea id="todoEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="Optional details"></textarea>
                             </div>
                         </div>
                     </div>
@@ -1985,83 +2003,16 @@ function assetUrl(string $path): string
                         </svg>
                         Delete
                     </button>
-                    <button type="button" class="btn btn-secondary" id="toggleTodoDetailDoneBtn">Mark as done</button>
-                    <button type="button" class="btn btn-secondary" id="editTodoDetailBtn">
+                    <button type="button" class="btn btn-secondary" id="toggleTodoDetailDoneBtn" data-ov="view">Mark as done</button>
+                    <button type="button" class="btn btn-secondary" id="editTodoDetailBtn" data-ov="view">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                         </svg>
                         Edit
                     </button>
+                    <button type="button" class="btn btn-secondary" id="cancelTodoEditBtn" data-ov="edit">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveTodoEditBtn" data-ov="edit">Save</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- To-Do Modal -->
-        <div class="modal" id="todoModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 id="todoModalTitle">New To-Do</h2>
-                    <button type="button" class="modal-close" id="closeTodoModal">&times;</button>
-                </div>
-                <form id="todoForm">
-                    <div class="modal-body">
-                        <div class="form-section">
-                            <div class="form-group">
-                                <label for="todoTitle">Title *</label>
-                                <input type="text" id="todoTitle" class="form-input" required maxlength="255" placeholder="Follow up with client">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="todoDescription">Description</label>
-                                <textarea id="todoDescription" class="form-input" rows="3" placeholder="Optional details"></textarea>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="todoDueDate">Due Date</label>
-                                <input type="date" id="todoDueDate" class="form-input">
-                            </div>
-
-                            <!-- On a new to-do the choice is applied right after
-                                 it is created (saveTodo in app.js). -->
-                            <div class="form-group" id="todoAssigneeGroup" hidden>
-                                <label>Assigned to</label>
-                                <div id="todoAssignee"></div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="todoPriority">Priority</label>
-                                <select id="todoPriority" class="form-select">
-                                    <option value="">No priority</option>
-                                    <option value="high">High</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="low">Low</option>
-                                </select>
-                            </div>
-
-                            <div class="todo-assignment-grid">
-                                <div class="form-group">
-                                    <label for="todoAssignType">Belongs to *</label>
-                                    <select id="todoAssignType" class="form-select" required>
-                                        <option value="contact">Contact</option>
-                                        <option value="project">Project</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="todoAssigneeId">Contact or project *</label>
-                                    <select id="todoAssigneeId" class="form-select" required>
-                                        <option value="">Select...</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <p class="overview-edited modal-footer-edited" id="todoEdited"></p>
-                        <button type="button" class="btn btn-secondary" id="cancelTodoBtn">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="saveTodoBtn">Create To-Do</button>
-                    </div>
-                </form>
             </div>
         </div>
 

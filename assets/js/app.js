@@ -79,8 +79,11 @@
         todoAssignedFilter: '',
         todoSortBy: 'default',
         todoFilterOptionsInitialized: false,
-        editingTodoId: null,
-        todoModalContext: null
+        // A project being created: what is added to its sheet before it
+        // exists, applied right after (saveProjectEdit). null otherwise.
+        projectDraft: null,
+        // How the to-do sheet was opened for a new to-do (openNewTodo).
+        todoSheetContext: null
     };
 
     // ============================================
@@ -267,9 +270,6 @@
         projectEditEstCompletion: document.getElementById('projectEditEstCompletion'),
         projectEditDescription: document.getElementById('projectEditDescription'),
 
-        // To-do modal
-        todoModal: document.getElementById('todoModal'),
-
         // To-do detail sheet
         todoDetailModal: document.getElementById('todoDetailModal'),
         todoDetailTitle: document.getElementById('todoDetailTitle'),
@@ -291,20 +291,14 @@
         deleteTodoDetailBtn: document.getElementById('deleteTodoDetailBtn'),
         toggleTodoDetailDoneBtn: document.getElementById('toggleTodoDetailDoneBtn'),
         editTodoDetailBtn: document.getElementById('editTodoDetailBtn'),
-        todoModalTitle: document.getElementById('todoModalTitle'),
-        todoEdited: document.getElementById('todoEdited'),
-        todoAssignee: document.getElementById('todoAssignee'),
-        todoAssigneeGroup: document.getElementById('todoAssigneeGroup'),
-        todoForm: document.getElementById('todoForm'),
-        todoTitle: document.getElementById('todoTitle'),
-        todoDescription: document.getElementById('todoDescription'),
-        todoDueDate: document.getElementById('todoDueDate'),
-        todoPriority: document.getElementById('todoPriority'),
-        todoAssignType: document.getElementById('todoAssignType'),
-        todoAssigneeId: document.getElementById('todoAssigneeId'),
-        closeTodoModal: document.getElementById('closeTodoModal'),
-        cancelTodoBtn: document.getElementById('cancelTodoBtn'),
-        saveTodoBtn: document.getElementById('saveTodoBtn')
+        cancelTodoEditBtn: document.getElementById('cancelTodoEditBtn'),
+        saveTodoEditBtn: document.getElementById('saveTodoEditBtn'),
+        todoEditTitle: document.getElementById('todoEditTitle'),
+        todoEditDescription: document.getElementById('todoEditDescription'),
+        todoEditDueDate: document.getElementById('todoEditDueDate'),
+        todoEditPriority: document.getElementById('todoEditPriority'),
+        todoEditAssignType: document.getElementById('todoEditAssignType'),
+        todoEditAssigneeId: document.getElementById('todoEditAssigneeId')
     };
 
     // ============================================
@@ -2164,7 +2158,7 @@
     }
 
     function populateTodoAssigneeOptions(assignType, selectedId = null) {
-        if (!elements.todoAssigneeId) {
+        if (!elements.todoEditAssigneeId) {
             return;
         }
 
@@ -2184,207 +2178,8 @@
             html += `<option value="${selectedId}">Selected item not found</option>`;
         }
 
-        elements.todoAssigneeId.innerHTML = html;
-        elements.todoAssigneeId.value = selectedId ? String(selectedId) : '';
-    }
-
-    function updateTodoModalForMode(isEditMode) {
-        if (!elements.todoModalTitle || !elements.saveTodoBtn) {
-            return;
-        }
-
-        if (isEditMode) {
-            elements.todoModalTitle.textContent = 'To-Do Bearbeiten';
-            elements.saveTodoBtn.textContent = 'Speichern';
-        } else {
-            elements.todoModalTitle.textContent = 'New To-Do';
-            elements.saveTodoBtn.textContent = 'Create To-Do';
-        }
-    }
-
-    async function openTodoModal(context = null, todoData = null) {
-        if (!elements.todoModal || !elements.todoForm) {
-            return;
-        }
-
-        const isEditMode = !!(todoData && todoData.id);
-
-        state.todoModalContext = context;
-        state.editingTodoId = isEditMode ? Number(todoData.id) : null;
-        elements.todoForm.reset();
-        elements.todoAssignType.disabled = false;
-        elements.todoAssigneeId.disabled = false;
-        updateTodoModalForMode(isEditMode);
-
-        await ensureTodoAssignmentData(true);
-
-        let assignType = 'contact';
-        let assigneeId = null;
-
-        if (isEditMode) {
-            if (todoData.project_id) {
-                assignType = 'project';
-                assigneeId = todoData.project_id;
-            } else if (todoData.contact_id) {
-                assignType = 'contact';
-                assigneeId = todoData.contact_id;
-            }
-        } else if (context && context.type === 'project') {
-            assignType = 'project';
-            assigneeId = context.id || null;
-            elements.todoModalTitle.textContent = 'New To-Do for Project';
-        } else if (context && context.type === 'contact') {
-            assignType = 'contact';
-            assigneeId = context.id || null;
-            elements.todoModalTitle.textContent = 'New To-Do for Contact';
-        }
-
-        elements.todoAssignType.value = assignType;
-        populateTodoAssigneeOptions(assignType, assigneeId);
-
-        if (!isEditMode && context && context.locked) {
-            elements.todoAssignType.disabled = true;
-            elements.todoAssigneeId.disabled = true;
-        }
-
-        if (isEditMode) {
-            elements.todoTitle.value = todoData.title || '';
-            elements.todoDescription.value = todoData.description || '';
-            elements.todoDueDate.value = todoData.due_date || '';
-            if (elements.todoPriority) {
-                elements.todoPriority.value = todoData.priority || '';
-            }
-            setEditedLine(elements.todoEdited, todoData);
-            setAssigneeControl(elements.todoAssignee, 'todo', todoData);
-            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
-        } else {
-            // A to-do being created has nobody to attribute yet. The assignee
-            // control has no record id, so choosing someone only marks the
-            // form; saveTodo() applies it once the to-do exists.
-            setEditedLine(elements.todoEdited, null);
-            if (elements.todoAssignee) {
-                elements.todoAssignee.innerHTML = assigneeControl('todo', null);
-                elements.todoAssignee.style.display = '';
-            }
-            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
-        }
-
-        elements.todoModal.classList.add('active');
-        elements.todoTitle.focus();
-    }
-
-    async function openTodoEditModal(todoId) {
-        if (!Number.isInteger(todoId) || todoId <= 0) {
-            return;
-        }
-
-        try {
-            const result = await api.getTodo(todoId);
-            if (!result.success) {
-                alert(result.error || 'Error loading to-do');
-                return;
-            }
-
-            await openTodoModal(null, result.data);
-        } catch (error) {
-            console.error('Error loading to-do for editing:', error);
-            alert('Error loading to-do');
-        }
-    }
-
-    function closeTodoModal() {
-        if (!elements.todoModal) {
-            return;
-        }
-
-        elements.todoModal.classList.remove('active');
-        state.todoModalContext = null;
-        state.editingTodoId = null;
-        if (elements.todoForm) {
-            elements.todoForm.reset();
-        }
-        updateTodoModalForMode(false);
-    }
-
-    async function saveTodo(e) {
-        e.preventDefault();
-
-        const title = elements.todoTitle ? elements.todoTitle.value.trim() : '';
-        const description = elements.todoDescription ? elements.todoDescription.value.trim() : '';
-        const dueDate = elements.todoDueDate ? elements.todoDueDate.value : '';
-        const priority = elements.todoPriority ? elements.todoPriority.value : '';
-        const assignType = elements.todoAssignType ? elements.todoAssignType.value : 'contact';
-        const assigneeIdRaw = elements.todoAssigneeId ? elements.todoAssigneeId.value : '';
-        const assigneeId = parseInt(assigneeIdRaw, 10);
-
-        if (!title) {
-            alert('Please provide a title for the to-do.');
-            return;
-        }
-
-        if (!Number.isInteger(assigneeId) || assigneeId <= 0) {
-            alert('Please choose a valid contact or project assignment.');
-            return;
-        }
-
-        const payload = {
-            title,
-            description: description || null,
-            due_date: dueDate || null,
-            priority: priority || null,
-            contact_id: null,
-            project_id: null
-        };
-
-        if (assignType === 'project') {
-            payload.project_id = assigneeId;
-        } else {
-            payload.contact_id = assigneeId;
-        }
-
-        if (elements.saveTodoBtn) {
-            elements.saveTodoBtn.disabled = true;
-            elements.saveTodoBtn.textContent = state.editingTodoId ? 'Saving...' : 'Creating...';
-        }
-
-        try {
-            const result = state.editingTodoId
-                ? await api.updateTodo(state.editingTodoId, payload)
-                : await api.createTodo(payload);
-
-            if (result.success) {
-                // New to-do: apply the assignee chosen in the form now that
-                // there is a record. Through api/assign.php, like any later
-                // reassignment, so it gets the same account checks and log entry.
-                const assignSelect = elements.todoAssignee
-                    ? elements.todoAssignee.querySelector('select.assignee-select')
-                    : null;
-                const assignTo = assignSelect ? assignSelect.value : '';
-                if (!state.editingTodoId && assignTo && result.data && result.data.id) {
-                    try {
-                        const saved = await saveAssignment('todo', result.data.id, assignTo);
-                        showAssignmentToast(saved.assigned_to_name);
-                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
-                    } catch (error) {
-                        // The to-do itself was created; only the assignment failed.
-                        alert('The to-do was created, but it could not be assigned: ' + error.message);
-                    }
-                }
-
-                closeTodoModal();
-                await refreshVisibleTodoLists();
-            } else {
-                alert(result.error || (state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do'));
-            }
-        } catch (error) {
-            console.error(state.editingTodoId ? 'Error updating to-do:' : 'Error creating to-do:', error);
-            alert(state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do');
-        } finally {
-            if (elements.saveTodoBtn) {
-                elements.saveTodoBtn.disabled = false;
-                updateTodoModalForMode(!!state.editingTodoId);
-            }
-        }
+        elements.todoEditAssigneeId.innerHTML = html;
+        elements.todoEditAssigneeId.value = selectedId ? String(selectedId) : '';
     }
 
     async function setTodoCompletion(todoId, completed) {
@@ -2428,10 +2223,11 @@
     // ---- To-do detail sheet --------------------------------------------------
 
     /**
-     * A to-do's own sheet: facts, description and links. Opened from the
-     * home page; Edit opens the to-do form on top of it.
+     * A to-do's own sheet: facts, description and links. Edit turns the same
+     * sheet into its form, as on the project sheet; { edit: true } opens it
+     * that way.
      */
-    async function openTodoDetail(todoId) {
+    async function openTodoDetail(todoId, { edit = false } = {}) {
         if (!Number.isInteger(todoId) || todoId <= 0 || !elements.todoDetailModal) {
             return;
         }
@@ -2446,10 +2242,15 @@
             if (state.viewingTodoId !== todoId) {
                 closeTodoLinkForm();
             }
+            exitTodoEdit();
+            elements.todoDetailModal.classList.remove('is-new');
             state.viewingTodoId = todoId;
             state.viewingTodo = result.data;
             renderTodoDetail(result.data);
             elements.todoDetailModal.classList.add('active');
+            if (edit) {
+                await enterTodoEdit();
+            }
         } catch (error) {
             console.error('Error opening to-do:', error);
             alert('Error loading to-do');
@@ -2529,10 +2330,200 @@
 
     function closeTodoDetail() {
         if (!elements.todoDetailModal) return;
-        elements.todoDetailModal.classList.remove('active');
+        elements.todoDetailModal.classList.remove('active', 'is-editing', 'is-new');
         closeTodoLinkForm();
+        state.todoSheetContext = null;
         state.viewingTodoId = null;
         state.viewingTodo = null;
+    }
+
+    // ---- Editing and creating a to-do in its sheet ---------------------------
+
+    function isEditingTodo() {
+        return elements.todoDetailModal.classList.contains('is-editing');
+    }
+
+    function isNewTodo() {
+        return elements.todoDetailModal.classList.contains('is-new');
+    }
+
+    /**
+     * Fill the sheet's fields from a to-do, or empty for a new one (with
+     * what it belongs to taken from the context), and show them.
+     */
+    async function showTodoEditFields(todo, context = null) {
+        elements.todoDetailModal.classList.add('is-editing');
+        await ensureTodoAssignmentData(true);
+        if (!elements.todoDetailModal.classList.contains('active') || !isEditingTodo()) return;
+
+        let assignType = 'contact';
+        let assigneeId = null;
+        if (todo) {
+            if (todo.project_id) {
+                assignType = 'project';
+                assigneeId = todo.project_id;
+            } else if (todo.contact_id) {
+                assigneeId = todo.contact_id;
+            }
+        } else if (context && (context.type === 'project' || context.type === 'contact')) {
+            assignType = context.type;
+            assigneeId = context.id || null;
+        }
+
+        elements.todoEditTitle.value = todo ? (todo.title || '') : '';
+        elements.todoEditDescription.value = todo ? (todo.description || '') : '';
+        elements.todoEditDueDate.value = todo ? (todo.due_date || '') : '';
+        elements.todoEditPriority.value = todo ? (todo.priority || '') : '';
+        elements.todoEditAssignType.value = assignType;
+        populateTodoAssigneeOptions(assignType, assigneeId);
+        if (!todo && context && context.draft) {
+            // For a project still being created: it has no id to choose yet.
+            elements.todoEditAssigneeId.innerHTML = `<option value="draft">${escapeHtml(elements.projectEditName.value.trim() || 'New project')}</option>`;
+        }
+
+        // Created from a contact or project sheet: it belongs there.
+        const locked = !todo && !!(context && context.locked);
+        elements.todoEditAssignType.disabled = locked;
+        elements.todoEditAssigneeId.disabled = locked;
+
+        elements.todoDetailModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveTodoEditBtn.textContent = todo ? 'Save' : 'Create';
+        elements.todoEditTitle.focus();
+    }
+
+    async function enterTodoEdit() {
+        if (!state.viewingTodo) return;
+        closeTodoLinkForm();
+        await showTodoEditFields(state.viewingTodo);
+    }
+
+    /**
+     * A new to-do: the sheet in edit mode with empty fields. Links belong to
+     * a saved to-do, so they appear once it has been created.
+     */
+    async function openNewTodo(context = null) {
+        if (!elements.todoDetailModal) return;
+        if (elements.todoDetailModal.classList.contains('active')) {
+            closeTodoDetail();
+        }
+
+        state.viewingTodoId = null;
+        state.viewingTodo = null;
+        state.todoSheetContext = context;
+
+        elements.todoDetailTitle.textContent = 'New To-Do';
+        elements.todoDetailContext.innerHTML = '';
+        setEditedLine(elements.todoDetailEdited, null);
+        // No record id yet: choosing someone only marks the sheet;
+        // saveTodoEdit() applies it once the to-do exists.
+        elements.todoDetailAssignee.innerHTML = assigneeControl('todo', null);
+        elements.todoDetailAssignee.style.display = '';
+
+        elements.todoDetailModal.classList.add('active', 'is-new');
+        elements.todoDetailModal.querySelector('.modal-body').scrollTop = 0;
+        await showTodoEditFields(null, context);
+    }
+
+    /** Cancel leaves edit mode; for a to-do not yet created, it closes the sheet. */
+    function cancelTodoEdit() {
+        if (isNewTodo()) {
+            closeTodoDetail();
+        } else {
+            exitTodoEdit();
+        }
+    }
+
+    function exitTodoEdit() {
+        if (!elements.todoDetailModal) return;
+        elements.todoDetailModal.classList.remove('is-editing');
+    }
+
+    async function saveTodoEdit() {
+        const creating = isNewTodo();
+        const todoId = state.viewingTodoId;
+        if (!isEditingTodo() || (!creating && !todoId)) return;
+
+        const title = elements.todoEditTitle.value.trim();
+        const assignType = elements.todoEditAssignType.value === 'project' ? 'project' : 'contact';
+        const assigneeId = parseInt(elements.todoEditAssigneeId.value, 10);
+        const forDraftProject = creating && !!(state.todoSheetContext && state.todoSheetContext.draft);
+
+        const missing = [];
+        if (!title) missing.push(elements.todoEditTitle);
+        if (!forDraftProject && (!Number.isInteger(assigneeId) || assigneeId <= 0)) missing.push(elements.todoEditAssigneeId);
+        [elements.todoEditTitle, elements.todoEditAssigneeId].forEach(input => input.classList.toggle('is-invalid', missing.includes(input)));
+        if (missing.length > 0) {
+            missing[0].focus();
+            return;
+        }
+
+        const payload = {
+            title,
+            description: elements.todoEditDescription.value.trim() || null,
+            due_date: elements.todoEditDueDate.value || null,
+            priority: elements.todoEditPriority.value || null,
+            contact_id: assignType === 'contact' ? assigneeId : null,
+            project_id: assignType === 'project' ? assigneeId : null
+        };
+
+        // For a project still being created: held with the project and
+        // created right after it (applyProjectDraft).
+        if (forDraftProject) {
+            const assignSelect = elements.todoDetailAssignee.querySelector('select.assignee-select');
+            const assignOption = assignSelect && assignSelect.value ? assignSelect.options[assignSelect.selectedIndex] : null;
+            stageProjectTodo({
+                ...payload,
+                assign_to: assignOption ? assignSelect.value : '',
+                assigned_to_name: assignOption ? assignOption.textContent : ''
+            });
+            closeTodoDetail();
+            return;
+        }
+
+        elements.saveTodoEditBtn.disabled = true;
+        try {
+            const result = creating
+                ? await api.createTodo(payload)
+                : await api.updateTodo(todoId, payload);
+            if (!result.success) {
+                alert(result.error || (creating ? 'Error creating to-do' : 'Error updating to-do'));
+                return;
+            }
+
+            if (creating) {
+                const newId = Number(result.data && result.data.id);
+
+                // Apply the assignee chosen in the sheet now that there is a
+                // record. Through api/assign.php, like any later reassignment,
+                // so it gets the same account checks and log entry.
+                const assignSelect = elements.todoDetailAssignee.querySelector('select.assignee-select');
+                const assignTo = assignSelect ? assignSelect.value : '';
+                if (assignTo && newId) {
+                    try {
+                        const saved = await saveAssignment('todo', newId, assignTo);
+                        showAssignmentToast(saved.assigned_to_name);
+                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+                    } catch (error) {
+                        // The to-do itself was created; only the assignment failed.
+                        alert('The to-do was created, but it could not be assigned: ' + error.message);
+                    }
+                }
+
+                // A created to-do opens as itself, ready for links.
+                exitTodoEdit();
+                elements.todoDetailModal.classList.remove('is-new');
+                if (newId) await openTodoDetail(newId);
+            } else {
+                exitTodoEdit();
+            }
+
+            await refreshVisibleTodoLists();
+        } catch (error) {
+            console.error(creating ? 'Error creating to-do:' : 'Error updating to-do:', error);
+            alert(creating ? 'Error creating to-do' : 'Error updating to-do');
+        } finally {
+            elements.saveTodoEditBtn.disabled = false;
+        }
     }
 
     function openTodoLinkForm() {
@@ -2603,8 +2594,31 @@
         elements.closeTodoDetail.addEventListener('click', closeTodoDetail);
         elements.todoDetailModal.querySelector('.modal-backdrop').addEventListener('click', closeTodoDetail);
 
-        elements.editTodoDetailBtn.addEventListener('click', () => {
-            if (state.viewingTodoId) openTodoEditModal(state.viewingTodoId);
+        elements.editTodoDetailBtn.addEventListener('click', enterTodoEdit);
+        elements.cancelTodoEditBtn.addEventListener('click', cancelTodoEdit);
+        elements.saveTodoEditBtn.addEventListener('click', saveTodoEdit);
+        elements.todoEditAssignType.addEventListener('change', () => {
+            populateTodoAssigneeOptions(elements.todoEditAssignType.value);
+        });
+
+        // Enter in a one-line field saves; Cmd/Ctrl+Enter in the description
+        elements.todoDetailModal.querySelector('.modal-content').addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' || !isEditingTodo()) return;
+            const field = e.target.closest('[data-ov="edit"], [data-ov="edit"] *');
+            if (!field || !e.target.matches('input, textarea')) return;
+            if (e.target.tagName === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            saveTodoEdit();
+        });
+        elements.todoDetailModal.addEventListener('input', (e) => {
+            if (e.target.classList.contains('is-invalid') && e.target.value.trim()) {
+                e.target.classList.remove('is-invalid');
+            }
+        });
+        elements.todoDetailModal.addEventListener('change', (e) => {
+            if (e.target === elements.todoEditAssigneeId && e.target.value) {
+                e.target.classList.remove('is-invalid');
+            }
         });
 
         elements.toggleTodoDetailDoneBtn.addEventListener('click', async () => {
@@ -2666,6 +2680,17 @@
         });
     }
 
+    /**
+     * The home page lists to-dos and projects; redrawn in place, without a
+     * loading state, so a change made in a sheet shows up behind it.
+     */
+    function refreshHome() {
+        if (state.currentView === 'workload' && window.CRMWorkload && window.CRMWorkload.refresh) {
+            return window.CRMWorkload.refresh();
+        }
+        return null;
+    }
+
     async function refreshVisibleTodoLists() {
         const tasks = [];
 
@@ -2685,11 +2710,9 @@
             tasks.push(refreshTodoDetail());
         }
 
-        // The home page lists to-dos too; redrawn in place, without a
-        // loading state, so a change made in a sheet shows up behind it.
-        if (state.currentView === 'workload' && window.CRMWorkload && window.CRMWorkload.refresh) {
-            tasks.push(window.CRMWorkload.refresh());
-        }
+        // The home page lists to-dos too.
+        const home = refreshHome();
+        if (home) tasks.push(home);
 
         if (tasks.length > 0) {
             await Promise.all(tasks);
@@ -2744,7 +2767,7 @@
             if (editBtn) {
                 const todoId = parseInt(editBtn.dataset.todoEdit, 10);
                 if (Number.isInteger(todoId)) {
-                    await openTodoEditModal(todoId);
+                    await openTodoDetail(todoId, { edit: true });
                 }
                 return;
             }
@@ -2786,7 +2809,7 @@
             if (row) {
                 const todoId = parseInt(row.dataset.todoId, 10);
                 if (Number.isInteger(todoId)) {
-                    await openTodoEditModal(todoId);
+                    await openTodoDetail(todoId);
                 }
             }
         });
@@ -5213,6 +5236,7 @@
                 closeDeleteProjectModal();
                 state.editingProjectId = null;
                 loadProjects();
+                refreshHome();
             } else {
                 alert('Error: ' + result.error);
             }
@@ -5224,6 +5248,7 @@
 
     async function openProjectOverview(projectId) {
         try {
+            state.projectDraft = null;
             state.viewingProjectId = projectId;
 
             // Ensure contacts are loaded for autocomplete
@@ -5486,12 +5511,19 @@
     }
 
     async function addProjectNote() {
-        if (!elements.newProjectNoteContent || !state.viewingProjectId) {
+        if (!elements.newProjectNoteContent || (!state.viewingProjectId && !state.projectDraft)) {
             return;
         }
 
         const content = elements.newProjectNoteContent.value.trim();
         if (!content) {
+            return;
+        }
+
+        if (state.projectDraft) {
+            state.projectDraft.notes.unshift({ id: draftId(), content, created_at: new Date().toISOString() });
+            closeProjectNoteForm();
+            renderProjectNotesTimeline(state.projectDraft.notes);
             return;
         }
 
@@ -5520,6 +5552,12 @@
     }
 
     async function deleteProjectNote(noteId) {
+        if (state.projectDraft) {
+            state.projectDraft.notes = state.projectDraft.notes.filter(note => note.id !== noteId);
+            renderProjectNotesTimeline(state.projectDraft.notes);
+            return;
+        }
+
         if (!confirm('Delete this note?')) {
             return;
         }
@@ -5540,6 +5578,7 @@
     }
 
     function closeProjectOverview() {
+        state.projectDraft = null;
         elements.projectOverviewModal.classList.remove('active');
         exitProjectEdit();
         elements.projectOverviewModal.classList.remove('is-new');
@@ -5616,13 +5655,27 @@
 
         state.viewingProjectId = null;
         state.viewingProject = null;
+        state.projectDraft = { tags: [], contacts: [], notes: [], todos: [] };
+        state.expandedProjectTodos.clear();
         if (window.ProjectDocuments) {
-            window.ProjectDocuments.reset();
+            window.ProjectDocuments.startDraft();
+        }
+        if (!state.contacts || state.contacts.length === 0) {
+            loadAllContacts();
         }
 
         elements.projectOverviewName.textContent = 'New Project';
         setEditedLine(elements.projectOverviewEdited, null);
-        setAssigneeControl(elements.projectOverviewAssignee, 'project', null);
+        // No record id yet: choosing someone only marks the sheet;
+        // saveProjectEdit() applies it once the project exists.
+        elements.projectOverviewAssignee.innerHTML = assigneeControl('project', null);
+        elements.projectOverviewAssignee.style.display = '';
+        closeProjectPickers();
+        closeProjectNoteForm();
+        renderProjectTags([]);
+        renderProjectContacts([]);
+        renderDraftProjectTodos();
+        renderProjectNotesTimeline([]);
         const review = document.getElementById('projectOverviewReview');
         if (review) review.hidden = true;
 
@@ -5687,13 +5740,20 @@
                 ? await api.createProject(data)
                 : await api.updateProject(projectId, data);
             if (result.success) {
-                // A created project opens as itself, ready for tags,
-                // contacts and the rest.
+                // A created project opens as itself, with everything added
+                // to its sheet before it existed.
                 const savedId = creating ? result.data.id : projectId;
+                if (creating) {
+                    const problems = await applyProjectDraft(Number(savedId));
+                    if (problems.length > 0) {
+                        alert('The project was created, but not everything could be added:\n\n' + problems.join('\n'));
+                    }
+                }
                 exitProjectEdit();
                 elements.projectOverviewModal.classList.remove('is-new');
                 await openProjectOverview(savedId);
                 loadProjects();
+                refreshHome();
             } else {
                 alert('Error: ' + result.error);
             }
@@ -5705,7 +5765,168 @@
         }
     }
 
+    // ---- A project being created --------------------------------------------
+    // Its sheet offers everything an existing project's does. What is added
+    // before it exists is held in state.projectDraft and applied right after
+    // it is created, in the order the sections appear.
+
+    let draftSeq = 0;
+    /** A temporary id for something held in a draft: negative, never a real row. */
+    function draftId() {
+        return -(++draftSeq);
+    }
+
+    function stageProjectTag(tagName) {
+        const draft = state.projectDraft;
+        const name = tagName.trim();
+        if (!name || draft.tags.some(tag => tag.name.toLowerCase() === name.toLowerCase())) return;
+
+        const existing = (state.allTags || []).find(tag => tag.name.toLowerCase() === name.toLowerCase());
+        draft.tags.push(existing
+            ? { id: Number(existing.id), name: existing.name, color: existing.color }
+            : { id: draftId(), name, color: '#3b82f6', isNew: true });
+        renderProjectTags(draft.tags);
+        elements.newProjectTagInput.value = '';
+        elements.projectTagSuggestions.style.display = 'none';
+        elements.newProjectTagInput.focus();
+    }
+
+    function stageProjectContact(contactId) {
+        const draft = state.projectDraft;
+        const contact = (state.contacts || []).find(c => Number(c.id) === Number(contactId));
+        if (!contact || draft.contacts.some(c => Number(c.id) === Number(contactId))) return;
+
+        draft.contacts.push(contact);
+        renderProjectContacts(draft.contacts);
+        elements.newProjectContactInput.value = '';
+        elements.projectContactSuggestions.style.display = 'none';
+        elements.newProjectContactInput.focus();
+    }
+
+    /** A to-do made in the to-do sheet for a project not yet created. */
+    function stageProjectTodo(todo) {
+        if (!state.projectDraft) return;
+        state.projectDraft.todos.push({ ...todo, id: draftId() });
+        renderDraftProjectTodos();
+    }
+
+    /** The draft's to-dos: the project sheet's rows, minus what needs a saved to-do. */
+    function renderDraftProjectTodos() {
+        const container = elements.projectTodosList;
+        const todos = state.projectDraft ? state.projectDraft.todos : [];
+        if (!container) return;
+
+        if (todos.length === 0) {
+            container.innerHTML = '<p class="empty-hint">No open to-dos</p>';
+            return;
+        }
+
+        const now = new Date();
+        container.innerHTML = `<div class="ptodo-card">${todos.map(todo => {
+            const dueDate = parseTodoDueDate(todo.due_date);
+            const dueText = dueDate
+                ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: dueDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+                : '';
+            const priorityMeta = getTodoPriorityMeta(todo.priority);
+            return `
+                <div class="ptodo ptodo-draft">
+                    <div class="ptodo-row">
+                        <span class="ptodo-title">${escapeHtml(todo.title)}</span>
+                        <span class="ptodo-meta">
+                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
+                            ${dueText ? `<span class="todo-due">${escapeHtml(dueText)}</span>` : ''}
+                            ${todo.assigned_to_name ? `<span class="ptodo-draft-assignee">${escapeHtml(todo.assigned_to_name)}</span>` : ''}
+                        </span>
+                        <button type="button" class="pcontact-remove" data-draft-todo-remove="${todo.id}" title="Remove to-do" aria-label="Remove ${escapeHtml(todo.title)}">&times;</button>
+                    </div>
+                </div>`;
+        }).join('')}</div>`;
+    }
+
+    /**
+     * Apply everything held for a project just created. Each part is tried
+     * on its own, so one failure does not lose the rest; returns what failed.
+     */
+    async function applyProjectDraft(projectId) {
+        const draft = state.projectDraft;
+        state.projectDraft = null;
+        const problems = [];
+        if (!draft || !projectId) return problems;
+
+        const attempt = async (what, fn) => {
+            try {
+                const result = await fn();
+                if (result && result.success === false) problems.push(`${what}: ${result.error || 'failed'}`);
+                return result;
+            } catch (error) {
+                problems.push(`${what}: ${error.message}`);
+                return null;
+            }
+        };
+
+        const assignSelect = elements.projectOverviewAssignee.querySelector('select.assignee-select');
+        const assignTo = assignSelect ? assignSelect.value : '';
+        if (assignTo) {
+            await attempt('Assignment', async () => {
+                const saved = await saveAssignment('project', projectId, assignTo);
+                showAssignmentToast(saved.assigned_to_name);
+                if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+            });
+        }
+
+        for (const tag of draft.tags) {
+            await attempt(`Tag "${tag.name}"`, async () => {
+                let tagId = tag.id;
+                if (tag.isNew) {
+                    const created = await api.createTag(tag.name);
+                    if (!created.success) return created;
+                    tagId = created.data.id;
+                }
+                return api.assignProjectTag(projectId, tagId);
+            });
+        }
+        if (draft.tags.some(tag => tag.isNew)) {
+            loadAllTags();
+        }
+
+        for (const contact of draft.contacts) {
+            await attempt(`Contact "${contact.name}"`, () => api.assignProjectContact(projectId, Number(contact.id)));
+        }
+
+        for (const todo of draft.todos) {
+            await attempt(`To-do "${todo.title}"`, async () => {
+                const created = await api.createTodo({
+                    title: todo.title,
+                    description: todo.description,
+                    due_date: todo.due_date,
+                    priority: todo.priority,
+                    contact_id: null,
+                    project_id: projectId
+                });
+                if (created.success && todo.assign_to && created.data && created.data.id) {
+                    await saveAssignment('todo', created.data.id, todo.assign_to);
+                }
+                return created;
+            });
+        }
+
+        if (window.ProjectDocuments) {
+            problems.push(...await window.ProjectDocuments.commitDraft(projectId));
+        }
+
+        // Oldest first, so they keep the order they were written in.
+        for (const note of draft.notes.slice().reverse()) {
+            await attempt('Note', () => api.createProjectNote(projectId, note.content));
+        }
+
+        return problems;
+    }
+
     async function addProjectTag(tagName) {
+        if (tagName && state.projectDraft) {
+            stageProjectTag(tagName);
+            return;
+        }
         if (!tagName || !state.viewingProjectId) return;
 
         try {
@@ -5737,6 +5958,11 @@
     }
 
     async function removeProjectTag(tagId) {
+        if (state.projectDraft) {
+            state.projectDraft.tags = state.projectDraft.tags.filter(tag => Number(tag.id) !== tagId);
+            renderProjectTags(state.projectDraft.tags);
+            return;
+        }
         if (!state.viewingProjectId) return;
 
         try {
@@ -5755,6 +5981,10 @@
     }
 
     async function addProjectContact(contactId) {
+        if (contactId && state.projectDraft) {
+            stageProjectContact(contactId);
+            return;
+        }
         if (!contactId || !state.viewingProjectId) return;
 
         try {
@@ -5776,6 +6006,11 @@
     }
 
     async function removeProjectContact(contactId) {
+        if (state.projectDraft) {
+            state.projectDraft.contacts = state.projectDraft.contacts.filter(contact => Number(contact.id) !== contactId);
+            renderProjectContacts(state.projectDraft.contacts);
+            return;
+        }
         if (!state.viewingProjectId) return;
 
         try {
@@ -6448,7 +6683,7 @@
         }
 
         if (elements.addTodoBtn) {
-            elements.addTodoBtn.addEventListener('click', () => openTodoModal());
+            elements.addTodoBtn.addEventListener('click', () => openNewTodo());
         }
 
         // Tag input - show suggestions
@@ -6569,7 +6804,7 @@
                 if (!state.viewingContactId) {
                     return;
                 }
-                openTodoModal({ type: 'contact', id: state.viewingContactId, locked: true });
+                openNewTodo({ type: 'contact', id: state.viewingContactId, locked: true });
             });
         }
 
@@ -6693,10 +6928,15 @@
 
         if (elements.addProjectTodoBtn) {
             elements.addProjectTodoBtn.addEventListener('click', () => {
-                if (!state.viewingProjectId) {
+                if (!state.viewingProjectId && !state.projectDraft) {
                     return;
                 }
-                openTodoModal({ type: 'project', id: state.viewingProjectId, locked: true });
+                if (state.projectDraft) {
+                    // The project does not exist yet: the to-do is held with it.
+                    openNewTodo({ type: 'project', draft: true, locked: true });
+                } else {
+                    openNewTodo({ type: 'project', id: state.viewingProjectId, locked: true });
+                }
             });
         }
 
@@ -6925,7 +7165,8 @@
                     return;
                 }
                 const chip = e.target.closest('[data-open-contact]');
-                if (chip) {
+                // Not while creating: leaving the sheet would lose what is in it.
+                if (chip && !state.projectDraft) {
                     openContactFromProject(parseInt(chip.dataset.openContact, 10));
                 }
             });
@@ -6934,6 +7175,13 @@
         // "Show" / "Hide" for completed to-dos in the project sheet
         if (elements.projectTodosList) {
             elements.projectTodosList.addEventListener('click', (e) => {
+                const removeDraft = e.target.closest('[data-draft-todo-remove]');
+                if (removeDraft && state.projectDraft) {
+                    const id = Number(removeDraft.dataset.draftTodoRemove);
+                    state.projectDraft.todos = state.projectDraft.todos.filter(todo => todo.id !== id);
+                    renderDraftProjectTodos();
+                    return;
+                }
                 if (e.target.closest('[data-ptodo-show-done]')) {
                     state.showCompletedProjectTodos = !state.showCompletedProjectTodos;
                     if (state.viewingProjectId) {
@@ -6960,28 +7208,6 @@
         bindTodoDetail();
         bindDeletedProjects();
 
-        // To-do modal
-        if (elements.closeTodoModal) {
-            elements.closeTodoModal.addEventListener('click', closeTodoModal);
-        }
-        if (elements.cancelTodoBtn) {
-            elements.cancelTodoBtn.addEventListener('click', closeTodoModal);
-        }
-        if (elements.todoModal) {
-            const todoBackdrop = elements.todoModal.querySelector('.modal-backdrop');
-            if (todoBackdrop) {
-                todoBackdrop.addEventListener('click', closeTodoModal);
-            }
-        }
-        if (elements.todoForm) {
-            elements.todoForm.addEventListener('submit', saveTodo);
-        }
-        if (elements.todoAssignType) {
-            elements.todoAssignType.addEventListener('change', () => {
-                populateTodoAssigneeOptions(elements.todoAssignType.value);
-            });
-        }
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
@@ -6990,16 +7216,19 @@
                     closeDeleteModal();
                 } else if (elements.deleteProjectModal.classList.contains('active')) {
                     closeDeleteProjectModal();
+                } else if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
+                    // The to-do sheet opens on top of the project and contact sheets.
+                    if (isEditingTodo()) {
+                        cancelTodoEdit();
+                    } else {
+                        closeTodoDetail();
+                    }
                 } else if (elements.projectOverviewModal.classList.contains('active')) {
                     if (isEditingProject()) {
                         cancelProjectEdit();
                     } else {
                         closeProjectOverview();
                     }
-                } else if (elements.todoModal.classList.contains('active')) {
-                    closeTodoModal();
-                } else if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
-                    closeTodoDetail();
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
@@ -7080,7 +7309,7 @@
 
     /**
      * Open the To-dos tab on one person's open or completed to-dos - the
-     * home page's "View all" and "Completed" links. Other filters are
+     * home page's "Completed" link. Other filters are
      * cleared, so the list is the whole of what was asked for.
      *
      * @param {{status?: string, assigned?: string}} options  status: open,
@@ -7109,6 +7338,8 @@
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
         openTodoDetail: openTodoDetail,
+        openNewTodo: openNewTodo,
+        openNewProject: openNewProject,
         openBookkeepingRow: openBookkeepingRow,
         switchView: switchView,
         openTodos: openTodos,

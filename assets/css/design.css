@@ -5039,21 +5039,6 @@ textarea.form-input:focus {
     }
 }
 
-/* "Last edited by ..." in a dialog footer shares the row with the buttons;
-   it stays on one line and gives way (ellipsis) rather than wrapping. */
-.modal-footer-edited {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.modal-footer-edited .edited-by {
-    white-space: nowrap;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 @media (max-width: 768px) {
     /* One person per row is too much for one line on a phone: who they are
        stays on top, what you can do to their account moves underneath. */
@@ -6261,21 +6246,26 @@ details.import-instructions p {
    anything moving. */
 
 #projectOverviewModal:not(.is-editing) [data-ov="edit"],
-#projectOverviewModal.is-editing [data-ov="view"] {
+#projectOverviewModal.is-editing [data-ov="view"],
+#todoDetailModal:not(.is-editing) [data-ov="edit"],
+#todoDetailModal.is-editing [data-ov="view"] {
     display: none !important;
 }
 
-#projectOverviewModal .modal-content {
+#projectOverviewModal .modal-content,
+#todoDetailModal .modal-content {
     transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
 }
 
-#projectOverviewModal.is-editing .modal-content {
+#projectOverviewModal.is-editing .modal-content,
+#todoDetailModal.is-editing .modal-content {
     border-color: var(--c-accent);
     box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
 }
 
 /* The name field takes the heading's size, so the header does not change. */
-#projectOverviewModal .ov-edit-title {
+#projectOverviewModal .ov-edit-title,
+#todoDetailModal .ov-edit-title {
     width: 100%;
     height: 36px;
     padding: 0 8px;
@@ -6285,22 +6275,26 @@ details.import-instructions p {
     letter-spacing: -0.02em;
 }
 
-#projectOverviewModal .ov-edit-company {
+#projectOverviewModal .ov-edit-company,
+#todoDetailModal .ov-edit-context {
     margin: 4px 0 0 -9px;
 }
 
-#projectOverviewModal .ov-edit-company .form-input {
+#projectOverviewModal .ov-edit-company .form-input,
+#todoDetailModal .ov-edit-context .form-select {
     height: 30px;
     padding: 0 8px;
     font-size: var(--t-sm);
 }
 
-#projectOverviewModal.is-editing .overview-details {
+#projectOverviewModal.is-editing .overview-details,
+#todoDetailModal.is-editing .overview-details {
     border-color: var(--c-accent);
     background: color-mix(in srgb, var(--c-accent) 4%, var(--c-surface));
 }
 
-#projectOverviewModal .ov-field {
+#projectOverviewModal .ov-field,
+#todoDetailModal .ov-field {
     width: 100%;
     height: 32px;
     padding: 0 8px;
@@ -6308,7 +6302,8 @@ details.import-instructions p {
     font-weight: 500;
 }
 
-#projectOverviewModal textarea.ov-field {
+#projectOverviewModal textarea.ov-field,
+#todoDetailModal textarea.ov-field {
     height: auto;
     min-height: 72px;
     padding: 6px 8px;
@@ -6324,27 +6319,80 @@ details.import-instructions p {
     min-width: 0;
 }
 
-#projectOverviewModal .is-invalid {
+#projectOverviewModal .is-invalid,
+#todoDetailModal .is-invalid {
     border-color: var(--c-danger);
     box-shadow: 0 0 0 3px var(--c-danger-soft);
 }
 
 #projectOverviewModal.is-editing .overview-header-info,
-#projectOverviewModal.is-editing .overview-title-info {
+#projectOverviewModal.is-editing .overview-title-info,
+#todoDetailModal.is-editing .overview-header-info,
+#todoDetailModal.is-editing .overview-title-info {
     flex: 1;
 }
 
-/* A project not yet created: only what can be filled in before it exists. */
-#projectOverviewModal.is-new .ov-section,
+/* A project not yet created: every section as when editing - what is added
+   is held and applied right after it is created - but no history, Claude
+   proposals or archiving yet. */
 #projectOverviewModal.is-new #projectOverviewEdited,
-#projectOverviewModal.is-new #projectOverviewAssignee,
 #projectOverviewModal.is-new #projectOverviewReview,
 #projectOverviewModal.is-new .ov-delete-btn {
     display: none !important;
 }
 
+/* A to-do held for a project being created: no checkbox or detail yet. */
+.ptodo-draft .ptodo-row {
+    cursor: default;
+}
+
+.ptodo-draft .ptodo-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ptodo-draft-assignee {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
 #projectOverviewModal.is-new .ov-footer {
     justify-content: flex-end;
+}
+
+/* A to-do not yet created: no status, links or history yet. The assignee
+   stays - it is applied right after the to-do is created. */
+#todoDetailModal.is-new .ov-section,
+#todoDetailModal.is-new .tdetail-status-item,
+#todoDetailModal.is-new #todoDetailEdited,
+#todoDetailModal.is-new .ov-delete-btn {
+    display: none !important;
+}
+
+#todoDetailModal.is-new .ov-footer {
+    justify-content: flex-end;
+}
+
+/* The compact padding above must not run text under a select's arrow. */
+#projectOverviewModal select.ov-field,
+#todoDetailModal select.ov-field,
+#todoDetailModal .ov-edit-context .form-select {
+    padding-right: 30px;
+    background-position: right 8px center;
+}
+
+/* Belongs to: the kind takes its width, the record the rest. */
+#todoDetailModal .ov-edit-context #todoEditAssignType {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+#todoDetailModal .ov-edit-context #todoEditAssigneeId {
+    flex: 1;
+    min-width: 0;
 }
 
 
@@ -7039,24 +7087,32 @@ details.import-instructions p {
     margin-bottom: 24px;
 }
 
-/* ---- New for you: one line per item in an accent-ringed card ---- */
+/* ---- New for you: a small card above the dashboard ----
+   A head (bell, title, count, "Mark as seen"), then one row per item laid
+   out in columns - kind, title over what it belongs to, who and when - so
+   the rows line up instead of running on as one sentence. */
 
 #workloadView .home-news {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 16px;
     margin: 0 0 24px;
-    padding: 10px 14px 10px 18px;
     background: var(--c-surface);
-    border: 1.5px solid var(--c-accent);
+    border: 1px solid color-mix(in srgb, var(--c-accent) 45%, var(--c-line));
     border-radius: var(--r-lg);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 12%, transparent), var(--e-1);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.home-news-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 10px 16px;
+    background: color-mix(in srgb, var(--c-accent) 6%, var(--c-surface));
+    border-bottom: 1px solid var(--c-line-2);
 }
 
 .home-news-icon {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     flex-shrink: 0;
     display: grid;
     place-items: center;
@@ -7066,33 +7122,92 @@ details.import-instructions p {
 }
 
 .home-news-icon svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
+}
+
+.home-news-heading {
+    margin: 0;
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.home-news-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-accent);
+    color: var(--c-bg);
+    font: 600 11px/1 var(--font);
 }
 
 .home-news-list {
-    flex: 1 1 320px;
-    min-width: 0;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
+.home-news-list li + li {
+    border-top: 1px solid var(--c-line-2);
+}
+
 .home-news-row {
-    display: block;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
     width: 100%;
-    padding: 3px 0;
+    padding: 9px 16px;
     border: 0;
     background: none;
     color: var(--c-ink);
     font: inherit;
-    font-size: var(--t-md);
-    line-height: 1.4;
     text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-news-row:hover {
+    background: var(--c-tint-3);
+}
+
+/* The kind, in the colour it has everywhere on the home page. */
+.home-news-type {
+    --wl-type: var(--type-todo);
+    justify-self: start;
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
+    color: var(--wl-type);
+    font: 600 11px/1.2 var(--font);
+    white-space: nowrap;
+}
+
+.home-news-type[data-type="project"] { --wl-type: var(--type-project); }
+.home-news-type[data-type="contact"] { --wl-type: var(--type-contact); }
+.home-news-type[data-type="bookkeeping"] { --wl-type: var(--type-bookkeeping); }
+
+.home-news-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.home-news-title,
+.home-news-context {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    cursor: pointer;
+}
+
+.home-news-title {
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1.35;
 }
 
 .home-news-row:hover .home-news-title {
@@ -7100,42 +7215,49 @@ details.import-instructions p {
     text-underline-offset: 2px;
 }
 
-.home-news-title {
-    font-weight: 600;
-}
-
-.home-news-meta {
+.home-news-context {
+    font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
 
-.home-news-actions {
+.home-news-meta {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.home-news-foot {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-left: auto;
+    padding: 4px 8px;
+    border-top: 1px solid var(--c-line-2);
 }
 
 .home-news-rest {
+    padding: 0 8px;
     font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
 
 .home-news-more,
 .home-news-dismiss {
-    height: 30px;
+    height: 28px;
     padding: 0 10px;
     border: 0;
     border-radius: var(--r-full);
     background: transparent;
-    color: var(--c-accent-2);
-    font: 600 var(--t-md)/1 var(--font);
+    font: 600 var(--t-sm)/1 var(--font);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease);
 }
 
+.home-news-dismiss {
+    margin-left: auto;
+    color: var(--c-accent-2);
+}
+
 .home-news-more {
     font-weight: 500;
-    font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
 
@@ -7687,9 +7809,21 @@ details.import-instructions p {
     cursor: pointer;
 }
 
+/* The link's name as on the To-dos tab, a little smaller: the home rows are
+   narrower, so a long name ends in an ellipsis sooner. */
 #workloadView .home-todo-titleline .tlink-pill {
-    width: 22px;
+    max-width: 160px;
     height: 22px;
+    padding: 0 8px 0 6px;
+    gap: 5px;
+}
+
+@media (max-width: 480px) {
+    /* The mark alone, as on the To-dos tab. */
+    #workloadView .home-todo-titleline .tlink-pill {
+        width: 22px;
+        padding: 0;
+    }
 }
 
 /* Priority: a pill in its colour, centred on the row. */
@@ -7961,12 +8095,18 @@ details.import-instructions p {
         padding-right: 16px;
     }
 
-    #workloadView .home-news {
-        padding: 10px 12px 10px 14px;
+    /* The kind and who/when move under the title. */
+    .home-news-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+        padding: 10px 14px;
     }
 
-    .home-news-row {
+    .home-news-row .home-news-type {
+        order: -1;
+    }
+
+    .home-news-meta {
         white-space: normal;
-        font-size: var(--t-base);
     }
 }

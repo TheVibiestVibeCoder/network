@@ -238,7 +238,7 @@ function handleWorkload(string $who): void
     $todos = fetchAssigned(
         $db,
         "SELECT t.id, t.title, t.description, t.due_date, t.priority, t.is_completed,
-                t.contact_id, t.project_id, t.assigned_to, t.assigned_to_name,
+                t.contact_id, t.project_id, t.assigned_to, t.assigned_to_name, t.review_status,
                 c.name AS contact_name, p.name AS project_name
          FROM todos t
          LEFT JOIN contacts c ON c.id = t.contact_id
@@ -257,7 +257,7 @@ function handleWorkload(string $who): void
         // open_todos counts every open to-do on the project, whoever it is
         // assigned to: the home page shows how much is left on it.
         "SELECT id, name, company, stage, start_date, estimated_completion,
-                success_chance, assigned_to, assigned_to_name,
+                success_chance, assigned_to, assigned_to_name, review_status,
                 (SELECT COUNT(*) FROM todos ot
                  WHERE ot.project_id = projects.id AND ot.parent_todo_id IS NULL
                    AND ot.is_completed = 0) AS open_todos
@@ -274,7 +274,7 @@ function handleWorkload(string $who): void
 
     $contacts = fetchAssigned(
         $db,
-        "SELECT id, name, company, location, email, phone, assigned_to, assigned_to_name
+        "SELECT id, name, company, location, email, phone, assigned_to, assigned_to_name, review_status
          FROM contacts
          WHERE ",
         'assigned_to',

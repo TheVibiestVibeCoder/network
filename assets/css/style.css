@@ -983,12 +983,6 @@ textarea.form-input {
     color: var(--color-text-muted);
 }
 
-.todo-assignment-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-4);
-}
-
 .list-header {
     padding: var(--spacing-3) var(--spacing-5);
     background-color: var(--color-bg);
@@ -3137,11 +3131,6 @@ textarea.form-input {
 
     .todos-list {
         padding: var(--spacing-3);
-    }
-
-    .todo-assignment-grid {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-2);
     }
 
     .todo-group-header {
@@ -5990,19 +5979,9 @@ button.user-chip:focus-visible {
     color: var(--color-border);
 }
 
-/* In the to-do dialog the line shares the footer with the buttons. */
-.modal-footer-edited {
-    margin: 0 auto 0 0;
-    min-width: 0;
-}
-
 @media (max-width: 768px) {
     .profile-pop {
         width: 240px;
-    }
-
-    .modal-footer-edited {
-        display: none;
     }
 }
 
@@ -6122,23 +6101,6 @@ button.user-chip:focus-visible {
 
 .assignee-select:disabled {
     opacity: 0.6;
-}
-
-/* The to-do dialog already labels the field, so the bar loses its own label
-   and its frame there. */
-#todoAssigneeGroup .assignee-bar {
-    margin-bottom: 0;
-    padding: 0;
-    background: none;
-    border: none;
-}
-
-#todoAssigneeGroup .assignee-bar-label {
-    display: none;
-}
-
-#todoAssigneeGroup .assignee-select {
-    max-width: none;
 }
 
 /* --- Nav badge ---------------------------------------------------------- */
