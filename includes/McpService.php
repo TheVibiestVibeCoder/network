@@ -1186,7 +1186,9 @@ final class McpService
 
         $reviewId = ReviewQueue::add('delete', $type, $id, $label, [], $this->deletionSnapshot($type, $record), $this->comment($p));
 
-        return $this->proposed('id', $id, $reviewId, 'Deleting it was proposed. Nothing is deleted unless a person accepts.');
+        return $this->proposed('id', $id, $reviewId, $type === 'project'
+            ? 'Archiving it was proposed. Nothing is archived unless a person accepts.'
+            : 'Deleting it was proposed. Nothing is deleted unless a person accepts.');
     }
 
     // =========================================================================

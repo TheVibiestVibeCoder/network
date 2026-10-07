@@ -138,14 +138,14 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
-    // Bring a deleted project back, or delete it for good: { id } of the
+    // Bring an archived project back, or delete it for good: { id } of the
     // deleted_projects entry.
     if ($action === 'restore' || $action === 'purge') {
         $input = Auth::getJsonInput();
         $archiveId = is_array($input) ? parsePositiveId($input['id'] ?? null) : null;
         if ($archiveId === null) {
             http_response_code(400);
-            echo json_encode(['error' => 'A deleted project id is required']);
+            echo json_encode(['error' => 'An archived project id is required']);
             return;
         }
 
@@ -542,11 +542,11 @@ function handleDelete(Project $model, string $action, ?int $id): void
         return;
     }
 
-    // Delete project
+    // Archive project
     $model->delete($id);
     logProjectActivityEvent('deleted', null, $existing);
 
-    echo json_encode(['success' => true, 'message' => 'Project deleted']);
+    echo json_encode(['success' => true, 'message' => 'Project archived']);
 }
 
 /**
@@ -737,7 +737,7 @@ function buildProjectActivityContent(string $action, ?array $current, ?array $pr
     }
 
     if ($action === 'deleted') {
-        return 'Projekt gelöscht';
+        return 'Projekt archiviert';
     }
 
     if ($action === 'restored') {

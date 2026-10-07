@@ -217,7 +217,7 @@
         switch (item.kind) {
             case 'create': return 'New ' + (TYPE_LABEL[item.entity_type] || 'record');
             case 'update': return 'Change';
-            case 'delete': return 'Delete';
+            case 'delete': return item.entity_type === 'project' ? 'Archive' : 'Delete';
             case 'link': return 'Add to project';
             case 'unlink': return 'Remove from project';
             case 'tag': return 'Add tag';
@@ -288,7 +288,9 @@
             case 'update':
                 return Object.keys(p).map(field => (FIELD_LABEL[field] || field) + ' → ' + displayValue(field, p[field])).join(' · ');
             case 'delete':
-                return 'Claude suggests deleting this ' + (TYPE_LABEL[item.entity_type] || 'record');
+                return item.entity_type === 'project'
+                    ? 'Claude suggests archiving this project'
+                    : 'Claude suggests deleting this ' + (TYPE_LABEL[item.entity_type] || 'record');
             case 'link':
             case 'unlink': {
                 const contact = (item.related || {}).contact;
@@ -392,9 +394,10 @@
             case 'delete': {
                 const snapshot = item.previous || {};
                 const facts = factsList(Object.keys(snapshot).map(field => [FIELD_LABEL[field] || field, displayValue(field, snapshot[field]), LONG_FIELDS.includes(field)]));
-                const goesWith = item.entity_type === 'contact' ? ' Its notes, to-dos, tags and project links go with it.'
-                    : item.entity_type === 'project' ? ' Its notes, to-dos and tags go with it.' : '';
-                return `${facts}${item.status === 'pending' ? `<p class="review-warning">Accepting deletes it for good.${goesWith}</p>` : ''}`;
+                const warning = item.entity_type === 'project'
+                    ? 'Accepting moves it to Archived projects, where it can be restored with everything in it.'
+                    : 'Accepting deletes it for good.' + (item.entity_type === 'contact' ? ' Its notes, to-dos, tags and project links go with it.' : '');
+                return `${facts}${item.status === 'pending' ? `<p class="review-warning">${warning}</p>` : ''}`;
             }
 
             case 'link':
@@ -788,6 +791,9 @@
         if (action === 'reject' && item.kind === 'create' && (item.entity_type === 'contact' || item.entity_type === 'project')) {
             return `Remove the proposed ${TYPE_LABEL[item.entity_type]} "${name}"? Anything added to it goes too.`;
         }
+        if (action === 'accept' && item.kind === 'delete' && item.entity_type === 'project') {
+            return `Archive the project "${name}"?`;
+        }
         if (action === 'accept' && item.kind === 'delete') {
             return `Delete the ${TYPE_LABEL[item.entity_type]} "${name}" for good?`;
         }
@@ -936,7 +942,7 @@
         const n = items.length;
         const what = n === 1 ? 'the 1 proposal' : `all ${n} proposals`;
         if (action === 'accept') {
-            const deletes = items.filter(i => i.kind === 'delete').length;
+            const deletes = items.filter(i => i.kind === 'delete' && i.entity_type !== 'project').length;
             return `Accept ${what} from Claude?` + (deletes
                 ? `\n\n${deletes === 1 ? 'One of them deletes a record' : deletes + ' of them delete records'} for good.`
                 : '');

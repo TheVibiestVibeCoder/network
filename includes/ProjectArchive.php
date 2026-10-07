@@ -46,7 +46,7 @@ class ProjectArchive
         ]);
     }
 
-    /** The deleted projects, newest first, with what each one holds. */
+    /** The archived projects, newest first, with what each one holds. */
     public static function list(PDO $db): array
     {
         $out = [];
@@ -83,7 +83,7 @@ class ProjectArchive
         $entry = self::find($db, $archiveId);
         $rows = json_decode((string) $entry['snapshot'], true);
         if (!is_array($rows) || empty($rows['projects'])) {
-            throw new RuntimeException('This deleted project cannot be restored.');
+            throw new RuntimeException('This archived project cannot be restored.');
         }
 
         $projectId = (int) $entry['project_id'];
@@ -167,7 +167,7 @@ class ProjectArchive
         $stmt->execute(['id' => $archiveId]);
         $entry = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$entry) {
-            throw new RuntimeException('Deleted project not found.');
+            throw new RuntimeException('Archived project not found.');
         }
 
         return $entry;

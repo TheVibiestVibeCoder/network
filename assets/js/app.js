@@ -4904,7 +4904,7 @@
                 entry.counts.notes ? plural(entry.counts.notes, 'note', 'notes') : '',
                 entry.counts.documents ? plural(entry.counts.documents, 'document', 'documents') : ''
             ].filter(Boolean).join(' · ');
-            const meta = [entry.company, `Deleted ${when}${entry.deleted_by_name ? ` by ${entry.deleted_by_name}` : ''}`, holds]
+            const meta = [entry.company, `Archived ${when}${entry.deleted_by_name ? ` by ${entry.deleted_by_name}` : ''}`, holds]
                 .filter(Boolean).map(escapeHtml).join(' · ');
 
             return `
@@ -4948,7 +4948,7 @@
                     openProjectOverview(Number(result.data.id));
                 }
             } catch (error) {
-                console.error('Error with deleted project:', error);
+                console.error('Error with archived project:', error);
                 alert('Something went wrong');
                 button.disabled = false;
             }
@@ -5217,8 +5217,8 @@
                 alert('Error: ' + result.error);
             }
         } catch (error) {
-            console.error('Error deleting project:', error);
-            alert('An error occurred while deleting the project');
+            console.error('Error archiving project:', error);
+            alert('An error occurred while archiving the project');
         }
     }
 

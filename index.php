@@ -1268,10 +1268,10 @@ function assetUrl(string $path): string
                         <!-- Projects will be loaded here -->
                     </div>
 
-                    <!-- Deleted projects: kept whole, restorable (ProjectArchive) -->
+                    <!-- Archived projects: kept whole, restorable (ProjectArchive) -->
                     <details class="deleted-projects" id="deletedProjects" hidden>
                         <summary class="deleted-projects-head">
-                            <span class="deleted-projects-title">Deleted projects</span>
+                            <span class="deleted-projects-title">Archived projects</span>
                             <span class="deleted-projects-count" id="deletedProjectsCount">0</span>
                         </summary>
                         <p class="deleted-projects-hint">Restoring brings a project back with its to-dos, notes, tags, contacts and documents.</p>
@@ -1713,21 +1713,21 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- Delete Project Confirmation Modal -->
+        <!-- Archive Project Confirmation Modal -->
         <div class="modal" id="deleteProjectModal">
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-small">
                 <div class="modal-header">
-                    <h2>Delete Project</h2>
+                    <h2>Archive Project</h2>
                     <button type="button" class="modal-close" id="closeDeleteProjectModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p>Delete <strong id="deleteProjectName"></strong>?</p>
-                    <p class="text-muted">It moves to &ldquo;Deleted projects&rdquo; at the bottom of the Projects page, where it can be restored with everything in it.</p>
+                    <p>Archive <strong id="deleteProjectName"></strong>?</p>
+                    <p class="text-muted">It moves to &ldquo;Archived projects&rdquo; at the bottom of the Projects page, where it can be restored with everything in it.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancelDeleteProjectBtn">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteProjectBtn">Delete</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteProjectBtn">Archive</button>
                 </div>
             </div>
         </div>
@@ -1902,9 +1902,9 @@ function assetUrl(string $path): string
                 <div class="modal-footer ov-footer">
                     <button type="button" class="btn btn-secondary ov-delete-btn" id="deleteProjectOverviewBtn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>
                         </svg>
-                        Delete
+                        Archive
                     </button>
                     <button type="button" class="btn btn-secondary" id="editProjectBtn" data-ov="view">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
