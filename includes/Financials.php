@@ -4,14 +4,13 @@
  *
  * What the Financials tab keeps that no other part of the CRM has: our own
  * costs (recurring positions and one-off planned ones), the bank balance as
- * we last entered it, and the few settings the cashflow needs (VAT, the cash
- * buffer). Income comes from the projects' budgets and expected payments,
+ * we last entered it, and the settings the cashflow needs (the cash buffer).
+ * Income comes from the projects' budgets and expected payments,
  * movements since the balance from Bookkeeping - both are read where they
  * live, not copied here. The arithmetic is in assets/js/cashflow.js.
  *
- * Amounts of costs and the balance are gross: what leaves or sits in the
- * account. A cost's vat_rate says how much VAT it contains, which comes back
- * as input VAT.
+ * VAT is left out: costs are entered net, like the projects' amounts. The
+ * balance is what is in the account.
  */
 
 // ---------------------------------------------------------------------------
@@ -26,15 +25,10 @@ class Financials
 {
     public const KINDS = ['recurring', 'once'];
     public const INTERVALS = [1, 3, 6, 12];
-    public const VAT_RATES = [0, 10, 13, 20];
-    public const VAT_PERIODS = ['month', 'quarter'];
     public const MAX_COSTS = 500;
 
     /** Settings with their defaults; stored in app_settings as fin_<key>. */
     public const SETTINGS = [
-        'vat_enabled' => true,
-        'vat_rate' => 20.0,
-        'vat_period' => 'quarter',
         'buffer' => 0.0,
     ];
 
@@ -57,7 +51,6 @@ class Financials
                 name VARCHAR(255) NOT NULL,
                 category VARCHAR(64),
                 amount DECIMAL(12,2) NOT NULL,
-                vat_rate DECIMAL(5,2) NOT NULL DEFAULT 20,
                 kind VARCHAR(16) NOT NULL DEFAULT 'recurring',
                 interval_months INTEGER NOT NULL DEFAULT 1,
                 start_month CHAR(7) NOT NULL,
@@ -91,7 +84,7 @@ class Financials
     public function overview(): array
     {
         $costs = $this->db->query("
-            SELECT id, name, category, amount, vat_rate, kind, interval_months, start_month, end_month, day,
+            SELECT id, name, category, amount, kind, interval_months, start_month, end_month, day,
                    updated_by_name, updated_at
             FROM fin_costs ORDER BY kind DESC, start_month, name COLLATE NOCASE
         ")->fetchAll(PDO::FETCH_ASSOC);
@@ -112,7 +105,6 @@ class Financials
     {
         $c['id'] = (int) $c['id'];
         $c['amount'] = (float) $c['amount'];
-        $c['vat_rate'] = (float) $c['vat_rate'];
         $c['interval_months'] = (int) $c['interval_months'];
         $c['day'] = (int) $c['day'];
         return $c;
@@ -161,11 +153,6 @@ class Financials
             return 'Repeat every 1, 3, 6 or 12 months';
         }
 
-        $vat = (float) ($in['vat_rate'] ?? 20);
-        if (!in_array((int) round($vat), self::VAT_RATES, true)) {
-            return 'VAT must be 0, 10, 13 or 20 %';
-        }
-
         $day = (int) ($in['day'] ?? 1);
         if ($day < 1 || $day > 31) {
             return 'The day must be between 1 and 31';
@@ -175,7 +162,6 @@ class Financials
             'name' => $name,
             'category' => $category === '' ? null : $category,
             'amount' => round((float) $amount, 2),
-            'vat_rate' => (float) round($vat),
             'kind' => $kind,
             'interval_months' => $kind === 'once' ? 1 : $interval,
             'start_month' => $start,
@@ -197,9 +183,9 @@ class Financials
                 throw new InvalidArgumentException('There are already ' . self::MAX_COSTS . ' costs');
             }
             $this->db->prepare("
-                INSERT INTO fin_costs (name, category, amount, vat_rate, kind, interval_months, start_month, end_month, day,
+                INSERT INTO fin_costs (name, category, amount, kind, interval_months, start_month, end_month, day,
                                        created_by, created_by_name, updated_by, updated_by_name)
-                VALUES (:name, :category, :amount, :vat_rate, :kind, :interval_months, :start_month, :end_month, :day,
+                VALUES (:name, :category, :amount, :kind, :interval_months, :start_month, :end_month, :day,
                         :actor_id, :actor_name, :actor_id2, :actor_name2)
             ")->execute($params);
             return (int) $this->db->lastInsertId();
@@ -207,7 +193,7 @@ class Financials
 
         $stmt = $this->db->prepare("
             UPDATE fin_costs
-            SET name = :name, category = :category, amount = :amount, vat_rate = :vat_rate, kind = :kind,
+            SET name = :name, category = :category, amount = :amount, kind = :kind,
                 interval_months = :interval_months, start_month = :start_month, end_month = :end_month, day = :day,
                 updated_by = :actor_id, updated_by_name = :actor_name, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
@@ -267,21 +253,6 @@ class Financials
     public function saveSettings(array $in): ?string
     {
         $clean = [];
-        if (array_key_exists('vat_enabled', $in)) {
-            $clean['vat_enabled'] = filter_var($in['vat_enabled'], FILTER_VALIDATE_BOOLEAN) ? '1' : '0';
-        }
-        if (array_key_exists('vat_rate', $in)) {
-            if (!is_numeric($in['vat_rate']) || (float) $in['vat_rate'] < 0 || (float) $in['vat_rate'] > 50) {
-                return 'The VAT rate must be between 0 and 50 %';
-            }
-            $clean['vat_rate'] = (string) round((float) $in['vat_rate'], 2);
-        }
-        if (array_key_exists('vat_period', $in)) {
-            if (!in_array($in['vat_period'], self::VAT_PERIODS, true)) {
-                return 'VAT is filed monthly or quarterly';
-            }
-            $clean['vat_period'] = $in['vat_period'];
-        }
         if (array_key_exists('buffer', $in)) {
             if (!is_numeric($in['buffer']) || (float) $in['buffer'] < 0 || (float) $in['buffer'] > 1e10) {
                 return 'The cash buffer must be 0 or more';

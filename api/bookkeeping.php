@@ -27,6 +27,9 @@ if (!Auth::isAuthenticated()) {
     exit;
 }
 
+// Bookkeeping - bank entries and invoices - is for administrators only.
+Auth::requireAdmin();
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 

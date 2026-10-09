@@ -7,11 +7,11 @@
  * balance and every cost we have.
  *
  * GET  ?action=overview         costs, balances (newest first), settings
- * POST ?action=save-cost        { id?, name, category, amount, vat_rate, kind, interval_months, start_month, end_month, day }
+ * POST ?action=save-cost        { id?, name, category, amount, kind, interval_months, start_month, end_month, day }
  * POST ?action=delete-cost      { id }
  * POST ?action=set-balance      { amount, as_of, note? }
  * POST ?action=delete-balance   { id }
- * POST ?action=save-settings    { vat_enabled?, vat_rate?, vat_period?, buffer? }
+ * POST ?action=save-settings    { buffer? }
  */
 
 define('APP_ROOT', dirname(__DIR__));

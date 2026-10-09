@@ -32,6 +32,12 @@
         return Number.isFinite(n) ? n : null;
     }
 
+    /** What someone typed or pasted into an amount field ("1.234,56", "1,234.56"); null when empty or unreadable. */
+    function typed(v) {
+        const n = root.CRMAmount ? root.CRMAmount.parse(v) : number(v);
+        return n === null || Number.isNaN(n) ? null : n;
+    }
+
     /** A project's payments (JSON text from the API, or a list) as [{ month, amount, paid }]. */
     function parse(raw) {
         let list = raw;
@@ -325,15 +331,15 @@
         return {
             start: f.start.value,
             end: f.end.value,
-            budget_min: f.min.value,
-            budget_max: f.max.value
+            budget_min: typed(f.min.value),
+            budget_max: typed(f.max.value)
         };
     }
 
     /** The rows as payments; rows without a usable amount are left out. */
     function currentPayments() {
         return editor.rows
-            .map(r => ({ month: r.month, amount: number(r.amount), paid: r.paid }))
+            .map(r => ({ month: r.month, amount: typed(r.amount), paid: r.paid }))
             .filter(p => p.amount !== null && p.amount > 0);
     }
 
@@ -359,7 +365,7 @@
                         ${monthOptionsHtml(r, ctx, used)}
                     </select>
                     <span class="ppay-amount">
-                        <input type="number" class="form-input ov-field" data-ppay-amount step="0.01" min="0" inputmode="decimal"
+                        <input type="text" class="form-input ov-field" data-ppay-amount data-amount inputmode="decimal" autocomplete="off"
                             placeholder="Amount" aria-label="Payment ${n}: amount in euros" value="${esc(r.amount)}">
                         <span class="ppay-currency" aria-hidden="true">€</span>
                     </span>
@@ -473,7 +479,7 @@
         editor.rows = parse(project && project.payments).map(p => ({
             key: ++editor.seq,
             month: p.month,
-            amount: String(Math.round(p.amount * 100) / 100),
+            amount: root.CRMAmount ? root.CRMAmount.format(p.amount) : String(Math.round(p.amount * 100) / 100),
             paid: p.paid
         }));
         renderEditor();
@@ -486,7 +492,7 @@
     function read() {
         let bad = null;
         editor.rows.forEach(r => {
-            const amount = number(r.amount);
+            const amount = typed(r.amount);
             const field = editor.el.querySelector(`[data-ppay-row="${r.key}"] [data-ppay-amount]`);
             const invalid = amount === null || amount <= 0;
             if (field) field.classList.toggle('is-invalid', invalid);

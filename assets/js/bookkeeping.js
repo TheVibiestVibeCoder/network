@@ -357,6 +357,8 @@
 
     function load() {
         init();
+        // Admins only: without the view there is nothing to load into.
+        if (!$('bookkeepingView')) return Promise.resolve();
         loading = true;
         loadPromise = (async () => {
             try {
@@ -2897,6 +2899,12 @@
             confirmCloseBtn: $('bkConfirmCloseBtn')
         });
 
+        // The PDF preview is shared - project documents open in it too - so
+        // it is wired for everyone. The rest needs the Bookkeeping view,
+        // which is only on the page for admins.
+        bindPreview();
+        if (!$('bookkeepingView')) return;
+
         // CSV import
         els.importCsvBtn.addEventListener('click', () => els.csvInput.click());
         els.csvInput.addEventListener('change', () => {
@@ -3199,17 +3207,19 @@
         // Confirm modal
         els.confirmCloseBtn.addEventListener('click', closeConfirm);
 
-        // PDF preview modal
-        els.pdfPreviewCloseBtn.addEventListener('click', closePdfPreview);
-        els.pdfPreviewDoneBtn.addEventListener('click', closePdfPreview);
-        els.pdfPreviewModal.querySelector('.modal-backdrop').addEventListener('click', closePdfPreview);
-
         // Close modals on backdrop click
         [els.importModal, els.pdfModal, els.confirmModal].forEach(modal => {
             modal.querySelector('.modal-backdrop').addEventListener('click', () => {
                 modal.classList.remove('active');
             });
         });
+    }
+
+    function bindPreview() {
+        if (!els.pdfPreviewModal) return;
+        els.pdfPreviewCloseBtn.addEventListener('click', closePdfPreview);
+        els.pdfPreviewDoneBtn.addEventListener('click', closePdfPreview);
+        els.pdfPreviewModal.querySelector('.modal-backdrop').addEventListener('click', closePdfPreview);
     }
 
     /**

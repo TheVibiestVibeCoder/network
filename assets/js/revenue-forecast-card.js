@@ -59,6 +59,8 @@
     const shared = {
         loading: true,
         projects: [],
+        // A fixed number of months on the axis, or null to run to the last end month.
+        months: null,
         settings: RF.settingsFor(RF.DEFAULT_PRESET),
         cards: [],
         listeners: []
@@ -373,7 +375,10 @@
                 <div class="rf-detail" id="${uid}-detail">
                     <div class="rf-detail-bar">
                         <span>Projects · ${f.counted} of ${ctx.items.length} counted</span>
-                        ${excluded ? '<button type="button" class="rf-link" data-rf-include-all data-rf-focus="include-all">Include all</button>' : ''}
+                        <span class="rf-detail-actions">
+                            ${excluded ? '<button type="button" class="rf-link" data-rf-include-all data-rf-focus="include-all">Select all</button>' : ''}
+                            ${ctx.items.some(p => !s.excluded[p.id]) ? '<button type="button" class="rf-link" data-rf-exclude-all data-rf-focus="exclude-all">Deselect all</button>' : ''}
+                        </span>
                     </div>
                     ${ctx.items.length ? `
                     <div class="rf-table-scroll">
@@ -435,7 +440,7 @@
                 items,
                 missing: prepared.missing,
                 all: items.concat(prepared.missing),
-                f: RF.forecast(items, state.settings)
+                f: RF.forecast(items, state.settings, shared.months)
             };
         }
 
@@ -548,6 +553,12 @@
                     });
                 } else if (t.hasAttribute('data-rf-include-all')) {
                     update(() => { s.excluded = {}; });
+                } else if (t.hasAttribute('data-rf-exclude-all') && current) {
+                    // Every project off, to switch on only the ones to look at.
+                    update(() => {
+                        s.excluded = {};
+                        current.items.forEach(p => { s.excluded[p.id] = true; });
+                    });
                 }
             });
 
@@ -624,6 +635,12 @@
         return { chance: s.chance, budget: s.budget, stages: s.stages.slice(), excluded: Object.assign({}, s.excluded) };
     }
 
+    /** Fixes the axis to `n` months (Financials' "months ahead"); null lets it run to the last end month. */
+    function setMonths(n) {
+        shared.months = n > 0 ? n : null;
+        renderAll();
+    }
+
     /** Picks a scenario from outside the card (the Financials header). */
     function setPreset(key) {
         shared.settings = RF.settingsFor(key);
@@ -637,5 +654,5 @@
         if (typeof fn === 'function') shared.listeners.push(fn);
     }
 
-    root.RevenueForecastCard = { init, setProjects, getSettings, setPreset, onChange };
+    root.RevenueForecastCard = { init, setProjects, getSettings, setPreset, setMonths, onChange };
 })(window);

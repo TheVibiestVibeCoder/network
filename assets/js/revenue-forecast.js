@@ -274,9 +274,11 @@
      * Everything the card shows, for one setting. The scale comes from the
      * Best case, so switching scenarios never rescales the chart; it covers
      * the undated bar too, which the card only draws when `hasUndated`.
+     * `months` fixes the axis (Financials' "months ahead"); without it the
+     * axis runs to the last end month, at least a year.
      */
-    function forecast(items, settings) {
-        const months = horizon(items);
+    function forecast(items, settings, months) {
+        months = months > 0 ? months : horizon(items);
         const current = compute(items, settings, months, true);
         const presets = {};
         PRESETS.forEach(p => { presets[p.key] = compute(items, settingsFor(p.key), months, false); });

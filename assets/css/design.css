@@ -2081,6 +2081,11 @@ input[type="checkbox"] {
     color: var(--c-ink-2);
 }
 
+.rf-detail-actions {
+    display: flex;
+    gap: 16px;
+}
+
 .rf-link {
     padding: 0;
     border: 0;
@@ -9574,7 +9579,7 @@ details.import-instructions p {
 
 .fin-table-scroll {
     overflow-x: auto;
-    margin: 0 -20px -20px;
+    margin: 0 -20px;
 }
 
 .fin-table {
@@ -10097,77 +10102,28 @@ details.import-instructions p {
     outline-offset: 2px;
 }
 
-/* ---- Assumptions ---- */
+/* ---- How it is worked out: folded under the months ---- */
 
-.fin-settings {
-    display: flex;
-    flex-direction: column;
-}
-
-.fin-setting {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 24px;
-    padding: 12px 0;
-}
-
-.fin-setting + .fin-setting {
-    border-top: 1px solid var(--c-line-2);
-}
-
-.fin-setting-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1 1 320px;
-    min-width: 0;
-}
-
-.fin-setting-text strong {
-    color: var(--c-ink);
-}
-
-.fin-setting-text span {
-    font-size: var(--t-sm);
-    line-height: 1.5;
-    color: var(--c-ink-3);
-}
-
-.fin-setting-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-}
-
-.fin-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.fin-small {
-    width: 72px;
-    height: 32px;
-    text-align: right;
-}
-
-.fin-mid {
-    width: 140px;
-    height: 32px;
-}
-
-.fin-foot {
-    margin: 12px 0 0;
-    padding-top: 12px;
+.fin-how {
+    margin: 20px -20px -20px;
+    padding: 12px 20px 14px;
     border-top: 1px solid var(--c-line-2);
     font-size: var(--t-xs);
     line-height: 1.6;
     color: var(--c-ink-3);
+}
+
+.fin-how summary {
+    width: fit-content;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-accent-2);
+    cursor: pointer;
+}
+
+.fin-how p {
+    margin: 8px 0 0;
+    max-width: 80ch;
 }
 
 /* ---- Loading ---- */
@@ -10214,7 +10170,12 @@ details.import-instructions p {
     }
 
     .fin-table-scroll {
-        margin: 0 -14px -16px;
+        margin: 0 -14px;
+    }
+
+    .fin-how {
+        margin: 16px -14px -16px;
+        padding: 12px 14px 14px;
     }
 
     .fin-table :is(th, td):first-child { padding-left: 14px; }

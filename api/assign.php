@@ -102,6 +102,10 @@ function handleAssign(): void
     if (!isset(ASSIGNABLE[$type])) {
         respond(['error' => 'Unknown record type.'], 422);
     }
+    // Bookkeeping is for administrators only.
+    if ($type === 'bookkeeping' && !Auth::isAdmin()) {
+        respond(['error' => 'Administrator access required'], 403);
+    }
 
     $id = isset($input['id']) ? (int) $input['id'] : 0;
     if ($id <= 0) {
@@ -286,7 +290,8 @@ function handleWorkload(string $who): void
     // "Unassigned" deliberately does not list bookkeeping rows: almost every
     // row ever imported is unassigned, and burying three real contacts under a
     // thousand bank lines would make that view useless.
-    $bookkeeping = ($isUnassigned || !bookkeepingAssignable($db))
+    // Bookkeeping is for administrators only; nobody else sees its rows here.
+    $bookkeeping = ($isUnassigned || !Auth::isAdmin() || !bookkeepingAssignable($db))
         ? []
         : fetchBookkeeping($db, $target['id']);
 
@@ -432,7 +437,7 @@ function handleSummary(): void
     $counts = [];
 
     $tables = ['todos' => 'todos', 'projects' => 'projects', 'contacts' => 'contacts'];
-    if (bookkeepingAssignable($db)) {
+    if (Auth::isAdmin() && bookkeepingAssignable($db)) {
         $tables['bookkeeping'] = 'bookkeeping_rows';
     }
 

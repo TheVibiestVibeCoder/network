@@ -729,13 +729,13 @@ function assetUrl(string $path): string
                         </svg>
                         <span class="nav-label">Calendar</span>
                     </button>
+                    <?php if ($isAdmin): ?>
                     <button type="button" class="toggle-btn nav-item" data-view="bookkeeping" title="Bookkeeping">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/>
                         </svg>
                         <span class="nav-label">Bookkeeping</span>
                     </button>
-                    <?php if ($isAdmin): ?>
                     <button type="button" class="toggle-btn nav-item" data-view="financials" title="Financials">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M3.5 20.5h17"/><path d="m4.5 15.5 4.5-5 3.5 3 7-7.5"/><path d="M15 6h4.5v4.5"/>
@@ -951,11 +951,11 @@ function assetUrl(string $path): string
                             <section class="fin-card" id="finIncome" aria-label="Expected income"></section>
                             <section class="fin-card" id="finCosts" aria-label="Costs"></section>
                         </div>
-                        <section class="fin-card" id="finSettings" aria-label="Settings"></section>
                     </div>
                 </div>
                 <?php endif; ?>
 
+                <?php if ($isAdmin): ?>
                 <div class="view-panel" id="bookkeepingView">
                     <div class="view-head">
                         <div class="view-head-text">
@@ -1079,6 +1079,7 @@ function assetUrl(string $path): string
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- List View -->
                 <div class="view-panel" id="listView">
@@ -1811,8 +1812,8 @@ function assetUrl(string $path): string
                                 <!-- "3 expected payments", what is still open (project-payments.js) -->
                                 <div class="ppay-summary" id="projectOverviewPayments" data-ov="view" hidden></div>
                                 <div class="ov-field-pair" data-ov="edit">
-                                    <input type="number" id="projectEditBudgetMin" class="form-input ov-field" step="0.01" placeholder="Min" aria-label="Budget min">
-                                    <input type="number" id="projectEditBudgetMax" class="form-input ov-field" step="0.01" placeholder="Max" aria-label="Budget max">
+                                    <input type="text" id="projectEditBudgetMin" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Min" aria-label="Budget min">
+                                    <input type="text" id="projectEditBudgetMax" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Max" aria-label="Budget max">
                                 </div>
                             </div>
                             <div class="overview-detail-item">
@@ -2046,6 +2047,7 @@ function assetUrl(string $path): string
             </div>
         </div>
 
+        <?php if ($isAdmin): ?>
         <!-- Bookkeeping: CSV Import Modal -->
         <div class="modal" id="bkImportModal">
             <div class="modal-backdrop"></div>
@@ -2104,7 +2106,9 @@ function assetUrl(string $path): string
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
+        <?php if ($isAdmin): ?>
         <!-- Bookkeeping: PDF Upload Modal -->
         <div class="modal" id="bkPdfModal">
             <div class="modal-backdrop"></div>
@@ -2134,6 +2138,7 @@ function assetUrl(string $path): string
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Bookkeeping: PDF Preview Modal -->
         <div class="modal" id="bkPdfPreviewModal">
@@ -2155,6 +2160,7 @@ function assetUrl(string $path): string
             </div>
         </div>
 
+        <?php if ($isAdmin): ?>
         <!-- Bookkeeping: Confirm Modal -->
         <div class="modal" id="bkConfirmModal">
             <div class="modal-backdrop"></div>
@@ -2169,6 +2175,7 @@ function assetUrl(string $path): string
                 <div class="modal-footer" id="bkConfirmActions"></div>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Expected payments that came in: asked after a bookkeeping import
              with income in it (project-payments.js) -->
@@ -2273,6 +2280,7 @@ function assetUrl(string $path): string
         <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
+        <script src="<?= assetUrl('assets/js/amount-input.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
         <?php if ($isAdmin): ?>
         <!-- The revenue forecast and cashflow live in Financials only. -->

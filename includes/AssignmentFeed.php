@@ -83,6 +83,10 @@ class AssignmentFeed
 
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $event) {
+            // Bookkeeping is for administrators only.
+            if ($event['record_type'] === 'bookkeeping' && !Auth::isAdmin()) {
+                continue;
+            }
             $record = self::currentRecord($db, $event['record_type'], (int) $event['record_id'], $person);
             if ($record === null) {
                 continue;

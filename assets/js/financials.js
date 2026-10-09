@@ -30,7 +30,6 @@
         { value: 6, label: 'Every 6 months', short: 'every 6 months' },
         { value: 12, label: 'Yearly', short: 'yearly' }
     ];
-    const VAT_RATES = [20, 13, 10, 0];
 
     const state = {
         inited: false,
@@ -47,6 +46,8 @@
         draftError: '',
         balanceOpen: false,
         balanceError: '',
+        bufferOpen: false,
+        bufferError: '',
         openMonths: new Set(),
         showPastPlanned: false,
         hover: null,
@@ -73,6 +74,10 @@
     /** "€57.5k", with a minus when below zero - for the chart's axis. */
     const short = n => (n < 0 ? MINUS : '') + RF.money(Math.abs(n));
     const plural = (n, word, many) => n + ' ' + (n === 1 ? word : (many || word + 's'));
+
+    /** An amount field's value: a number, null when empty, NaN when it cannot be read. */
+    const readAmount = value => (window.CRMAmount ? window.CRMAmount.parse(value) : (value === '' ? null : Number(value)));
+    const showAmount = n => (window.CRMAmount ? window.CRMAmount.format(n) : String(n ?? ''));
 
     function todayIso() {
         const d = new Date();
@@ -138,7 +143,7 @@
         if (state.inited) return;
         state.inited = true;
         ['financialsView', 'finHeadTools', 'finPage', 'finKpis', 'finAlerts', 'finChart', 'finMonths',
-            'finIncome', 'finCosts', 'finForecast', 'finSettings'].forEach(id => { els[id] = document.getElementById(id); });
+            'finIncome', 'finCosts', 'finForecast'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
             const stored = Number(localStorage.getItem(HORIZON_KEY));
@@ -146,6 +151,8 @@
         } catch (e) { /* no storage: a year */ }
 
         Card.init(els.finForecast, { name: 'financials' });
+        // The forecast looks as far ahead as the rest of the page.
+        Card.setMonths(state.months);
         Card.onChange(() => {
             if (!state.loaded) return;
             compute();
@@ -242,7 +249,6 @@
         renderMonths();
         renderIncome();
         renderCosts();
-        renderSettings();
 
         if (focusKey) {
             const again = els.financialsView.querySelector(`[data-fin-focus="${focusKey}"]`);
@@ -311,7 +317,7 @@
                 <span class="fin-kpi-icon" aria-hidden="true">${ICON.in}</span>
                 <span class="fin-kpi-label">Coming in · next 3 months</span>
                 <span class="fin-kpi-value">${esc(euro(k.incomeNext3))}</span>
-                <span class="fin-kpi-sub">${esc(euro(k.incomeTotal))} in ${p.months} months${p.settings.vat_enabled ? ' · incl. VAT' : ''}${k.overdue.count ? ` · ${euro(k.overdue.gross)} overdue` : ''}</span>
+                <span class="fin-kpi-sub">${esc(euro(k.incomeTotal))} in ${p.months} months · net${k.overdue.count ? ` · ${euro(k.overdue.amount)} overdue` : ''}</span>
             </article>
             <article class="fin-kpi fin-kpi--out">
                 <span class="fin-kpi-icon" aria-hidden="true">${ICON.out}</span>
@@ -324,7 +330,28 @@
                 <span class="fin-kpi-label">Lowest balance</span>
                 <span class="fin-kpi-value">${k.lowest ? esc((k.lowest.amount < 0 ? MINUS : '') + euro(Math.abs(k.lowest.amount))) : '—'}</span>
                 <span class="fin-kpi-sub">${k.lowest ? `<strong>${esc(k.lowest.label)}</strong> · ` : ''}${esc(lowSub)}</span>
+                <button type="button" class="fin-link fin-kpi-action" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
+                    title="The least that should always be in the account; the chart and this figure warn below it">${p.settings.buffer > 0 ? 'Buffer ' + esc(euro(p.settings.buffer)) : 'Set buffer'}</button>
+                ${state.bufferOpen ? bufferForm() : ''}
             </article>`;
+    }
+
+    function bufferForm() {
+        const buffer = state.plan.settings.buffer;
+        return `
+            <form class="fin-balance-form" data-fin-buffer-form>
+                <label class="fin-field">
+                    <span>Cash buffer</span>
+                    <span class="fin-amount"><input type="text" class="form-input" name="buffer" data-amount inputmode="decimal" autocomplete="off"
+                        value="${buffer > 0 ? esc(showAmount(buffer)) : ''}" placeholder="0" data-fin-focus="buffer-amount"><span aria-hidden="true">€</span></span>
+                </label>
+                <p class="fin-hint">The least that should always be in the account. The chart and this figure warn below it; 0 turns it off.</p>
+                ${state.bufferError ? `<p class="fin-form-error">${esc(state.bufferError)}</p>` : ''}
+                <div class="fin-form-actions">
+                    <button type="button" class="btn btn-secondary btn-small" data-fin-buffer-cancel>Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-small">Save buffer</button>
+                </div>
+            </form>`;
     }
 
     function balanceForm() {
@@ -335,8 +362,8 @@
                 <div class="fin-field-row">
                     <label class="fin-field">
                         <span>Balance</span>
-                        <span class="fin-amount"><input type="number" step="0.01" class="form-input" name="amount" required
-                            value="${anchor ? esc(state.plan.balance.amount) : ''}" data-fin-focus="balance-amount" inputmode="decimal"><span aria-hidden="true">€</span></span>
+                        <span class="fin-amount"><input type="text" class="form-input" name="amount" required data-amount autocomplete="off"
+                            value="${anchor ? esc(showAmount(state.plan.balance.amount)) : ''}" data-fin-focus="balance-amount" inputmode="decimal"><span aria-hidden="true">€</span></span>
                     </label>
                     <label class="fin-field">
                         <span>At the end of</span>
@@ -368,7 +395,7 @@
         }
         if (k.overdue.count) {
             const oldest = p.income.filter(x => x.counted && x.overdue).sort((a, b) => a.due - b.due)[0];
-            alerts.push({ tone: 'warn', html: `<strong>${esc(plural(k.overdue.count, 'payment'))} overdue, ${esc(euro(k.overdue.gross))}</strong> - counted in this month. Oldest: ${esc(oldest.name)}, due ${esc(RF.monthName(oldest.due, RF.monthOf(new Date())))}.` });
+            alerts.push({ tone: 'warn', html: `<strong>${esc(plural(k.overdue.count, 'payment'))} overdue, ${esc(euro(k.overdue.amount))}</strong> - counted in this month. Oldest: ${esc(oldest.name)}, due ${esc(RF.monthName(oldest.due, RF.monthOf(new Date())))}.` });
         }
         if (!p.hasBalance) {
             alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one above.' });
@@ -579,7 +606,6 @@
 
         const body = p.rows.map(r => {
             const open = state.openMonths.has(r.offset);
-            const vat = r.vat;
             return `
                 <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}">
                     <th scope="row">
@@ -589,29 +615,32 @@
                     </th>
                     <td class="is-pos">${r.in > 0.005 ? esc(signed(r.in)) : '<span class="fin-muted">–</span>'}</td>
                     <td>${r.fixed + r.planned > 0.005 ? esc(signed(-(r.fixed + r.planned))) : '<span class="fin-muted">–</span>'}</td>
-                    <td>${Math.abs(vat) > 0.005 ? esc(signed(-vat)) : '<span class="fin-muted">–</span>'}</td>
                     <td class="${r.net < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(r.net))}</strong></td>
                     <td class="fin-col-balance ${p.hasBalance ? balClass(r.closing) : ''}">${p.hasBalance ? esc((r.closing < 0 ? MINUS : '') + euro(Math.abs(r.closing))) : '<span class="fin-muted">–</span>'}</td>
                 </tr>
-                ${open ? `<tr class="fin-month-detail"><td colspan="6">${monthDetail(r)}</td></tr>` : ''}`;
+                ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(r)}</td></tr>` : ''}`;
         }).join('');
 
         els.finMonths.innerHTML = `
             <div class="fin-card-head">
                 <div>
                     <h2 class="fin-card-title">Month by month</h2>
-                    <p class="fin-card-sub">Open a month to see what makes it up${p.settings.vat_enabled ? ` · income incl. ${esc(p.settings.vat_rate)}% VAT` : ''}</p>
+                    <p class="fin-card-sub">Open a month to see what makes it up · all amounts net</p>
                 </div>
             </div>
             <div class="fin-table-scroll">
                 <table class="fin-table">
                     <thead><tr>
                         <th scope="col">Month</th><th scope="col">In</th><th scope="col">Costs</th>
-                        <th scope="col">VAT</th><th scope="col">Net</th><th scope="col">Balance</th>
+                        <th scope="col">Net</th><th scope="col">Balance</th>
                     </tr></thead>
                     <tbody>${body}</tbody>
                 </table>
-            </div>`;
+            </div>
+            <details class="fin-how">
+                <summary>How this is worked out</summary>
+                <p>Income follows the scenario of the revenue forecast at the top. An expected payment counts in its month, the part of a budget the payments leave open at the project’s end; anything overdue counts in this month. Complete projects still bring their unpaid payments. A fixed cost whose day this month has passed is taken to be in the balance already. VAT is left out: project amounts are net, so enter costs net too - over a VAT period that is what stays in the account; only when the VAT is paid is not shown.${state.tx.amountColumn ? ` Bank movements come from the Bookkeeping column “${esc(state.tx.amountColumn)}”; rows left out of the month totals do not move the balance.` : ''}</p>
+            </details>`;
     }
 
     function monthDetail(r) {
@@ -620,12 +649,11 @@
         const income = r.items.income.map(x => line(
             `<a href="#" data-crm-action="open-project-overview" data-project-id="${esc(x.projectId)}">${esc(x.name)}</a>`,
             esc(incomeKind(x) + (x.overdue ? ' · overdue' : '') + (x.factor < 1 ? ` · ${Math.round(x.factor * 100)}% of ${euro(x.net)}` : '')),
-            esc(signed(x.gross)), 'is-in'));
+            esc(signed(x.expected)), 'is-in'));
         const costs = r.items.costs.map(c => line(esc(c.cost.name),
             esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost), c.paid ? 'already paid this month' : ''].filter(Boolean).join(' · ')),
             esc(signed(-c.amount)), c.paid ? 'is-paid' : 'is-out'));
-        const vat = r.items.vat.map(v => line(esc(v.label), esc(`output ${euro(v.output)} − input ${euro(v.input)}`), esc(signed(-v.amount)), 'is-out'));
-        const all = income.concat(costs, vat);
+        const all = income.concat(costs);
         return all.length ? `<ul class="fin-detail">${all.join('')}</ul>` : '<p class="fin-muted fin-detail-empty">Nothing planned this month.</p>';
     }
 
@@ -655,7 +683,7 @@
                     </span>
                 </span>
                 <span class="fin-income-amount">
-                    <strong>${esc(euro(x.gross || x.expected))}</strong>
+                    <strong>${esc(euro(x.expected))}</strong>
                     <span>${x.factor < 1 ? `${Math.round(x.factor * 100)}% of ${esc(euro(x.net))} net` : `${esc(euro(x.net))} net`}</span>
                 </span>
             </li>`;
@@ -679,7 +707,7 @@
                 const counted = g.items.filter(x => x.counted);
                 return `
                 <section class="fin-group">
-                    <h3 class="fin-group-title"><span>${esc(g.title)}</span><strong>${esc(euro(counted.reduce((s, x) => s + x.gross, 0)))}</strong></h3>
+                    <h3 class="fin-group-title"><span>${esc(g.title)}</span><strong>${esc(euro(counted.reduce((s, x) => s + x.expected, 0)))}</strong></h3>
                     ${g.note ? `<p class="fin-hint">${esc(g.note)}</p>` : ''}
                     <ul class="fin-income-list">${g.items.map(row).join('')}</ul>
                 </section>`;
@@ -713,7 +741,7 @@
                 <button type="button" class="fin-cost${ended(c) ? ' is-ended' : ''}" data-fin-edit="${c.id}" data-fin-focus="cost-${c.id}">
                     <span class="fin-cost-main">
                         <span class="fin-cost-name">${esc(c.name)}${c.category ? `<span class="fin-chip">${esc(c.category)}</span>` : ''}</span>
-                        <span class="fin-cost-meta">${esc(rhythm(c))} · ${esc(monthLabelOf(c.start_month))}${c.end_month ? ' – ' + esc(monthLabelOf(c.end_month)) : ' onwards'}${ended(c) ? ' · ended' : ''}${c.vat_rate ? ` · ${esc(c.vat_rate)}% VAT` : ''}</span>
+                        <span class="fin-cost-meta">${esc(rhythm(c))} · ${esc(monthLabelOf(c.start_month))}${c.end_month ? ' – ' + esc(monthLabelOf(c.end_month)) : ' onwards'}${ended(c) ? ' · ended' : ''}</span>
                     </span>
                     <span class="fin-cost-amount"><strong>${esc(euro(c.amount))}</strong>${Number(c.interval_months) > 1 ? `<span>≈ ${esc(euro(c.amount / c.interval_months))} / month</span>` : ''}</span>
                 </button>
@@ -723,7 +751,7 @@
                 <button type="button" class="fin-cost" data-fin-edit="${c.id}" data-fin-focus="cost-${c.id}">
                     <span class="fin-cost-main">
                         <span class="fin-cost-name">${esc(c.name)}${c.category ? `<span class="fin-chip">${esc(c.category)}</span>` : ''}</span>
-                        <span class="fin-cost-meta">${esc(monthLabelOf(c.start_month))}${c.vat_rate ? ` · ${esc(c.vat_rate)}% VAT` : ''}</span>
+                        <span class="fin-cost-meta">${esc(monthLabelOf(c.start_month))}</span>
                     </span>
                     <span class="fin-cost-amount"><strong>${esc(euro(c.amount))}</strong></span>
                 </button>
@@ -734,7 +762,7 @@
             <div class="fin-card-head">
                 <div>
                     <h2 class="fin-card-title">Costs</h2>
-                    <p class="fin-card-sub">Gross, as they leave the account · ≈ ${esc(euro(p.kpis.fixedPerMonth))} fixed per month</p>
+                    <p class="fin-card-sub">Net, without VAT · ≈ ${esc(euro(p.kpis.fixedPerMonth))} fixed per month</p>
                 </div>
             </div>
             ${editing ? costForm(editing) : ''}
@@ -776,10 +804,8 @@
                         <input type="text" class="form-input" name="name" value="${esc(d.name)}" maxlength="255" required placeholder="${once ? 'e.g. New laptops' : 'e.g. Office rent'}" data-fin-focus="draft-name"></label>
                     <label class="fin-field"><span>Category</span>
                         <input type="text" class="form-input" name="category" value="${esc(d.category || '')}" maxlength="64" list="finCategories" placeholder="Optional"></label>
-                    <label class="fin-field"><span>Amount (gross)</span>
-                        <span class="fin-amount"><input type="number" class="form-input" name="amount" value="${esc(d.amount)}" step="0.01" min="0" required inputmode="decimal"><span aria-hidden="true">€</span></span></label>
-                    <label class="fin-field"><span>VAT in it</span>
-                        <select class="form-select" name="vat_rate">${VAT_RATES.map(v => `<option value="${v}"${Number(d.vat_rate) === v ? ' selected' : ''}>${v}%</option>`).join('')}</select></label>
+                    <label class="fin-field"><span>Amount (excl. VAT)</span>
+                        <span class="fin-amount"><input type="text" class="form-input" name="amount" value="${esc(d.amount)}" required data-amount inputmode="decimal" autocomplete="off" placeholder="0"><span aria-hidden="true">€</span></span></label>
                     ${once ? `
                     <label class="fin-field"><span>Month</span>
                         <select class="form-select" name="start_month">${monthOptions(d.start_month, from, 36, now)}</select></label>` : `
@@ -803,42 +829,6 @@
             </form>`;
     }
 
-    // ---- Settings ----
-
-    function renderSettings() {
-        const s = state.plan.settings;
-        els.finSettings.innerHTML = `
-            <div class="fin-card-head">
-                <div>
-                    <h2 class="fin-card-title">Assumptions</h2>
-                    <p class="fin-card-sub">Saved for everyone who sees Financials</p>
-                </div>
-            </div>
-            <div class="fin-settings">
-                <div class="fin-setting">
-                    <div class="fin-setting-text">
-                        <strong>VAT</strong>
-                        <span>Project amounts are net: add VAT to what comes in, and plan paying it - output less input VAT - on the 15th of the second month after each period.</span>
-                    </div>
-                    <div class="fin-setting-controls">
-                        <button type="button" class="rf-switch" role="switch" aria-checked="${s.vat_enabled}" data-fin-vat data-fin-focus="vat" aria-label="Include VAT"><span class="rf-switch-knob"></span></button>
-                        <label class="fin-inline"><input type="number" class="form-input fin-small" min="0" max="50" step="0.5" value="${esc(s.vat_rate)}" data-fin-setting="vat_rate" ${s.vat_enabled ? '' : 'disabled'} aria-label="VAT rate">%</label>
-                        ${segmented('period', 'Filed', [{ key: 'month', label: 'Monthly' }, { key: 'quarter', label: 'Quarterly' }], s.vat_period)}
-                    </div>
-                </div>
-                <div class="fin-setting">
-                    <div class="fin-setting-text">
-                        <strong>Cash buffer</strong>
-                        <span>The least that should always be in the account. The chart and the lowest balance warn below it.</span>
-                    </div>
-                    <div class="fin-setting-controls">
-                        <span class="fin-amount"><input type="number" class="form-input fin-mid" min="0" step="100" value="${esc(s.buffer || '')}" placeholder="0" data-fin-setting="buffer" aria-label="Cash buffer"><span aria-hidden="true">€</span></span>
-                    </div>
-                </div>
-            </div>
-            <p class="fin-foot">How it is worked out: income uses the scenario of the revenue forecast at the top. An expected payment counts in its month, the part of a budget the payments leave open at the project’s end; anything overdue counts in this month. Complete projects still bring their unpaid payments. A fixed cost whose day this month has passed is taken to be in the balance already. VAT from before this month is not known here - add what is still to pay as a planned cost.${state.tx.amountColumn ? ` Bank movements come from the Bookkeeping column “${esc(state.tx.amountColumn)}”; rows left out of the month totals do not move the balance.` : ''}</p>`;
-    }
-
     // ------------------------------------------------------------------
     // Editing
     // ------------------------------------------------------------------
@@ -846,7 +836,7 @@
     function newDraft(kind) {
         const now = RF.monthOf(new Date());
         return {
-            id: null, kind, name: '', category: '', amount: '', vat_rate: 20,
+            id: null, kind, name: '', category: '', amount: '',
             interval_months: 1, day: 1,
             start_month: monthKey(kind === 'once' ? 1 : 0, now), end_month: ''
         };
@@ -855,7 +845,7 @@
     function readCostForm(form) {
         const f = new FormData(form);
         const d = Object.assign({}, state.draft);
-        ['name', 'category', 'amount', 'vat_rate', 'interval_months', 'day', 'start_month', 'end_month'].forEach(k => {
+        ['name', 'category', 'amount', 'interval_months', 'day', 'start_month', 'end_month'].forEach(k => {
             if (f.has(k)) d[k] = f.get(k);
         });
         return d;
@@ -864,9 +854,17 @@
     async function saveCost(form) {
         const d = readCostForm(form);
         state.draft = d;
+        const amount = readAmount(d.amount);
+        if (amount === null || Number.isNaN(amount) || amount <= 0) {
+            state.draftError = 'Enter an amount above 0, e.g. 1.234,56';
+            renderCosts();
+            const field = els.finCosts.querySelector('[data-fin-cost-form] [name="amount"]');
+            if (field) field.focus();
+            return;
+        }
         try {
             const result = await post('save-cost', {
-                id: d.id, name: d.name, category: d.category, amount: d.amount, vat_rate: Number(d.vat_rate),
+                id: d.id, name: d.name, category: d.category, amount,
                 kind: d.kind, interval_months: Number(d.interval_months) || 1, day: Number(d.day) || 1,
                 start_month: d.start_month, end_month: d.end_month || null
             });
@@ -901,8 +899,16 @@
 
     async function saveBalance(form) {
         const f = new FormData(form);
+        const amount = readAmount(f.get('amount'));
+        if (amount === null || Number.isNaN(amount)) {
+            state.balanceError = 'Enter the balance, e.g. 48.500,00';
+            renderKpis();
+            const field = els.finKpis.querySelector('[data-fin-focus="balance-amount"]');
+            if (field) field.focus();
+            return;
+        }
         try {
-            const result = await post('set-balance', { amount: f.get('amount'), as_of: f.get('as_of') });
+            const result = await post('set-balance', { amount, as_of: f.get('as_of') });
             state.overview = result.data;
             state.balanceOpen = false;
             state.balanceError = '';
@@ -927,15 +933,25 @@
         }
     }
 
-    async function saveSetting(patch) {
+    async function saveBuffer(form) {
+        const value = readAmount(new FormData(form).get('buffer'));
+        if (Number.isNaN(value) || (value !== null && value < 0)) {
+            state.bufferError = 'Enter an amount of 0 or more, e.g. 15.000';
+            renderKpis();
+            return;
+        }
         try {
-            const result = await post('save-settings', patch);
+            const result = await post('save-settings', { buffer: value || 0 });
             state.overview = result.data;
+            state.bufferOpen = false;
+            state.bufferError = '';
             compute();
             render();
+            const btn = els.finKpis.querySelector('[data-fin-buffer]');
+            if (btn) btn.focus();
         } catch (error) {
-            alert('Could not save: ' + error.message);
-            render();
+            state.bufferError = error.message;
+            renderKpis();
         }
     }
 
@@ -955,6 +971,7 @@
             } else if (t.hasAttribute('data-fin-months')) {
                 state.months = Number(t.getAttribute('data-fin-months'));
                 try { localStorage.setItem(HORIZON_KEY, String(state.months)); } catch (err) { /* fine */ }
+                Card.setMonths(state.months);
                 compute();
                 render();
             } else if (t.hasAttribute('data-fin-balance')) {
@@ -967,6 +984,17 @@
                 state.balanceOpen = false;
                 renderKpis();
                 const btn = els.finKpis.querySelector('[data-fin-balance]');
+                if (btn) btn.focus();
+            } else if (t.hasAttribute('data-fin-buffer')) {
+                state.bufferOpen = !state.bufferOpen;
+                state.bufferError = '';
+                renderKpis();
+                const field = els.finKpis.querySelector('[data-fin-focus="buffer-amount"]');
+                if (field) { field.focus(); field.select(); }
+            } else if (t.hasAttribute('data-fin-buffer-cancel')) {
+                state.bufferOpen = false;
+                renderKpis();
+                const btn = els.finKpis.querySelector('[data-fin-buffer]');
                 if (btn) btn.focus();
             } else if (t.hasAttribute('data-fin-balance-delete')) {
                 deleteBalance(Number(t.getAttribute('data-fin-balance-delete')));
@@ -985,7 +1013,7 @@
             } else if (t.hasAttribute('data-fin-edit')) {
                 const cost = state.overview.costs.find(c => c.id === Number(t.getAttribute('data-fin-edit')));
                 if (!cost) return;
-                state.draft = Object.assign({}, cost, { end_month: cost.end_month || '' });
+                state.draft = Object.assign({}, cost, { end_month: cost.end_month || '', amount: showAmount(cost.amount) });
                 state.draftError = '';
                 renderCosts();
                 els.finCosts.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1003,10 +1031,6 @@
             } else if (t.hasAttribute('data-fin-past')) {
                 state.showPastPlanned = !state.showPastPlanned;
                 renderCosts();
-            } else if (t.hasAttribute('data-fin-vat')) {
-                saveSetting({ vat_enabled: !state.plan.settings.vat_enabled });
-            } else if (t.hasAttribute('data-fin-period')) {
-                saveSetting({ vat_period: t.getAttribute('data-fin-period') });
             }
         });
 
@@ -1017,6 +1041,9 @@
             } else if (e.target.matches('[data-fin-balance-form]')) {
                 e.preventDefault();
                 saveBalance(e.target);
+            } else if (e.target.matches('[data-fin-buffer-form]')) {
+                e.preventDefault();
+                saveBuffer(e.target);
             }
         });
 
@@ -1026,18 +1053,16 @@
             if (form && state.draft) state.draft = readCostForm(form);
         });
 
-        view.addEventListener('change', e => {
-            const key = e.target.getAttribute('data-fin-setting');
-            if (!key) return;
-            const value = e.target.value === '' ? 0 : Number(e.target.value);
-            if (Number.isFinite(value)) saveSetting({ [key]: value });
-        });
-
         view.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
             if (state.draft && e.target.closest('[data-fin-cost-form]')) {
                 state.draft = null;
                 renderCosts();
+            } else if (state.bufferOpen && e.target.closest('[data-fin-buffer-form]')) {
+                state.bufferOpen = false;
+                renderKpis();
+                const btn = els.finKpis.querySelector('[data-fin-buffer]');
+                if (btn) btn.focus();
             } else if (state.balanceOpen && e.target.closest('[data-fin-balance-form]')) {
                 state.balanceOpen = false;
                 renderKpis();

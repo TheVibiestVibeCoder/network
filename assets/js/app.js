@@ -1407,8 +1407,8 @@
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
 
-        // Financials is only on the page for admins.
-        if (stored === 'financials' && !document.getElementById('financialsView')) return HOME_VIEW;
+        // Bookkeeping and Financials are only on the page for admins.
+        if ((stored === 'financials' || stored === 'bookkeeping') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1635,6 +1635,8 @@
      * first and then letting that view find the row.
      */
     function openBookkeepingRow(rowId) {
+        // Admins only: for anyone else the tab is not on the page.
+        if (!elements.bookkeepingView) return;
         switchView('bookkeeping');
 
         if (window.Bookkeeping && window.Bookkeeping.focusRow) {
@@ -5195,8 +5197,8 @@
         elements.projectEditCompany.value = project.company || '';
         elements.projectEditStartDate.value = project.start_date || '';
         elements.projectEditStage.value = project.stage || 'Lead';
-        elements.projectEditBudgetMin.value = project.budget_min ?? '';
-        elements.projectEditBudgetMax.value = project.budget_max ?? '';
+        elements.projectEditBudgetMin.value = window.CRMAmount ? window.CRMAmount.format(project.budget_min) : (project.budget_min ?? '');
+        elements.projectEditBudgetMax.value = window.CRMAmount ? window.CRMAmount.format(project.budget_max) : (project.budget_max ?? '');
         elements.projectEditSuccessChance.value = project.success_chance ?? '';
         elements.projectEditEstCompletion.value = project.estimated_completion || '';
         elements.projectEditDescription.value = project.description || '';
@@ -5296,6 +5298,18 @@
             return;
         }
 
+        // Budgets as typed or pasted: "18.000", "18,000.00" and "18000" are all 18000.
+        const budget = [elements.projectEditBudgetMin, elements.projectEditBudgetMax].map(input => {
+            const n = window.CRMAmount ? window.CRMAmount.read(input) : (input.value === '' ? null : Number(input.value));
+            input.classList.toggle('is-invalid', Number.isNaN(n) || (n !== null && n < 0));
+            return n;
+        });
+        const badBudget = [elements.projectEditBudgetMin, elements.projectEditBudgetMax].find(input => input.classList.contains('is-invalid'));
+        if (badBudget) {
+            badBudget.focus();
+            return;
+        }
+
         const payments = window.ProjectPayments ? window.ProjectPayments.read() : { payments: undefined };
         if (payments.error) {
             return;
@@ -5306,8 +5320,8 @@
             start_date: elements.projectEditStartDate.value,
             description: elements.projectEditDescription.value.trim(),
             company: elements.projectEditCompany.value.trim() || null,
-            budget_min: elements.projectEditBudgetMin.value || null,
-            budget_max: elements.projectEditBudgetMax.value || null,
+            budget_min: budget[0],
+            budget_max: budget[1],
             success_chance: elements.projectEditSuccessChance.value || null,
             stage: elements.projectEditStage.value,
             estimated_completion: elements.projectEditEstCompletion.value || null,

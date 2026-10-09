@@ -47,13 +47,12 @@
     }
     const pay = (month, amount, paid) => ({ month, amount, paid: !!paid });
 
-    const NO_VAT = { vat_enabled: false, vat_rate: 20, vat_period: 'quarter', buffer: 0 };
-    const VAT = { vat_enabled: true, vat_rate: 20, vat_period: 'quarter', buffer: 0 };
+    const SETTINGS = { buffer: 0 };
 
     function run(input) {
         return CF.plan(Object.assign({
             projects: [], costs: [], balances: [], transactions: [],
-            settings: NO_VAT, scenario: RF.settingsFor('realistic'),
+            settings: SETTINGS, scenario: RF.settingsFor('realistic'),
             months: 12, now: NOW, today: TODAY
         }, input));
     }
@@ -61,6 +60,13 @@
     // ------------------------------------------------------------------
     // Money in
     // ------------------------------------------------------------------
+
+    test('amounts stay net: no VAT is added to income', () => {
+        nextId = 1;
+        const p = run({ projects: [project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30')] });
+        near(p.rows[1].income, 10000, 'Nov');
+        eq(p.rows[1].vat, undefined, 'no VAT column');
+    });
 
     test('no payments: the whole budget comes in at the end month, not spread', () => {
         nextId = 1;
@@ -94,14 +100,14 @@
             project('In Progress', 5000, 5000, 100, '2026-03-01', '2026-09-30')
         ] });
         near(p.rows[0].income, 7000, 'Oct');
-        eq(p.kpis.overdue, { count: 2, gross: 7000 });
+        eq(p.kpis.overdue, { count: 2, amount: 7000 });
     });
 
     test('without an end date the rest has no month', () => {
         nextId = 1;
         const p = run({ projects: [project('Proposal', 8000, 8000, 50, '2026-10-01', null)] });
         near(p.kpis.incomeTotal, 0, 'not in the months');
-        eq(p.kpis.undated, { count: 1, gross: 4000 });
+        eq(p.kpis.undated, { count: 1, amount: 4000 });
     });
 
     test('the scenario weighs income like the forecast', () => {
@@ -119,39 +125,32 @@
         near(p.rows[0].income, 6000, 'overdue invoice');
     });
 
-    test('VAT: income comes in gross', () => {
-        nextId = 1;
-        const p = run({ settings: VAT, projects: [project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30')] });
-        near(p.rows[1].income, 12000, 'Nov gross');
-        near(p.rows[1].incomeNet, 10000, 'Nov net');
-    });
-
     // ------------------------------------------------------------------
     // Money out
     // ------------------------------------------------------------------
 
     test('a monthly cost already due this month is in the balance; later months count', () => {
-        const occ = CF.costOccurrences({ kind: 'recurring', amount: 1200, vat_rate: 20, interval_months: 1, start_month: '2026-01', day: 1 }, 12, NOW, 9);
+        const occ = CF.costOccurrences({ kind: 'recurring', amount: 1200, interval_months: 1, start_month: '2026-01', day: 1 }, 12, NOW, 9);
         eq(occ.length, 12, 'every month');
         eq(occ[0].paid, true, 'October already paid');
         eq(occ[1].paid, false, 'November');
-        near(occ[1].inputVat, 200, 'input VAT in 1.200 gross');
+        near(occ[1].amount, 1200, 'amount as entered');
     });
 
     test('a cost later in the month still counts this month', () => {
-        const occ = CF.costOccurrences({ kind: 'recurring', amount: 100, vat_rate: 0, interval_months: 1, start_month: '2026-10', day: 25 }, 3, NOW, 9);
+        const occ = CF.costOccurrences({ kind: 'recurring', amount: 100, interval_months: 1, start_month: '2026-10', day: 25 }, 3, NOW, 9);
         eq(occ.map(o => o.paid), [false, false, false]);
     });
 
     test('quarterly from November, until a last month', () => {
-        const occ = CF.costOccurrences({ kind: 'recurring', amount: 500, vat_rate: 0, interval_months: 3, start_month: '2026-05', end_month: '2027-06', day: 1 }, 12, NOW, 9);
+        const occ = CF.costOccurrences({ kind: 'recurring', amount: 500, interval_months: 3, start_month: '2026-05', end_month: '2027-06', day: 1 }, 12, NOW, 9);
         eq(occ.map(o => o.offset), [1, 4, 7], 'Nov, Feb, May');
     });
 
     test('a planned cost once, in its month; past ones not at all', () => {
-        eq(CF.costOccurrences({ kind: 'once', amount: 900, vat_rate: 20, start_month: '2027-02' }, 12, NOW, 9).map(o => o.offset), [4]);
-        eq(CF.costOccurrences({ kind: 'once', amount: 900, vat_rate: 20, start_month: '2026-09' }, 12, NOW, 9).length, 0);
-        eq(CF.costOccurrences({ kind: 'once', amount: 900, vat_rate: 20, start_month: '2026-10', day: 1 }, 12, NOW, 9)[0].paid, false, 'planned this month still counts');
+        eq(CF.costOccurrences({ kind: 'once', amount: 900, start_month: '2027-02' }, 12, NOW, 9).map(o => o.offset), [4]);
+        eq(CF.costOccurrences({ kind: 'once', amount: 900, start_month: '2026-09' }, 12, NOW, 9).length, 0);
+        eq(CF.costOccurrences({ kind: 'once', amount: 900, start_month: '2026-10', day: 1 }, 12, NOW, 9)[0].paid, false, 'planned this month still counts');
     });
 
     test('fixed costs per month: quarterly and yearly averaged, ended ones left out', () => {
@@ -162,29 +161,6 @@
             { kind: 'recurring', amount: 5000, interval_months: 1, start_month: '2025-01', end_month: '2026-06' },
             { kind: 'once', amount: 9999, start_month: '2026-11' }
         ], NOW), 1000 + 200 + 100);
-    });
-
-    test('VAT due two months after the quarter: output less input', () => {
-        nextId = 1;
-        const p = run({
-            settings: VAT,
-            projects: [project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30')],
-            costs: [{ id: 1, kind: 'once', amount: 1200, vat_rate: 20, start_month: '2026-12', day: 1 }]
-        });
-        const q4 = p.vatPayments.find(v => v.label === 'VAT Q4 2026');
-        near(q4.output, 2000, 'output');
-        near(q4.input, 200, 'input');
-        eq(q4.offset, 4, 'due in February');
-        near(p.rows[4].vat, 1800, 'paid in February');
-    });
-
-    test('monthly filing: due two months after each month', () => {
-        nextId = 1;
-        const p = run({
-            settings: Object.assign({}, VAT, { vat_period: 'month' }),
-            projects: [project('In Progress', 5000, 5000, 100, '2026-10-01', '2026-11-30')]
-        });
-        near(p.rows[3].vat, 1000, 'November VAT in January');
     });
 
     // ------------------------------------------------------------------
@@ -210,7 +186,7 @@
         const p = run({
             balances: [{ id: 1, amount: 20000, as_of: TODAY }],
             projects: [project('In Progress', 6000, 6000, 100, '2026-10-01', '2026-11-30')],
-            costs: [{ id: 1, kind: 'recurring', amount: 3000, vat_rate: 0, interval_months: 1, start_month: '2026-10', day: 28 }]
+            costs: [{ id: 1, kind: 'recurring', amount: 3000, interval_months: 1, start_month: '2026-10', day: 28 }]
         });
         eq([p.rows[0].opening, p.rows[0].closing], [20000, 17000], 'October');
         eq([p.rows[1].opening, p.rows[1].closing], [17000, 20000], 'November');
@@ -221,9 +197,9 @@
 
     test('the cash buffer warns before zero does', () => {
         const p = run({
-            settings: Object.assign({}, NO_VAT, { buffer: 10000 }),
+            settings: { buffer: 10000 },
             balances: [{ id: 1, amount: 15000, as_of: TODAY }],
-            costs: [{ id: 1, kind: 'recurring', amount: 2000, vat_rate: 0, interval_months: 1, start_month: '2026-11', day: 1 }]
+            costs: [{ id: 1, kind: 'recurring', amount: 2000, interval_months: 1, start_month: '2026-11', day: 1 }]
         });
         eq(p.kpis.belowBuffer.label, 'Jan 2027', 'below 10k');
         eq(p.kpis.belowZero.label, 'Jun 2027', 'below zero later');

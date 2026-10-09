@@ -14,13 +14,12 @@
  * end date, the rest has no month and is listed apart. Complete projects
  * still bring their unpaid payments, in full.
  *
- * Project amounts are net. With VAT on, income comes in gross (+ rate), and
- * the VAT due for each filing period - output VAT less the input VAT in our
- * costs - is paid on the 15th of the second month after the period. Only
- * months from this one on are known; VAT for earlier periods that is still
- * to pay belongs in a planned cost.
+ * VAT is left out: project amounts are net, and costs are entered net too.
+ * Over a VAT period that is what stays in the account - the VAT collected
+ * is passed on, the VAT in our costs comes back - only its timing is not
+ * shown.
  *
- * Money out: our costs, gross. A recurring cost every 1, 3, 6 or 12 months
+ * Money out: our costs, net. A recurring cost every 1, 3, 6 or 12 months
  * from its first month to its last; one already due this month (its day has
  * passed) is taken to be in the balance already. A planned cost once, in its
  * month.
@@ -42,7 +41,7 @@
     // Past months shown from Bookkeeping, before this one.
     const PAST_MONTHS = 6;
 
-    const DEFAULT_SETTINGS = { vat_enabled: true, vat_rate: 20, vat_period: 'quarter', buffer: 0 };
+    const DEFAULT_SETTINGS = { buffer: 0 };
 
     const round2 = n => Math.round(n * 100) / 100;
     const sum = (list, fn) => list.reduce((s, x) => s + (fn ? fn(x) : x), 0);
@@ -56,9 +55,6 @@
     function cleanSettings(raw) {
         const s = Object.assign({}, DEFAULT_SETTINGS, raw || {});
         return {
-            vat_enabled: s.vat_enabled === true || s.vat_enabled === '1' || s.vat_enabled === 1,
-            vat_rate: Math.max(0, number(s.vat_rate) || 0),
-            vat_period: s.vat_period === 'month' ? 'month' : 'quarter',
             buffer: Math.max(0, number(s.buffer) || 0)
         };
     }
@@ -78,20 +74,6 @@
         const c = RF.calendarMonth(offset, now);
         const last = new Date(Date.UTC(c.year, c.month + 1, 0)).getUTCDate();
         return c.year + '-' + String(c.month + 1).padStart(2, '0') + '-' + String(last).padStart(2, '0');
-    }
-
-    /** The month offset a filing period ends in, for a month offset. */
-    function periodEnd(offset, now, period) {
-        if (period === 'month') return offset;
-        const c = RF.calendarMonth(offset, now);
-        return offset + (2 - (c.month % 3));
-    }
-
-    function periodLabel(endOffset, now, period) {
-        const c = RF.calendarMonth(endOffset, now);
-        return period === 'month'
-            ? RF.MONTHS_SHORT[c.month] + ' ' + c.year
-            : 'Q' + (Math.floor(c.month / 3) + 1) + ' ' + c.year;
     }
 
     // ------------------------------------------------------------------
@@ -163,16 +145,14 @@
 
     /**
      * Where a cost falls in the next `months` months:
-     *   [{ offset, amount, inputVat, paid }] - paid: a recurring cost whose
+     *   [{ offset, amount, paid }] - paid: a recurring cost whose
      * day this month has already come, so it is in the balance already.
      */
     function costOccurrences(cost, months, now, todayDay) {
         const start = RF.offsetOf(cost.start_month, now);
         if (start === null) return [];
         const amount = number(cost.amount) || 0;
-        const rate = number(cost.vat_rate) || 0;
-        const inputVat = amount * rate / (100 + rate);
-        const make = (offset, paid) => ({ offset, amount, inputVat, paid: !!paid });
+        const make = (offset, paid) => ({ offset, amount, paid: !!paid });
 
         if (cost.kind === 'once') {
             return start >= 0 && start < months ? [make(start, false)] : [];
@@ -271,79 +251,43 @@
         const todayDay = dayOf(today);
         const months = HORIZONS.indexOf(input.months) >= 0 ? input.months : DEFAULT_HORIZON;
         const settings = cleanSettings(input.settings);
-        const vatRate = settings.vat_enabled ? settings.vat_rate / 100 : 0;
 
         const income = incomeItems(input.projects, input.scenario, now);
-        income.items.forEach(x => {
-            x.vat = x.expected * vatRate;
-            x.gross = x.expected + x.vat;
-        });
 
         const rows = [];
         for (let i = 0; i < months; i++) {
             rows.push({
                 offset: i, label: RF.monthName(i, now),
-                income: 0, incomeNet: 0, outputVat: 0,
-                fixed: 0, planned: 0, inputVat: 0, vat: 0,
-                items: { income: [], costs: [], vat: [] }
+                income: 0, fixed: 0, planned: 0,
+                items: { income: [], costs: [] }
             });
         }
 
         income.items.forEach(x => {
             if (!x.counted || x.offset === null || x.offset >= months) return;
             const r = rows[x.offset];
-            r.income += x.gross;
-            r.incomeNet += x.expected;
-            r.outputVat += x.vat;
+            r.income += x.expected;
             r.items.income.push(x);
         });
 
         const costs = (input.costs || []).map(c => Object.assign({}, c, { occurrences: costOccurrences(c, months, now, todayDay) }));
         costs.forEach(c => c.occurrences.forEach(o => {
             const r = rows[o.offset];
-            r.items.costs.push({ cost: c, amount: o.amount, inputVat: o.inputVat, paid: o.paid });
+            r.items.costs.push({ cost: c, amount: o.amount, paid: o.paid });
             if (o.paid) return;
             if (c.kind === 'once') r.planned += o.amount; else r.fixed += o.amount;
-            r.inputVat += o.inputVat;
         }));
-
-        // VAT: each filing period's output less input, due two months after it ends.
-        const vatPayments = [];
-        if (settings.vat_enabled) {
-            const periods = new Map();
-            rows.forEach(r => {
-                const end = periodEnd(r.offset, now, settings.vat_period);
-                const p = periods.get(end) || { end, output: 0, input: 0 };
-                p.output += r.outputVat;
-                p.input += r.inputVat;
-                periods.set(end, p);
-            });
-            periods.forEach(p => {
-                const amount = p.output - p.input;
-                const dueOffset = p.end + 2;
-                const item = {
-                    label: 'VAT ' + periodLabel(p.end, now, settings.vat_period),
-                    output: round2(p.output), input: round2(p.input), amount: round2(amount),
-                    offset: dueOffset < months ? dueOffset : null
-                };
-                vatPayments.push(item);
-                if (item.offset !== null && Math.abs(amount) > 0.005) {
-                    rows[item.offset].vat += amount;
-                    rows[item.offset].items.vat.push(item);
-                }
-            });
-        }
 
         const balance = balanceToday(input.balances, input.transactions);
         let running = balance ? balance.amount : 0;
         rows.forEach(r => {
             r.opening = round2(running);
-            r.out = r.fixed + r.planned + Math.max(0, r.vat);
-            r.in = r.income + Math.max(0, -r.vat);
+            r.out = r.fixed + r.planned;
+            r.in = r.income;
             r.net = r.in - r.out;
             running += r.net;
             r.closing = round2(running);
-            ['income', 'incomeNet', 'outputVat', 'fixed', 'planned', 'inputVat', 'vat', 'out', 'in', 'net']
+            ['income', 'fixed', 'planned', 'out', 'in', 'net']
                 .forEach(k => { r[k] = round2(r[k]); });
         });
 
@@ -364,7 +308,6 @@
             income: income.items,
             missing: income.missing,
             costs,
-            vatPayments,
             kpis: {
                 balance: balance ? balance.amount : null,
                 incomeNext3: round2(sum(rows.slice(0, 3), r => r.income)),
@@ -375,9 +318,9 @@
                 end: rows.length ? rows[rows.length - 1].closing : null,
                 belowBuffer: settings.buffer > 0 ? below(settings.buffer) : null,
                 belowZero: below(0),
-                overdue: { count: overdue.length, gross: round2(sum(overdue, x => x.gross)) },
-                undated: { count: undated.length, gross: round2(sum(undated, x => x.gross)) },
-                later: { count: later.length, gross: round2(sum(later, x => x.gross)) }
+                overdue: { count: overdue.length, amount: round2(sum(overdue, x => x.expected)) },
+                undated: { count: undated.length, amount: round2(sum(undated, x => x.expected)) },
+                later: { count: later.length, amount: round2(sum(later, x => x.expected)) }
             }
         };
     }
@@ -385,7 +328,7 @@
     root.Cashflow = {
         HORIZONS, DEFAULT_HORIZON, PAST_MONTHS, DEFAULT_SETTINGS,
         cleanSettings, incomeItems, costOccurrences, monthlyFixed,
-        anchorOf, balanceToday, pastMonths, periodEnd, periodLabel, lastDayOf,
+        anchorOf, balanceToday, pastMonths, lastDayOf,
         plan
     };
 })(typeof window !== 'undefined' ? window : globalThis);
