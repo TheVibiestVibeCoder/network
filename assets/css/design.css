@@ -1826,24 +1826,46 @@ input[type="checkbox"] {
     color: var(--c-ink-3);
 }
 
+/* The three scenarios stacked, label left and amount right, so the
+   amounts line up; the one in use is tinted. */
 .rf-compare {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 8px;
+    flex-direction: column;
+    gap: 1px;
+    max-width: 220px;
+    margin: 8px 0 0 -8px;
     font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
 
+.rf-compare-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+}
+
 .rf-compare strong {
-    font-weight: 700;
-    color: var(--c-ink);
+    font-weight: 600;
+    color: var(--c-ink-2);
     font-variant-numeric: tabular-nums;
 }
 
 .rf-compare-item.is-active {
+    background: var(--c-accent-softer);
     color: var(--c-ink);
     font-weight: 600;
+}
+
+.rf-compare-item.is-active strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.rf-muted {
+    color: var(--c-ink-4);
 }
 
 .rf-chart {
@@ -1933,6 +1955,26 @@ input[type="checkbox"] {
 
 .rf-col.is-hover {
     background: var(--c-accent-softer);
+}
+
+/* Projects without an end date: one wider bar after the months, set apart. */
+.rf-col.is-undated,
+.rf-axis-label.is-undated {
+    flex: 1.6;
+    margin-left: 8px;
+}
+
+.rf-col.is-undated::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -6px;
+    border-left: 1px dashed var(--c-line-strong);
+}
+
+.rf-axis-label.is-undated {
+    white-space: nowrap;
 }
 
 .rf-ghost,
@@ -6601,6 +6643,524 @@ details.import-instructions p {
 #todoDetailModal .ov-edit-context #todoEditAssigneeId {
     flex: 1;
     min-width: 0;
+}
+
+
+/* ---- Expected payments (project-payments.js) ----
+   Reading: a short summary under the budget ("3 expected payments", what is
+   still open) and the full-width list. Editing: one row per payment - month,
+   amount, paid. Both end in the same sums against the budget. On a project
+   card: a green band with what is still open. */
+
+.ppay-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ppay-count {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+/* What is still open: the figure that matters once payments are planned.
+   Plain text, so a long range wraps between words, never inside it. */
+.ppay-open {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--c-success);
+}
+
+.ppay-open strong {
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-nowrap {
+    white-space: nowrap;
+}
+
+.ppay-open svg {
+    margin-right: 4px;
+    vertical-align: -2px;
+}
+
+.ppay-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: var(--r-full);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ppay-flag.is-warn {
+    background: var(--c-warning-soft);
+    color: var(--c-warning);
+}
+
+.ppay-flag svg {
+    width: 12px;
+    height: 12px;
+}
+
+.overview-detail-item.ppay-panel {
+    align-items: stretch;
+    gap: 10px;
+}
+
+.ppay-items,
+.ppay-rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ppay-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto 92px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.ppay-item:last-child {
+    border-bottom: 0;
+}
+
+.ppay-num {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-item-month {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.ppay-item-amount {
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-item-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.ppay-item.is-paid .ppay-num {
+    background: var(--c-success-soft);
+    color: var(--c-success);
+}
+
+.ppay-item.is-paid .ppay-item-status {
+    font-weight: 600;
+    color: var(--c-success);
+}
+
+/* Editing */
+
+.ppay-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ppay-rows {
+    gap: 6px;
+}
+
+.ppay-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1.3fr) minmax(0, 1fr) auto 32px;
+    grid-template-areas: "num month amount paid remove";
+    align-items: center;
+    gap: 8px;
+}
+
+.ppay-row > .ppay-num { grid-area: num; }
+.ppay-row > .ppay-month { grid-area: month; }
+.ppay-row > .ppay-amount { grid-area: amount; }
+.ppay-row > .ppay-paid { grid-area: paid; }
+.ppay-row > .ppay-remove { grid-area: remove; }
+
+.ppay-row.is-paid .ppay-num {
+    background: var(--c-success-soft);
+    color: var(--c-success);
+}
+
+#projectOverviewModal .ppay-month.is-outside {
+    border-color: var(--c-warning);
+}
+
+.ppay-amount {
+    position: relative;
+    min-width: 0;
+}
+
+#projectOverviewModal .ppay-amount .ov-field {
+    padding-right: 26px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+/* The spinner would sit on top of the € sign. */
+.ppay-amount .ov-field::-webkit-inner-spin-button,
+.ppay-amount .ov-field::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.ppay-currency {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+    pointer-events: none;
+}
+
+/* "Paid": a checkbox that reads as one. */
+.ppay-paid {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px 0 8px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.ppay-paid:hover {
+    border-color: var(--c-accent);
+}
+
+.ppay-paid-box {
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border: 1.5px solid var(--c-line-strong);
+    border-radius: 5px;
+    color: transparent;
+    transition: inherit;
+}
+
+.ppay-paid-box svg {
+    width: 12px;
+    height: 12px;
+}
+
+.ppay-paid[aria-checked="true"] {
+    border-color: transparent;
+    background: var(--c-success-soft);
+    color: var(--c-success);
+    font-weight: 600;
+}
+
+.ppay-paid[aria-checked="true"] .ppay-paid-box {
+    border-color: var(--c-success);
+    background: var(--c-success);
+    color: var(--c-surface);
+}
+
+.ppay-remove {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-4);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.ppay-remove:hover {
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
+}
+
+:is(.ppay-paid, .ppay-remove):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.ppay-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.ppay-add.ov-add-btn {
+    margin-left: -7px;
+}
+
+.ppay-status {
+    align-self: stretch;
+}
+
+/* ---- The sums: head line, budget bar, legend ---- */
+
+.ppay-sum {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 2px;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.ppay-sum-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 16px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.ppay-sum-planned strong {
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-sum-open {
+    font-weight: 500;
+    color: var(--c-success);
+}
+
+.ppay-sum-open strong {
+    font-size: var(--t-base);
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-sum-open svg {
+    margin-right: 4px;
+    vertical-align: -2px;
+}
+
+.ppay-bar {
+    position: relative;
+    height: 8px;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+    overflow: hidden;
+}
+
+.ppay-bar-seg,
+.ppay-bar-range {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+}
+
+.ppay-bar-seg.is-paid {
+    background: var(--c-success);
+}
+
+.ppay-bar-seg.is-expected {
+    background: var(--c-accent);
+}
+
+/* min to max of a budget range: the part that may or may not come */
+.ppay-bar-range {
+    background: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--c-surface) 70%, transparent) 3px 6px);
+}
+
+/* the payments past the budget, and where the budget ends */
+.ppay-bar-over {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    background: repeating-linear-gradient(-45deg, var(--c-warning) 0 3px, transparent 3px 6px);
+    opacity: 0.75;
+}
+
+.ppay-bar-mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--c-warning);
+    box-shadow: 0 0 0 1px var(--c-surface);
+}
+
+.ppay-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.ppay-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ppay-legend strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-key {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.ppay-key.is-paid { background: var(--c-success); }
+.ppay-key.is-expected { background: var(--c-accent); }
+.ppay-key.is-rest { background: var(--c-tint); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+
+.ppay-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    color: var(--c-ink-3);
+}
+
+.ppay-note svg {
+    flex-shrink: 0;
+}
+
+.ppay-note.is-warn,
+.ppay-note.is-warn strong {
+    color: var(--c-warning);
+}
+
+.ppay-note strong {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* On a project card, under the budget: what is still open, hard to miss,
+   over the same budget bar as in the project sheet. */
+.ppay-card {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 12px;
+    padding: 9px 12px 11px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.ppay-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 12px;
+}
+
+.ppay-card .ppay-bar {
+    height: 6px;
+}
+
+.ppay-card-open {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-success);
+}
+
+.ppay-card-open strong {
+    font-size: var(--t-base);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-card-open svg {
+    align-self: center;
+}
+
+.ppay-card.is-done .ppay-card-open {
+    font-weight: 600;
+}
+
+.ppay-card-count {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 560px) {
+    .ppay-row {
+        grid-template-columns: 22px minmax(0, 1fr) auto 32px;
+        grid-template-areas:
+            "num month  month month"
+            ".   amount paid  remove";
+        row-gap: 6px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--c-line-2);
+    }
+
+    .ppay-item {
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+    }
+
+    .ppay-item-status {
+        grid-column: 2 / -1;
+        justify-content: flex-start;
+    }
 }
 
 

@@ -1884,31 +1884,59 @@
     }
 
     /**
+     * A CSV date as "YYYY-MM-DD", or '' when it cannot be read. The same
+     * rules as bkParseDate() in api/bookkeeping.php, which fills row_date on
+     * import, so an imported "07.03.2026" compares equal to a stored row.
+     */
+    function parseBookingDate(raw) {
+        const value = String(raw ?? '').trim();
+        let y, m, d, match;
+        if ((match = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(value))) {
+            [, y, m, d] = match;
+        } else if ((match = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/.exec(value))) {
+            [, d, m, y] = match;
+            // If day-first is impossible but month-first is valid, swap.
+            if (Number(m) > 12 && Number(d) <= 12) [d, m] = [m, d];
+            if (y.length === 2) y = (Number(y) < 70 ? '20' : '19') + y;
+        } else {
+            return '';
+        }
+        y = Number(y); m = Number(m); d = Number(d);
+        const date = new Date(Date.UTC(y, m - 1, d));
+        if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+        return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    /**
      * Flags rows that look like they might already exist, checked against
      * both the table's current rows and other rows in this same import
      * batch. Prefers matching on "Betrag"/amount + "Partnername"/payee
-     * columns (the fields that most reliably identify a duplicate bank
-     * transaction); falls back to comparing every imported column's value
-     * when those aren't present.
+     * columns plus the booking date (the fields that most reliably identify
+     * a duplicate bank transaction - without the date, every monthly payment
+     * of the same amount to the same payee would look like a duplicate);
+     * falls back to comparing every imported column's value, the date
+     * column included, when those aren't present.
      */
-    function computeDuplicateFlags(candidateRows, selectedColumns) {
+    function computeDuplicateFlags(candidateRows, selectedColumns, dateColumn) {
         const amountCol = findColumnByNames(selectedColumns, ['betrag', 'amount', 'sum', 'value']);
         const partyCol = findColumnByNames(selectedColumns, ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'beschreibung', 'description']);
         const useSpecificKey = amountCol && partyCol;
 
-        const keyOf = (getValue) => useSpecificKey
-            ? `${normalizeForCompare(getValue(amountCol))}|${normalizeForCompare(getValue(partyCol))}`
+        // Dates are compared normalized: stored rows by their row_date, new
+        // ones parsed from the chosen date column.
+        const keyOf = (getValue, date) => useSpecificKey
+            ? `${normalizeForCompare(getValue(amountCol))}|${normalizeForCompare(getValue(partyCol))}|${date}`
             : selectedColumns.map(c => normalizeForCompare(getValue(c))).join('|');
 
         const existingKeys = new Set();
         state.rows.forEach(row => {
-            const key = keyOf(col => row.data[col]);
+            const key = keyOf(col => row.data[col], row.row_date || '');
             if (key.replace(/\|/g, '') !== '') existingKeys.add(key);
         });
 
         const seenInBatch = new Set();
         return candidateRows.map(row => {
-            const key = keyOf(col => row[col]);
+            const key = keyOf(col => row[col], dateColumn ? parseBookingDate(row[dateColumn]) : '');
             const isDup = key.replace(/\|/g, '') !== '' && (existingKeys.has(key) || seenInBatch.has(key));
             seenInBatch.add(key);
             return isDup;
@@ -1950,7 +1978,7 @@
             return;
         }
 
-        const dupFlags = computeDuplicateFlags(candidateData, selectedColumns);
+        const dupFlags = computeDuplicateFlags(candidateData, selectedColumns, dateColumn);
 
         state.previewColumns = selectedColumns;
         state.previewExcludedColumns = new Set();
@@ -1992,7 +2020,7 @@
         // Duplicate detection depends on which columns are included, so it is
         // recalculated whenever the column selection changes.
         const cols = activePreviewColumns();
-        const dupFlags = computeDuplicateFlags(state.previewRows.map(r => r.data), cols);
+        const dupFlags = computeDuplicateFlags(state.previewRows.map(r => r.data), cols, state.previewDateColumn);
         state.previewRows.forEach((row, i) => { row.isDuplicate = dupFlags[i]; });
 
         const dupCount = state.previewRows.filter(r => r.isDuplicate).length;

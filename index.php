@@ -1790,6 +1790,8 @@ function assetUrl(string $path): string
                             <div class="overview-detail-item">
                                 <label class="detail-label" for="projectEditBudgetMin">Budget</label>
                                 <span class="detail-value" id="projectOverviewBudget" data-ov="view"></span>
+                                <!-- "3 expected payments", what is still open (project-payments.js) -->
+                                <div class="ppay-summary" id="projectOverviewPayments" data-ov="view" hidden></div>
                                 <div class="ov-field-pair" data-ov="edit">
                                     <input type="number" id="projectEditBudgetMin" class="form-input ov-field" step="0.01" placeholder="Min" aria-label="Budget min">
                                     <input type="number" id="projectEditBudgetMax" class="form-input ov-field" step="0.01" placeholder="Max" aria-label="Budget max">
@@ -1804,6 +1806,13 @@ function assetUrl(string $path): string
                                 <label class="detail-label" for="projectEditEstCompletion">Est. Completion</label>
                                 <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
                                 <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
+                            </div>
+                            <!-- Expected payments: the list while reading (opened from the
+                                 budget), the editor while editing (project-payments.js) -->
+                            <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
+                            <div class="overview-detail-item full-width ppay-panel" data-ov="edit">
+                                <span class="detail-label" id="projectPaymentsLabel">Expected payments</span>
+                                <div class="ppay-editor" id="projectPaymentsEditor" role="group" aria-labelledby="projectPaymentsLabel"></div>
                             </div>
                             <div class="overview-detail-item full-width">
                                 <label class="detail-label" for="projectEditDescription">Description</label>
@@ -2225,6 +2234,7 @@ function assetUrl(string $path): string
         <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js" integrity="sha384-RLIyj5q1b5XJTn0tqUhucRZe40nFTocRP91R/NkRJHwAe4XxnTV77FXy/vGLiec2" crossorigin="anonymous"></script>
 
         <!-- Application JS -->
+        <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/revenue-forecast.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/revenue-forecast-card.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>

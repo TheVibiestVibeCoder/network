@@ -233,6 +233,9 @@
         projectOverviewStartDate: document.getElementById('projectOverviewStartDate'),
         projectOverviewStage: document.getElementById('projectOverviewStage'),
         projectOverviewBudget: document.getElementById('projectOverviewBudget'),
+        projectOverviewPayments: document.getElementById('projectOverviewPayments'),
+        projectOverviewPaymentsList: document.getElementById('projectOverviewPaymentsList'),
+        projectPaymentsEditor: document.getElementById('projectPaymentsEditor'),
         projectOverviewSuccessChance: document.getElementById('projectOverviewSuccessChance'),
         projectOverviewEstCompletion: document.getElementById('projectOverviewEstCompletion'),
         projectOverviewDescription: document.getElementById('projectOverviewDescription'),
@@ -4741,7 +4744,8 @@
 
     /**
      * One project, as a card: what it is, for whom and who has it on top;
-     * when it runs in the timeline panel; budget and chance at the foot.
+     * when it runs in the timeline panel; budget and chance at the foot,
+     * and with expected payments, what is still open under them.
      * Notes, contacts and the rest live in the detail view.
      */
     function createProjectCard(project) {
@@ -4793,6 +4797,7 @@
                         ${budgetStat}
                         ${chanceStat}
                     </div>
+                    ${window.ProjectPayments ? window.ProjectPayments.cardSummary(project) : ''}
                 </div>
             </article>
         `;
@@ -4875,6 +4880,9 @@
         elements.projectOverviewBudget.textContent = (ovBMin === null && ovBMax === null)
             ? 'N/A'
             : (formatProjectValue(project) || 'Undetermined');
+        if (window.ProjectPayments) {
+            window.ProjectPayments.renderView(project, elements.projectOverviewPayments, elements.projectOverviewPaymentsList);
+        }
 
         elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
         elements.projectOverviewEstCompletion.textContent = project.estimated_completion
@@ -5206,6 +5214,9 @@
         elements.projectEditSuccessChance.value = project.success_chance ?? '';
         elements.projectEditEstCompletion.value = project.estimated_completion || '';
         elements.projectEditDescription.value = project.description || '';
+        if (window.ProjectPayments) {
+            window.ProjectPayments.edit(project);
+        }
 
         elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
         elements.saveProjectEditBtn.textContent = 'Save';
@@ -5258,6 +5269,9 @@
          elements.projectEditEstCompletion, elements.projectEditDescription].forEach(input => { input.value = ''; });
         elements.projectEditStartDate.value = new Date().toISOString().split('T')[0];
         elements.projectEditStage.value = 'Lead';
+        if (window.ProjectPayments) {
+            window.ProjectPayments.edit(null);
+        }
 
         elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
         elements.saveProjectEditBtn.textContent = 'Create';
@@ -5296,6 +5310,11 @@
             return;
         }
 
+        const payments = window.ProjectPayments ? window.ProjectPayments.read() : { payments: undefined };
+        if (payments.error) {
+            return;
+        }
+
         const data = {
             name: elements.projectEditName.value.trim(),
             start_date: elements.projectEditStartDate.value,
@@ -5305,7 +5324,8 @@
             budget_max: elements.projectEditBudgetMax.value || null,
             success_chance: elements.projectEditSuccessChance.value || null,
             stage: elements.projectEditStage.value,
-            estimated_completion: elements.projectEditEstCompletion.value || null
+            estimated_completion: elements.projectEditEstCompletion.value || null,
+            payments: payments.payments
         };
 
         elements.saveProjectEditBtn.disabled = true;
@@ -6454,6 +6474,19 @@
         // Add project button
         if (elements.addProjectBtn) {
             elements.addProjectBtn.addEventListener('click', openNewProject);
+        }
+
+        // Expected payments in the project sheet
+        if (window.ProjectPayments) {
+            window.ProjectPayments.init({
+                editor: elements.projectPaymentsEditor,
+                fields: {
+                    start: elements.projectEditStartDate,
+                    end: elements.projectEditEstCompletion,
+                    min: elements.projectEditBudgetMin,
+                    max: elements.projectEditBudgetMax
+                }
+            });
         }
 
         // Revenue forecast card above the list

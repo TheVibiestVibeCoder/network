@@ -6,7 +6,7 @@
  *   - in a browser: open tests/revenue-forecast.test.html straight from disk (file://)
  *   - in a terminal on macOS, with the JavaScriptCore shell:
  *       /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc \
- *           assets/js/revenue-forecast.js tests/revenue-forecast.test.js
+ *           assets/js/project-payments.js assets/js/revenue-forecast.js tests/revenue-forecast.test.js
  *
  * The current month is fixed at October 2026.
  */
@@ -14,6 +14,7 @@
     'use strict';
 
     const RF = root.RevenueForecast;
+    const PP = root.ProjectPayments;
     const NOW = { year: 2026, month: 9 };
     const results = [];
 
@@ -292,12 +293,69 @@
             project('Lead', 1000, 2000, null, '', '2026-12-31'),
             project('Lead', 0, 0, 20, '2026-10-01', '2026-12-31'),
             project('Lead', 1000, 1000, 20, '2026-12-01', '2026-10-31'),
-            project('Proposal', 1000, 2000, 50, '2026-10-01', '2026-12-31')
+            project('Proposal', 1000, 2000, 50, '2026-10-01', '2026-12-31'),
+            project('Lead', 1000, 2000, 50, null, null),
+            project('Lead', 1000, 2000, 50, null, '2026-12-31')
         ], NOW);
-        eq(items.map(p => p.id), [6], 'usable');
+        eq(items.map(p => p.id), [2, 6, 7, 8], 'usable');
+        eq(items.map(p => p.undated), [true, false, true, false], 'no end date is undated');
         eq(missing.map(p => p.gaps), [
-            ['budget'], ['end date'], ['chance', 'start date'], ['budget'], ['end before start']
+            ['budget'], ['chance'], ['budget'], ['end before start']
         ]);
+    });
+
+    test('no start date: the whole budget is due in the end month', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 6000, 6000, 100, null, '2027-01-31')]);
+        near(f.current.totals[2], 0, 'Dec');
+        near(f.current.totals[3], 6000, 'Jan');
+        near(f.current.total, 6000, 'total');
+        eq(RF.periodLabel(null, 3, NOW), 'Ends Jan ’27');
+    });
+
+    test('no start date and an end month in the past: due now', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 6000, 6000, 100, '', '2026-05-31')]);
+        near(f.current.totals[0], 6000, 'Oct');
+    });
+
+    // ------------------------------------------------------------------
+    // Projects without an end date
+    // ------------------------------------------------------------------
+
+    test('no end date: the whole budget x chance goes into the undated sum', () => {
+        nextId = 1;
+        const f = run(examples().concat([project('Proposal', 10000, 20000, 50, '2026-11-01', null)]));
+        near(f.current.undated, 7500, 'undated');
+        near(f.current.undatedByStage.Proposal, 7500, 'by stage');
+        near(f.current.totals.reduce((a, b) => a + b, 0), 68600, 'months unchanged');
+        near(f.current.total, 68600 + 7500, 'total');
+        near(f.ceiling.undated, 20000, 'best');
+        eq(f.hasUndated, true, 'bar shown');
+        eq(f.months, 12, 'axis unchanged');
+    });
+
+    test('without undated projects there is no undated bar', () => {
+        const f = run(examples());
+        eq(f.hasUndated, false);
+        near(f.current.undated, 0);
+    });
+
+    test('undated projects follow stages and switches', () => {
+        nextId = 1;
+        const rows = [project('Lead', 10000, 10000, 100, null, null)];
+        const s = RF.settingsFor('realistic');
+        s.excluded = { 1: true };
+        const f = run(rows, s);
+        near(f.current.undated, 0, 'switched off');
+        eq(f.hasUndated, true, 'bar still shown');
+        near(run(rows, RF.settingsFor('worst')).current.undated, 0, 'stage off');
+    });
+
+    test('the y-scale covers the undated bar', () => {
+        nextId = 1;
+        const f = run([project('Proposal', 100000, 100000, 50, null, null)]);
+        eq(f.scale, { step: 25000, max: 100000 });
     });
 
     test('complete and pending projects are not part of the forecast', () => {
@@ -336,6 +394,144 @@
         eq(RF.budgetLabel(500, 2000), '€500–2k');
         eq(RF.periodLabel(2, 7, NOW), 'Dec ’26 – May ’27');
         eq(RF.periodLabel(1, 1, NOW), 'Nov ’26');
+        eq(RF.periodLabel(2, null, NOW), 'From Dec ’26');
+        eq(RF.periodLabel(null, null, NOW), 'No dates');
+    });
+
+    // ------------------------------------------------------------------
+    // Expected payments
+    // ------------------------------------------------------------------
+
+    const pay = (month, amount, paid) => ({ month, amount, paid: !!paid });
+
+    test('payments count in their month; the rest of the budget is spread', () => {
+        nextId = 1;
+        // €12k over Oct-Jan, €5k expected in Nov: €7k left -> €1.75k a month.
+        const f = run([project('In Progress', 12000, 12000, 100, '2026-10-01', '2027-01-31',
+            { payments: JSON.stringify([pay('2026-11', 5000)]) })]);
+        near(f.current.totals[0], 1750, 'Oct');
+        near(f.current.totals[1], 1750 + 5000, 'Nov');
+        near(f.current.totals[3], 1750, 'Jan');
+        near(f.current.total, 12000, 'total');
+    });
+
+    test('payments covering the budget leave nothing to spread', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', '2027-03-31',
+            { payments: [pay('2026-12', 4000), pay('2027-03', 6000)] })]);
+        near(f.current.totals[0], 0, 'Oct');
+        near(f.current.totals[2], 4000, 'Dec');
+        near(f.current.totals[5], 6000, 'Mar');
+        near(f.current.total, 10000, 'total');
+    });
+
+    test('payments above the budget count in full', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-12-31',
+            { payments: [pay('2026-11', 12000)] })]);
+        near(f.current.total, 12000);
+    });
+
+    test('a budget range: the rest depends on Low / Mid / High', () => {
+        nextId = 1;
+        const rows = [project('In Progress', 20000, 30000, 100, '2026-10-01', '2026-11-30',
+            { payments: [pay('2026-10', 22000)] })];
+        near(run(rows, RF.settingsFor('worst')).current.total, 22000, 'low: payments are above the min');
+        near(run(rows).current.total, 25000, 'mid: 3k rest');
+        near(run(rows, RF.settingsFor('best')).current.total, 30000, 'high: 8k rest');
+    });
+
+    test('paid payments are not forecast but still reduce the rest', () => {
+        nextId = 1;
+        // €10k Oct-Nov; €4k already paid, €2k expected in Nov: €4k rest, €2k a month.
+        const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30',
+            { payments: [pay('2026-09', 4000, true), pay('2026-11', 2000)] })]);
+        near(f.current.totals[0], 2000, 'Oct');
+        near(f.current.totals[1], 4000, 'Nov');
+        near(f.current.total, 6000, 'total');
+    });
+
+    test('an unpaid payment in a past month is due now', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 3000, 3000, 100, '2026-06-01', '2026-12-31',
+            { payments: [pay('2026-07', 3000)] })]);
+        near(f.current.totals[0], 3000);
+    });
+
+    test('payments are weighted by chance like the budget', () => {
+        nextId = 1;
+        const f = run([project('Proposal', 10000, 10000, 50, '2026-10-01', '2026-10-31',
+            { payments: [pay('2026-10', 4000)] })]);
+        near(f.current.total, 5000, 'as set');
+        near(run([project('Proposal', 10000, 10000, 50, '2026-10-01', '2026-10-31',
+            { payments: [pay('2026-10', 4000)] })], RF.settingsFor('best')).current.total, 10000, 'all 100%');
+    });
+
+    test('a payment after the end date stretches the axis', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 5000, 5000, 100, '2026-10-01', '2026-12-31',
+            { payments: [pay('2028-01', 5000)] })]);
+        eq(f.months, 16);
+        near(f.current.totals[15], 5000);
+    });
+
+    test('payments without a budget are forecast on their own', () => {
+        nextId = 1;
+        const { items, missing } = RF.prepare([project('In Progress', null, null, 100, '2026-10-01', '2026-12-31',
+            { payments: [pay('2026-11', 2500)] })], NOW);
+        eq(missing.length, 0, 'not missing');
+        near(RF.forecast(items, RF.settingsFor('realistic')).current.total, 2500);
+    });
+
+    test('undated project: payments in their months, only the rest in the undated bar', () => {
+        nextId = 1;
+        const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', null,
+            { payments: [pay('2026-12', 4000)] })]);
+        near(f.current.totals[2], 4000, 'Dec');
+        near(f.current.undated, 6000, 'undated');
+        eq(f.hasUndated, true);
+        const covered = run([project('In Progress', 10000, 10000, 100, '2026-10-01', null,
+            { payments: [pay('2026-12', 10000)] })]);
+        eq(covered.hasUndated, false, 'fully planned: no undated bar');
+    });
+
+    test('summary against the budget: above, below, unplanned and open', () => {
+        const sum = PP.summarize({ budget_min: 24000, budget_max: 30000 },
+            [pay('2026-11', 5000, true), pay('2027-01', 7000)]);
+        eq([sum.count, sum.planned, sum.paid], [2, 12000, 5000], 'counts');
+        eq(sum.below, 12000, 'below min');
+        eq(sum.above, 0, 'not above');
+        eq(sum.unplanned, { min: 12000, max: 18000 }, 'not planned yet');
+        eq(sum.open, { min: 19000, max: 25000 }, 'still open');
+
+        const over = PP.summarize({ budget_min: 10000, budget_max: 10000 }, [pay('2026-11', 12000, true)]);
+        eq([over.above, over.open.min, over.open.max], [2000, 0, 0], 'above and fully paid');
+
+        const none = PP.summarize({ budget_min: null, budget_max: null }, [pay('2026-11', 3000)]);
+        eq([none.budget, none.open.min], [null, 3000], 'no budget');
+    });
+
+    test('payment months: the project range, 24 months without an end, outside months kept', () => {
+        const r = PP.monthOptions('2026-10-15', '2027-01-31', ['2027-04'], '2026-10-09');
+        eq(r.map(o => o.value), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-04']);
+        eq(r[4].outside, true, 'outside marked');
+        eq(PP.monthOptions('2026-10-15', null, [], '2026-10-09').length, 25, 'no end date');
+        eq(PP.isOutside('2027-02', '2026-10-15', '2027-01-31', '2026-10-09'), true);
+        eq(PP.monthName('2027-02'), 'Feb 2027');
+    });
+
+    test('stored payments are read leniently and junk is dropped', () => {
+        eq(PP.parse('not json'), []);
+        eq(PP.parse(null), []);
+        eq(PP.parse([{ month: '2026-13', amount: 5 }, { month: '2026-11', amount: '1500.5', paid: 1 }, { month: '2026-12', amount: 0 }]),
+            [{ month: '2026-11', amount: 1500.5, paid: true }]);
+    });
+
+    test('euro formats as in the project sheet', () => {
+        eq(PP.euro(18000).replace(/\s/g, ' '), '18.000 €');
+        eq(PP.euro(18450.5).replace(/\s/g, ' '), '18.450,50 €');
+        eq(PP.euroRange({ min: 4000, max: 10000 }).replace(/\s/g, ' '), '4.000 – 10.000 €');
+        eq(PP.euroRange({ min: 4000, max: 4000 }).replace(/\s/g, ' '), '4.000 €');
     });
 
     root.revenueForecastTestResults = results;

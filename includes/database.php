@@ -210,6 +210,10 @@ class Database
             )
         ");
 
+        // Expected payments: a JSON list of {month: "YYYY-MM", amount, paid},
+        // ordered by month (see Project::normalizePayments). NULL = none.
+        self::addColumnIfMissing($db, 'projects', 'payments', 'TEXT');
+
         // Create indexes for projects
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_company ON projects(company)");

@@ -460,6 +460,11 @@ final class McpService
         ");
         $todos->execute(['id' => $id]);
 
+        // Read-only for Claude: proposals cannot set payments (yet).
+        $payments = $this->db->prepare("SELECT payments FROM projects WHERE id = :id");
+        $payments->execute(['id' => $id]);
+        $project['expected_payments'] = Project::decodePayments($payments->fetchColumn());
+
         return [
             'project' => $project,
             'contacts' => $contacts->fetchAll(),

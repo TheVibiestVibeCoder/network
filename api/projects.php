@@ -290,6 +290,7 @@ function handlePost(Project $model, string $action): void
     $budgetMin = normalizeNullableFloat($input['budget_min'] ?? null);
     $budgetMax = normalizeNullableFloat($input['budget_max'] ?? null);
     $successChance = normalizeNullableInt($input['success_chance'] ?? null);
+    $payments = Project::normalizePayments($input['payments'] ?? null);
 
     // Validate required fields
     if ($name === null || trim($name) === '') {
@@ -328,6 +329,12 @@ function handlePost(Project $model, string $action): void
         return;
     }
 
+    if (is_string($payments)) {
+        http_response_code(400);
+        echo json_encode(['error' => $payments]);
+        return;
+    }
+
     $normalizedSuccessChance = $successChance === null ? null : max(0, min(100, $successChance));
     $normalizedBudgetMin = $budgetMin === null ? null : (float) $budgetMin;
     $normalizedBudgetMax = $budgetMax === null ? null : (float) $budgetMax;
@@ -345,7 +352,8 @@ function handlePost(Project $model, string $action): void
         'budget_max' => $normalizedBudgetMax,
         'success_chance' => $normalizedSuccessChance,
         'stage' => $stage,
-        'estimated_completion' => $estimatedCompletion
+        'estimated_completion' => $estimatedCompletion,
+        'payments' => $payments
     ];
 
     // Create project
@@ -392,6 +400,8 @@ function handlePut(Project $model, ?int $id): void
     $budgetMin = normalizeNullableFloat($input['budget_min'] ?? null);
     $budgetMax = normalizeNullableFloat($input['budget_max'] ?? null);
     $successChance = normalizeNullableInt($input['success_chance'] ?? null);
+    // Payments are only replaced when sent at all.
+    $payments = array_key_exists('payments', $input) ? Project::normalizePayments($input['payments']) : null;
 
     // Validate required fields
     if ($name === null || trim($name) === '') {
@@ -449,6 +459,15 @@ function handlePut(Project $model, ?int $id): void
         'stage' => $stage,
         'estimated_completion' => $estimatedCompletion
     ];
+
+    if (is_string($payments)) {
+        http_response_code(400);
+        echo json_encode(['error' => $payments]);
+        return;
+    }
+    if ($payments !== null) {
+        $sanitized['payments'] = $payments;
+    }
 
     // Update project
     $model->update($id, $sanitized);
@@ -775,7 +794,8 @@ function detectProjectChangedFields(?array $before, ?array $after): array
         'budget_min' => 'Budget Min',
         'budget_max' => 'Budget Max',
         'estimated_completion' => 'Abschlussdatum',
-        'description' => 'Beschreibung'
+        'description' => 'Beschreibung',
+        'payments' => 'Zahlungen'
     ];
 
     $changed = [];

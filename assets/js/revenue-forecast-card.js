@@ -35,6 +35,9 @@
         best: 'Every project won, at the high end of its budget'
     };
 
+    // The bar for projects without an end date, after the months.
+    const UNDATED_LABEL = 'No end date';
+
     const toneOf = key => (RF.STAGES.find(s => s.key === key) || {}).tone || 'lead';
     const labelOf = key => (RF.STAGES.find(s => s.key === key) || {}).label || key;
 
@@ -186,25 +189,41 @@
             <div class="rf-summary">
                 <span class="rf-summary-label">${esc(preset)} · ${f.counted} of ${ctx.items.length} ${ctx.items.length === 1 ? 'project' : 'projects'}</span>
                 <span class="rf-hero" aria-label="${esc(RF.moneyFull(f.current.total))}">${esc(RF.money(f.current.total))}</span>
-                <span class="rf-hero-sub">expected ${esc(RF.monthName(0, now))} – ${esc(RF.monthName(f.months - 1, now))}</span>
+                <span class="rf-hero-sub">expected ${esc(RF.monthName(0, now))} – ${esc(RF.monthName(f.months - 1, now))}${
+                    f.current.undated > 0 ? ` · ${esc(RF.money(f.current.undated))} without end date` : ''}</span>
                 <span class="rf-compare">${compare}</span>
             </div>`;
     }
 
-    /** The line above the chart: the busiest month, or the month in focus. */
+    /** Columns on the chart: the months, then the undated bar if there is one. */
+    const columnCount = f => f.months + (f.hasUndated ? 1 : 0);
+
+    /** One column's numbers from a compute() result: a month, or the undated bar. */
+    function columnOf(f, result, i) {
+        if (i >= f.months) return { total: result.undated, stage: k => result.undatedByStage[k] };
+        return { total: result.totals[i], stage: k => result.byStage[k][i] };
+    }
+
+    const columnName = (ctx, i) => (i >= ctx.f.months ? UNDATED_LABEL : RF.monthName(i, ctx.now));
+
+    /** The line above the chart: the busiest month, or the column in focus. */
     function readout(ctx, month) {
         const f = ctx.f;
         if (month === null || month === undefined) {
             if (f.current.total <= 0) {
                 return '<span>Nothing counted in this scenario</span>';
             }
-            return `<span>Busiest month: ${esc(RF.monthName(f.busiest, ctx.now))} · </span><strong>${esc(RF.money(f.current.totals[f.busiest]))}</strong>`
+            const busiest = f.current.totals[f.busiest] > 0
+                ? `<span>Busiest month: ${esc(RF.monthName(f.busiest, ctx.now))} · </span><strong>${esc(RF.money(f.current.totals[f.busiest]))}</strong>`
+                : `<span>${esc(UNDATED_LABEL)} · </span><strong>${esc(RF.money(f.current.undated))}</strong>`;
+            return busiest
                 + '<span> · <span class="rf-key-ghost" aria-hidden="true"></span>grey = everything won at the top of its budget</span>';
         }
-        const parts = RF.STACK.filter(k => f.current.byStage[k][month] > 0)
-            .map(k => `${labelOf(k)} ${RF.money(f.current.byStage[k][month])}`);
-        return `<span>${esc(RF.monthName(month, ctx.now))} · </span><strong>${esc(RF.money(f.current.totals[month]))}</strong>`
-            + `<span>${parts.length ? esc(' (' + parts.join(' · ') + ')') : ''} · up to ${esc(RF.money(f.ceiling.totals[month]))}</span>`;
+        const col = columnOf(f, f.current, month);
+        const parts = RF.STACK.filter(k => col.stage(k) > 0)
+            .map(k => `${labelOf(k)} ${RF.money(col.stage(k))}`);
+        return `<span>${esc(columnName(ctx, month))} · </span><strong>${esc(RF.money(col.total))}</strong>`
+            + `<span>${parts.length ? esc(' (' + parts.join(' · ') + ')') : ''} · up to ${esc(RF.money(columnOf(f, f.ceiling, month).total))}</span>`;
     }
 
     function chart(ctx) {
@@ -212,7 +231,7 @@
         const now = ctx.now;
         const H = state.expanded ? CHART_H.expanded : CHART_H.compact;
         const px = v => Math.round((v / f.scale.max) * H);
-        const focus = Math.min(state.focusMonth, f.months - 1);
+        const focus = Math.min(state.focusMonth, columnCount(f) - 1);
 
         const ticks = [];
         if (state.expanded) {
@@ -223,29 +242,38 @@
 
         const cols = [];
         const labels = [];
-        for (let i = 0; i < f.months; i++) {
-            const c = RF.calendarMonth(i, now);
+        for (let i = 0; i < columnCount(f); i++) {
+            const undated = i >= f.months;
+            const col = columnOf(f, f.current, i);
             const segs = RF.STACK
-                .map(k => ({ k, h: px(f.current.byStage[k][i]) }))
+                .map(k => ({ k, h: px(col.stage(k)) }))
                 .filter(x => x.h > 0)
                 .map(x => `<span class="rf-seg" data-tone="${toneOf(x.k)}" style="height:${x.h}px"></span>`)
                 .join('');
-            const ghost = px(f.ceiling.totals[i]);
-            const parts = RF.STACK.filter(k => f.current.byStage[k][i] > 0)
-                .map(k => `, ${labelOf(k)} ${RF.moneyFull(f.current.byStage[k][i])}`).join('');
+            const ghost = px(columnOf(f, f.ceiling, i).total);
+            const parts = RF.STACK.filter(k => col.stage(k) > 0)
+                .map(k => `, ${labelOf(k)} ${RF.moneyFull(col.stage(k))}`).join('');
 
-            cols.push(`<button type="button" class="rf-col" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
-                data-rf-focus="month-${i}" aria-label="${esc(RF.monthName(i, now) + ': ' + RF.moneyFull(f.current.totals[i]) + parts)}">
+            cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
+                data-rf-focus="month-${undated ? 'undated' : i}" aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
                 ${ghost > 0 ? `<span class="rf-ghost" style="height:${ghost}px"></span>` : ''}
                 <span class="rf-stack">${segs}</span>
             </button>`);
 
+            if (undated) {
+                labels.push(`<span class="rf-axis-label is-undated" data-rf-label="${i}">`
+                    + '<span class="rf-m-long">No date</span><span class="rf-m-short">?</span>'
+                    + `${state.expanded ? '<span class="rf-axis-year"></span>' : ''}</span>`);
+                continue;
+            }
+
+            const c = RF.calendarMonth(i, now);
             const name = RF.MONTHS_SHORT[c.month];
             const year = state.expanded && (i === 0 || c.month === 0) ? c.year : '';
-            // Expanded shows "Oct", unless the chart is too narrow (CSS falls back to "O").
-            labels.push(`<span class="rf-axis-label${i === 0 ? ' is-now' : ''}" data-rf-label="${i}">${state.expanded
-                ? `<span class="rf-m-long">${esc(name)}</span><span class="rf-m-short">${esc(name.charAt(0))}</span><span class="rf-axis-year">${year}</span>`
-                : esc(name.charAt(0))}</span>`);
+            // "Oct", unless the chart is too narrow (CSS falls back to "O").
+            labels.push(`<span class="rf-axis-label${i === 0 ? ' is-now' : ''}" data-rf-label="${i}">`
+                + `<span class="rf-m-long">${esc(name)}</span><span class="rf-m-short">${esc(name.charAt(0))}</span>`
+                + `${state.expanded ? `<span class="rf-axis-year">${year}</span>` : ''}</span>`);
         }
 
         return `
@@ -289,10 +317,11 @@
                         <span class="rf-row-bar" aria-hidden="true"></span>
                         <span class="rf-row-text">
                             <a href="#" class="rf-row-name" data-crm-action="open-project-overview" data-project-id="${esc(p.id)}">${esc(p.name)}</a>
-                            <span class="rf-row-meta">${esc([p.company, labelOf(p.stage)].filter(Boolean).join(' · '))}</span>
+                            <span class="rf-row-meta">${esc([p.company, labelOf(p.stage),
+                                p.payments ? p.payments + (p.payments === 1 ? ' payment' : ' payments') : ''].filter(Boolean).join(' · '))}</span>
                         </span>
                     </td>
-                    <td>${esc(RF.budgetLabel(p.min, p.max))}</td>
+                    <td>${p.max > 0 ? esc(RF.budgetLabel(p.min, p.max)) : '<span class="rf-muted">–</span>'}</td>
                     <td>${p.chance}%</td>
                     <td class="rf-cell-runs">${esc(RF.periodLabel(p.s, p.e, now))}</td>
                     <td class="rf-cell-value">
@@ -320,7 +349,9 @@
                     </table>
                 </div>` : ''}
                 ${missingNote(ctx)}
-                <p class="rf-foot">The full budget counts, spread evenly over the months a project has left; one past its end date counts in this month.
+                <p class="rf-foot">The full budget counts, spread evenly over the months a project has left; one past its end date counts in this month,
+                    one without a start date in its end month, one without an end date in the “No date” bar after the months.
+                    Expected payments count in their own month instead; only the part of the budget they leave open is spread, and paid ones are left out.
                     <strong>Worst</strong>: only projects in progress, low end of the budget.
                     <strong>Realistic</strong>: all projects, middle of the budget × chance.
                     <strong>Best</strong>: every project won, high end of the budget.</p>

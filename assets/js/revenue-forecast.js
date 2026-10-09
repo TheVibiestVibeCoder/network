@@ -10,17 +10,26 @@
  *
  *     budget   = Low -> min | Mid -> (min + max) / 2 | High -> max
  *     factor   = "As set" -> chance / 100 | "All 100%" -> 1
- *     perMonth = budget x factor / months still to come, from the later of
- *                start and this month to end, inclusive
+ *     payment  = each expected payment not yet paid x factor, in its month
+ *     rest     = (budget - all payments, paid ones included, at least 0) x factor
+ *     perMonth = rest / months still to come, from the later of start and
+ *                this month to end, inclusive
  *
- * The whole budget is always counted: a project that started in the past
- * spreads all of it over the months it has left, and one still open past its
- * end month is due now, so all of it lands in this month. Months are carried
- * as an offset from the current month: 0 is this month, -3 three months ago,
- * 12 a year from now.
+ * Expected payments (project-payments.js) say when the money comes; only
+ * what they leave of the budget is spread. Paid payments are money already
+ * in, so they are not forecast. The whole budget is always counted: a
+ * project that started in the past spreads all of it over the months it has
+ * left, and one still open past its end month - or a payment past its month
+ * - is due now, so it lands in this month. A project without a start date
+ * is due in its end month. One without an end date cannot be spread over
+ * months: its rest goes into a separate "undated" sum next to the months.
+ * Months are carried as an offset from the current month: 0 is this month,
+ * -3 three months ago, 12 a year from now.
  */
 (function (root) {
     'use strict';
+
+    const PP = root.ProjectPayments;
 
     // The open pipeline, in the order a project moves through it. Complete
     // projects are not forecast; archived ones are no longer in the table.
@@ -95,7 +104,8 @@
     /**
      * Sorts API rows into the projects the forecast can use and the open
      * ones it cannot, with the reason. Nothing is guessed: a project without
-     * a budget, a chance or both dates is left out and named instead.
+     * a budget (or expected payments) or a chance is left out and named
+     * instead. One without an end date is kept as undated.
      */
     function prepare(projects, now) {
         const items = [];
@@ -117,12 +127,17 @@
             const s = offsetOf(p.start_date, now);
             const e = offsetOf(p.estimated_completion, now);
 
+            const payments = PP.parse(p.payments);
+            const planned = payments.reduce((sum, x) => sum + x.amount, 0);
+            // Only payments still to come are forecast, each at its month.
+            const due = payments.filter(x => !x.paid).map(x => ({ o: offsetOf(x.month, now), amount: x.amount }));
+
             const gaps = [];
-            if (min === null || max === 0) gaps.push('budget');
+            if ((min === null || max === 0) && !payments.length) gaps.push('budget');
             if (chanceRaw === null) gaps.push('chance');
-            if (s === null) gaps.push('start date');
-            if (e === null) gaps.push('end date');
             if (s !== null && e !== null && e < s) gaps.push('end before start');
+            // Payments without a budget: the payments are all there is.
+            if (min === null) { min = 0; max = 0; }
 
             const base = { id: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: p.stage };
             if (gaps.length) {
@@ -132,16 +147,21 @@
 
             items.push(Object.assign(base, {
                 chance: Math.max(0, Math.min(100, chanceRaw)),
-                min, max, s, e
+                min, max, s, e,
+                undated: e === null,
+                payments: payments.length,
+                planned,
+                due
             }));
         });
 
         return { items, missing };
     }
 
-    /** Months on the axis: this month to the last end month, at least a year. */
+    /** Months on the axis: this month to the last end month or payment, at least a year. */
     function horizon(items) {
-        return items.reduce((n, p) => Math.max(n, p.e + 1), MIN_MONTHS);
+        return items.reduce((n, p) => p.due.reduce((m, x) => Math.max(m, x.o + 1),
+            p.undated ? n : Math.max(n, p.e + 1)), MIN_MONTHS);
     }
 
     // ------------------------------------------------------------------
@@ -198,13 +218,15 @@
     }
 
     /**
-     * Monthly revenue for one setting over `months` months.
+     * Monthly revenue for one setting over `months` months, plus what
+     * undated projects bring (`undated`, by stage in `undatedByStage`).
      * `excluded` (by project id) only applies when respectExcluded is true:
      * the preset totals for comparison ignore individual switches.
      */
     function compute(items, settings, months, respectExcluded) {
         const byStage = {};
-        STAGE_KEYS.forEach(k => { byStage[k] = new Array(months).fill(0); });
+        const undatedByStage = {};
+        STAGE_KEYS.forEach(k => { byStage[k] = new Array(months).fill(0); undatedByStage[k] = 0; });
         const perProject = {};
 
         items.forEach(p => {
@@ -213,12 +235,21 @@
             let value = 0;
             if (counted) {
                 const factor = settings.chance === 'all' ? 1 : p.chance / 100;
-                const first = Math.max(p.s, 0);
-                const last = Math.max(p.e, 0);
-                const perMonth = budgetFor(p, settings.budget) * factor / (last - first + 1);
-                for (let i = first; i <= last && i < months; i++) {
-                    byStage[p.stage][i] += perMonth;
-                    value += perMonth;
+                const add = (i, v) => {
+                    if (i < months) { byStage[p.stage][i] += v; value += v; }
+                };
+                p.due.forEach(x => add(Math.max(x.o, 0), x.amount * factor));
+
+                const rest = Math.max(0, budgetFor(p, settings.budget) - p.planned) * factor;
+                if (rest > 0 && p.undated) {
+                    undatedByStage[p.stage] += rest;
+                    value += rest;
+                } else if (rest > 0) {
+                    // No start date: all of it is due in the end month.
+                    const first = Math.max(p.s === null ? p.e : p.s, 0);
+                    const last = Math.max(p.e, 0);
+                    const perMonth = rest / (last - first + 1);
+                    for (let i = first; i <= last; i++) add(i, perMonth);
                 }
             }
             perProject[p.id] = { counted, value };
@@ -226,7 +257,11 @@
 
         const totals = new Array(months).fill(0)
             .map((_, i) => STAGE_KEYS.reduce((sum, k) => sum + byStage[k][i], 0));
-        return { byStage, totals, perProject, total: totals.reduce((a, b) => a + b, 0) };
+        const undated = STAGE_KEYS.reduce((sum, k) => sum + undatedByStage[k], 0);
+        return {
+            byStage, totals, undatedByStage, undated, perProject,
+            total: totals.reduce((a, b) => a + b, 0) + undated
+        };
     }
 
     /** The y-axis maximum: the peak rounded up to a clean step, at most 4 steps. */
@@ -237,7 +272,8 @@
 
     /**
      * Everything the card shows, for one setting. The scale comes from the
-     * Best case, so switching scenarios never rescales the chart.
+     * Best case, so switching scenarios never rescales the chart; it covers
+     * the undated bar too, which the card only draws when `hasUndated`.
      */
     function forecast(items, settings) {
         const months = horizon(items);
@@ -254,8 +290,10 @@
             current,
             presets,
             ceiling,
-            scale: scale(Math.max(0, ...ceiling.totals)),
+            scale: scale(Math.max(0, ceiling.undated, ...ceiling.totals)),
             busiest,
+            // Only when an undated project has budget its payments leave open.
+            hasUndated: items.some(p => p.undated && p.max > p.planned),
             active: activePreset(settings),
             counted: items.filter(p => current.perProject[p.id].counted).length
         };
@@ -288,9 +326,11 @@
         return (a.slice(-1) === unit && /[kM]/.test(unit) ? a.slice(0, -1) : a) + '–' + b.slice(1);
     }
 
-    /** "Dec ’26 – May ’27", or one month. */
+    /** "Dec ’26 – May ’27", one month, "From Dec ’26", "Ends Dec ’26" or "No dates". */
     function periodLabel(s, e, now) {
         const one = o => { const c = calendarMonth(o, now); return MONTHS_SHORT[c.month] + ' ’' + String(c.year).slice(2); };
+        if (e === null) return s === null ? 'No dates' : 'From ' + one(s);
+        if (s === null) return 'Ends ' + one(e);
         return s === e ? one(s) : one(s) + ' – ' + one(e);
     }
 
