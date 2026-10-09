@@ -95,6 +95,7 @@
         workloadView: document.getElementById('workloadView'),
         mapView: document.getElementById('mapView'),
         bookkeepingView: document.getElementById('bookkeepingView'),
+        financialsView: document.getElementById('financialsView'),
         reviewView: document.getElementById('reviewView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
@@ -1388,7 +1389,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'review'];
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'financials', 'review'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1405,6 +1406,9 @@
 
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
+
+        // Financials is only on the page for admins.
+        if (stored === 'financials' && !document.getElementById('financialsView')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1451,6 +1455,9 @@
         if (elements.bookkeepingView) {
             elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
         }
+        if (elements.financialsView) {
+            elements.financialsView.classList.toggle('active', view === 'financials');
+        }
         if (elements.reviewView) {
             elements.reviewView.classList.toggle('active', view === 'review');
         }
@@ -1474,6 +1481,10 @@
         } else if (view === 'bookkeeping') {
             if (window.Bookkeeping) {
                 window.Bookkeeping.load();
+            }
+        } else if (view === 'financials') {
+            if (window.Financials) {
+                window.Financials.load();
             }
         } else if (view === 'review') {
             if (window.CRMReview) {
@@ -4427,30 +4438,6 @@
     // Project Functions
     // ============================================
 
-    /**
-     * The revenue forecast (revenue-forecast-card.js) covers the whole
-     * company, whatever the list is searched for: with a search on, it asks
-     * for every project itself instead of taking the list's.
-     */
-    async function updateRevenueForecast(listedProjects) {
-        const card = window.RevenueForecastCard;
-        if (!card) {
-            return;
-        }
-        if (!state.projectSearchQuery) {
-            card.setProjects(listedProjects);
-            return;
-        }
-        try {
-            const result = await api.getProjects('', 'name', 'ASC');
-            if (result.success) {
-                card.setProjects(result.data);
-            }
-        } catch (error) {
-            console.error('Error loading the revenue forecast:', error);
-        }
-    }
-
     async function loadProjects() {
         try {
             const result = await api.getProjects(
@@ -4462,7 +4449,6 @@
             if (result.success) {
                 state.projects = result.data;
                 renderProjects(state.projects);
-                updateRevenueForecast(state.projects);
                 loadDeletedProjects();
             } else {
                 console.error('Failed to load projects:', result.error);
@@ -5803,6 +5789,8 @@
                 if (window.CRMWorkload) window.CRMWorkload.load();
             } else if (state.currentView === 'bookkeeping') {
                 if (window.Bookkeeping) window.Bookkeeping.load();
+            } else if (state.currentView === 'financials') {
+                if (window.Financials) window.Financials.load();
             } else if (state.currentView !== 'review') {
                 refreshData();
             }
@@ -6481,6 +6469,9 @@
         document.addEventListener('crm:projects-changed', () => {
             loadProjects();
             refreshHome();
+            if (state.currentView === 'financials' && window.Financials) {
+                window.Financials.load();
+            }
             if (state.viewingProjectId && !isEditingProject()) {
                 openProjectOverview(state.viewingProjectId);
             }
@@ -6497,11 +6488,6 @@
                     max: elements.projectEditBudgetMax
                 }
             });
-        }
-
-        // Revenue forecast card above the list
-        if (window.RevenueForecastCard) {
-            window.RevenueForecastCard.init(document.getElementById('revenueForecast'));
         }
 
         // Delete project modal

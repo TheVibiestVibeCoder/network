@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cashflow tests</title>
+<style>
+    body { margin: 0; padding: 24px; background: #F9F7F7; color: #112D4E; font: 14px/1.5 system-ui, sans-serif; }
+    h1 { margin: 0 0 16px; font-size: 20px; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    li { padding: 6px 0; border-bottom: 1px solid #ECEFF4; }
+    .ok::before { content: "✓ "; color: #2A7550; }
+    .fail::before { content: "✗ "; color: #B3453B; }
+    .fail small { display: block; color: #B3453B; }
+</style>
+</head>
+<body>
+<h1 id="summary">Running…</h1>
+<ul id="results"></ul>
+<script src="../assets/js/project-payments.js"></script>
+<script src="../assets/js/revenue-forecast.js"></script>
+<script src="../assets/js/cashflow.js"></script>
+<script src="cashflow.test.js"></script>
+<script>
+    (function () {
+        const results = window.cashflowTestResults || [];
+        const failed = results.filter(r => !r.ok).length;
+        document.getElementById('summary').textContent =
+            (results.length - failed) + ' of ' + results.length + ' tests passed';
+        const list = document.getElementById('results');
+        results.forEach(r => {
+            const li = document.createElement('li');
+            li.className = r.ok ? 'ok' : 'fail';
+            li.textContent = r.name;
+            if (!r.ok) {
+                const msg = document.createElement('small');
+                msg.textContent = r.message;
+                li.appendChild(msg);
+            }
+            list.appendChild(li);
+        });
+    })();
+</script>
+</body>
+</html>

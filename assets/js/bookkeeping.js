@@ -555,24 +555,24 @@
      * column ("Betrag", "Amount", "Umsatz"). A name match is preferred when it
      * also carries numbers, so a stray numeric reference column cannot win.
      */
-    function detectAmountColumn() {
-        if (!state.columns.length || !state.rows.length) return null;
+    function detectAmountColumn(columns = state.columns, rows = state.rows, isDateColumn = isDateSortColumn) {
+        if (!columns.length || !rows.length) return null;
 
         const named = /^(betrag|amount|umsatz|summe|value|wert|saldo|total)$/i;
         let best = null;
 
-        state.columns.forEach(col => {
-            if (isDateSortColumn(col.name)) return;
+        columns.forEach(col => {
+            if (isDateColumn(col.name)) return;
 
             let parsed = 0;
-            state.rows.forEach(row => {
+            rows.forEach(row => {
                 if (parseDecimalValue(row.data[col.name]) !== null) parsed++;
             });
             if (parsed === 0) return;
 
             // A column has to look like an amount in most of its rows before it
             // is believed at all - one numeric cell in a text column is noise.
-            const ratio = parsed / state.rows.length;
+            const ratio = parsed / rows.length;
             if (ratio < 0.5) return;
 
             const score = ratio + (named.test(col.name.trim()) ? 1 : 0);
@@ -3212,9 +3212,30 @@
         });
     }
 
+    /**
+     * Every bookkeeping row as { date, amount, excluded }, without drawing
+     * the table - for Financials, which works out the bank balance and past
+     * months from them. The amount is read from the same column the table's
+     * month totals use.
+     */
+    async function transactions() {
+        const result = await apiJson('table');
+        const { columns, rows, settings } = result.data;
+        const dateColumn = settings && settings.date_column;
+        const amountColumn = detectAmountColumn(columns, rows, name => name === dateColumn || looksLikeDateColumn(name));
+        if (!amountColumn) return { amountColumn: null, rows: [] };
+        return {
+            amountColumn,
+            rows: rows
+                .map(r => ({ date: r.row_date, amount: parseDecimalValue(r.data[amountColumn]), excluded: !!Number(r.excluded) }))
+                .filter(r => r.date && r.amount !== null)
+        };
+    }
+
     window.Bookkeeping = {
         load,
         focusRow,
+        transactions,
         // The preview dialog belongs to this module; init() only wires it up
         // and fetches nothing, so it is safe to call from any view.
         preview(url, name, kind) {

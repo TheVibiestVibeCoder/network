@@ -735,6 +735,14 @@ function assetUrl(string $path): string
                         </svg>
                         <span class="nav-label">Bookkeeping</span>
                     </button>
+                    <?php if ($isAdmin): ?>
+                    <button type="button" class="toggle-btn nav-item" data-view="financials" title="Financials">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3.5 20.5h17"/><path d="m4.5 15.5 4.5-5 3.5 3 7-7.5"/><path d="M15 6h4.5v4.5"/>
+                        </svg>
+                        <span class="nav-label">Financials</span>
+                    </button>
+                    <?php endif; ?>
                     <button type="button" class="toggle-btn nav-item" data-view="review" title="From Claude - waiting for review">
                         <!-- Claude's mark, filled: the outline style of the other icons would blur its rays -->
                         <svg class="nav-icon nav-icon--claude" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -918,6 +926,35 @@ function assetUrl(string $path): string
                     </div>
                     <div class="review-list" id="reviewList" aria-live="polite"></div>
                 </div>
+
+                <?php if ($isAdmin): ?>
+                <!-- Financials (admins only): cash, costs and what is coming in.
+                     Drawn by assets/js/financials.js; the arithmetic is in
+                     assets/js/cashflow.js. -->
+                <div class="view-panel" id="financialsView">
+                    <div class="view-head fin-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Financials</h1>
+                            <p class="view-sub">Cash, costs and what is coming in</p>
+                        </div>
+                        <div class="fin-head-tools" id="finHeadTools"></div>
+                    </div>
+                    <div class="fin-page" id="finPage" aria-busy="true">
+                        <!-- The revenue forecast (revenue-forecast-card.js); its
+                             scenario is the one the whole page plans with. -->
+                        <section class="rf-card" id="finForecast" aria-label="Revenue forecast" aria-busy="true"></section>
+                        <div class="fin-kpis" id="finKpis"></div>
+                        <div id="finAlerts"></div>
+                        <section class="fin-card fin-chart-card" id="finChart" aria-label="Cashflow"></section>
+                        <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
+                        <div class="fin-columns">
+                            <section class="fin-card" id="finIncome" aria-label="Expected income"></section>
+                            <section class="fin-card" id="finCosts" aria-label="Costs"></section>
+                        </div>
+                        <section class="fin-card" id="finSettings" aria-label="Settings"></section>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <div class="view-panel" id="bookkeepingView">
                     <div class="view-head">
@@ -1202,25 +1239,6 @@ function assetUrl(string $path): string
                             <h1 class="view-title">Projects</h1>
                         </div>
                     </div>
-
-                    <!--
-                        Revenue forecast: drawn by revenue-forecast-card.js from
-                        every open project. Until the projects arrive it shows
-                        a skeleton in the card's shape.
-                    -->
-                    <section class="rf-card" id="revenueForecast" aria-label="Revenue forecast" aria-busy="true">
-                        <div class="rf-top">
-                            <div class="rf-head"><h2 class="rf-title">Revenue forecast</h2></div>
-                            <div class="rf-body">
-                                <div class="rf-summary">
-                                    <span class="rf-skel rf-skel--line"></span>
-                                    <span class="rf-skel rf-skel--hero"></span>
-                                    <span class="rf-skel rf-skel--line"></span>
-                                </div>
-                                <div class="rf-chart"><div class="rf-skel rf-skel--chart"></div></div>
-                            </div>
-                        </div>
-                    </section>
 
                     <div class="list-header">
                         <div class="list-header-top">
@@ -2256,8 +2274,13 @@ function assetUrl(string $path): string
 
         <!-- Application JS -->
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
+        <?php if ($isAdmin): ?>
+        <!-- The revenue forecast and cashflow live in Financials only. -->
         <script src="<?= assetUrl('assets/js/revenue-forecast.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/revenue-forecast-card.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/cashflow.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/financials.js') ?>"></script>
+        <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
