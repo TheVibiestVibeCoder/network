@@ -259,6 +259,75 @@ class Project
         return $payments;
     }
 
+    /**
+     * Marks expected payments as paid, each named by project, month and
+     * amount: the first unpaid payment of that project that matches both is
+     * the one. A payment that was changed or paid in the meantime matches
+     * nothing and is skipped, never guessed.
+     *
+     * @param array $items [{project_id, month, amount}]
+     * @return array{marked: int, skipped: int, changed: array<int, array{before: array, after: array}>}
+     */
+    public function markPaymentsPaid(array $items): array
+    {
+        return Database::transactional(function (PDO $db) use ($items) {
+            $byProject = [];
+            foreach ($items as $item) {
+                $byProject[(int) ($item['project_id'] ?? 0)][] = $item;
+            }
+
+            $marked = 0;
+            $skipped = 0;
+            $changed = [];
+            $actor = Auth::actor();
+            $read = $db->prepare("SELECT * FROM projects WHERE id = :id");
+            $write = $db->prepare("
+                UPDATE projects
+                SET payments = :payments, updated_by = :actor_id, updated_by_name = :actor_name, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+
+            foreach ($byProject as $projectId => $wanted) {
+                $read->execute(['id' => $projectId]);
+                $before = $read->fetch(PDO::FETCH_ASSOC);
+                if (!$before) {
+                    $skipped += count($wanted);
+                    continue;
+                }
+
+                $payments = self::decodePayments($before['payments'] ?? null);
+                $hits = 0;
+                foreach ($wanted as $item) {
+                    $month = (string) ($item['month'] ?? '');
+                    $amount = (float) ($item['amount'] ?? 0);
+                    $found = false;
+                    foreach ($payments as $i => $p) {
+                        if (empty($p['paid']) && ($p['month'] ?? '') === $month && abs((float) ($p['amount'] ?? 0) - $amount) < 0.005) {
+                            $payments[$i]['paid'] = true;
+                            $found = true;
+                            break;
+                        }
+                    }
+                    $found ? $hits++ : $skipped++;
+                }
+
+                if ($hits > 0) {
+                    $write->execute([
+                        'id' => $projectId,
+                        'payments' => self::encodePayments($payments),
+                        'actor_id' => $actor['id'],
+                        'actor_name' => $actor['name'],
+                    ]);
+                    $read->execute(['id' => $projectId]);
+                    $changed[] = ['before' => $before, 'after' => $read->fetch(PDO::FETCH_ASSOC)];
+                    $marked += $hits;
+                }
+            }
+
+            return ['marked' => $marked, 'skipped' => $skipped, 'changed' => $changed];
+        });
+    }
+
     /** A project row's stored payments as a list (empty when none or unreadable). */
     public static function decodePayments($raw): array
     {

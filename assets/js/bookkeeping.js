@@ -2076,20 +2076,51 @@
             return;
         }
 
+        const dateColumn = state.previewDateColumn;
         els.importConfirmBtn.disabled = true;
         try {
             const result = await postJson('import', {
                 columns: cols,
-                date_column: state.previewDateColumn,
+                date_column: dateColumn,
                 rows: selectedRows
             });
             closeImportModal();
             showToast(`Imported ${result.imported} rows` + (result.new_columns > 0 ? ` (${result.new_columns} new columns added)` : ''));
             await load();
+            await askAboutExpectedPayments(selectedRows, cols, dateColumn);
         } catch (error) {
             showToast('Import failed: ' + error.message, true);
         } finally {
             els.importConfirmBtn.disabled = false;
+        }
+    }
+
+    /**
+     * Income in an import may pay a project's expected payments: when the
+     * imported rows hold any, project-payments.js asks which ones. The
+     * amount column is the one the table already uses for its totals, read
+     * after the reload so the new rows count too.
+     */
+    async function askAboutExpectedPayments(importedRows, cols, dateColumn) {
+        if (!window.ProjectPayments || !window.ProjectPayments.askAfterImport) return;
+        const amountCol = detectAmountColumn();
+        if (!amountCol || !cols.includes(amountCol)) return;
+        const partyCol = findColumnByNames(cols, ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'auftraggeber', 'beschreibung', 'description']);
+
+        const incomes = importedRows
+            .map(row => ({
+                amount: parseDecimalValue(row[amountCol]),
+                party: partyCol ? String(row[partyCol] || '').trim() : '',
+                date: dateColumn ? parseBookingDate(row[dateColumn]) : ''
+            }))
+            .filter(x => x.amount !== null && x.amount > 0);
+        if (!incomes.length) return;
+
+        try {
+            const marked = await window.ProjectPayments.askAfterImport(incomes);
+            if (marked > 0) showToast(`${marked} expected payment${marked === 1 ? '' : 's'} marked as paid`);
+        } catch (error) {
+            console.error('Asking about expected payments failed:', error);
         }
     }
 

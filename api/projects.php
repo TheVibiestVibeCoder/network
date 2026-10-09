@@ -138,6 +138,34 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // Expected payments that came in (asked after a bookkeeping import):
+    // { payments: [{ project_id, month, amount }] }.
+    if ($action === 'mark-payments-paid') {
+        $input = Auth::getJsonInput();
+        $items = is_array($input) && is_array($input['payments'] ?? null) ? $input['payments'] : null;
+        if ($items === null || count($items) === 0 || count($items) > 500) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A list of payments is required']);
+            return;
+        }
+        foreach ($items as $item) {
+            if (!is_array($item) || parsePositiveId($item['project_id'] ?? null) === null
+                || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', (string) ($item['month'] ?? ''))
+                || !is_numeric($item['amount'] ?? null)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Each payment needs project_id, month (YYYY-MM) and amount']);
+                return;
+            }
+        }
+
+        $result = $model->markPaymentsPaid($items);
+        foreach ($result['changed'] as $change) {
+            logProjectActivityEvent('updated', $change['after'], $change['before']);
+        }
+        echo json_encode(['success' => true, 'marked' => $result['marked'], 'skipped' => $result['skipped']]);
+        return;
+    }
+
     // Bring an archived project back, or delete it for good: { id } of the
     // deleted_projects entry.
     if ($action === 'restore' || $action === 'purge') {

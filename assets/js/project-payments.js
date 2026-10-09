@@ -499,10 +499,194 @@
         return { payments: currentPayments() };
     }
 
+    // ---- After a bookkeeping import: which expected payments came in? ----
+
+    const ask = { modal: null, open: [], selected: new Set(), resolve: null, busy: false, returnFocus: null };
+
+    function csrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    /** "2026-10-03" -> "3 Oct 2026"; anything else as it came. */
+    function dayName(iso) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+        return m ? Number(m[3]) + ' ' + MONTHS_SHORT[Number(m[2]) - 1] + ' ' + m[1] : String(iso || '');
+    }
+
+    const sameAmount = (a, b) => Math.abs(a - b) < 0.005;
+
+    /**
+     * Shows every open expected payment, across all projects, and asks which
+     * of them the imported income paid. incomes: [{ amount, party, date }],
+     * amounts above 0. Payments of the same amount as an income are listed
+     * first and labelled, but nothing is ticked for the user. Resolves with
+     * how many payments were marked paid (0 when there was nothing to ask,
+     * or the user chose "Not now").
+     */
+    async function askAfterImport(incomes) {
+        const modal = document.getElementById('ppayPaidModal');
+        if (!modal || !incomes || !incomes.length || ask.resolve) return 0;
+
+        let projects = null;
+        try {
+            const response = await fetch('api/projects.php?' + new URLSearchParams({ search: '', sort: 'name', order: 'ASC' }));
+            const result = await response.json();
+            projects = result && result.success ? result.data : null;
+        } catch (e) {
+            projects = null;
+        }
+        if (!Array.isArray(projects)) return 0;
+
+        const open = [];
+        projects.forEach(p => {
+            // A project Claude proposed and nobody accepted yet is not ours.
+            if (p.review_status === 'pending') return;
+            parse(p.payments).forEach(x => {
+                if (x.paid) return;
+                const match = incomes.find(inc => sameAmount(inc.amount, x.amount)) || null;
+                open.push({ key: open.length, project: p, month: x.month, amount: x.amount, match });
+            });
+        });
+        if (!open.length) return 0;
+
+        // Matching amounts first, then by month, oldest first.
+        open.sort((a, b) => (!!b.match - !!a.match) || (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+
+        ask.modal = modal;
+        ask.open = open;
+        ask.selected = new Set();
+        ask.returnFocus = document.activeElement;
+        bindAsk(modal);
+        renderAsk(incomes);
+        modal.classList.add('active');
+        const first = modal.querySelector('[data-ppaid-key]');
+        if (first) first.focus();
+
+        return new Promise(resolve => { ask.resolve = resolve; });
+    }
+
+    function renderAsk(incomes) {
+        const modal = ask.modal;
+        const total = incomes.reduce((s, x) => s + x.amount, 0);
+        modal.querySelector('#ppayPaidSub').textContent = incomes.length === 1
+            ? `This import has one incoming payment of ${euro(total)}. Tick the expected payments it covers.`
+            : `This import has ${incomes.length} incoming payments, ${euro(total)} in all. Tick the expected payments they cover.`;
+
+        const shown = incomes.slice(0, 6);
+        const incomeList = `
+            <ul class="ppaid-incomes" aria-label="Income in this import">
+                ${shown.map(inc => `
+                    <li class="ppaid-income">
+                        <span class="ppaid-income-amount">+${esc(euro(inc.amount))}</span>
+                        <span class="ppaid-income-text">${esc(inc.party || 'Unknown sender')}${inc.date ? `<span class="ppaid-income-date">${esc(dayName(inc.date))}</span>` : ''}</span>
+                    </li>`).join('')}
+                ${incomes.length > shown.length ? `<li class="ppaid-income is-more">and ${incomes.length - shown.length} more</li>` : ''}
+            </ul>`;
+
+        const row = item => {
+            const p = item.project;
+            const id = 'ppaid-' + item.key;
+            return `
+                <li>
+                    <label class="ppaid-row${item.match ? ' is-match' : ''}" for="${id}">
+                        <input type="checkbox" id="${id}" data-ppaid-key="${item.key}"${ask.selected.has(item.key) ? ' checked' : ''}>
+                        <span class="ppaid-row-main">
+                            <span class="ppaid-row-name">${esc(p.name || 'Untitled project')}</span>
+                            <span class="ppaid-row-meta">${esc([p.company, p.stage].filter(Boolean).join(' · '))}</span>
+                            ${item.match ? `<span class="ppaid-row-match">${ICON_CHECK}Same amount as ${esc(item.match.party || 'an income')}${item.match.date ? ' on ' + esc(dayName(item.match.date)) : ''}</span>` : ''}
+                        </span>
+                        <span class="ppaid-row-month">${esc(monthName(item.month))}</span>
+                        <span class="ppaid-row-amount">${esc(euro(item.amount))}</span>
+                    </label>
+                </li>`;
+        };
+
+        const matches = ask.open.filter(x => x.match);
+        const others = ask.open.filter(x => !x.match);
+        const group = (title, items) => items.length ? `
+            <section class="ppaid-group">
+                <h3 class="ppaid-group-title">${esc(title)} <span>${items.length}</span></h3>
+                <ul class="ppaid-list">${items.map(row).join('')}</ul>
+            </section>` : '';
+
+        modal.querySelector('#ppayPaidBody').innerHTML = incomeList
+            + group('Matching amounts', matches)
+            + group(matches.length ? 'Other open payments' : 'Open expected payments', others);
+        updateAskCount();
+    }
+
+    function updateAskCount() {
+        const n = ask.selected.size;
+        const sum = ask.open.filter(x => ask.selected.has(x.key)).reduce((s, x) => s + x.amount, 0);
+        ask.modal.querySelector('#ppayPaidCount').textContent = n ? `${plural(n, 'payment')} · ${euro(sum)}` : '';
+        const confirm = ask.modal.querySelector('#ppayPaidConfirm');
+        confirm.disabled = n === 0 || ask.busy;
+        confirm.textContent = n ? `Mark ${n} as paid` : 'Mark as paid';
+    }
+
+    function closeAsk(marked) {
+        if (!ask.modal) return;
+        ask.modal.classList.remove('active');
+        const resolve = ask.resolve;
+        ask.resolve = null;
+        if (ask.returnFocus && ask.returnFocus.focus) ask.returnFocus.focus();
+        if (resolve) resolve(marked || 0);
+    }
+
+    async function confirmAsk() {
+        const chosen = ask.open.filter(x => ask.selected.has(x.key));
+        if (!chosen.length || ask.busy) return;
+        ask.busy = true;
+        updateAskCount();
+        try {
+            const response = await fetch('api/projects.php?action=mark-payments-paid', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+                body: JSON.stringify({ payments: chosen.map(x => ({ project_id: x.project.id, month: x.month, amount: x.amount })) })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Request failed');
+            // Projects on screen (cards, forecast, an open sheet) catch up.
+            document.dispatchEvent(new CustomEvent('crm:projects-changed'));
+            closeAsk(result.marked);
+        } catch (e) {
+            const count = ask.modal.querySelector('#ppayPaidCount');
+            count.textContent = 'Could not save: ' + e.message;
+            count.classList.add('is-error');
+        } finally {
+            ask.busy = false;
+            if (ask.modal.classList.contains('active')) updateAskCount();
+        }
+    }
+
+    let askBound = false;
+    function bindAsk(modal) {
+        if (askBound) return;
+        askBound = true;
+        modal.addEventListener('click', e => {
+            if (e.target.closest('[data-ppaid-close]')) closeAsk(0);
+        });
+        modal.addEventListener('change', e => {
+            const box = e.target.closest('[data-ppaid-key]');
+            if (!box) return;
+            const key = Number(box.getAttribute('data-ppaid-key'));
+            if (box.checked) ask.selected.add(key); else ask.selected.delete(key);
+            modal.querySelector('#ppayPaidCount').classList.remove('is-error');
+            updateAskCount();
+        });
+        modal.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { e.stopPropagation(); closeAsk(0); }
+        });
+        modal.querySelector('#ppayPaidConfirm').addEventListener('click', confirmAsk);
+    }
+
     root.ProjectPayments = {
         // numbers
         parse, budgetOf, summarize, monthRange, monthOptions, isOutside, monthName, euro, euroRange,
         // sheet
-        init, edit, read, renderView, cardSummary
+        init, edit, read, renderView, cardSummary,
+        // bookkeeping
+        askAfterImport
     };
 })(typeof window !== 'undefined' ? window : globalThis);

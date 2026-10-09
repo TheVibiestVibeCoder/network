@@ -2152,6 +2152,27 @@ function assetUrl(string $path): string
             </div>
         </div>
 
+        <!-- Expected payments that came in: asked after a bookkeeping import
+             with income in it (project-payments.js) -->
+        <div class="modal" id="ppayPaidModal">
+            <div class="modal-backdrop" data-ppaid-close></div>
+            <div class="modal-content modal-large" role="dialog" aria-modal="true" aria-labelledby="ppayPaidTitle" aria-describedby="ppayPaidSub">
+                <div class="modal-header">
+                    <div class="ppaid-head">
+                        <h2 id="ppayPaidTitle">Payments received?</h2>
+                        <p class="ppaid-sub" id="ppayPaidSub"></p>
+                    </div>
+                    <button type="button" class="modal-close" data-ppaid-close aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body ppaid-body" id="ppayPaidBody"></div>
+                <div class="modal-footer ppaid-foot">
+                    <span class="ppaid-count" id="ppayPaidCount" aria-live="polite"></span>
+                    <button type="button" class="btn btn-secondary" data-ppaid-close>Not now</button>
+                    <button type="button" class="btn btn-primary" id="ppayPaidConfirm" disabled>Mark as paid</button>
+                </div>
+            </div>
+        </div>
+
         <?php if ($isAdmin): ?>
         <!-- User Management (admin only) -->
         <div class="modal" id="usersModal">

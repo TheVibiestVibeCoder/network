@@ -6476,6 +6476,16 @@
             elements.addProjectBtn.addEventListener('click', openNewProject);
         }
 
+        // Payments marked paid elsewhere (after a bookkeeping import): the
+        // project cards, the forecast and an open sheet catch up.
+        document.addEventListener('crm:projects-changed', () => {
+            loadProjects();
+            refreshHome();
+            if (state.viewingProjectId && !isEditingProject()) {
+                openProjectOverview(state.viewingProjectId);
+            }
+        });
+
         // Expected payments in the project sheet
         if (window.ProjectPayments) {
             window.ProjectPayments.init({
