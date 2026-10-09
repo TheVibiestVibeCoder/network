@@ -477,6 +477,23 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_cid ON login_challenges(challenge_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_user ON login_challenges(user_id, created_at)");
 
+        // What the two-factor throttles count. Kept apart from login_challenges
+        // because challenges are deleted as they are replaced or spent, and from
+        // login_attempts because a correct password clears those - either way an
+        // attacker holding the password could reset the count just by signing
+        // in again. Nothing here is removed by the sign-in flow except the
+        // failures, and only by a correct code.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS two_factor_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_two_factor_events_user ON two_factor_events(user_id, event, created_at)");
+
         // ---------------------------------------------------------------
         // "Remember this device" tokens
         // ---------------------------------------------------------------

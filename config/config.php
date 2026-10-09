@@ -231,6 +231,10 @@ define('LOGIN_CODE_MAX_ATTEMPTS', max(1, envInt('LOGIN_CODE_MAX_ATTEMPTS', 5)));
 // Codes an account may request per hour, so the sign-in form cannot be turned
 // into a way to flood somebody's inbox.
 define('LOGIN_CODE_MAX_PER_HOUR', max(1, envInt('LOGIN_CODE_MAX_PER_HOUR', 10)));
+// Wrong codes one account may collect in 24 hours before it gets no more codes.
+// The per-code limit alone does not bound guessing: whoever has the password can
+// keep asking for fresh codes. A correct code, or a new password, resets it.
+define('LOGIN_CODE_MAX_FAILURES_PER_DAY', max(1, envInt('LOGIN_CODE_MAX_FAILURES_PER_DAY', 20)));
 
 // -----------------------------------------------------------------------------
 // "Remember this device"
@@ -239,7 +243,9 @@ define('LOGIN_CODE_MAX_PER_HOUR', max(1, envInt('LOGIN_CODE_MAX_PER_HOUR', 10)))
 // second key to the account, so it is off by default, expires on its own, and
 // dies with the password it was issued against.
 define('REMEMBER_ME_ENABLED', envBool('REMEMBER_ME_ENABLED', true));
-define('REMEMBER_ME_LIFETIME', max(3600, envInt('REMEMBER_ME_LIFETIME', 2592000))); // 30 days
+// Counted from the sign-in that issued the cookie, not from its last use, so it
+// is the longest any device goes without entering a two-factor code.
+define('REMEMBER_ME_LIFETIME', max(3600, envInt('REMEMBER_ME_LIFETIME', 604800))); // 7 days
 define('REMEMBER_COOKIE_NAME', 'crm_remember');
 // How long the just-replaced validator stays acceptable after a rotation. One
 // page load fires several requests at once, and they all carry the cookie the

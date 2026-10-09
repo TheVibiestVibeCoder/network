@@ -626,6 +626,15 @@ class Auth
     {
         $userId = (int) $identity['id'];
 
+        // Checked before the hourly limit so the message says why. Whoever hit
+        // this has the password, so the way out for the owner is a new one.
+        if (self::codeFailuresExhausted($userId)) {
+            return [
+                'success' => false,
+                'error' => 'Too many incorrect codes for this account. Please try again later, or reset your password.',
+            ];
+        }
+
         if (!self::codeRequestAllowed($userId)) {
             return [
                 'success' => false,
@@ -666,6 +675,8 @@ class Auth
             error_log('two-factor challenge could not be created: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Could not start sign-in. Please try again.'];
         }
+
+        self::recordCodeEvent($userId, 'sent');
 
         $_SESSION['pending_challenge'] = $challengeId;
 
@@ -712,14 +723,17 @@ class Auth
 
     /**
      * Cap how many codes one account can trigger per hour.
+     *
+     * Counted from two_factor_events, not login_challenges: every new code
+     * deletes the one it replaces, so counting challenges never got past one.
      */
     private static function codeRequestAllowed(int $userId): bool
     {
         try {
             $db = Database::getInstance();
             $stmt = $db->prepare("
-                SELECT COUNT(*) FROM login_challenges
-                WHERE user_id = :uid AND created_at > datetime('now', '-1 hour')
+                SELECT COUNT(*) FROM two_factor_events
+                WHERE user_id = :uid AND event = 'sent' AND created_at > datetime('now', '-1 hour')
             ");
             $stmt->execute(['uid' => $userId]);
 
@@ -727,6 +741,49 @@ class Auth
         } catch (Throwable $e) {
             error_log('code throttle check failed: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Has this account used up its wrong codes for the day?
+     *
+     * Without this, the per-code limit bounds nothing: someone with the
+     * password signs in again, gets a fresh code and five fresh guesses, and
+     * works through all million codes in hours. Failures from before the last
+     * password change do not count - the person who caused them no longer has
+     * the password. Fails closed, like the hourly limit.
+     */
+    private static function codeFailuresExhausted(int $userId): bool
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT COUNT(*) FROM two_factor_events e
+                JOIN users u ON u.id = e.user_id
+                WHERE e.user_id = :uid AND e.event = 'failed'
+                  AND e.created_at > datetime('now', '-1 day')
+                  AND e.created_at > COALESCE(u.password_changed_at, '')
+            ");
+            $stmt->execute(['uid' => $userId]);
+
+            return (int) $stmt->fetchColumn() >= LOGIN_CODE_MAX_FAILURES_PER_DAY;
+        } catch (Throwable $e) {
+            error_log('code failure check failed: ' . $e->getMessage());
+            return true;
+        }
+    }
+
+    /**
+     * Note a code sent or a wrong code entered, for the throttles above.
+     */
+    private static function recordCodeEvent(int $userId, string $event): void
+    {
+        try {
+            Database::getInstance()
+                ->prepare("INSERT INTO two_factor_events (user_id, event) VALUES (:uid, :event)")
+                ->execute(['uid' => $userId, 'event' => $event]);
+        } catch (Throwable $e) {
+            error_log('could not record two-factor event: ' . $e->getMessage());
         }
     }
 
@@ -788,6 +845,17 @@ class Auth
         $submitted = preg_replace('/\D/', '', $submitted) ?? '';
         $ip = self::getClientIp();
 
+        // The daily cap can run out while a challenge is still open, e.g. from
+        // a second browser working on the same account.
+        if (self::codeFailuresExhausted((int) $row['user_id'])) {
+            self::discardChallenge((int) $row['id']);
+
+            return [
+                'success' => false,
+                'error' => 'Too many incorrect codes for this account. Please try again later, or reset your password.',
+            ];
+        }
+
         // Count the attempt before checking it, so a client that abandons the
         // request mid-flight cannot get a free guess.
         try {
@@ -809,6 +877,7 @@ class Auth
 
         if ($submitted === '' || !password_verify($submitted, (string) $row['code_hash'])) {
             self::recordLoginAttempt($ip, false, (string) $row['email']);
+            self::recordCodeEvent((int) $row['user_id'], 'failed');
             $remaining = max(0, LOGIN_CODE_MAX_ATTEMPTS - $attempts);
 
             return [
@@ -840,6 +909,16 @@ class Auth
 
         unset($_SESSION['pending_challenge']);
         self::clearFailedAttempts((string) $row['email']);
+
+        // A correct code is the one thing that proves the owner is here, so it
+        // is the one thing that resets their wrong-code count.
+        try {
+            Database::getInstance()
+                ->prepare("DELETE FROM two_factor_events WHERE user_id = :uid AND event = 'failed'")
+                ->execute(['uid' => (int) $row['user_id']]);
+        } catch (Throwable $e) {
+            // Ages out of the window on its own.
+        }
 
         self::completeLogin([
             'id' => (int) $row['user_id'],
@@ -922,10 +1001,13 @@ class Auth
     public static function pruneChallenges(): void
     {
         try {
-            Database::getInstance()->exec(
+            $db = Database::getInstance();
+            $db->exec(
                 "DELETE FROM login_challenges
                  WHERE expires_at < datetime('now') OR consumed_at IS NOT NULL"
             );
+            // Nothing reads further back than the daily failure window.
+            $db->exec("DELETE FROM two_factor_events WHERE created_at < datetime('now', '-1 day')");
         } catch (Throwable $e) {
             // Housekeeping only.
         }
@@ -1065,7 +1147,19 @@ class Auth
             return false;
         }
 
-        $invalid = strtotime((string) $row['expires_at'] . ' UTC') < time()
+        // The token is created the moment a sign-in completes, i.e. right
+        // after the code was entered, so created_at is when this device last
+        // passed two-factor. Using it is what makes the lifetime a hard cap:
+        // it also catches tokens whose expires_at was pushed out by older code
+        // that slid it forward on every use, and tokens issued under a longer
+        // REMEMBER_ME_LIFETIME than the one configured now.
+        $issuedAt = strtotime((string) $row['created_at'] . ' UTC');
+        $expiresAt = min(
+            strtotime((string) $row['expires_at'] . ' UTC'),
+            $issuedAt + REMEMBER_ME_LIFETIME
+        );
+
+        $invalid = $expiresAt < time()
             || $row['status'] !== User::STATUS_ACTIVE
             || (string) ($row['pw_stamp'] ?? '') !== (string) ($row['password_changed_at'] ?? '');
 
@@ -1079,9 +1173,12 @@ class Auth
         // One inside the grace window is a straggler from a rotation that has
         // already happened: it signs in, and leaves both the row and the cookie
         // to the request that won.
+        //
+        // Rotation keeps the expiry where it is. Sliding it forward on every
+        // use would let a device that is used regularly never see a code again;
+        // it has to pass two-factor once per REMEMBER_ME_LIFETIME.
         $newValidator = null;
         $rotated = false;
-        $expiresAt = time() + REMEMBER_ME_LIFETIME;
 
         if ($current) {
             $newValidator = bin2hex(random_bytes(32));
