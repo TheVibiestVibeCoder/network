@@ -935,7 +935,6 @@ function assetUrl(string $path): string
                     <div class="view-head fin-head">
                         <div class="view-head-text">
                             <h1 class="view-title">Financials</h1>
-                            <p class="view-sub">Cash, costs and what is coming in</p>
                         </div>
                         <div class="fin-head-tools" id="finHeadTools"></div>
                     </div>

@@ -9110,39 +9110,35 @@ details.import-instructions p {
    -------------------------------------------------------------------------- */
 
 .fin-head {
-    align-items: flex-end;
+    align-items: center;
 }
 
+/* "Months ahead" beside its switch, both no taller than the page title,
+   so this header is as high as every other tab's. */
 .fin-head-tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 20px;
+    gap: 8px 20px;
 }
 
 .fin-tool {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 10px;
 }
 
 .fin-tool-label {
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
     color: var(--c-ink-3);
 }
 
-.fin-tool-label em {
-    margin-left: 4px;
-    padding: 0 6px;
-    border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent-2);
-    font-style: normal;
-    font-weight: 600;
+.fin-head .fin-seg {
+    padding: 2px;
 }
 
-.fin-seg .segmented-btn {
-    height: 30px;
+.fin-head .fin-seg .segmented-btn {
+    height: 26px;
     padding: 0 12px;
 }
 
