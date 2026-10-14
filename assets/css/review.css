@@ -280,7 +280,8 @@
 /* ---- Tone: what kind of decision, or how it ended ------------------------
    Blue for something new, amber for a change, red for a removal; in the
    history, green or red for how it ended. Used by the row's icon, the kind
-   label and the sheet's header. */
+   label and the sheet's header. These stay the app's own colours: Claude's
+   colour marks where something came from, not what kind of change it is. */
 
 .review-tone--new      { --review-tone: var(--c-accent);    --review-tone-soft: var(--c-accent-soft); }
 .review-tone--change   { --review-tone: var(--c-warning);   --review-tone-soft: var(--c-warning-soft); }
@@ -574,7 +575,7 @@
     gap: 10px;
     padding: 12px 14px;
     border-radius: var(--r-lg);
-    background: var(--c-accent-softer);
+    background: var(--c-claude-softer);
     color: var(--c-ink-2);
     font-size: var(--t-sm);
     line-height: 1.55;
@@ -585,7 +586,7 @@
     height: 14px;
     margin-top: 3px;
     flex-shrink: 0;
-    color: var(--c-accent);
+    color: var(--c-claude);
 }
 
 .review-sheet-note p {
@@ -742,8 +743,8 @@
 .review-empty svg {
     width: 34px;
     height: 34px;
-    color: var(--c-accent);
-    opacity: 0.8;
+    color: var(--c-claude);
+    opacity: 0.9;
 }
 
 .review-empty h3 {
@@ -768,8 +769,8 @@
     height: 20px;
     padding: 0 8px 0 6px;
     border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent-2);
+    background: var(--c-claude-soft);
+    color: var(--c-claude-2);
     font: 600 11px/1 var(--font);
     white-space: nowrap;
     flex-shrink: 0;
@@ -781,7 +782,7 @@
     height: 11px;
 }
 
-/* A proposed record: a solid accent frame and a tint, so it stands apart from
+/* A proposed record: a solid frame in Claude's colour and a tint, so it stands apart from
    accepted records at a glance. The frame is an inset ring rather than a
    border, so nothing shifts or resizes; it follows each element's own radius.
    The id-scoped selectors match design.css, which restyles these elements
@@ -792,16 +793,16 @@
 #listView .contact-card.is-proposed:hover,
 #todoView .todo-item.is-proposed,
 #todoView .todo-item.is-proposed:hover {
-    background: var(--c-accent-soft);
-    box-shadow: inset 0 0 0 2px var(--c-accent);
+    background: var(--c-claude-softer);
+    box-shadow: inset 0 0 0 2px var(--c-claude);
 }
 
 /* Cards already have a border and a lift; colour the border and keep the lift. */
 #projectsView .project-card.is-proposed,
 #projectsView .project-card.is-proposed:hover {
-    background: color-mix(in srgb, var(--c-accent) 6%, var(--c-surface));
-    border-color: var(--c-accent);
-    box-shadow: inset 0 0 0 1px var(--c-accent), var(--e-1);
+    background: color-mix(in srgb, var(--c-claude) 6%, var(--c-surface));
+    border-color: var(--c-claude);
+    box-shadow: inset 0 0 0 1px var(--c-claude), var(--e-1);
 }
 
 /* Home page rows: the same frame and tint, scoped by id to beat design.css. */
@@ -811,8 +812,8 @@
 #workloadView .home-project.is-proposed:hover,
 #workloadView .workload-row.is-proposed,
 #workloadView .workload-row.is-proposed:hover {
-    background: var(--c-accent-soft);
-    box-shadow: inset 0 0 0 2px var(--c-accent);
+    background: var(--c-claude-softer);
+    box-shadow: inset 0 0 0 2px var(--c-claude);
 }
 
 /* The frame has to follow the shape of whatever it marks, or its corners and
@@ -848,8 +849,8 @@
    project cards, instead of a second line just inside it. */
 #overviewModal .todo-item.is-proposed,
 #overviewModal .todo-item.is-proposed:hover {
-    border-color: var(--c-accent);
-    box-shadow: inset 0 0 0 1px var(--c-accent);
+    border-color: var(--c-claude);
+    box-shadow: inset 0 0 0 1px var(--c-claude);
 }
 
 /* Badge and accept / reject follow the title, as the link pill does. */
@@ -861,10 +862,8 @@
 
 /* The badge on a proposed record is the second half of the signal. */
 .is-proposed .review-badge {
-    background: var(--c-accent);
-    /* The page background: near-white on the dark blue of light mode, near-black
-       on the light blue of dark mode. */
-    color: var(--c-bg);
+    background: var(--c-claude);
+    color: var(--c-on-claude);
 }
 
 .review-inline {
@@ -935,13 +934,13 @@
 .review-panel-head svg {
     width: 15px;
     height: 15px;
-    color: var(--c-accent);
+    color: var(--c-claude);
     flex-shrink: 0;
 }
 
 .review-panel .review-list-card {
     border-style: dashed;
-    border-color: var(--c-accent);
+    border-color: var(--c-claude);
     box-shadow: none;
 }
 

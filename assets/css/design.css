@@ -124,6 +124,14 @@
     --c-accent-soft: rgba(63, 114, 175, 0.11);
     --c-accent-softer: rgba(63, 114, 175, 0.06);
 
+    /* Claude: everything it proposed or wrote, and the From Claude screen.
+       -2 is for text, darker on light backgrounds so it stays readable. */
+    --c-claude: #D97757;
+    --c-claude-2: #B4583A;
+    --c-claude-soft: rgba(217, 119, 87, 0.13);
+    --c-claude-softer: rgba(217, 119, 87, 0.07);
+    --c-on-claude: #FFFFFF;
+
     --c-primary: #112D4E;
     --c-primary-2: #1D426F;
     --c-on-primary: #F9F7F7;
@@ -185,6 +193,12 @@
     --c-accent-2: #A6C2E9;
     --c-accent-soft: rgba(131, 169, 220, 0.16);
     --c-accent-softer: rgba(131, 169, 220, 0.08);
+
+    --c-claude: #D97757;
+    --c-claude-2: #E8957A;
+    --c-claude-soft: rgba(217, 119, 87, 0.18);
+    --c-claude-softer: rgba(217, 119, 87, 0.09);
+    --c-on-claude: #FFFFFF;
 
     --c-primary: #DBE2EF;
     --c-primary-2: #F9F7F7;
@@ -566,6 +580,14 @@ h1, h2, h3, h4 {
 
 .sidebar .nav-item.active .nav-count--alert {
     background: var(--c-accent);
+}
+
+.sidebar .nav-count--claude,
+.sidebar .toggle-badge.nav-count--claude,
+.sidebar .nav-item.active .nav-count--claude,
+.tabbar .tab-badge--claude {
+    background: var(--c-claude);
+    color: var(--c-on-claude);
 }
 
 .sidebar .nav-item--quiet {
