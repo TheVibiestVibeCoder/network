@@ -389,6 +389,16 @@ class Auth
             // recovery path that must keep working when mail does not. It stays
             // single-factor by design; every account with an inbox does not.
             if (self::twoFactorRequiredFor($authenticated)) {
+                // This browser may already have passed two-factor for this
+                // account: a live session, or a remembered device. Both are
+                // common here, because the cookies are SameSite=Strict - a link
+                // from mail or another site arrives without them and shows the
+                // form, but the form's own POST carries them again. A code
+                // mailed then would never be asked for.
+                if (self::alreadySignedInAs((int) $authenticated['id'])) {
+                    return ['success' => true];
+                }
+
                 return self::beginTwoFactor($authenticated, $ip, $remember);
             }
 
@@ -590,6 +600,35 @@ class Auth
         }
 
         return filter_var((string) $identity['email'], FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * Is this browser already signed in - or remembered - as this account?
+     *
+     * isAuthenticated() does the full checks (timeouts, password stamp, token
+     * expiry and rotation), and restores a remembered device as it goes. The
+     * existing session is kept as it is: a password alone must not extend it,
+     * nor issue a fresh remember token, or a device could go on indefinitely
+     * without ever seeing a code.
+     *
+     * If the browser belongs to a different account, that identity is signed
+     * out here. Otherwise the code screen for the new account would open on the
+     * old one's session, or be let past by the old one's remember cookie.
+     */
+    private static function alreadySignedInAs(int $userId): bool
+    {
+        if (!self::isAuthenticated()) {
+            return false;
+        }
+
+        if (empty($_SESSION['is_owner']) && (int) ($_SESSION['user_id'] ?? 0) === $userId) {
+            return true;
+        }
+
+        self::forgetRememberedDevice();
+        self::endSession();
+
+        return false;
     }
 
     /**
@@ -1246,6 +1285,23 @@ class Auth
         self::setRememberCookie('', time() - 42000);
     }
 
+    /**
+     * Retire this browser's remember token, both the row and the cookie.
+     */
+    private static function forgetRememberedDevice(): void
+    {
+        if (empty($_COOKIE[REMEMBER_COOKIE_NAME])) {
+            return;
+        }
+
+        $raw = (string) $_COOKIE[REMEMBER_COOKIE_NAME];
+        $selector = substr($raw, 0, (int) (strpos($raw, ':') ?: 0));
+        if (preg_match('/^[a-f0-9]{32}$/', $selector)) {
+            self::deleteRememberToken($selector);
+        }
+        self::clearRememberCookie();
+    }
+
     private static function deleteRememberToken(string $selector): void
     {
         try {
@@ -1296,14 +1352,7 @@ class Auth
 
         // Signing out has to retire this device too, otherwise the next request
         // would be let straight back in by the cookie.
-        if (!empty($_COOKIE[REMEMBER_COOKIE_NAME])) {
-            $raw = (string) $_COOKIE[REMEMBER_COOKIE_NAME];
-            $selector = substr($raw, 0, (int) (strpos($raw, ':') ?: 0));
-            if (preg_match('/^[a-f0-9]{32}$/', $selector)) {
-                self::deleteRememberToken($selector);
-            }
-            self::clearRememberCookie();
-        }
+        self::forgetRememberedDevice();
 
         $_SESSION = [];
 

@@ -2046,6 +2046,29 @@ function assetUrl(string $path): string
             </div>
         </div>
 
+        <!-- One proposal from Claude, opened from the From Claude list or from
+             the box in a contact's or project's sheet. Last of the sheets, so
+             it opens on top of whichever one it was opened from. Filled in by
+             review.js (renderSheet); editing turns the same sheet into a form. -->
+        <div class="modal" id="reviewDetailModal">
+            <div class="modal-backdrop" data-review-sheet-close></div>
+            <div class="modal-content modal-large" role="dialog" aria-modal="true" aria-labelledby="reviewSheetTitle">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <span class="review-sheet-icon" id="reviewSheetIcon" aria-hidden="true"></span>
+                        <div class="overview-title-info">
+                            <h2 id="reviewSheetTitle">Proposal</h2>
+                            <p class="overview-company" id="reviewSheetContext"></p>
+                            <p class="overview-edited" id="reviewSheetBy"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" data-review-sheet-close aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body overview-body" id="reviewSheetBody"></div>
+                <div class="modal-footer ov-footer" id="reviewSheetFooter"></div>
+            </div>
+        </div>
+
         <?php if ($isAdmin): ?>
         <!-- Bookkeeping: CSV Import Modal -->
         <div class="modal" id="bkImportModal">

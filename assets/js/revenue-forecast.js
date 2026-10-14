@@ -222,44 +222,86 @@
      * undated projects bring (`undated`, by stage in `undatedByStage`).
      * `excluded` (by project id) only applies when respectExcluded is true:
      * the preset totals for comparison ignore individual switches.
+     *
+     * perProject[id] also says how a counted project's value comes about, so
+     * the card can show it rather than only the result:
+     *     open     what its unpaid payments add up to, `openCount` of them
+     *     budget   the budget the setting uses (low, middle or high end)
+     *     rest     what of that budget the payments (paid ones too) leave open
+     *     factor   what both are multiplied by: chance / 100, or 1
+     *     after    the part, already multiplied, that falls after the last
+     *              month on the axis and so is not in `value`
+     *     undated  the part of `value` that went to the "No date" bar
+     *
+     * `parts[i]` lists what makes up month i, and `undatedParts` the "No
+     * date" bar - one entry per payment or budget share, so a hovered bar can
+     * say which projects it comes from:
+     *     { id, kind: 'payment', amount, raw, o }   a payment (raw before the
+     *                                               factor; o its own month,
+     *                                               earlier when it is overdue)
+     *     { id, kind: 'budget', amount, raw, of, months }   a share of the
+     *                                               budget left (`of`), spread
+     *                                               over `months` months
      */
     function compute(items, settings, months, respectExcluded) {
         const byStage = {};
         const undatedByStage = {};
         STAGE_KEYS.forEach(k => { byStage[k] = new Array(months).fill(0); undatedByStage[k] = 0; });
         const perProject = {};
+        const parts = Array.from({ length: months }, () => []);
+        const undatedParts = [];
 
         items.forEach(p => {
             const switchedOff = respectExcluded && settings.excluded && settings.excluded[p.id];
             const counted = settings.stages.indexOf(p.stage) >= 0 && !switchedOff;
             let value = 0;
+            let after = 0;
+            let undated = 0;
+            const factor = settings.chance === 'all' ? 1 : p.chance / 100;
+            const budget = budgetFor(p, settings.budget);
+            const restRaw = Math.max(0, budget - p.planned);
             if (counted) {
-                const factor = settings.chance === 'all' ? 1 : p.chance / 100;
-                const add = (i, v) => {
-                    if (i < months) { byStage[p.stage][i] += v; value += v; }
+                const add = (i, v, part) => {
+                    if (i < months) {
+                        byStage[p.stage][i] += v;
+                        value += v;
+                        parts[i].push(Object.assign({ id: p.id, amount: v }, part));
+                    } else {
+                        after += v;
+                    }
                 };
-                p.due.forEach(x => add(Math.max(x.o, 0), x.amount * factor));
+                p.due.forEach(x => add(Math.max(x.o, 0), x.amount * factor, { kind: 'payment', raw: x.amount, o: x.o }));
 
-                const rest = Math.max(0, budgetFor(p, settings.budget) - p.planned) * factor;
+                const rest = restRaw * factor;
                 if (rest > 0 && p.undated) {
                     undatedByStage[p.stage] += rest;
                     value += rest;
+                    undated = rest;
+                    undatedParts.push({ id: p.id, kind: 'budget', amount: rest, raw: restRaw, of: restRaw, months: 0 });
                 } else if (rest > 0) {
                     // No start date: all of it is due in the end month.
                     const first = Math.max(p.s === null ? p.e : p.s, 0);
                     const last = Math.max(p.e, 0);
-                    const perMonth = rest / (last - first + 1);
-                    for (let i = first; i <= last; i++) add(i, perMonth);
+                    const n = last - first + 1;
+                    const perMonth = rest / n;
+                    for (let i = first; i <= last; i++) {
+                        add(i, perMonth, { kind: 'budget', raw: restRaw / n, of: restRaw, months: n });
+                    }
                 }
             }
-            perProject[p.id] = { counted, value };
+            perProject[p.id] = {
+                counted, value, factor, budget, after, undated,
+                rest: restRaw,
+                open: p.due.reduce((sum, x) => sum + x.amount, 0),
+                openCount: p.due.length
+            };
         });
 
         const totals = new Array(months).fill(0)
             .map((_, i) => STAGE_KEYS.reduce((sum, k) => sum + byStage[k][i], 0));
         const undated = STAGE_KEYS.reduce((sum, k) => sum + undatedByStage[k], 0);
         return {
-            byStage, totals, undatedByStage, undated, perProject,
+            byStage, totals, undatedByStage, undated, perProject, parts, undatedParts,
             total: totals.reduce((a, b) => a + b, 0) + undated
         };
     }

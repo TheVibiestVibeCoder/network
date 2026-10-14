@@ -5,6 +5,8 @@
  * The card is drawn whole from state on every change - settings, expanded or
  * not, the projects - and keeps the keyboard where it was. Hovering a month
  * only touches the readout line, so moving the mouse never redraws the card.
+ * Clicking a month opens a panel beside it with the projects, payments and
+ * budget shares it is made of; it stays until closed.
  *
  * The controls come in two levels on purpose: the Scenario switch (Worst /
  * Realistic / Best) in the header sets every assumption at once; the
@@ -47,6 +49,7 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     const CHEVRON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 
     // ------------------------------------------------------------------
@@ -113,7 +116,9 @@
             expanded: storedExpanded(name),
             adjustOpen: false,
             focusMonth: 0,
-            hover: null
+            hover: null,
+            // The column whose panel is open, or null.
+            selected: null
         };
         ['loading', 'projects', 'settings'].forEach(key => Object.defineProperty(state, key, {
             get: () => shared[key],
@@ -214,7 +219,7 @@
                 return `<span class="rf-key${on ? ' is-on' : ''}" data-tone="${st.tone}">
                     <span class="rf-stage-dot" aria-hidden="true"></span>${esc(st.label)}${on ? '' : '<span class="rf-sr"> (not counted)</span>'}
                 </span>`;
-            }).join('')}</div>`;
+            }).join('')}<span class="rf-legend-hint">Click a bar to see its projects</span></div>`;
         }
 
         function summary(ctx) {
@@ -245,6 +250,77 @@
         }
 
         const columnName = (ctx, i) => (i >= ctx.f.months ? UNDATED_LABEL : RF.monthName(i, ctx.now));
+
+        /**
+         * What a column is made of, by project, largest first: each project's
+         * share of the bar and the payments and budget shares behind it.
+         */
+        function columnProjects(ctx, i) {
+            const f = ctx.f;
+            const list = i >= f.months ? f.current.undatedParts : (f.current.parts[i] || []);
+            const byId = new Map();
+            list.forEach(part => {
+                let g = byId.get(part.id);
+                if (!g) {
+                    g = { p: ctx.items.find(x => x.id === part.id), amount: 0, parts: [] };
+                    byId.set(part.id, g);
+                }
+                g.amount += part.amount;
+                g.parts.push(part);
+            });
+            return Array.from(byId.values()).filter(g => g.p).sort((a, b) => b.amount - a.amount);
+        }
+
+        /** One payment or budget share, the way the table's Counted column puts it. */
+        function partLine(ctx, g, part) {
+            const pct = ' × ' + Math.round(ctx.f.current.perProject[g.p.id].factor * 100) + '%';
+            if (part.kind === 'payment') {
+                return 'Payment ' + RF.money(part.raw) + pct
+                    + (part.o < 0 ? ' · due ' + RF.monthName(part.o, ctx.now) : '');
+            }
+            if (part.months > 1) {
+                return 'Budget left ' + RF.money(part.of) + ' ÷ ' + part.months + ' months' + pct;
+            }
+            return 'Budget left ' + RF.money(part.raw) + pct + (part.months === 0 ? ' · no end date' : '');
+        }
+
+        const TIP_LIMIT = 8;
+
+        /** The tooltip beside a hovered column: which projects, which payments. */
+        function tipHtml(ctx, i) {
+            const groups = columnProjects(ctx, i);
+            const close = `<button type="button" class="rf-tip-close" data-rf-tip-close aria-label="Close">${ICON_CLOSE}</button>`;
+            if (!groups.length) {
+                return `
+                    <div class="rf-tip-head"><span>${esc(columnName(ctx, i))}</span>${close}</div>
+                    <p class="rf-tip-empty">Nothing is counted in this month.</p>`;
+            }
+            const total = groups.reduce((sum, g) => sum + g.amount, 0);
+            const shown = groups.slice(0, TIP_LIMIT);
+            const rest = groups.slice(TIP_LIMIT);
+
+            const rows = shown.map(g => `
+                <li class="rf-tip-project" data-tone="${toneOf(g.p.stage)}">
+                    <span class="rf-tip-dot" aria-hidden="true"></span>
+                    <span class="rf-tip-main">
+                        <a href="#" class="rf-tip-name" data-crm-action="open-project-overview" data-project-id="${esc(g.p.id)}">${esc(g.p.name)}</a>
+                        ${g.parts.map(part => `<span class="rf-tip-part">${esc(partLine(ctx, g, part))}</span>`).join('')}
+                    </span>
+                    <span class="rf-tip-amount">${esc(RF.money(g.amount))}</span>
+                </li>`).join('');
+
+            const more = rest.length
+                ? `<li class="rf-tip-more">${rest.length} more ${rest.length === 1 ? 'project' : 'projects'} · ${esc(RF.money(rest.reduce((sum, g) => sum + g.amount, 0)))}</li>`
+                : '';
+
+            return `
+                <div class="rf-tip-head">
+                    <span>${esc(columnName(ctx, i))}</span>
+                    <strong>${esc(RF.money(total))}</strong>
+                    ${close}
+                </div>
+                <ul class="rf-tip-list">${rows}${more}</ul>`;
+        }
 
         /** The line above the chart: the busiest month, or the column in focus. */
         function readout(ctx, month) {
@@ -292,10 +368,14 @@
                     .join('');
                 const ghost = px(columnOf(f, f.ceiling, i).total);
                 const parts = RF.STACK.filter(k => col.stage(k) > 0)
-                    .map(k => `, ${labelOf(k)} ${RF.moneyFull(col.stage(k))}`).join('');
+                    .map(k => `, ${labelOf(k)} ${RF.moneyFull(col.stage(k))}`).join('')
+                    + columnProjects(ctx, i).map(g => `; ${g.p.name} ${RF.moneyFull(g.amount)}`).join('');
 
-                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
-                    data-rf-focus="month-${undated ? 'undated' : i}" aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
+                const selected = state.selected === i;
+                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
+                    data-rf-focus="month-${undated ? 'undated' : i}" aria-expanded="${selected}" aria-controls="${uid}-tip"
+                    title="${esc(columnName(ctx, i))}: click for its projects"
+                    aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
                     ${ghost > 0 ? `<span class="rf-ghost" style="height:${ghost}px"></span>` : ''}
                     <span class="rf-stack">${segs}</span>
                 </button>`);
@@ -322,32 +402,89 @@
                     <div class="rf-plot-wrap" style="height:${H}px">
                         ${ticks.join('')}
                         <div class="rf-plot" role="group" aria-label="Revenue per month">${cols.join('')}</div>
+                        <div class="rf-tip" id="${uid}-tip" data-rf-tip role="region" aria-live="polite" hidden></div>
                     </div>
                     <div class="rf-axis" aria-hidden="true">${labels.join('')}</div>
                     ${stageLegend(ctx)}
                 </div>`;
         }
 
+        /**
+         * How a project's counted value comes about: a short formula under
+         * the amount ("2 open payments €12k + €5k budget left × 45%") and the
+         * same in full sentences for the tooltip and screen readers.
+         */
+        function howCounted(p, c, off, ctx) {
+            if (!c.counted) {
+                const text = off ? 'Switched off' : 'Stage not counted';
+                return { short: text, long: text };
+            }
+
+            const s = state.settings;
+            const pct = Math.round(c.factor * 100) + '%';
+            const budgetWord = p.min === p.max ? 'budget'
+                : ({ low: 'low end of the budget', high: 'high end of the budget' }[s.budget] || 'middle of the budget');
+
+            const short = [];
+            const long = [];
+            if (c.open > 0) {
+                const n = c.openCount + (c.openCount === 1 ? ' open payment' : ' open payments');
+                short.push(n + ' ' + RF.money(c.open));
+                long.push(n + ' (' + RF.moneyFull(c.open) + ')');
+            }
+            if (c.rest > 0) {
+                if (p.payments) {
+                    short.push(RF.money(c.rest) + ' budget left');
+                    long.push('the ' + RF.moneyFull(c.rest) + ' of the ' + budgetWord + ' (' + RF.moneyFull(c.budget)
+                        + ') that the payments leave open');
+                } else {
+                    short.push(budgetWord.charAt(0).toUpperCase() + budgetWord.slice(1) + ' ' + RF.money(c.rest));
+                    long.push('the ' + budgetWord + ' (' + RF.moneyFull(c.rest) + ')');
+                }
+            }
+
+            if (!short.length) {
+                const text = p.payments ? 'All payments paid' : 'Nothing left to come';
+                return { short: text, long: text + ' - nothing is forecast for this project.' };
+            }
+
+            // Brackets when there are two parts: the chance applies to both.
+            let shortText = (short.length > 1 ? '(' + short.join(' + ') + ')' : short[0]) + ' × ' + pct;
+            let longText = long.join(' and ') + (s.chance === 'all'
+                ? ', counted in full (every project won).'
+                : ', × its ' + pct + ' chance of success.');
+
+            if (c.after > 0.5) {
+                shortText += ' · ' + RF.money(c.after) + ' later';
+                longText += ' ' + RF.moneyFull(c.after) + ' of it falls after ' + RF.monthName(ctx.f.months - 1, ctx.now)
+                    + ', past the last month shown, and is not counted.';
+            }
+            if (c.undated > 0.5) {
+                shortText += ' · no end date';
+                longText += ' Without an end date it cannot be spread over months: '
+                    + RF.moneyFull(c.undated) + ' is in the “No date” bar.';
+            }
+
+            return { short: shortText, long: longText.charAt(0).toUpperCase() + longText.slice(1) };
+        }
+
         function table(ctx) {
             const f = ctx.f;
             const now = ctx.now;
             const s = state.settings;
-            const maxBest = Math.max(1, ...ctx.items.map(p => f.ceiling.perProject[p.id].value));
             const excluded = RF.excludedCount(s) > 0;
 
             const rows = ctx.items.map(p => {
                 const c = f.current.perProject[p.id];
                 const off = !!s.excluded[p.id];
-                const stageOff = s.stages.indexOf(p.stage) < 0;
-                return { p, c, off, stageOff };
+                return { p, c, off };
             // Ordered by what each project could bring at best, which no control
             // changes: switching a project or a stage never moves a row.
             }).sort((a, b) => (f.ceiling.perProject[b.p.id].value - f.ceiling.perProject[a.p.id].value)
                 || String(a.p.name).localeCompare(String(b.p.name)));
 
-            const body = rows.map(({ p, c, off, stageOff }) => {
-                const value = c.counted ? RF.money(c.value) : (off ? 'Off' : (stageOff ? 'Stage off' : 'Off'));
-                const width = c.counted ? (c.value / maxBest) * 100 : 0;
+            const body = rows.map(({ p, c, off }) => {
+                const how = howCounted(p, c, off, ctx);
                 return `
                     <tr class="rf-row${c.counted ? '' : ' is-off'}" data-tone="${toneOf(p.stage)}">
                         <td><button type="button" class="rf-switch" role="switch" aria-checked="${!off}"
@@ -362,11 +499,12 @@
                             </span>
                         </td>
                         <td>${p.max > 0 ? esc(RF.budgetLabel(p.min, p.max)) : '<span class="rf-muted">–</span>'}</td>
-                        <td>${p.chance}%</td>
+                        <td><span class="rf-chance"><span class="project-chance-ring" style="--chance:${p.chance}" aria-hidden="true"></span>${p.chance}%</span></td>
                         <td class="rf-cell-runs">${esc(RF.periodLabel(p.s, p.e, now))}</td>
-                        <td class="rf-cell-value">
-                            <span class="rf-value-track" aria-hidden="true"><span class="rf-value-bar" style="width:${width.toFixed(1)}%"></span></span>
-                            <span class="rf-value">${esc(value)}</span>
+                        <td class="rf-cell-value" title="${esc(how.long)}">
+                            <span class="rf-value">${c.counted ? esc(RF.money(c.value)) : '–'}</span>
+                            <span class="rf-how" aria-hidden="true">${esc(how.short)}</span>
+                            <span class="rf-sr">${esc(how.long)}</span>
                         </td>
                     </tr>`;
             }).join('');
@@ -462,6 +600,10 @@
             const ctx = context();
             current = ctx;
             state.hover = null;
+            // A panel stays open across a change of settings, unless its column is gone.
+            if (state.selected !== null && (!ctx.items.length || state.selected >= columnCount(ctx.f))) {
+                state.selected = null;
+            }
             const expandBtn = `<button type="button" class="btn btn-secondary btn-small rf-expand" data-rf-expand data-rf-focus="expand"
                 aria-expanded="${state.expanded}" aria-controls="${uid}-detail">${state.expanded ? 'Collapse' : 'Expand'}${CHEVRON}</button>`;
 
@@ -495,19 +637,71 @@
                 const again = el.querySelector(`[data-rf-focus="${focusKey}"]`) || el.querySelector('[data-rf-adjust]');
                 if (again) again.focus();
             }
+            if (state.selected !== null) placeTip(state.selected);
         }
 
         function showMonth(month) {
             if (!current || !state.el) return;
             state.hover = month;
             const line = state.el.querySelector('[data-rf-readout]');
-            if (line) line.innerHTML = readout(current, month);
+            if (line) line.innerHTML = readout(current, month === null ? state.selected : month);
             state.el.querySelectorAll('[data-rf-month]').forEach(col => {
                 col.classList.toggle('is-hover', Number(col.getAttribute('data-rf-month')) === month);
             });
             state.el.querySelectorAll('[data-rf-label]').forEach(lab => {
                 lab.classList.toggle('is-hover', Number(lab.getAttribute('data-rf-label')) === month);
             });
+        }
+
+        /** Open the panel for a column, or close it (null, or the open one again). */
+        function selectMonth(month) {
+            if (!current || !state.el) return;
+            state.selected = month === state.selected ? null : month;
+            state.el.querySelectorAll('[data-rf-month]').forEach(col => {
+                const on = Number(col.getAttribute('data-rf-month')) === state.selected;
+                col.classList.toggle('is-selected', on);
+                col.setAttribute('aria-expanded', String(on));
+            });
+            placeTip(state.selected);
+            showMonth(state.hover);
+        }
+
+        /** Close the panel and give the keyboard back to its column. */
+        function closeTip() {
+            const month = state.selected;
+            if (month === null) return;
+            selectMonth(null);
+            const col = state.el.querySelector(`[data-rf-month="${month}"]`);
+            if (col && state.el.contains(document.activeElement)) col.focus();
+        }
+
+        /**
+         * Fill the panel for a column and set it beside it - to the right of
+         * a column in the left half, to the left of one in the right half, so
+         * it never covers the bar it explains.
+         */
+        function placeTip(month) {
+            const tip = state.el.querySelector('[data-rf-tip]');
+            if (!tip) return;
+            const html = month === null || month === undefined ? '' : tipHtml(current, month);
+            const col = html ? state.el.querySelector(`[data-rf-month="${month}"]`) : null;
+            if (!col) {
+                tip.hidden = true;
+                return;
+            }
+
+            tip.innerHTML = html;
+            tip.hidden = false;
+            const wrap = tip.parentElement.getBoundingClientRect();
+            const c = col.getBoundingClientRect();
+            const gap = 10;
+            if (c.left + c.width / 2 - wrap.left < wrap.width / 2) {
+                tip.style.left = Math.round(c.right - wrap.left + gap) + 'px';
+                tip.style.right = '';
+            } else {
+                tip.style.right = Math.round(wrap.right - c.left + gap) + 'px';
+                tip.style.left = '';
+            }
         }
 
         function update(change) {
@@ -527,7 +721,11 @@
                 if (!t || !el.contains(t)) return;
                 const s = state.settings;
 
-                if (t.hasAttribute('data-rf-adjust')) {
+                if (t.hasAttribute('data-rf-month')) {
+                    selectMonth(Number(t.getAttribute('data-rf-month')));
+                } else if (t.hasAttribute('data-rf-tip-close')) {
+                    closeTip();
+                } else if (t.hasAttribute('data-rf-adjust')) {
                     state.adjustOpen = !state.adjustOpen;
                     render();
                 } else if (t.hasAttribute('data-rf-expand')) {
@@ -560,6 +758,24 @@
                         current.items.forEach(p => { s.excluded[p.id] = true; });
                     });
                 }
+            });
+
+            // An open panel closes on Escape and on a click anywhere but the
+            // panel itself or the bars (a bar's own click switches or closes it).
+            el.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && state.selected !== null) {
+                    e.stopPropagation();
+                    closeTip();
+                }
+            });
+            document.addEventListener('click', e => {
+                if (state.selected === null || !state.el) return;
+                // A control of this card that redrew it (a scenario, a switch):
+                // the panel was kept open on purpose and its target is gone.
+                if (!document.contains(e.target)) return;
+                if (e.target.closest && e.target.closest('[data-rf-tip], [data-rf-month]')
+                    && state.el.contains(e.target)) return;
+                selectMonth(null);
             });
 
             // Months: hover and focus show the month; leaving goes back to the busiest.

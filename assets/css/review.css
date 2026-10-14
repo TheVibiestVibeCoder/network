@@ -8,9 +8,11 @@
    The proposals use the same pattern as every other list in the CRM: one
    card per group, one row per proposal, hairlines between rows. A row shows
    what the proposal is in two lines and ends in accept / reject; everything
-   else (before and after, Claude's note, editing) opens on click. A small
-   dot says what kind of decision it is - blue for something new, amber for a
-   change, red for a removal; in the history, green or red for how it ended.
+   else (before and after, Claude's note, editing) is in the sheet a click on
+   the row opens, like a contact's or a project's. The row's icon says what
+   kind of record it is, its colour what kind of decision - blue for
+   something new, amber for a change, red for a removal; in the history,
+   green or red for how it ended.
    ========================================================================== */
 
 
@@ -118,7 +120,7 @@
 
 /* While "Accept all" / "Reject all" runs, nothing else in the list is clickable. */
 .review-list.is-bulk-running .review-row-actions,
-.review-list.is-bulk-running .review-row-toggle {
+.review-list.is-bulk-running .review-row-open {
     pointer-events: none;
 }
 
@@ -275,29 +277,72 @@
     }
 }
 
-.review-row.is-open {
-    background: var(--c-tint-3);
+/* ---- Tone: what kind of decision, or how it ended ------------------------
+   Blue for something new, amber for a change, red for a removal; in the
+   history, green or red for how it ended. Used by the row's icon, the kind
+   label and the sheet's header. */
+
+.review-tone--new      { --review-tone: var(--c-accent);    --review-tone-soft: var(--c-accent-soft); }
+.review-tone--change   { --review-tone: var(--c-warning);   --review-tone-soft: var(--c-warning-soft); }
+.review-tone--remove,
+.review-tone--rejected { --review-tone: var(--c-danger);    --review-tone-soft: var(--c-danger-soft); }
+.review-tone--accepted { --review-tone: var(--c-success);   --review-tone-soft: var(--c-success-soft); }
+.review-tone--neutral  { --review-tone: var(--c-ink-3);     --review-tone-soft: var(--c-tint-2); }
+
+/* The record type, on the tone's tint - the row's counterpart to an avatar. */
+.review-type-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--r-md);
+    background: var(--review-tone-soft, var(--c-tint-2));
+    color: var(--review-tone, var(--c-ink-2));
 }
+
+.review-type-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* "New contact", "Change", "Delete": short, in the tone's colour. */
+.review-kind {
+    flex-shrink: 0;
+    color: var(--review-tone, var(--c-ink-3));
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+
+/* ---- A row ---------------------------------------------------------------- */
 
 .review-row-head {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding-right: 14px;
+    gap: 10px;
+    padding-right: 16px;
+    transition: background-color var(--dur-1) var(--ease);
 }
 
 .review-row-head:hover {
     background: var(--c-tint-3);
 }
 
-.review-row-toggle {
+/* The row whose sheet is open. */
+.review-row.is-current .review-row-head {
+    background: var(--c-accent-soft);
+}
+
+.review-row-open {
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-height: 62px;
-    padding: 10px 8px 10px 16px;
+    gap: 14px;
+    min-height: 64px;
+    padding: 12px 8px 12px 16px;
     border: 0;
     background: transparent;
     color: inherit;
@@ -306,39 +351,18 @@
     cursor: pointer;
 }
 
-.review-row-toggle:focus-visible {
+.review-row-open:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: -2px;
     border-radius: var(--r-md);
 }
-
-.review-row-mark {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: var(--c-accent);
-}
-
-.review-row--change .review-row-mark { background: var(--c-warning); }
-.review-row--remove .review-row-mark,
-.review-row--rejected .review-row-mark { background: var(--c-danger); }
-.review-row--accepted .review-row-mark { background: var(--c-success); }
-.review-row--neutral .review-row-mark { background: var(--c-line-strong); }
 
 .review-row-text {
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-}
-
-.review-row-line {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    min-width: 0;
+    gap: 3px;
 }
 
 .review-row-title {
@@ -350,22 +374,11 @@
     font: 600 var(--t-base)/1.35 var(--font);
 }
 
-.review-row-kind {
-    flex-shrink: 0;
-    color: var(--c-ink-3);
-    font-size: var(--t-xs);
-    font-weight: 500;
-    white-space: nowrap;
-}
-
 .review-row-summary {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: var(--c-ink-3);
     font-size: var(--t-sm);
     line-height: 1.4;
@@ -378,16 +391,9 @@
     white-space: nowrap;
 }
 
-.review-row-note,
 .review-row-warn {
     display: inline-flex;
     flex-shrink: 0;
-}
-
-.review-row-note svg {
-    width: 12px;
-    height: 12px;
-    color: var(--c-accent);
 }
 
 .review-row-warn svg {
@@ -398,24 +404,14 @@
 
 .review-row-when {
     flex-shrink: 0;
-    color: var(--c-ink-3);
+    color: var(--c-ink-4);
     font-size: var(--t-xs);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-.review-row-chevron {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    color: var(--c-ink-4);
-    transition: transform var(--dur-2) var(--ease);
-}
-
-.review-row.is-open .review-row-chevron {
-    transform: rotate(90deg);
-}
-
-/* Accept and reject: the only two things most proposals need. */
+/* Accept and reject: the only two things most proposals need. Quiet until
+   pointed at, so a long list does not read as a wall of buttons. */
 .review-row-actions {
     display: flex;
     align-items: center;
@@ -442,15 +438,10 @@
     height: 16px;
 }
 
-.review-act--accept {
-    background: var(--c-primary);
-    border-color: var(--c-primary);
-    color: var(--c-on-primary);
-}
-
 .review-act--accept:hover:not(:disabled) {
-    background: var(--c-primary-2);
-    border-color: var(--c-primary-2);
+    border-color: var(--c-success);
+    background: var(--c-success-soft);
+    color: var(--c-success);
 }
 
 .review-act--reject:hover:not(:disabled) {
@@ -485,81 +476,224 @@
 .review-pill--accepted { background: var(--c-success-soft); color: var(--c-success); }
 .review-pill--rejected { background: var(--c-danger-soft); color: var(--c-danger); }
 
+.review-row > .review-error {
+    margin: 0 16px 12px 66px;
+}
 
-/* ---- Opened: the details -------------------------------------------------- */
 
-.review-row-detail {
+/* ---- The sheet: one proposal ---------------------------------------------
+   The same sheet as a contact, project or to-do: header, sections with a
+   label-over-value grid, actions in the footer. Layout, editing outline and
+   field sizes are shared with those sheets in design.css. */
+
+.review-sheet-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--r-lg);
+}
+
+.review-sheet-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* Two to a row by default - an email address needs the room; three for the
+   short facts of a project or to-do (review.js facts). */
+#reviewDetailModal .overview-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#reviewDetailModal .overview-details.review-facts-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#reviewSheetContext {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 6px;
+}
+
+#reviewSheetContext .review-kind {
+    font-size: var(--t-sm);
+}
+
+.review-sheet-context-sep {
+    color: var(--c-ink-4);
+}
+
+#reviewDetailModal.is-busy .modal-content {
+    cursor: progress;
+}
+
+#reviewDetailModal .ov-footer .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#reviewDetailModal .ov-footer .btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+#reviewDetailModal .overview-body > .review-error,
+#reviewDetailModal .overview-body > .review-callout,
+#reviewDetailModal .overview-body > .review-outcome {
+    margin-bottom: 18px;
+}
+
+/* Long values - a description, an address - keep their line breaks. */
+.review-sheet-long,
+.review-sheet-text {
+    white-space: pre-wrap;
+    line-height: 1.55;
+}
+
+/* A note: the text itself, in the card the facts use. */
+.review-sheet-text {
+    padding: 14px 16px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    color: var(--c-ink);
+    font-size: var(--t-base);
+    overflow-wrap: anywhere;
+}
+
+.review-sheet-hint {
+    margin: 10px 0 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+/* Why Claude proposed it. */
+.review-sheet-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--r-lg);
+    background: var(--c-accent-softer);
+    color: var(--c-ink-2);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+}
+
+.review-sheet-note svg {
+    width: 14px;
+    height: 14px;
+    margin-top: 3px;
+    flex-shrink: 0;
+    color: var(--c-accent);
+}
+
+.review-sheet-note p {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Before and after: one field per line, in the card the facts use. */
+.review-changes {
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.review-change {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 2px 16px 16px 36px;
+    gap: 4px;
+    padding: 12px 16px;
 }
 
-.review-row > .review-error {
-    margin: 0 16px 12px 36px;
+.review-change + .review-change {
+    border-top: 1px solid var(--c-line-2);
 }
 
-.review-detail-actions {
+.review-change-values {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 4px 10px;
+    font-size: var(--t-base);
+    line-height: 1.5;
 }
 
-.review-detail-actions .btn svg {
-    width: 15px;
-    height: 15px;
-}
-
-.review-facts {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px 20px;
-    margin: 0;
-}
-
-.review-fact {
-    min-width: 0;
-}
-
-.review-fact--long {
-    grid-column: 1 / -1;
-}
-
-.review-fact dt {
+.review-change-old {
     color: var(--c-ink-3);
+    text-decoration: line-through;
+    text-decoration-color: var(--c-line-strong);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.review-change-arrow {
+    display: inline-flex;
+    align-self: center;
+    color: var(--c-ink-4);
+}
+
+.review-change-arrow svg {
+    width: 14px;
+    height: 14px;
+}
+
+.review-change-new {
+    color: var(--c-ink);
+    font-weight: 500;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.review-stale {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--c-warning);
     font-size: var(--t-xs);
     font-weight: 500;
 }
 
-.review-fact dd {
-    margin: 2px 0 0;
-    color: var(--c-ink);
-    font-size: var(--t-sm);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+.review-stale svg {
+    width: 12px;
+    height: 12px;
 }
 
-.review-line {
-    margin: 0;
-    color: var(--c-ink);
+/* A word of warning above everything else. */
+.review-callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: var(--r-lg);
     font-size: var(--t-sm);
     line-height: 1.5;
-    overflow-wrap: anywhere;
 }
 
-.review-muted {
-    color: var(--c-ink-3);
+.review-callout svg {
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    flex-shrink: 0;
 }
 
-.review-quote-text {
+.review-callout p {
     margin: 0;
-    color: var(--c-ink);
+}
+
+.review-callout--warning { background: var(--c-warning-soft); color: var(--c-warning); }
+.review-callout--danger  { background: var(--c-danger-soft);  color: var(--c-danger); }
+
+/* History: how it ended. */
+.review-outcome {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    color: var(--c-ink-3);
     font-size: var(--t-sm);
-    line-height: 1.55;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
 }
 
 .review-link {
@@ -572,96 +706,6 @@
     text-decoration: underline;
 }
 
-/* Before and after, field by field. */
-.review-diff {
-    width: 100%;
-    max-width: 720px;
-    border-collapse: collapse;
-    font-size: var(--t-sm);
-}
-
-.review-diff th,
-.review-diff td {
-    padding: 6px 0;
-    vertical-align: top;
-    border-bottom: 1px solid var(--c-line-2);
-    text-align: left;
-    overflow-wrap: anywhere;
-}
-
-.review-diff tr:last-child th,
-.review-diff tr:last-child td {
-    border-bottom: 0;
-}
-
-.review-diff th {
-    width: 26%;
-    padding-right: 12px;
-    color: var(--c-ink-3);
-    font-size: var(--t-xs);
-    font-weight: 500;
-}
-
-.review-diff .review-old {
-    color: var(--c-ink-3);
-    text-decoration: line-through;
-    text-decoration-color: var(--c-line-strong);
-}
-
-.review-diff .review-arrow {
-    width: 24px;
-    padding: 6px 4px;
-    color: var(--c-ink-4);
-}
-
-.review-diff .review-new {
-    color: var(--c-ink);
-    font-weight: 500;
-}
-
-.review-stale {
-    display: block;
-    margin-top: 3px;
-    color: var(--c-warning);
-    font-size: var(--t-xs);
-    text-decoration: none;
-}
-
-.review-warning {
-    margin: 0;
-    color: var(--c-danger);
-    font-size: var(--t-sm);
-}
-
-/* Why Claude proposed it. */
-.review-reason {
-    margin: 0;
-    padding: 8px 12px;
-    border-left: 2px solid var(--c-accent);
-    border-radius: 0 var(--r-sm) var(--r-sm) 0;
-    background: var(--c-surface);
-    color: var(--c-ink-2);
-    font-size: var(--t-sm);
-    line-height: 1.45;
-    overflow-wrap: anywhere;
-}
-
-.review-reason-label {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-bottom: 2px;
-    color: var(--c-ink-3);
-    font-size: var(--t-xs);
-    font-weight: 600;
-}
-
-.review-reason-label svg {
-    width: 12px;
-    height: 12px;
-    color: var(--c-accent);
-}
-
 .review-error {
     margin: 0;
     padding: 8px 12px;
@@ -671,56 +715,16 @@
     font-size: var(--t-sm);
 }
 
-
-/* ---- Editing before accepting ------------------------------------------- */
-
-.review-edit {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 720px;
+/* Editing: the facts grid turns into fields, as on the to-do sheet. */
+.review-sheet-form {
+    margin: 0;
 }
 
-.review-edit-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 12px;
-}
-
-.review-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-
-.review-field--wide {
-    grid-column: 1 / -1;
-}
-
-.review-field label {
-    color: var(--c-ink-3);
-    font-size: var(--t-xs);
-    font-weight: 500;
-}
-
-.review-field .form-input,
-.review-field .form-select {
-    width: 100%;
-    min-width: 0;
-    background: var(--c-surface);
-}
-
-.review-field textarea.form-input {
-    resize: vertical;
-    min-height: 72px;
-    line-height: 1.45;
-}
-
-.review-field--check label {
+.review-check {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-height: 32px;
     color: var(--c-ink);
     font-size: var(--t-sm);
 }
@@ -800,13 +804,6 @@
     box-shadow: inset 0 0 0 1px var(--c-accent), var(--e-1);
 }
 
-/* Rows sit flush in their list; round the frame a touch so it reads as a
-   marked item rather than a stray rule between rows. */
-#listView .contact-card.is-proposed,
-#todoView .todo-item.is-proposed {
-    border-radius: var(--r-md);
-}
-
 /* Home page rows: the same frame and tint, scoped by id to beat design.css. */
 #workloadView .home-todo.is-proposed,
 #workloadView .home-todo.is-proposed:hover,
@@ -816,7 +813,43 @@
 #workloadView .workload-row.is-proposed:hover {
     background: var(--c-accent-soft);
     box-shadow: inset 0 0 0 2px var(--c-accent);
-    border-radius: var(--r-md);
+}
+
+/* The frame has to follow the shape of whatever it marks, or its corners and
+   the card's corners disagree.
+
+   Rows that sit flush in a list card are square along the card's straight
+   sides, and take the card's own curve (less its 1px border) at the corners
+   they share with it - otherwise the card's clip cuts the frame off there. */
+#listView .contact-card.is-proposed,
+#todoView .todo-item.is-proposed,
+#projectOverviewModal .ptodo.is-proposed,
+#workloadView .home-todo.is-proposed,
+#workloadView .home-project.is-proposed,
+#workloadView .workload-row.is-proposed {
+    border-radius: 0;
+}
+
+#projectOverviewModal .ptodo-card > .ptodo.is-proposed:first-child {
+    border-top-left-radius: calc(var(--r-lg) - 1px);
+    border-top-right-radius: calc(var(--r-lg) - 1px);
+}
+
+#listView .company-group > .contact-card.is-proposed:last-child,
+#listView .pinned-section > .contact-card.is-proposed:last-child,
+#listView .tag-group > .contact-card.is-proposed:last-child,
+#todoView .todo-group-items > .todo-item.is-proposed:last-child,
+#projectOverviewModal .ptodo-card > .ptodo.is-proposed:last-child {
+    border-bottom-left-radius: calc(var(--r-lg) - 1px);
+    border-bottom-right-radius: calc(var(--r-lg) - 1px);
+}
+
+/* Items with a border of their own: the border becomes the frame, as on the
+   project cards, instead of a second line just inside it. */
+#overviewModal .todo-item.is-proposed,
+#overviewModal .todo-item.is-proposed:hover {
+    border-color: var(--c-accent);
+    box-shadow: inset 0 0 0 1px var(--c-accent);
 }
 
 /* Badge and accept / reject follow the title, as the link pill does. */
@@ -949,25 +982,38 @@
         display: none;
     }
 
-    .review-row-toggle {
-        gap: 10px;
+    .review-row-open {
+        gap: 12px;
         padding-left: 14px;
     }
 
     .review-row-head {
-        padding-right: 10px;
-    }
-
-    .review-row-detail {
-        padding: 2px 14px 14px;
+        padding-right: 12px;
     }
 
     .review-row > .review-error {
         margin: 0 14px 12px;
     }
 
-    .review-edit-grid {
-        grid-template-columns: 1fr;
+    #reviewDetailModal .overview-details.review-facts-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Four actions do not fit one row on a phone: the decision gets a row of
+       its own under the others. */
+    #reviewDetailModal .ov-footer {
+        flex-wrap: wrap;
+    }
+
+    #reviewDetailModal .ov-footer .btn {
+        flex: 1 1 0;
+        justify-content: center;
+        margin-right: 0;
+    }
+
+    #reviewDetailModal .ov-footer .btn-primary {
+        flex-basis: 100%;
+        order: 1;
     }
 
     .review-pill {
@@ -983,7 +1029,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .review-row,
-    .review-row-chevron,
+    .review-row-head,
     .review-toast {
         transition: none;
     }

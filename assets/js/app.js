@@ -4592,6 +4592,58 @@
         });
 
         triggerProjectDeckAnimation();
+        fitProjectDescriptions();
+    }
+
+    /**
+     * Cards in a grid row stretch to the tallest one, so a card without
+     * expected payments next to one with them has room to spare above its
+     * timeline. Its description uses that room: as many more lines than the
+     * usual two as fit there, never more, so no card grows because of it.
+     *
+     * Runs after every render and whenever the list changes size (a resize, the
+     * tab being shown, fonts arriving) - see bindProjectDescriptionFit.
+     */
+    function fitProjectDescriptions() {
+        const list = elements.projectsList;
+        if (!list) {
+            return;
+        }
+
+        const descriptions = [...list.querySelectorAll('.project-card-description')];
+
+        // Back to the stylesheet's two lines first, so every row settles at the
+        // height its cards need without any of the extra lines.
+        descriptions.forEach(desc => desc.style.removeProperty('-webkit-line-clamp'));
+
+        // All reads, then all writes: one layout, not one per card.
+        const fits = descriptions.map(desc => {
+            const bottom = desc.parentElement.querySelector('.project-card-bottom');
+            if (!bottom || desc.offsetHeight === 0) {
+                return 0;
+            }
+            const spare = bottom.offsetTop - (desc.offsetTop + desc.offsetHeight);
+            const lineHeight = parseFloat(getComputedStyle(desc).lineHeight) || 0;
+            return lineHeight > 0 ? Math.floor((spare + 1) / lineHeight) : 0;
+        });
+
+        descriptions.forEach((desc, i) => {
+            if (fits[i] > 0) {
+                desc.style.setProperty('-webkit-line-clamp', String(2 + fits[i]));
+            }
+        });
+    }
+
+    function bindProjectDescriptionFit() {
+        if (!elements.projectsList || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+
+        let frame = 0;
+        new ResizeObserver(() => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(fitProjectDescriptions);
+        }).observe(elements.projectsList);
     }
 
     /**
@@ -6896,6 +6948,7 @@
         bindAssignmentControls();
         bindReviewRefresh();
         bindShell();
+        bindProjectDescriptionFit();
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();

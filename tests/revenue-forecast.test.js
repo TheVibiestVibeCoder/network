@@ -534,6 +534,59 @@
         eq(PP.euroRange({ min: 4000, max: 4000 }).replace(/\s/g, ' '), '4.000 €');
     });
 
+    test('each project says how its counted value comes about', () => {
+        nextId = 1;
+        const rows = [
+            // Payments and a budget: one paid, one open; the rest of the budget is spread.
+            project('Proposal', 20000, 20000, 50, '2026-10-01', '2027-03-31', {
+                payments: [{ month: '2026-11', amount: 8000, paid: true }, { month: '2027-01', amount: 5000 }]
+            }),
+            // Budget only: the middle of it, times the chance.
+            project('Proposal', 24000, 30000, 70, '2026-12-01', '2027-05-31'),
+            // A payment after the last month on the axis.
+            project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-10-31', {
+                payments: [{ month: '2026-10', amount: 4000 }, { month: '2028-01', amount: 6000 }]
+            }),
+            // No end date: the rest goes to the "No date" bar.
+            project('Lead', 9000, 9000, 20, '2026-11-01', null)
+        ];
+        // A fixed year, as Financials' "months ahead" sets it.
+        const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('realistic'), 12);
+        const [a, b, c, d] = [1, 2, 3, 4].map(id => f.current.perProject[id]);
+
+        eq([a.open, a.openCount, a.rest, a.budget, a.factor], [5000, 1, 7000, 20000, 0.5], 'payments + rest');
+        near(a.value, (5000 + 7000) * 0.5, 'payments + rest value');
+
+        eq([b.open, b.openCount, b.rest, b.budget], [0, 0, 27000, 27000], 'budget only');
+        near(b.value, 27000 * 0.7, 'budget only value');
+
+        eq([c.open, c.rest], [10000, 0], 'payments cover the budget');
+        near(c.value, 4000, 'only the payment on the axis counts');
+        near(c.after, 6000, 'the later payment is reported, not counted');
+
+        near(d.undated, 9000 * 0.2, 'undated part');
+        near(d.value, 9000 * 0.2, 'undated part is in the value');
+    });
+
+    test('the parts listed for each bar add up to the bar', () => {
+        const rows = busy();
+        rows[0].payments = [{ month: '2026-08', amount: 6000 }, { month: '2026-12', amount: 10000 }];
+        rows.push(project('Lead', 5000, 5000, 20, '2026-11-01', null));
+        ['worst', 'realistic', 'best'].forEach(key => {
+            const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor(key), 12);
+            f.current.totals.forEach((total, i) => {
+                near(f.current.parts[i].reduce((sum, x) => sum + x.amount, 0), total, key + ' month ' + i);
+            });
+            near(f.current.undatedParts.reduce((sum, x) => sum + x.amount, 0), f.current.undated, key + ' no date');
+        });
+
+        const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('realistic'), 12);
+        const overdue = f.current.parts[0].find(x => x.id === 1 && x.kind === 'payment');
+        eq([overdue.raw, overdue.o], [6000, -2], 'an overdue payment counts now and keeps its own month');
+        const share = f.current.parts[1].find(x => x.id === 1 && x.kind === 'budget');
+        eq([share.of, share.months], [32000, 6], 'a budget share knows what it is a share of');
+    });
+
     root.revenueForecastTestResults = results;
 
     if (typeof document === 'undefined') {

@@ -2,10 +2,11 @@
  * My Work
  *
  * One screen answering one question: what is on my plate? A slim "New for you"
- * line, then two cards: the to-dos - by priority, by day, and as a list - and
- * the projects, by stage. Bookkeeping rows still waiting on an invoice and the
- * contacts somebody made you responsible for sit under the projects. The
- * numbers come from home-dashboard.js; this file draws and wires them.
+ * line; the bookkeeping entries still waiting on an invoice, across the full
+ * width so they are not missed; then two cards: the to-dos - by priority, by
+ * day, and as a list - and the projects, by stage. The contacts somebody made
+ * you responsible for sit under the projects. The numbers come from
+ * home-dashboard.js; this file draws and wires them.
  *
  * It defaults to the signed-in user and can be pointed at any colleague, or at
  * "Unassigned" to see what nobody has picked up. It is a different arrangement
@@ -157,17 +158,14 @@
 
         renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
 
-        // The narrow column: projects, then whatever else is handed over -
-        // bookkeeping rows waiting on a PDF, contacts to look after.
+        // The narrow column: projects, then the contacts to look after.
         let side = projectsCard(projects, todos);
-        if (bookkeeping.length) {
-            side += listCard('bookkeeping', 'Bookkeeping', bookkeeping.map(bookkeepingRow).join(''), bookkeeping.length);
-        }
         if (contacts.length) {
             side += listCard('contact', 'Contacts', contacts.map(contactRow).join(''), contacts.length);
         }
 
         els.body.innerHTML = newsBox()
+            + bookkeepingBand(bookkeeping)
             + `<section class="home-dash" aria-label="Dashboard">
                    ${todosCard(todos, openTodos, today)}
                    <div class="home-side">${side}</div>
@@ -473,6 +471,33 @@
     }
 
     // ---- Bookkeeping and contacts -------------------------------------
+
+    /**
+     * Bank entries still missing their invoice, above the to-dos and projects
+     * and across the full width: each one is money that cannot be booked
+     * until somebody finds the PDF, and in the side column they went unseen.
+     * Every entry is a drop target for its PDF (bindPdfDrops).
+     */
+    function bookkeepingBand(entries) {
+        if (!entries.length) return '';
+
+        const count = entries.length;
+        return `
+            <section class="home-bk" aria-labelledby="homeBkHeading">
+                <div class="home-bk-head">
+                    <span class="home-bk-icon" aria-hidden="true">${ICON_RECEIPT}</span>
+                    <div class="home-bk-titles">
+                        <h2 class="home-bk-heading" id="homeBkHeading">
+                            Bookkeeping
+                            <span class="home-bk-count">${count}</span>
+                        </h2>
+                        <p class="home-bk-sub">${count === 1 ? 'A bank entry is' : 'Bank entries are'} waiting for ${count === 1 ? 'its' : 'their'} invoice. Drop the PDF onto an entry, or click it to open it.</p>
+                    </div>
+                    <button type="button" class="home-link" data-home-go="bookkeeping">Open Bookkeeping</button>
+                </div>
+                <div class="home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
+            </section>`;
+    }
 
     /**
      * A compact card for the other things a person can be handed. Each kind
@@ -835,7 +860,9 @@
         const crm = window.CRM;
         if (!crm) return;
 
-        if (crm.openTodos) {
+        if (where === 'bookkeeping') {
+            crm.switchView('bookkeeping');
+        } else if (crm.openTodos) {
             crm.openTodos({ status: where === 'completed' ? 'completed' : 'open', assigned: state.who });
         } else {
             crm.switchView('todos');
