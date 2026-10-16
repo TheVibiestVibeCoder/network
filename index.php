@@ -1798,11 +1798,11 @@ function assetUrl(string $path): string
                                 <label class="detail-label" for="projectEditStage">Stage</label>
                                 <span class="detail-value" id="projectOverviewStage" data-ov="view"></span>
                                 <select id="projectEditStage" class="form-select ov-field" data-ov="edit">
-                                    <option value="Lead">Lead</option>
+                                    <option value="Complete">Complete</option>
+                                    <option value="In Progress">In Progress</option>
                                     <option value="Proposal">Proposal</option>
                                     <option value="Negotiation">Negotiation</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Complete">Complete</option>
+                                    <option value="Lead">Lead</option>
                                 </select>
                             </div>
                             <div class="overview-detail-item">
@@ -1977,6 +1977,9 @@ function assetUrl(string $path): string
                          is created (saveTodoEdit in app.js). -->
                     <div id="todoDetailAssignee"></div>
 
+                    <!-- Proposals from Claude about this to-do (review.js) -->
+                    <div class="review-record-slot" id="todoDetailReview" hidden></div>
+
                     <div class="overview-section">
                         <div class="overview-details">
                             <div class="overview-detail-item tdetail-status-item">
@@ -2066,6 +2069,22 @@ function assetUrl(string $path): string
                 </div>
                 <div class="modal-body overview-body" id="reviewSheetBody"></div>
                 <div class="modal-footer ov-footer" id="reviewSheetFooter"></div>
+            </div>
+        </div>
+
+        <!-- From Claude: asked before a decision Undo cannot take back (review.js) -->
+        <div class="modal review-confirm" id="reviewConfirmModal">
+            <div class="modal-backdrop" data-review-confirm-cancel></div>
+            <div class="modal-content modal-small" role="alertdialog" aria-modal="true" aria-labelledby="reviewConfirmTitle" aria-describedby="reviewConfirmMessage">
+                <div class="modal-header">
+                    <h2 id="reviewConfirmTitle">Are you sure?</h2>
+                    <button type="button" class="modal-close" data-review-confirm-cancel aria-label="Cancel">&times;</button>
+                </div>
+                <div class="modal-body review-confirm-message" id="reviewConfirmMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-review-confirm-cancel>Cancel</button>
+                    <button type="button" class="btn btn-primary" id="reviewConfirmOk">OK</button>
+                </div>
             </div>
         </div>
 

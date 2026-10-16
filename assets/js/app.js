@@ -2008,7 +2008,7 @@
                     <div class="todo-content">
                         <div class="todo-title-row">
                             <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
-                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : ''}
+                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : reviewChangeBadge(todo)}
                             ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
@@ -2098,7 +2098,7 @@
                         <span class="todo-check-indicator"></span>
                     </label>
                     <button type="button" class="ptodo-title" data-todo-expand-btn aria-expanded="${expanded}">${escapeHtml(todo.title || '')}</button>
-                    ${isProposed ? reviewBadge(todo) : ''}
+                    ${isProposed ? reviewBadge(todo) : reviewChangeBadge(todo)}
                     <span class="ptodo-meta">
                         ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
                         ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
@@ -2332,6 +2332,12 @@
             : '<span class="tdetail-muted">No description</span>';
 
         renderTodoDetailLinks(todo.links || []);
+
+        // What Claude proposes about this to-do, if anything; proposals are
+        // about the to-do itself, which a mirrored copy points to.
+        if (window.CRMReview) {
+            window.CRMReview.renderRecordPanel('todo', todo.parent_todo_id || todo.id, document.getElementById('todoDetailReview'));
+        }
 
         elements.toggleTodoDetailDoneBtn.textContent = isCompleted ? 'Reopen' : 'Mark as done';
     }
@@ -4826,6 +4832,7 @@
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
                         ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                         ${isProposed ? `<div class="project-card-review">${reviewBadge(project)}</div>` : ''}
+                        ${!isProposed && reviewChangeBadge(project, 'project') ? `<div class="project-card-review">${reviewChangeBadge(project, 'project')}</div>` : ''}
                     </div>
                     ${assigneeChip(project)}
                 </div>
@@ -5836,6 +5843,11 @@
         return window.CRMReview ? window.CRMReview.badge(record) : '';
     }
 
+    /** The quieter mark on a record Claude proposes to change (review.js). */
+    function reviewChangeBadge(record, entityType) {
+        return window.CRMReview ? window.CRMReview.changeBadge(record, entityType) : '';
+    }
+
     /** Accept / reject buttons on a proposed note or to-do (review.js). */
     function reviewInline(entityType, id) {
         return window.CRMReview ? window.CRMReview.inlineActions(entityType, id) : '';
@@ -5862,9 +5874,12 @@
             }
             updateContactCount();
 
-            // A rejected proposal for the record on screen means that record
-            // is gone; everything else just needs a fresh look.
-            const gone = detail.action === 'reject';
+            // The record on screen is gone when its proposal as a new record
+            // was rejected, or a proposal to delete it accepted; everything
+            // else just needs a fresh look. (No kind: a proposed record's own
+            // buttons, which decide on it as new.)
+            const kind = detail.kind || 'create';
+            const gone = (detail.action === 'reject' && kind === 'create') || (detail.action === 'accept' && kind === 'delete');
             if (elements.overviewModal.classList.contains('active') && state.viewingContactId) {
                 if (gone && detail.entity_type === 'contact' && Number(detail.entity_id) === Number(state.viewingContactId)) {
                     closeOverviewModal();
@@ -5878,6 +5893,10 @@
                 } else {
                     openProjectOverview(state.viewingProjectId);
                 }
+            }
+            // A to-do that is gone closes by itself when it fails to reload.
+            if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active') && state.viewingTodoId && !isNewTodo()) {
+                refreshTodoDetail();
             }
         });
     }

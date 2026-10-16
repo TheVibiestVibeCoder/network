@@ -10,6 +10,7 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Project.php';
+require_once APP_ROOT . '/includes/ReviewQueue.php';
 
 // Set JSON response headers and security headers
 header('Content-Type: application/json');
@@ -130,6 +131,15 @@ function handleGet(Project $model, string $action, ?int $id): void
     $sortOrder = $_GET['order'] ?? 'ASC';
 
     $projects = $model->getAll($search, $sortBy, $sortOrder);
+
+    // The kinds of change Claude has proposed for each project and nobody has
+    // decided yet ('pending_changes', e.g. ['assign']), for the mark on its card.
+    $changes = ReviewQueue::pendingChangesFor('project', array_column($projects, 'id'));
+    foreach ($projects as &$project) {
+        $project['pending_changes'] = $changes[(int) $project['id']] ?? [];
+    }
+    unset($project);
+
     echo json_encode(['success' => true, 'data' => $projects]);
 }
 

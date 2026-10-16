@@ -6785,11 +6785,12 @@ details.import-instructions p {
     justify-content: flex-end;
 }
 
-/* A to-do not yet created: no status, links or history yet. The assignee
-   stays - it is applied right after the to-do is created. */
+/* A to-do not yet created: no status, links, history or Claude proposals
+   yet. The assignee stays - it is applied right after the to-do is created. */
 #todoDetailModal.is-new .ov-section,
 #todoDetailModal.is-new .tdetail-status-item,
 #todoDetailModal.is-new #todoDetailEdited,
+#todoDetailModal.is-new #todoDetailReview,
 #todoDetailModal.is-new .ov-delete-btn {
     display: none !important;
 }

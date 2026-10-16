@@ -10,9 +10,10 @@
    what the proposal is in two lines and ends in accept / reject; everything
    else (before and after, Claude's note, editing) is in the sheet a click on
    the row opens, like a contact's or a project's. The row's icon says what
-   kind of record it is, its colour what kind of decision - blue for
-   something new, amber for a change, red for a removal; in the history,
-   green or red for how it ended.
+   kind of record it is (a note or document shows its contact's or
+   project's), its colour what kind of decision - green for a new record,
+   blue for a note or document added to one, amber for a change, red for a
+   removal; in the history, green or red for how it ended.
    ========================================================================== */
 
 
@@ -53,6 +54,28 @@
 }
 
 /* One card per group, rows separated by hairlines - like Contacts and To-dos. */
+/* Within a kind of record: new, changes, deletions - a quieter heading, so
+   the record types stay the main structure. */
+.review-subgroup + .review-subgroup {
+    margin-top: 14px;
+}
+
+.review-subgroup-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px;
+    color: var(--c-ink-2);
+    font: 600 var(--t-xs)/1.3 var(--font);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.review-subgroup-count {
+    color: var(--c-ink-3);
+    font-weight: 500;
+}
+
 .review-list-card {
     background: var(--c-surface);
     border: 1px solid var(--c-line);
@@ -124,6 +147,45 @@
     pointer-events: none;
 }
 
+
+/* ---- Several proposals about one record ---------------------------------
+   The record gets a row of its own, built like every other row, with accept
+   all / reject all. Its proposals follow, indented to the text column, and
+   show only what each one does - the record's row already names it. */
+
+.review-row + .review-cluster,
+.review-cluster + .review-row,
+.review-cluster + .review-cluster {
+    border-top: 1px solid var(--c-line-2);
+}
+
+.review-cluster-head:hover {
+    background: transparent;
+}
+
+.review-cluster-head .review-row-open {
+    cursor: default;
+}
+
+.review-cluster.is-busy .review-cluster-head .review-row-actions {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* 66px: the head's 16px padding, 36px icon and 14px gap. */
+.review-cluster > .review-row {
+    margin-left: 66px;
+}
+
+.review-cluster > .review-row .review-row-open {
+    min-height: 44px;
+    padding-left: 0;
+}
+
+.review-cluster > .review-row .review-type-icon,
+.review-cluster > .review-row .review-row-title {
+    display: none;
+}
 
 /* ---- Accept all / Reject all --------------------------------------------- */
 
@@ -278,11 +340,13 @@
 }
 
 /* ---- Tone: what kind of decision, or how it ended ------------------------
-   Blue for something new, amber for a change, red for a removal; in the
-   history, green or red for how it ended. Used by the row's icon, the kind
+   Green for a new record, blue for a note or document added to one, amber
+   for a change, red for a removal; in the history, green or red for how it
+   ended. Used by the row's icon, the kind
    label and the sheet's header. These stay the app's own colours: Claude's
    colour marks where something came from, not what kind of change it is. */
 
+.review-tone--created  { --review-tone: var(--c-success);   --review-tone-soft: var(--c-success-soft); }
 .review-tone--new      { --review-tone: var(--c-accent);    --review-tone-soft: var(--c-accent-soft); }
 .review-tone--change   { --review-tone: var(--c-warning);   --review-tone-soft: var(--c-warning-soft); }
 .review-tone--remove,
@@ -392,15 +456,55 @@
     white-space: nowrap;
 }
 
-.review-row-warn {
-    display: inline-flex;
-    flex-shrink: 0;
+/* A change: what was there, struck through and muted, then what Claude
+   proposes. With several fields, each is named first. */
+.review-pair {
+    white-space: nowrap;
 }
 
-.review-row-warn svg {
-    width: 14px;
-    height: 14px;
+.review-was {
+    color: var(--c-ink-4);
+}
+
+.review-pair-arrow {
+    margin: 0 5px;
+    color: var(--c-ink-4);
+}
+
+.review-now {
+    color: var(--c-ink);
+    font-weight: 500;
+}
+
+.review-pair-field {
+    color: var(--c-ink-3);
+}
+
+.review-pair-sep {
+    margin: 0 7px;
+    color: var(--c-ink-4);
+}
+
+/* Someone changed the record since Claude proposed: say so where it is
+   listed, not only in the sheet. "Accept all" leaves these out. */
+.review-outdated {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    height: 18px;
+    padding: 0 7px 0 5px;
+    border-radius: var(--r-full);
+    background: var(--c-warning-soft);
     color: var(--c-warning);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.review-outdated svg {
+    width: 11px;
+    height: 11px;
 }
 
 .review-row-when {
@@ -860,6 +964,30 @@
     vertical-align: middle;
 }
 
+/* An accepted record Claude proposes to change: an outline in Claude's
+   colour and nothing else - no fill, no frame or tint on the row - so it
+   reads as a note on the record, well below a record that is itself new. */
+.review-change-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 7px 0 5px;
+    border-radius: var(--r-full);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-claude) 55%, transparent);
+    color: var(--c-claude-2);
+    font: 500 11px/1 var(--font);
+    white-space: nowrap;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.review-change-badge svg {
+    width: 10px;
+    height: 10px;
+    opacity: 0.8;
+}
+
 /* The badge on a proposed record is the second half of the signal. */
 .is-proposed .review-badge {
     background: var(--c-claude);
@@ -971,6 +1099,51 @@
 .review-toast.is-visible {
     opacity: 1;
     transform: translate(-50%, 0);
+}
+
+/* While a decision waits, the toast offers to take it back. */
+.review-toast.has-action {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-right: 10px;
+}
+
+.review-toast.has-action.is-visible {
+    pointer-events: auto;
+}
+
+.review-toast-undo {
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: inherit;
+    font: 600 var(--t-sm)/1.4 var(--font);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.review-toast-undo:hover,
+.review-toast-undo:focus-visible {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+/* ---- Asking first -------------------------------------------------------- */
+
+.review-confirm-message p {
+    margin: 0;
+    color: var(--c-ink-2);
+    line-height: 1.5;
+}
+
+.review-confirm-message p + p {
+    margin-top: 10px;
+}
+
+.review-confirm-message strong {
+    color: var(--c-ink);
 }
 
 

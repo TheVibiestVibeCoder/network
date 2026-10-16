@@ -40,6 +40,10 @@
     // The bar for projects without an end date, after the months.
     const UNDATED_LABEL = 'No end date';
 
+    // The project list, top to bottom, as everywhere in the CRM. Complete
+    // projects are not forecast, so they never show here.
+    const STAGE_ORDER = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
+
     const toneOf = key => (RF.STAGES.find(s => s.key === key) || {}).tone || 'lead';
     const labelOf = key => (RF.STAGES.find(s => s.key === key) || {}).label || key;
 
@@ -472,22 +476,25 @@
             const f = ctx.f;
             const now = ctx.now;
             const s = state.settings;
-            const excluded = RF.excludedCount(s) > 0;
+            const anyOff = ctx.items.some(p => !f.current.perProject[p.id].counted);
 
             const rows = ctx.items.map(p => {
                 const c = f.current.perProject[p.id];
                 const off = !!s.excluded[p.id];
                 return { p, c, off };
-            // Ordered by what each project could bring at best, which no control
-            // changes: switching a project or a stage never moves a row.
-            }).sort((a, b) => (f.ceiling.perProject[b.p.id].value - f.ceiling.perProject[a.p.id].value)
+            // By stage, then by what each project could bring at best, which no
+            // control changes: switching a project or a stage never moves a row.
+            }).sort((a, b) => (STAGE_ORDER.indexOf(a.p.stage) - STAGE_ORDER.indexOf(b.p.stage))
+                || (f.ceiling.perProject[b.p.id].value - f.ceiling.perProject[a.p.id].value)
                 || String(a.p.name).localeCompare(String(b.p.name)));
 
+            // A switch shows whether the project is counted - off as well when
+            // its stage is left out, by hand or by the scenario.
             const body = rows.map(({ p, c, off }) => {
                 const how = howCounted(p, c, off, ctx);
                 return `
                     <tr class="rf-row${c.counted ? '' : ' is-off'}" data-tone="${toneOf(p.stage)}">
-                        <td><button type="button" class="rf-switch" role="switch" aria-checked="${!off}"
+                        <td><button type="button" class="rf-switch" role="switch" aria-checked="${c.counted}"
                             data-rf-project="${esc(p.id)}" data-rf-focus="project-${esc(p.id)}"
                             aria-label="${esc('Count ' + p.name)}"><span class="rf-switch-knob"></span></button></td>
                         <td class="rf-cell-project">
@@ -514,8 +521,8 @@
                     <div class="rf-detail-bar">
                         <span>Projects · ${f.counted} of ${ctx.items.length} counted</span>
                         <span class="rf-detail-actions">
-                            ${excluded ? '<button type="button" class="rf-link" data-rf-include-all data-rf-focus="include-all">Select all</button>' : ''}
-                            ${ctx.items.some(p => !s.excluded[p.id]) ? '<button type="button" class="rf-link" data-rf-exclude-all data-rf-focus="exclude-all">Deselect all</button>' : ''}
+                            ${anyOff ? '<button type="button" class="rf-link" data-rf-include-all data-rf-focus="include-all">Select all</button>' : ''}
+                            ${f.counted > 0 ? '<button type="button" class="rf-link" data-rf-exclude-all data-rf-focus="exclude-all">Deselect all</button>' : ''}
                         </span>
                     </div>
                     ${ctx.items.length ? `
@@ -742,15 +749,28 @@
                         s.stages = s.stages.indexOf(key) >= 0
                             ? s.stages.filter(k => k !== key)
                             : RF.STAGE_KEYS.filter(k => k === key || s.stages.indexOf(k) >= 0);
+                        // A stage switched on or off takes all its projects along.
+                        if (current) current.items.forEach(p => { if (p.stage === key) delete s.excluded[p.id]; });
                     });
                 } else if (t.hasAttribute('data-rf-project')) {
                     const id = t.getAttribute('data-rf-project');
+                    const project = current && current.items.find(p => String(p.id) === id);
                     update(() => {
-                        if (s.excluded[id]) delete s.excluded[id];
-                        else s.excluded[id] = true;
+                        if (project && s.stages.indexOf(project.stage) < 0) {
+                            // Its stage is left out: count this project only. The
+                            // stage's other projects stay off, as they were shown.
+                            s.stages = RF.STAGE_KEYS.filter(k => k === project.stage || s.stages.indexOf(k) >= 0);
+                            current.items.forEach(p => { if (p.stage === project.stage) s.excluded[p.id] = true; });
+                            delete s.excluded[id];
+                        } else if (s.excluded[id]) {
+                            delete s.excluded[id];
+                        } else {
+                            s.excluded[id] = true;
+                        }
                     });
                 } else if (t.hasAttribute('data-rf-include-all')) {
-                    update(() => { s.excluded = {}; });
+                    // Every switch on: every stage as well.
+                    update(() => { s.excluded = {}; s.stages = RF.STAGE_KEYS.slice(); });
                 } else if (t.hasAttribute('data-rf-exclude-all') && current) {
                     // Every project off, to switch on only the ones to look at.
                     update(() => {

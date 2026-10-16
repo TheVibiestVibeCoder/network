@@ -47,6 +47,15 @@
         title: 'Title', due_date: 'Due', priority: 'Priority', is_completed: 'Done', content: 'Text'
     };
 
+    // A field as it reads in "Change to stage".
+    const FIELD_NOUN = {
+        name: 'name', company: 'company', location: 'location', email: 'email', phone: 'phone',
+        website: 'website', address: 'address', note: 'note', description: 'description',
+        start_date: 'start date', estimated_completion: 'planned finish', stage: 'stage',
+        budget_min: 'budget', budget_max: 'budget', success_chance: 'chance',
+        title: 'title', due_date: 'due date', priority: 'priority', is_completed: 'status', content: 'text'
+    };
+
     // What can be edited before accepting, per proposed record type.
     const EDITABLE = {
         contact: ['name', 'company', 'email', 'phone', 'location', 'website', 'address', 'note'],
@@ -56,7 +65,8 @@
         project_note: ['content']
     };
 
-    const STAGES = ['Lead', 'Proposal', 'Negotiation', 'In Progress', 'Complete'];
+    // Top to bottom, as in the project sheet's stage select.
+    const STAGES = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
     const PRIORITIES = ['', 'low', 'medium', 'high'];
     const LONG_FIELDS = ['note', 'address', 'description', 'content'];
     const DATE_FIELDS = ['start_date', 'estimated_completion', 'due_date'];
@@ -190,6 +200,8 @@
         if (isEmpty(value)) return '—';
         if (field === 'priority') return String(value).charAt(0).toUpperCase() + String(value).slice(1);
         if (DATE_FIELDS.includes(field)) return formatDay(value);
+        if ((field === 'budget_min' || field === 'budget_max') && !isNaN(Number(value))) return Number(value).toLocaleString('de-AT') + ' €';
+        if (field === 'success_chance' && !isNaN(Number(value))) return Number(value) + ' %';
         return String(value);
     }
 
@@ -228,13 +240,19 @@
     function kindLabel(item) {
         switch (item.kind) {
             case 'create': return 'New ' + (TYPE_LABEL[item.entity_type] || 'record');
-            case 'update': return 'Change';
+            case 'update': {
+                const fields = Object.keys(item.payload || {});
+                const nouns = [...new Set(fields.map(f => FIELD_NOUN[f] || f))];
+                if (nouns.length === 1) return 'Change to ' + nouns[0];
+                if (nouns.length === 2) return 'Change to ' + nouns[0] + ' & ' + nouns[1];
+                return nouns.length ? 'Change to ' + nouns.length + ' fields' : 'Change';
+            }
             case 'delete': return item.entity_type === 'project' ? 'Archive' : 'Delete';
             case 'link': return 'Add to project';
             case 'unlink': return 'Remove from project';
             case 'tag': return 'Add tag';
             case 'untag': return 'Remove tag';
-            case 'assign': return 'Assign';
+            case 'assign': return 'Change to assignee';
             default: return 'Proposal';
         }
     }
@@ -244,7 +262,8 @@
         if (item.status === 'accepted') return 'accepted';
         if (item.status === 'rejected') return 'rejected';
         if (item.status !== 'pending') return 'neutral';
-        if (item.kind === 'create') return 'new';
+        // A new record is green; a note or document added to one is blue.
+        if (item.kind === 'create') return ATTACHED_TYPES.includes(item.entity_type) ? 'new' : 'created';
         if (item.kind === 'delete' || item.kind === 'unlink' || item.kind === 'untag') return 'remove';
         return 'change';
     }
@@ -319,6 +338,64 @@
         }
     }
 
+    /** Old value struck through, then the new one: "~~Proposal~~ → Negotiation". */
+    function valuePair(was, now) {
+        const old = was === '—'
+            ? '<span class="review-was is-empty">—</span>'
+            : `<del class="review-was">${escapeHtml(was)}</del>`;
+        return `<span class="review-pair">${old}<span class="review-pair-arrow" aria-label="to">→</span><span class="review-now">${escapeHtml(now)}</span></span>`;
+    }
+
+    /** A field named in a sentence or a row: "Chance", "Due date". */
+    function fieldName(field) {
+        if (field === 'budget_min') return 'Budget from';
+        if (field === 'budget_max') return 'Budget to';
+        const noun = FIELD_NOUN[field] || field;
+        return noun.charAt(0).toUpperCase() + noun.slice(1);
+    }
+
+    /** A value short enough for a row. */
+    function rowValue(field, value) {
+        const text = displayValue(field, value);
+        return LONG_FIELDS.includes(field) ? excerpt(text, 40) : text;
+    }
+
+    /**
+     * The row's second line as HTML. Changes show what was there and what
+     * Claude proposes; the field is already named in the kind label when
+     * there is only one, so it is only repeated when there are several.
+     */
+    function summaryHtml(item) {
+        const p = item.payload || {};
+        const previous = item.previous || {};
+
+        if (item.kind === 'update') {
+            const fields = Object.keys(p);
+            // A budget's two ends are one proposal: show them as a range.
+            if (fields.length === 2 && fields.includes('budget_min') && fields.includes('budget_max')) {
+                const range = v => isEmpty(v.budget_min) && isEmpty(v.budget_max) ? '—' : budgetText(v);
+                return valuePair(range(previous), range(p));
+            }
+            return fields.map(field => {
+                const pair = valuePair(rowValue(field, previous[field]), rowValue(field, p[field]));
+                return fields.length > 1 ? `<span class="review-pair-field">${escapeHtml(fieldName(field))}</span> ${pair}` : pair;
+            }).join('<span class="review-pair-sep">·</span>');
+        }
+        if (item.kind === 'assign') {
+            return valuePair(previous.assigned_to_name || 'Nobody', p.assigned_to_name || 'Nobody');
+        }
+        return escapeHtml(summaryFor(item));
+    }
+
+    /** The fields somebody changed since Claude proposed, with their value now. */
+    function staleFields(item) {
+        if (item.kind !== 'update' || !item.record) return [];
+        const previous = item.previous || {};
+        return Object.keys(item.payload || {})
+            .filter(field => !sameValue(previous[field], item.record[field]))
+            .map(field => ({ field, label: fieldName(field), now: displayValue(field, item.record[field]) }));
+    }
+
     /** Whether somebody changed the record after Claude proposed a change to it. */
     function isStale(item) {
         if (item.kind !== 'update' || !item.record) return false;
@@ -382,8 +459,13 @@
         project_document: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'
     };
 
+    // Notes and documents belong to a contact or project and carry its icon.
+    const ATTACHED_TYPES = ['contact_note', 'project_note', 'project_document'];
+    const ICON_OF = { contact_note: 'contact', project_note: 'project', project_document: 'project' };
+
     function typeIcon(item) {
-        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TYPE_ICON[item.entity_type] || TYPE_ICON.contact_note}</svg>`;
+        const type = ICON_OF[item.entity_type] || item.entity_type;
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TYPE_ICON[type] || TYPE_ICON.contact_note}</svg>`;
     }
 
     function statusPill(item) {
@@ -407,7 +489,10 @@
         const busy = state.busy.has(item.id);
         const error = state.errors[item.id];
         const stale = pending && isStale(item);
-        const summary = summaryFor(item);
+        const summary = summaryHtml(item);
+        const staleTitle = stale
+            ? 'Changed since Claude proposed this - ' + staleFields(item).map(f => f.label + ' is now ' + f.now).join(', ')
+            : '';
         const when = pending ? item.created_at : (item.resolved_at || item.created_at);
 
         const end = pending ? `
@@ -425,8 +510,8 @@
                             <span class="review-row-title">${escapeHtml(titleFor(item))}</span>
                             <span class="review-row-summary">
                                 <span class="review-kind">${escapeHtml(kindLabel(item))}</span>
-                                ${stale ? `<span class="review-row-warn" title="Changed by someone since Claude proposed this">${ICON_WARN}</span>` : ''}
-                                ${summary ? `<span class="review-row-summary-text">${escapeHtml(summary)}</span>` : ''}
+                                ${stale ? `<span class="review-outdated" title="${escapeHtml(staleTitle)}">${ICON_WARN}Outdated</span>` : ''}
+                                ${summary ? `<span class="review-row-summary-text">${summary}</span>` : ''}
                             </span>
                         </span>
                         <span class="review-row-when" title="${escapeHtml(fullDate(when))}">${escapeHtml(timeAgo(when))}</span>
@@ -746,15 +831,109 @@
         if (first) first.focus();
     }
 
+    // One section per kind of record; within it what is new, then changes,
+    // then what would go.
+    // Notes and documents are listed with what they belong to.
     const GROUPS = [
-        { title: 'New contacts', match: i => i.kind === 'create' && i.entity_type === 'contact' },
-        { title: 'New projects', match: i => i.kind === 'create' && i.entity_type === 'project' },
-        { title: 'New to-dos', match: i => i.kind === 'create' && i.entity_type === 'todo' },
-        { title: 'New notes', match: i => i.kind === 'create' && (i.entity_type === 'contact_note' || i.entity_type === 'project_note') },
-        { title: 'Invoices', match: i => i.entity_type === 'bookkeeping_pdf' },
-        { title: 'Project documents', match: i => i.entity_type === 'project_document' },
-        { title: 'Changes to existing records', match: () => true }
+        { title: 'Contacts', types: ['contact', 'contact_note'] },
+        { title: 'Projects', types: ['project', 'project_note', 'project_document'] },
+        { title: 'To-dos', types: ['todo'] },
+        { title: 'Invoices', types: ['bookkeeping_pdf'] }
     ];
+
+    const SUBGROUPS = [
+        { key: 'new', title: 'New' },
+        { key: 'notes', title: 'Notes' },
+        { key: 'documents', title: 'Documents' },
+        { key: 'change', title: 'Changes' },
+        { key: 'delete', title: 'Deletions' }
+    ];
+
+    const NOTE_TYPES = ['contact_note', 'project_note'];
+
+    /** The record a proposal is about, e.g. "todo:16". */
+    function recordKey(item) {
+        return item.entity_type + ':' + item.entity_id;
+    }
+
+    /** New first, then changes, then what would go. */
+    function kindRank(item) {
+        return item.kind === 'create' ? 0 : (item.kind === 'delete' ? 2 : 1);
+    }
+
+    /**
+     * Where a record's proposals go: notes together, documents together;
+     * otherwise with the new records if it is itself new, with the deletions
+     * if one of them removes it, else with the changes.
+     */
+    function subgroupOf(proposals) {
+        if (NOTE_TYPES.includes(proposals[0].entity_type)) return 'notes';
+        if (proposals[0].entity_type === 'project_document') return 'documents';
+        if (proposals.some(i => i.kind === 'create')) return 'new';
+        if (proposals.some(i => i.kind === 'delete')) return 'delete';
+        return 'change';
+    }
+
+    /**
+     * A section's rows, split into new / changes / deletions. Proposals about
+     * the same record stay together, as one cluster.
+     */
+    function groupBody(group, items) {
+        const byRecord = new Map();
+        items.forEach(item => {
+            const key = recordKey(item);
+            if (!byRecord.has(key)) byRecord.set(key, []);
+            byRecord.get(key).push(item);
+        });
+        const records = [...byRecord.values()].map(list => list.sort((a, b) => kindRank(a) - kindRank(b)));
+
+        return SUBGROUPS.map(sub => {
+            const mine = records.filter(list => subgroupOf(list) === sub.key);
+            if (!mine.length) return '';
+            const count = mine.reduce((n, list) => n + list.length, 0);
+            // Deleting a project archives it.
+            const title = sub.key === 'delete' && group.types[0] === 'project' ? 'Archiving' : sub.title;
+            return `
+                <div class="review-subgroup review-subgroup--${sub.key}">
+                    <h3 class="review-subgroup-title">${escapeHtml(title)} <span class="review-subgroup-count" data-review-count>${count}</span></h3>
+                    <div class="review-list-card">${mine.map(list => list.length > 1 ? renderCluster(list) : renderRow(list[0])).join('')}</div>
+                </div>`;
+        }).join('');
+    }
+
+    const SUBGROUP_TONE = { new: 'created', notes: 'new', documents: 'new', change: 'change', delete: 'remove' };
+
+    /**
+     * Several proposals about one record: a row like any other for the record
+     * - its name, how many proposals, accept all / reject all - with its
+     * proposals indented beneath it, each still decided on its own if wanted.
+     */
+    function renderCluster(list) {
+        const first = list[0];
+        const key = recordKey(first);
+        const n = list.length;
+        const off = state.bulk ? ' disabled' : '';
+        return `
+            <div class="review-cluster" data-review-cluster="${escapeHtml(key)}">
+                <div class="review-row-head review-cluster-head">
+                    <div class="review-row-open">
+                        <span class="review-type-icon review-tone--${SUBGROUP_TONE[subgroupOf(list)]}">${typeIcon(first)}</span>
+                        <span class="review-row-text">
+                            <span class="review-row-title">${escapeHtml(titleFor(first))}</span>
+                            <span class="review-row-summary">
+                                <span class="review-kind"><span data-review-count>${n}</span> proposals</span>
+                                <span class="review-row-summary-text">${escapeHtml(list.map(kindLabel).join(' · '))}</span>
+                            </span>
+                        </span>
+                    </div>
+                    <div class="review-row-actions">
+                        <button type="button" class="review-act review-act--reject" data-review-cluster-act="reject" title="Reject all" aria-label="Reject all ${n} proposals"${off}>${ICON_X}</button>
+                        <button type="button" class="review-act review-act--accept" data-review-cluster-act="accept" title="Accept all" aria-label="Accept all ${n} proposals"${off}>${ICON_CHECK}</button>
+                    </div>
+                </div>
+                ${list.map(renderRow).join('')}
+            </div>`;
+    }
 
     function render() {
         if (!els.list) return;
@@ -801,15 +980,13 @@
             return;
         }
 
-        const used = new Set();
         els.list.innerHTML = GROUPS.map(group => {
-            const items = state.items.filter(i => !used.has(i.id) && group.match(i));
-            items.forEach(i => used.add(i.id));
+            const items = state.items.filter(i => group.types.includes(i.entity_type));
             if (!items.length) return '';
             return `
                 <section class="review-group" aria-label="${escapeHtml(group.title)}">
                     <h2 class="review-group-title">${escapeHtml(group.title)} <span class="review-group-count">${items.length}</span></h2>
-                    ${listCard(items)}
+                    ${groupBody(group, items)}
                 </section>`;
         }).join('');
     }
@@ -841,7 +1018,8 @@
         render();
         try {
             const result = await request(`${API}?action=list&status=${state.tab === 'resolved' ? 'resolved' : 'pending'}`);
-            state.items = Array.isArray(result.data) ? result.data : [];
+            // A decision still waiting for Undo keeps its proposals off the screen.
+            state.items = (Array.isArray(result.data) ? result.data : []).filter(i => !heldIds.has(i.id));
             state.errors = {};
         } catch (error) {
             state.items = [];
@@ -987,18 +1165,46 @@
         throw new Error('Unknown kind of change.');
     }
 
-    function confirmText(item, action) {
-        const name = titleFor(item) || item.entity_label || '';
-        if (action === 'reject' && item.kind === 'create' && (item.entity_type === 'contact' || item.entity_type === 'project')) {
-            return `Remove the proposed ${TYPE_LABEL[item.entity_type]} "${name}"? Anything added to it goes too.`;
+    /**
+     * What to ask before a decision, or null when Undo is enough. Asked only
+     * where the result outlasts the few seconds Undo has: something deleted
+     * for good, a new contact or project removed with everything added to
+     * it, or a newer value overwritten.
+     */
+    function confirmFor(items, action) {
+        const name = escapeHtml(titleFor(items[0]) || items[0].entity_label || '');
+        const parts = [];
+        let title = '';
+        let label = '';
+
+        if (action === 'accept') {
+            const del = items.find(i => i.kind === 'delete' && i.entity_type !== 'project');
+            if (del) {
+                title = 'Delete for good?';
+                label = 'Delete';
+                parts.push(`Accepting deletes the ${escapeHtml(TYPE_LABEL[del.entity_type] || 'record')} <strong>${name}</strong> for good.`
+                    + (del.entity_type === 'contact' ? ' Its notes, to-dos, tags and project links go with it.' : ''));
+            }
+            const stale = items.filter(isStale);
+            if (stale.length) {
+                title = title || 'Overwrite newer changes?';
+                label = label || 'Accept anyway';
+                const fields = stale.flatMap(staleFields);
+                parts.push(`Someone changed <strong>${name}</strong> since Claude proposed this: `
+                    + fields.map(f => `${escapeHtml(f.label)} is now <strong>${escapeHtml(f.now)}</strong>`).join(', ')
+                    + '. Accepting replaces it with Claude\'s value.');
+            }
+        } else {
+            const created = items.find(i => i.kind === 'create' && (i.entity_type === 'contact' || i.entity_type === 'project'));
+            if (created) {
+                title = `Remove the proposed ${TYPE_LABEL[created.entity_type]}?`;
+                label = 'Remove';
+                parts.push(`<strong>${name}</strong> is removed, along with anything added to it.`);
+            }
         }
-        if (action === 'accept' && item.kind === 'delete' && item.entity_type === 'project') {
-            return `Archive the project "${name}"?`;
-        }
-        if (action === 'accept' && item.kind === 'delete') {
-            return `Delete the ${TYPE_LABEL[item.entity_type]} "${name}" for good?`;
-        }
-        return null;
+
+        if (!parts.length) return null;
+        return { title, message: parts.map(text => `<p>${text}</p>`).join(''), confirmLabel: label, danger: action === 'reject' || label === 'Delete' };
     }
 
     /**
@@ -1025,26 +1231,92 @@
         const item = findItem(id);
         if (!item || state.busy.has(id) || state.bulk) return;
 
-        const question = confirmText(item, action);
-        if (question && !window.confirm(question)) return;
+        const ask = confirmFor([item], action);
+        if (ask && !(await askConfirm(ask))) return;
 
-        state.busy.add(id);
-        delete state.errors[id];
-        rerenderRow(id);
+        if (sheet.id === id) closeSheet();
+        hold([item], action, values, action === 'reject' ? 'Rejected' : 'Accepted');
+    }
 
-        try {
-            await performDecision(item, action, values);
+    // ------------------------------------------------------------------
+    // Undo: a decision waits a few seconds before it is sent
+    // ------------------------------------------------------------------
 
-            state.busy.delete(id);
-            if (sheet.id === id) closeSheet();
-            removeItem(id, action);
-            toast(action === 'reject' ? 'Rejected' : 'Accepted');
-            notifyChanged({ id, action, entity_type: item.entity_type, entity_id: item.entity_id });
-        } catch (error) {
-            state.busy.delete(id);
-            state.errors[id] = error.message;
-            rerenderRow(id);
+    const UNDO_MS = 5000;
+
+    // The decision that can still be undone: { items, action, values, timer }.
+    // Only one at a time; the next decision sends it straight away.
+    let held = null;
+    // Proposals decided but not sent yet, kept off the screen meanwhile.
+    const heldIds = new Set();
+
+    function hold(items, action, values, message) {
+        flushHeld();
+        const entry = { items, action, values, timer: null };
+        items.forEach(item => {
+            heldIds.add(item.id);
+            delete state.errors[item.id];
+            removeItem(item.id, action);
+        });
+        entry.timer = setTimeout(() => commitHeld(entry), UNDO_MS);
+        held = entry;
+        toast(message, { undo: true });
+    }
+
+    /** Send the decision that is waiting now, without waiting any longer. */
+    function flushHeld() {
+        if (!held) return;
+        clearTimeout(held.timer);
+        commitHeld(held);
+    }
+
+    function undoHeld() {
+        if (!held) return;
+        const entry = held;
+        held = null;
+        clearTimeout(entry.timer);
+        entry.items.forEach(item => heldIds.delete(item.id));
+        hideToast();
+        // Nothing was sent: the proposals are simply still open.
+        load();
+        notifyChanged({ action: 'undo' });
+    }
+
+    async function commitHeld(entry) {
+        if (held === entry) held = null;
+        const items = entry.items;
+        const failed = [];
+
+        for (const item of items.length > 1 ? clusterOrder(items, entry.action) : items) {
+            try {
+                await performDecision(item, entry.action, items.length === 1 ? entry.values : null);
+            } catch (error) {
+                failed.push({ item, message: error.message });
+            }
         }
+        items.forEach(item => heldIds.delete(item.id));
+
+        if (failed.length) {
+            // Back on the screen, with the reason.
+            toast(failed.length === items.length
+                ? 'Could not be saved - ' + failed[0].message
+                : `${items.length - failed.length} of ${items.length} done - ${failed.length} need${failed.length === 1 ? 's' : ''} a look`);
+            await load();
+            failed.forEach(f => { if (findItem(f.item.id)) state.errors[f.item.id] = f.message; });
+            render();
+        } else if (items.length > 1) {
+            // Deciding together can settle other proposals on the server.
+            await load();
+        }
+
+        const first = items[0];
+        notifyChanged({
+            id: items.length === 1 ? first.id : undefined,
+            action: entry.action,
+            kind: items.some(i => i.kind === 'create') ? 'create' : (items.some(i => i.kind === 'delete') ? 'delete' : first.kind),
+            entity_type: first.entity_type,
+            entity_id: first.entity_id
+        });
     }
 
     async function saveOnly(id, values) {
@@ -1071,12 +1343,6 @@
     }
 
     /**
-     * Take a decided row off the screen. With an outcome it leaves the way the
-     * decision went: a green sweep and a slide to the right for accepted, a red
-     * one to the left for rejected, then the gap closes. Without motion (or
-     * with "reduce motion" set) it simply fades.
-     */
-    /**
      * Take a decided row off the screen. With an outcome it takes on a faint
      * tint of it, lifts and fades, then the gap closes; with "reduce motion"
      * set, or no outcome, it simply fades.
@@ -1097,17 +1363,21 @@
             setTimeout(() => node.classList.add('is-collapsing'), fade);
             setTimeout(() => {
                 const group = node.closest('.review-group');
+                const sub = node.closest('.review-subgroup');
+                const cluster = node.closest('.review-cluster');
                 const panel = node.closest('.review-record-slot');
                 node.remove();
+                if (cluster && !cluster.querySelector('.review-row')) cluster.remove();
+                if (sub && !sub.querySelector('.review-row')) sub.remove();
                 if (group && !group.querySelector('.review-row')) group.remove();
                 if (panel && !panel.querySelector('.review-row')) panel.hidden = true;
                 if (els.list && state.tab === 'pending' && state.items.length === 0 && !state.bulk) render();
             }, fade + collapse);
         });
         if (state.tab === 'pending' && els.list) {
-            els.list.querySelectorAll('.review-group').forEach(group => {
+            els.list.querySelectorAll('.review-group, .review-subgroup, .review-cluster').forEach(group => {
                 const count = group.querySelectorAll('.review-row:not(.is-leaving)').length;
-                const badge = group.querySelector('.review-group-count');
+                const badge = group.querySelector(':scope > h2 > .review-group-count, :scope > h3 > [data-review-count], :scope > .review-cluster-head [data-review-count]');
                 if (badge) badge.textContent = String(count);
             });
         }
@@ -1125,6 +1395,7 @@
         if (els.list) els.list.classList.toggle('is-bulk-running', !!state.bulk);
 
         els.bulk.querySelectorAll('[data-review-bulk]').forEach(btn => { btn.disabled = !!state.bulk; });
+        if (els.list) els.list.querySelectorAll('[data-review-cluster-act]').forEach(btn => { btn.disabled = !!state.bulk; });
         // Switching tab mid-run would reload the list under the loop and
         // silently skip whatever was left, so the tabs wait too.
         document.querySelectorAll('[data-review-tab]').forEach(btn => { btn.disabled = !!state.bulk; });
@@ -1141,16 +1412,26 @@
         }
     }
 
-    function bulkQuestion(action, items) {
+    function bulkQuestion(action, items, outdated) {
         const n = items.length;
         const what = n === 1 ? 'the 1 proposal' : `all ${n} proposals`;
         if (action === 'accept') {
             const deletes = items.filter(i => i.kind === 'delete' && i.entity_type !== 'project').length;
-            return `Accept ${what} from Claude?` + (deletes
-                ? `\n\n${deletes === 1 ? 'One of them deletes a record' : deletes + ' of them delete records'} for good.`
-                : '');
+            return {
+                title: n === 1 ? 'Accept 1 proposal?' : `Accept ${n} proposals?`,
+                message: `<p>Accept ${what} from Claude?</p>`
+                    + (deletes ? `<p>${deletes === 1 ? 'One of them deletes a record' : deletes + ' of them delete records'} for good.</p>` : '')
+                    + (outdated ? `<p>${outdated === 1 ? '1 outdated proposal is' : outdated + ' outdated proposals are'} left for you to check: someone has changed those records since.</p>` : ''),
+                confirmLabel: 'Accept all',
+                danger: deletes > 0
+            };
         }
-        return `Reject ${what} from Claude?\n\nNew records Claude proposed are removed, along with anything added to them, and proposed changes are discarded.`;
+        return {
+            title: n === 1 ? 'Reject 1 proposal?' : `Reject ${n} proposals?`,
+            message: `<p>Reject ${what} from Claude?</p><p>New records Claude proposed are removed, along with anything added to them, and proposed changes are discarded.</p>`,
+            confirmLabel: 'Reject all',
+            danger: true
+        };
     }
 
     /**
@@ -1163,14 +1444,50 @@
         const isParent = i => i.kind === 'create' && (i.entity_type === 'contact' || i.entity_type === 'project');
         const parents = items.filter(isParent);
         const rest = items.filter(i => !isParent(i));
-        return action === 'accept' ? parents.concat(rest) : rest.concat(parents);
+        // A record has to be changed before it is deleted, not after.
+        return action === 'accept'
+            ? parents.concat(rest.filter(i => i.kind !== 'delete'), rest.filter(i => i.kind === 'delete'))
+            : rest.concat(parents);
+    }
+
+    // ------------------------------------------------------------------
+    // Accept all / Reject all for one record
+    // ------------------------------------------------------------------
+
+    /**
+     * Accepting goes new record first, deletion last; rejecting leaves the
+     * new record for last, since rejecting it removes everything about it.
+     */
+    function clusterOrder(items, action) {
+        const sorted = items.slice().sort((a, b) => kindRank(a) - kindRank(b));
+        return action === 'accept' ? sorted : sorted.filter(i => i.kind !== 'create').concat(sorted.filter(i => i.kind === 'create'));
+    }
+
+    async function decideCluster(key, action) {
+        if (state.bulk) return;
+        const items = state.items.filter(i => i.status === 'pending' && recordKey(i) === key && !state.busy.has(i.id));
+        if (items.length === 0) return;
+
+        const ask = confirmFor(items, action);
+        if (ask && !(await askConfirm(ask))) return;
+
+        if (items.some(i => i.id === sheet.id)) closeSheet();
+        hold(items, action, null, `${action === 'reject' ? 'Rejected' : 'Accepted'} all ${items.length}`);
     }
 
     async function decideAll(action) {
         if (state.bulk) return;
-        const items = state.items.filter(i => i.status === 'pending' && !state.busy.has(i.id));
-        if (items.length === 0) return;
-        if (!window.confirm(bulkQuestion(action, items))) return;
+        flushHeld();
+        const open = state.items.filter(i => i.status === 'pending' && !state.busy.has(i.id));
+        // Accepting everything leaves out what someone has changed since:
+        // those need a look of their own. Rejecting overwrites nothing.
+        const outdated = action === 'accept' ? open.filter(isStale).length : 0;
+        const items = action === 'accept' ? open.filter(i => !isStale(i)) : open;
+        if (items.length === 0) {
+            if (outdated) toast('Only outdated proposals are left - check them one by one');
+            return;
+        }
+        if (!(await askConfirm(bulkQuestion(action, items, outdated)))) return;
 
         state.bulk = { action, total: items.length, done: 0, failed: 0 };
         closeSheet();
@@ -1211,11 +1528,14 @@
         await wait(reduceMotion() ? 200 : 520);
         state.bulk = null;
 
-        if (failed === 0) {
-            state.cleared = action;
-            toast(action === 'accept' ? `Accepted ${total === 1 ? '1 proposal' : 'all ' + total}` : `Rejected ${total === 1 ? '1 proposal' : 'all ' + total}`);
-        } else {
+        const verb = action === 'accept' ? 'Accepted' : 'Rejected';
+        if (failed > 0) {
             toast(`${total - failed} of ${total} done - ${failed} need${failed === 1 ? 's' : ''} a look`);
+        } else if (outdated) {
+            toast(`${verb} ${total} - ${outdated} outdated left for you`);
+        } else {
+            state.cleared = action;
+            toast(`${verb} ${total === 1 ? '1 proposal' : 'all ' + total}`);
         }
 
         // Reload rather than trust the local list: decisions can settle other
@@ -1232,6 +1552,34 @@
             render();
         }
         notifyChanged({ action, bulk: true });
+    }
+
+    // ------------------------------------------------------------------
+    // Asking first, in the CRM's own dialog
+    // ------------------------------------------------------------------
+
+    let confirmResolve = null;
+
+    /** Resolves true for the confirm button, false for Cancel, Escape or the backdrop. */
+    function askConfirm({ title, message, confirmLabel, danger }) {
+        if (!els.confirm) return Promise.resolve(true);
+        if (confirmResolve) confirmResolve(false);
+        els.confirmTitle.textContent = title;
+        els.confirmMessage.innerHTML = message;
+        els.confirmOk.textContent = confirmLabel || 'OK';
+        els.confirmOk.classList.toggle('btn-danger', !!danger);
+        els.confirmOk.classList.toggle('btn-primary', !danger);
+        els.confirm.classList.add('active');
+        els.confirmOk.focus();
+        return new Promise(resolve => { confirmResolve = resolve; });
+    }
+
+    function closeConfirm(answer) {
+        if (!els.confirm) return;
+        els.confirm.classList.remove('active');
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        if (resolve) resolve(answer);
     }
 
     function openRecord(item) {
@@ -1267,7 +1615,8 @@
     }
 
     let toastTimer = null;
-    function toast(message) {
+    /** A short confirmation at the bottom; with { undo: true } it offers Undo while the decision waits. */
+    function toast(message, { undo = false } = {}) {
         let node = document.getElementById('reviewToast');
         if (!node) {
             node = document.createElement('div');
@@ -1276,10 +1625,18 @@
             node.setAttribute('role', 'status');
             document.body.appendChild(node);
         }
-        node.textContent = message;
+        node.innerHTML = `<span>${escapeHtml(message)}</span>`
+            + (undo ? '<button type="button" class="review-toast-undo" data-review-undo>Undo</button>' : '');
+        node.classList.toggle('has-action', undo);
         node.classList.add('is-visible');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => node.classList.remove('is-visible'), 2200);
+        toastTimer = setTimeout(hideToast, undo ? UNDO_MS : 2200);
+    }
+
+    function hideToast() {
+        const node = document.getElementById('reviewToast');
+        if (node) node.classList.remove('is-visible', 'has-action');
+        clearTimeout(toastTimer);
     }
 
     // ------------------------------------------------------------------
@@ -1291,6 +1648,25 @@
         if (!record || record.review_status !== 'pending') return '';
         // Says what it means, not just who: the point is that nobody has accepted it yet.
         return `<span class="review-badge" title="Proposed by Claude - not accepted yet">${ICON_SPARK}<span>Awaiting review</span></span>`;
+    }
+
+    /**
+     * The quieter mark on an accepted to-do or project Claude proposes to
+     * change (record.pending_changes: the kinds, e.g. ['assign']). Deciding happens
+     * in the record's own sheet, which lists the proposals.
+     */
+    function changeBadge(record, entityType = 'todo') {
+        const kinds = (record && Array.isArray(record.pending_changes)) ? record.pending_changes : [];
+        if (kinds.length === 0 || record.review_status === 'pending') return '';
+        const words = {
+            update: 'Change', assign: 'Reassignment',
+            delete: entityType === 'project' ? 'Archiving' : 'Deletion',
+            link: 'New contact', unlink: 'Contact removal', tag: 'Tag change', untag: 'Tag change'
+        };
+        const label = kinds.length === 1
+            ? (words[kinds[0]] || 'Change') + ' proposed'
+            : kinds.length + ' changes proposed';
+        return `<span class="review-change-badge" title="Claude proposes ${kinds.length === 1 ? 'a change' : kinds.length + ' changes'} here - open it to accept or reject">${ICON_SPARK}<span>${escapeHtml(label)}</span></span>`;
     }
 
     /** Accept / reject buttons for a proposed note, to-do, invoice or document, where it is listed. */
@@ -1317,7 +1693,7 @@
         let items = [];
         try {
             const result = await request(`${API}?action=list&entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
-            items = Array.isArray(result.data) ? result.data : [];
+            items = (Array.isArray(result.data) ? result.data : []).filter(i => !heldIds.has(i.id));
         } catch (e) {
             return;
         }
@@ -1358,6 +1734,16 @@
             els.sheetBody = document.getElementById('reviewSheetBody');
             els.sheetFooter = document.getElementById('reviewSheetFooter');
         }
+        els.confirm = document.getElementById('reviewConfirmModal');
+        if (els.confirm) {
+            els.confirmTitle = document.getElementById('reviewConfirmTitle');
+            els.confirmMessage = document.getElementById('reviewConfirmMessage');
+            els.confirmOk = document.getElementById('reviewConfirmOk');
+            els.confirm.addEventListener('click', event => {
+                if (event.target.closest('#reviewConfirmOk')) closeConfirm(true);
+                else if (event.target.closest('[data-review-confirm-cancel]')) closeConfirm(false);
+            });
+        }
 
         if (els.bulk) {
             els.bulk.addEventListener('click', event => {
@@ -1373,8 +1759,21 @@
         // One delegated handler for every row, wherever it is rendered, and
         // for the sheet - both carry the proposal's id.
         document.addEventListener('click', event => {
+            if (event.target.closest('[data-review-undo]')) {
+                undoHeld();
+                return;
+            }
+
             if (event.target.closest('[data-review-sheet-close]')) {
                 closeSheet();
+                return;
+            }
+
+            const clusterBtn = event.target.closest('[data-review-cluster-act]');
+            if (clusterBtn) {
+                event.preventDefault();
+                const cluster = clusterBtn.closest('[data-review-cluster]');
+                if (cluster) decideCluster(cluster.dataset.reviewCluster, clusterBtn.dataset.reviewClusterAct);
                 return;
             }
 
@@ -1426,6 +1825,18 @@
             decide(Number(holder.dataset.reviewId), 'accept', readForm(form));
         });
 
+        // Escape on the question answers it with Cancel, and nothing else.
+        window.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !els.confirm || !els.confirm.classList.contains('active')) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeConfirm(false);
+        }, true);
+
+        // A decision still waiting for Undo is sent when the page goes; should
+        // the request not make it, the proposal simply stays open.
+        window.addEventListener('pagehide', flushHeld);
+
         // Escape: leave editing first, then close. Captured ahead of app.js,
         // which would otherwise close the contact or project sheet underneath.
         window.addEventListener('keydown', event => {
@@ -1456,7 +1867,7 @@
                 json: { entity_type: entityType, entity_id: entityId }
             });
             toast(action === 'reject' ? 'Rejected' : 'Accepted');
-            notifyChanged({ action, entity_type: entityType, entity_id: entityId });
+            notifyChanged({ action, kind: 'create', entity_type: entityType, entity_id: entityId });
         } catch (error) {
             if (wrap) wrap.classList.remove('is-busy');
             window.alert(error.message);
@@ -1468,6 +1879,7 @@
         refreshBadge,
         renderRecordPanel,
         badge,
+        changeBadge,
         inlineActions
     };
 

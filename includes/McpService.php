@@ -56,7 +56,7 @@ final class McpFile
 
 final class McpService
 {
-    private const STAGES = ['Lead', 'Proposal', 'Negotiation', 'In Progress', 'Complete'];
+    private const STAGES = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
     private const PRIORITIES = ['low', 'medium', 'high'];
     private const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -719,9 +719,9 @@ final class McpService
                     'message' => 'The contact is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'contact', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('contact', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('contact_id', $id, $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('contact_id', $id, $reviewIds);
     }
 
     private function contactsAddNote(array $p): array
@@ -804,9 +804,9 @@ final class McpService
                     'message' => 'The project is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'project', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('project', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('project_id', $id, $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('project_id', $id, $reviewIds);
     }
 
     private function projectsAddNote(array $p): array
@@ -1090,9 +1090,9 @@ final class McpService
                     'message' => 'The to-do is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'todo', (int) $todo['id'], (string) $todo['title'], $diff, $this->pick($todo, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('todo', (int) $todo['id'], (string) $todo['title'], $diff, $this->pick($todo, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('todo_id', (int) $todo['id'], $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('todo_id', (int) $todo['id'], $reviewIds);
     }
 
     // =========================================================================
@@ -1684,6 +1684,15 @@ final class McpService
             'message' => $message . ' It is marked in the CRM as coming from ' . MCP_ACTOR_NAME
                 . ' and waits for a person to accept, edit or reject it.',
         ];
+    }
+
+    /** A change to several fields is proposed one field at a time (ReviewQueue::addUpdates). */
+    private function proposedChanges(string $idKey, int $id, array $reviewIds): array
+    {
+        $many = count($reviewIds) > 1;
+        return $this->proposed($idKey, $id, (int) $reviewIds[0], $many
+            ? 'The change was proposed as ' . count($reviewIds) . ' proposals, one per field, so each can be accepted on its own. They are applied once a person accepts them.'
+            : 'The change was proposed. It is applied once a person accepts it.') + ['review_ids' => $reviewIds];
     }
 
     private function comment(array $p): ?string

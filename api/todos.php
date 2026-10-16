@@ -10,6 +10,7 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/TodoLink.php';
+require_once APP_ROOT . '/includes/ReviewQueue.php';
 
 // Set JSON response headers and security headers
 header('Content-Type: application/json');
@@ -82,6 +83,7 @@ function handleGet(PDO $db, ?int $id): void
 
         $one = [$todo];
         TodoLink::attach($db, $one);
+        attachPendingChanges($one);
         echo json_encode(['success' => true, 'data' => $one[0]]);
         return;
     }
@@ -204,8 +206,27 @@ function handleGet(PDO $db, ?int $id): void
     $stmt->execute($params);
     $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     TodoLink::attach($db, $todos);
+    attachPendingChanges($todos);
 
     echo json_encode(['success' => true, 'data' => $todos]);
+}
+
+/**
+ * Put on each to-do the kinds of change Claude has proposed for it and nobody
+ * has decided yet ('pending_changes', e.g. ['assign']). Proposals are about
+ * the master to-do, so its mirrored copies carry the same list.
+ *
+ * @param array<int, array> $todos
+ */
+function attachPendingChanges(array &$todos): void
+{
+    $rootOf = static fn(array $todo): int => !empty($todo['parent_todo_id']) ? (int) $todo['parent_todo_id'] : (int) $todo['id'];
+    $byRoot = ReviewQueue::pendingChangesFor('todo', array_map($rootOf, $todos));
+
+    foreach ($todos as &$todo) {
+        $todo['pending_changes'] = $byRoot[$rootOf($todo)] ?? [];
+    }
+    unset($todo);
 }
 
 /**
