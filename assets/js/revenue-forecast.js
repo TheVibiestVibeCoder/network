@@ -11,18 +11,17 @@
  *     budget   = Low -> min | Mid -> (min + max) / 2 | High -> max
  *     factor   = "As set" -> chance / 100 | "All 100%" -> 1
  *     payment  = each expected payment not yet paid x factor, in its month
- *     rest     = (budget - all payments, paid ones included, at least 0) x factor
- *     perMonth = rest / months still to come, from the later of start and
- *                this month to end, inclusive
+ *     rest     = (budget - all payments, paid ones included, at least 0) x factor,
+ *                in the project's end month
  *
- * Expected payments (project-payments.js) say when the money comes; only
- * what they leave of the budget is spread. Paid payments are money already
- * in, so they are not forecast. The whole budget is always counted: a
- * project that started in the past spreads all of it over the months it has
- * left, and one still open past its end month - or a payment past its month
- * - is due now, so it lands in this month. A project without a start date
- * is due in its end month. One without an end date cannot be spread over
- * months: its rest goes into a separate "undated" sum next to the months.
+ * Expected payments (project-payments.js) say when the money comes; what
+ * they leave of the budget - all of it, for a project without payments -
+ * comes at the end, as the final invoice, the way the cashflow counts it
+ * (cashflow.js). Paid payments are money already in, so they are not
+ * forecast. The whole budget is always counted: a project still open past
+ * its end month - or a payment past its month - is due now, so it lands in
+ * this month. One without an end date has no month for its rest: it goes
+ * into a separate "undated" sum next to the months.
  * Months are carried as an offset from the current month: 0 is this month,
  * -3 three months ago, 12 a year from now.
  */
@@ -239,9 +238,10 @@
      *     { id, kind: 'payment', amount, raw, o }   a payment (raw before the
      *                                               factor; o its own month,
      *                                               earlier when it is overdue)
-     *     { id, kind: 'budget', amount, raw, of, months }   a share of the
-     *                                               budget left (`of`), spread
-     *                                               over `months` months
+     *     { id, kind: 'budget', amount, raw, of, months }   the budget left
+     *                                               (`of`, here all of `raw`),
+     *                                               in the end month (`months`
+     *                                               1), or undated (0)
      */
     function compute(items, settings, months, respectExcluded) {
         const byStage = {};
@@ -279,14 +279,8 @@
                     undated = rest;
                     undatedParts.push({ id: p.id, kind: 'budget', amount: rest, raw: restRaw, of: restRaw, months: 0 });
                 } else if (rest > 0) {
-                    // No start date: all of it is due in the end month.
-                    const first = Math.max(p.s === null ? p.e : p.s, 0);
-                    const last = Math.max(p.e, 0);
-                    const n = last - first + 1;
-                    const perMonth = rest / n;
-                    for (let i = first; i <= last; i++) {
-                        add(i, perMonth, { kind: 'budget', raw: restRaw / n, of: restRaw, months: n });
-                    }
+                    // At the end, as the final invoice; past its end, due now.
+                    add(Math.max(p.e, 0), rest, { kind: 'budget', raw: restRaw, of: restRaw, months: 1 });
                 }
             }
             perProject[p.id] = {

@@ -282,10 +282,7 @@
                 return 'Payment ' + RF.money(part.raw) + pct
                     + (part.o < 0 ? ' · due ' + RF.monthName(part.o, ctx.now) : '');
             }
-            if (part.months > 1) {
-                return 'Budget left ' + RF.money(part.of) + ' ÷ ' + part.months + ' months' + pct;
-            }
-            return 'Budget left ' + RF.money(part.raw) + pct + (part.months === 0 ? ' · no end date' : '');
+            return 'Budget left ' + RF.money(part.raw) + pct + (part.months === 0 ? ' · no end date' : ' · at the end');
         }
 
         const TIP_LIMIT = 8;
@@ -465,7 +462,7 @@
             }
             if (c.undated > 0.5) {
                 shortText += ' · no end date';
-                longText += ' Without an end date it cannot be spread over months: '
+                longText += ' Without an end date it has no month: '
                     + RF.moneyFull(c.undated) + ' is in the “No date” bar.';
             }
 
@@ -537,9 +534,9 @@
                         </table>
                     </div>` : ''}
                     ${missingNote(ctx)}
-                    <p class="rf-foot">The full budget counts, spread evenly over the months a project has left; one past its end date counts in this month,
-                        one without a start date in its end month, one without an end date in the “No date” bar after the months.
-                        Expected payments count in their own month instead; only the part of the budget they leave open is spread, and paid ones are left out.
+                    <p class="rf-foot">The full budget counts, in the project's end month, as the final invoice; one past its end date counts in this month,
+                        one without an end date in the “No date” bar after the months.
+                        Expected payments count in their own month instead; only the part of the budget they leave open comes at the end, and paid ones are left out.
                         <strong>Worst</strong>: only projects in progress, low end of the budget.
                         <strong>Realistic</strong>: all projects, middle of the budget × chance.
                         <strong>Best</strong>: every project won, high end of the budget.</p>

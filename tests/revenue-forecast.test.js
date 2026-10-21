@@ -82,19 +82,20 @@
     // Worked examples
     // ------------------------------------------------------------------
 
-    test('A: started in June, the full €48k spread over October to March -> €8k a month', () => {
+    test('A: started in June, the full €48k comes in its end month, March', () => {
         const f = run([examples()[0]]);
-        near(f.current.totals[0], 8000, 'Oct');
-        near(f.current.totals[5], 8000, 'Mar');
+        near(f.current.totals[0], 0, 'Oct');
+        near(f.current.totals[4], 0, 'Feb');
+        near(f.current.totals[5], 48000, 'Mar');
         near(f.current.totals[6], 0, 'Apr');
         near(f.current.total, 48000, 'total');
     });
 
-    test('B: €27k x 0.7 = €18.9k, €3.15k a month December to May', () => {
+    test('B: €27k x 0.7 = €18.9k, all of it in May', () => {
         const f = run([examples()[1]]);
-        near(f.current.totals[1], 0, 'Nov');
-        near(f.current.totals[2], 3150, 'Dec');
-        near(f.current.totals[7], 3150, 'May');
+        near(f.current.totals[2], 0, 'Dec');
+        near(f.current.totals[6], 0, 'Apr');
+        near(f.current.totals[7], 18900, 'May');
         near(f.current.totals[8], 0, 'Jun');
         near(f.current.total, 18900, 'total');
     });
@@ -105,10 +106,12 @@
         near(f.current.total, 1700, 'total');
     });
 
-    test('A + B + C stack per stage in the same month', () => {
+    test('A + B + C each count under their stage, in their own end month', () => {
         const f = run(examples());
-        near(f.current.byStage['In Progress'][2], 8000, 'Dec in progress');
-        near(f.current.byStage.Proposal[2], 3150, 'Dec proposal');
+        near(f.current.byStage['In Progress'][5], 48000, 'Mar in progress');
+        near(f.current.byStage.Proposal[7], 18900, 'May proposal');
+        near(f.current.byStage.Negotiation[1], 1700, 'Nov negotiation');
+        near(f.current.byStage.Proposal[5], 0, 'Mar proposal');
         near(f.current.total, 48000 + 18900 + 1700, 'total');
     });
 
@@ -136,14 +139,16 @@
 
     test('busiest month and hover readout numbers', () => {
         const f = run(busy());
-        eq(RF.monthName(f.busiest, NOW), 'Jan 2027', 'busiest');
-        eq(RF.money(f.current.totals[f.busiest]), '€20.8k', 'busiest value');
-        // Feb 2027 = offset 4: A 8k | BfS 3.125k + Krisen 3.15k + Pflege 2.1k | Social 1.56k
-        eq(RF.money(f.current.totals[4]), '€17.9k', 'Feb total');
-        eq(RF.money(f.current.byStage['In Progress'][4]), '€8k', 'Feb in progress');
-        eq(RF.money(f.current.byStage.Proposal[4]), '€8.4k', 'Feb proposal');
-        eq(RF.money(f.current.byStage.Negotiation[4]), '€1.6k', 'Feb negotiation');
-        eq(RF.money(f.ceiling.totals[4]), '€29.5k', 'Feb ceiling');
+        // Each budget in its end month: A's 48k in Mar 2027 is the biggest.
+        eq(RF.monthName(f.busiest, NOW), 'Mar 2027', 'busiest');
+        eq(RF.money(f.current.totals[f.busiest]), '€48k', 'busiest value');
+        // Dec 2027 = offset 14: a 75k proposal x 0.5 and a 25k lead x 0.1.
+        eq(RF.money(f.current.totals[14]), '€40k', 'Dec 2027 total');
+        eq(RF.money(f.current.byStage.Proposal[14]), '€37.5k', 'Dec 2027 proposal');
+        eq(RF.money(f.current.byStage.Lead[14]), '€2.5k', 'Dec 2027 lead');
+        eq(RF.money(f.current.totals[4]), '€0', 'Feb 2027: nothing ends then');
+        // Best: both at the high end, every project won.
+        eq(RF.money(f.ceiling.totals[14]), '€120k', 'Dec 2027 ceiling');
     });
 
     test('picking a preset gives exactly its controls and clears switches', () => {
@@ -230,10 +235,10 @@
         near(f.current.total, 3000, 'total');
     });
 
-    test('a project starting later is spread over its own months only', () => {
+    test('the start month does not matter: nothing comes before the end month', () => {
         const f = run([examples()[1]]);
-        near(f.current.totals[1], 0, 'Nov, before it starts');
-        near(f.current.totals[2], 3150, 'Dec');
+        near(f.current.totals[2], 0, 'Dec, when it starts');
+        near(f.current.totals[7], 18900, 'May, when it ends');
     });
 
     test('the axis runs at least 12 months, longer when a project ends later', () => {
@@ -404,18 +409,19 @@
 
     const pay = (month, amount, paid) => ({ month, amount, paid: !!paid });
 
-    test('payments count in their month; the rest of the budget is spread', () => {
+    test('payments count in their month; the rest of the budget comes in the end month', () => {
         nextId = 1;
-        // €12k over Oct-Jan, €5k expected in Nov: €7k left -> €1.75k a month.
+        // €12k over Oct-Jan, €5k expected in Nov: the €7k left comes in Jan.
         const f = run([project('In Progress', 12000, 12000, 100, '2026-10-01', '2027-01-31',
             { payments: JSON.stringify([pay('2026-11', 5000)]) })]);
-        near(f.current.totals[0], 1750, 'Oct');
-        near(f.current.totals[1], 1750 + 5000, 'Nov');
-        near(f.current.totals[3], 1750, 'Jan');
+        near(f.current.totals[0], 0, 'Oct');
+        near(f.current.totals[1], 5000, 'Nov');
+        near(f.current.totals[2], 0, 'Dec');
+        near(f.current.totals[3], 7000, 'Jan');
         near(f.current.total, 12000, 'total');
     });
 
-    test('payments covering the budget leave nothing to spread', () => {
+    test('payments covering the budget leave nothing for the end', () => {
         nextId = 1;
         const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', '2027-03-31',
             { payments: [pay('2026-12', 4000), pay('2027-03', 6000)] })]);
@@ -443,11 +449,11 @@
 
     test('paid payments are not forecast but still reduce the rest', () => {
         nextId = 1;
-        // €10k Oct-Nov; €4k already paid, €2k expected in Nov: €4k rest, €2k a month.
+        // €10k Oct-Nov; €4k already paid, €2k expected in Nov: €4k rest, in Nov too.
         const f = run([project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30',
             { payments: [pay('2026-09', 4000, true), pay('2026-11', 2000)] })]);
-        near(f.current.totals[0], 2000, 'Oct');
-        near(f.current.totals[1], 4000, 'Nov');
+        near(f.current.totals[0], 0, 'Oct');
+        near(f.current.totals[1], 6000, 'Nov');
         near(f.current.total, 6000, 'total');
     });
 
@@ -537,7 +543,7 @@
     test('each project says how its counted value comes about', () => {
         nextId = 1;
         const rows = [
-            // Payments and a budget: one paid, one open; the rest of the budget is spread.
+            // Payments and a budget: one paid, one open; the rest of the budget comes at the end.
             project('Proposal', 20000, 20000, 50, '2026-10-01', '2027-03-31', {
                 payments: [{ month: '2026-11', amount: 8000, paid: true }, { month: '2027-01', amount: 5000 }]
             }),
@@ -583,8 +589,10 @@
         const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('realistic'), 12);
         const overdue = f.current.parts[0].find(x => x.id === 1 && x.kind === 'payment');
         eq([overdue.raw, overdue.o], [6000, -2], 'an overdue payment counts now and keeps its own month');
-        const share = f.current.parts[1].find(x => x.id === 1 && x.kind === 'budget');
-        eq([share.of, share.months], [32000, 6], 'a budget share knows what it is a share of');
+        // 48k less 16k of payments: the 32k left, in one share in its end month (Mar).
+        const share = f.current.parts[5].find(x => x.id === 1 && x.kind === 'budget');
+        eq([share.of, share.raw, share.months], [32000, 32000, 1], 'the budget left comes in one share, at the end');
+        eq(f.current.parts[1].some(x => x.id === 1 && x.kind === 'budget'), false, 'nothing of it before');
     });
 
     root.revenueForecastTestResults = results;
