@@ -8,44 +8,7 @@
    ============================================ */
 
 :root {
-    /* Soft light palette (default) */
-    --color-bg: #edf1f6;
-    --color-surface: #f5f7fb;
-    --color-surface-2: #ffffff;
-    --color-surface-3: #e8edf4;
-    --color-surface-hover: #dde5ef;
-
-    /* Borders */
-    --color-border: #d7dee9;
-    --color-border-subtle: #e1e7f0;
-
-    /* Text */
-    --color-text: #172033;
-    --color-text-secondary: #425168;
-    --color-text-tertiary: #6a7890;
-    --color-text-muted: #8b97ab;
-
-    /* Accent */
-    --color-accent: #111827;
-    --color-accent-subtle: rgba(17, 24, 39, 0.08);
-    --color-accent-hover: rgba(17, 24, 39, 0.12);
-
-    /* Semantic */
-    --color-primary: #1f2a3d;
-    --color-primary-hover: #151d2b;
-    --color-primary-subtle: rgba(31, 42, 61, 0.08);
-    --color-danger: #dc2626;
-    --color-danger-hover: #b91c1c;
-    --color-danger-subtle: rgba(220, 38, 38, 0.1);
-    --color-success: #16a34a;
-    --color-success-subtle: rgba(22, 163, 74, 0.12);
-
-    /* Foreground for text sitting ON a semantic fill. These flip with the
-       theme: the semantic colours are dark here and light in dark mode, so a
-       fixed white would become unreadable on the dark-mode variants. */
-    --color-on-danger: #ffffff;
-    --color-on-success: #ffffff;
-    --color-warning: #d97706;
+    /* Colours and shadows come from design.css (the company palette). */
 
     /* Typography */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -74,12 +37,6 @@
     --radius-xl: 16px;
     --radius-full: 9999px;
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
-    --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.1);
-    --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.12);
-    --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.16);
-
     /* Transitions */
     --transition-fast: 0.12s ease;
     --transition-base: 0.2s ease;
@@ -89,48 +46,6 @@
     --header-height: 56px;
 }
 
-:root[data-theme="dark"] {
-    /* Softer dark palette */
-    --color-bg: #0f131c;
-    --color-surface: #151b26;
-    --color-surface-2: #1a2230;
-    --color-surface-3: #222c3d;
-    --color-surface-hover: #2a364a;
-
-    /* Borders */
-    --color-border: #2b374b;
-    --color-border-subtle: #233044;
-
-    /* Text */
-    --color-text: #f4f7ff;
-    --color-text-secondary: #c1cadb;
-    --color-text-tertiary: #94a1b8;
-    --color-text-muted: #6f7f99;
-
-    /* Accent */
-    --color-accent: #edf2ff;
-    --color-accent-subtle: rgba(237, 242, 255, 0.1);
-    --color-accent-hover: rgba(237, 242, 255, 0.14);
-
-    /* Semantic */
-    --color-primary: #edf2ff;
-    --color-primary-hover: #d7e0f4;
-    --color-primary-subtle: rgba(237, 242, 255, 0.08);
-    --color-danger: #ff6b6b;
-    --color-danger-hover: #ff5252;
-    --color-danger-subtle: rgba(255, 107, 107, 0.15);
-    --color-success: #4fd58a;
-    --color-success-subtle: rgba(79, 213, 138, 0.14);
-    --color-on-danger: #2a0a0a;
-    --color-on-success: #06301c;
-    --color-warning: #f7b955;
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(4, 8, 16, 0.35);
-    --shadow-md: 0 6px 16px rgba(4, 8, 16, 0.42);
-    --shadow-lg: 0 12px 28px rgba(4, 8, 16, 0.5);
-    --shadow-xl: 0 20px 48px rgba(4, 8, 16, 0.58);
-}
 
 /* ============================================
    Reset & Base
@@ -230,7 +145,7 @@ body {
 .alert-error {
     background-color: var(--color-danger-subtle);
     color: var(--color-danger);
-    border: 1px solid rgba(255, 68, 68, 0.2);
+    border: 1px solid color-mix(in srgb, var(--c-danger) 20%, transparent);
 }
 
 /* ============================================
@@ -567,24 +482,24 @@ textarea.form-input {
     font-family: var(--font-family);
     font-size: var(--font-size-base);
     font-weight: 600;
-    color: #111;
+    color: var(--c-ink);
     margin-bottom: 4px;
 }
 
 .map-popup p {
     font-family: var(--font-family);
     font-size: var(--font-size-sm);
-    color: #555;
+    color: var(--c-ink-2);
     margin-bottom: 2px;
 }
 
 .map-popup .popup-company {
-    color: #777;
+    color: var(--c-ink-3);
 }
 
 .map-popup .popup-note {
     font-style: italic;
-    color: #888;
+    color: var(--c-ink-3);
 }
 
 .popup-buttons {
@@ -606,7 +521,7 @@ textarea.form-input {
 }
 
 .popup-details-btn {
-    background-color: #111;
+    background-color: var(--c-primary);
     color: #fff;
 }
 
@@ -615,12 +530,12 @@ textarea.form-input {
 }
 
 .popup-edit-btn {
-    background-color: #f0f0f0;
-    color: #333;
+    background-color: var(--c-tint-2);
+    color: var(--c-ink);
 }
 
 .popup-edit-btn:hover {
-    background-color: #e0e0e0;
+    background-color: var(--c-tint);
 }
 
 /* Marker cluster */
@@ -896,7 +811,7 @@ textarea.form-input {
 .todo-due-overdue {
     color: var(--color-danger);
     background-color: var(--color-danger-subtle);
-    border-color: rgba(248, 113, 113, 0.35);
+    border-color: color-mix(in srgb, var(--c-danger) 35%, transparent);
 }
 
 .todo-priority {
@@ -911,19 +826,19 @@ textarea.form-input {
 .todo-priority--high {
     color: var(--color-danger);
     background-color: var(--color-danger-subtle);
-    border-color: rgba(248, 113, 113, 0.35);
+    border-color: color-mix(in srgb, var(--c-danger) 35%, transparent);
 }
 
 .todo-priority--medium {
     color: var(--color-warning);
-    background-color: rgba(217, 119, 6, 0.12);
-    border-color: rgba(217, 119, 6, 0.35);
+    background-color: color-mix(in srgb, var(--c-warning) 12%, transparent);
+    border-color: color-mix(in srgb, var(--c-warning) 35%, transparent);
 }
 
 .todo-priority--low {
     color: var(--color-success);
     background-color: var(--color-success-subtle);
-    border-color: rgba(74, 222, 128, 0.35);
+    border-color: color-mix(in srgb, var(--c-success) 35%, transparent);
 }
 
 .todo-context {
@@ -936,15 +851,15 @@ textarea.form-input {
 }
 
 .todo-context--contact {
-    color: #6ee7b7;
-    background-color: rgba(52, 211, 153, 0.12);
-    border-color: rgba(52, 211, 153, 0.35);
+    color: var(--c-success-ink);
+    background-color: var(--c-success-soft);
+    border-color: color-mix(in srgb, var(--c-success) 35%, transparent);
 }
 
 .todo-context--project {
-    color: #93c5fd;
-    background-color: rgba(96, 165, 250, 0.12);
-    border-color: rgba(96, 165, 250, 0.35);
+    color: var(--c-accent);
+    background-color: var(--c-accent-soft);
+    border-color: color-mix(in srgb, var(--c-accent) 35%, transparent);
 }
 
 .todo-open-links {
@@ -1906,8 +1821,8 @@ textarea.form-input {
 }
 
 .tag-delete-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
 }
 
 /* Inline Tag Edit Form */
@@ -1964,21 +1879,21 @@ textarea.form-input {
 }
 
 .tag-edit-save {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
 }
 
 .tag-edit-save:hover {
-    background: rgba(34, 197, 94, 0.3);
+    background: color-mix(in srgb, var(--c-success) 30%, transparent);
 }
 
 .tag-edit-cancel {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
 }
 
 .tag-edit-cancel:hover {
-    background: rgba(239, 68, 68, 0.25);
+    background: color-mix(in srgb, var(--c-danger) 25%, transparent);
 }
 
 /* ============================================
@@ -3460,28 +3375,28 @@ textarea.form-input {
 }
 
 .stage-lead {
-    background-color: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
+    background-color: color-mix(in srgb, var(--stage-lead) 15%, transparent);
+    color: var(--c-ink-2);
 }
 
 .stage-proposal {
-    background-color: rgba(168, 85, 247, 0.15);
-    color: #c084fc;
+    background-color: color-mix(in srgb, var(--stage-proposal) 15%, transparent);
+    color: var(--c-ink-2);
 }
 
 .stage-negotiation {
-    background-color: rgba(245, 158, 11, 0.15);
-    color: #fbbf24;
+    background-color: color-mix(in srgb, var(--stage-negotiation) 15%, transparent);
+    color: var(--c-ink-2);
 }
 
 .stage-in-progress {
-    background-color: rgba(34, 197, 94, 0.15);
-    color: #4ade80;
+    background-color: color-mix(in srgb, var(--stage-progress) 15%, transparent);
+    color: var(--c-ink-2);
 }
 
 .stage-complete {
-    background-color: rgba(100, 116, 139, 0.15);
-    color: #94a3b8;
+    background-color: color-mix(in srgb, var(--stage-complete) 15%, transparent);
+    color: var(--c-ink-2);
 }
 
 /* Projects List */
@@ -4252,12 +4167,12 @@ textarea.form-input {
 
 .pin-btn--active {
     opacity: 1;
-    color: var(--color-primary, #3b82f6);
+    color: var(--color-primary);
 }
 
 .pin-btn--active:hover {
-    color: var(--color-primary, #3b82f6);
-    background: color-mix(in srgb, var(--color-primary, #3b82f6) 12%, transparent);
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 /* ── Pinned section ─────────────────────────────────────── */
@@ -4272,17 +4187,17 @@ textarea.form-input {
     padding: var(--spacing-2) var(--spacing-3);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    color: var(--color-primary, #3b82f6);
+    color: var(--color-primary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-primary, #3b82f6) 25%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
     margin-bottom: var(--spacing-1);
 }
 
 .pinned-count {
     margin-left: auto;
-    background: color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent);
-    color: var(--color-primary, #3b82f6);
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
     font-size: 11px;
     font-weight: 700;
     padding: 1px 7px;
@@ -4290,7 +4205,7 @@ textarea.form-input {
 }
 
 .contact-card--pinned {
-    border-left: 2px solid var(--color-primary, #3b82f6) !important;
+    border-left: 2px solid var(--color-primary) !important;
 }
 
 .projects-list {
@@ -4403,7 +4318,7 @@ textarea.form-input {
     left: 0;
     bottom: 0;
     border-radius: var(--radius-full);
-    background: linear-gradient(90deg, var(--color-success), #34d399);
+    background: var(--c-success);
 }
 
 .project-card-progress-label {
@@ -5348,7 +5263,7 @@ textarea.form-input {
 
 .alert-success {
     background-color: var(--color-success-subtle);
-    border: 1px solid rgba(22, 163, 74, 0.3);
+    border: 1px solid color-mix(in srgb, var(--c-success) 30%, transparent);
     color: var(--color-success);
 }
 
@@ -5689,7 +5604,7 @@ textarea.form-input {
 }
 
 .user-badge-pending {
-    background-color: rgba(217, 119, 6, 0.12);
+    background-color: var(--c-warning-soft);
     color: var(--color-warning);
 }
 
@@ -5740,7 +5655,7 @@ textarea.form-input {
 
 .user-action-btn.is-danger:hover {
     background-color: var(--color-danger-subtle);
-    border-color: rgba(220, 38, 38, 0.25);
+    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
     color: var(--color-danger);
 }
 
@@ -5940,7 +5855,7 @@ button.user-chip:focus-visible {
 
 .profile-pop-remove:hover:not(:disabled) {
     background-color: var(--color-danger-subtle);
-    border-color: rgba(220, 38, 38, 0.25);
+    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
 }
 
 .profile-pop-hint {
@@ -6487,7 +6402,7 @@ div.workload-row {
 }
 
 .workload-chip--medium {
-    background-color: rgba(217, 119, 6, 0.12);
+    background-color: color-mix(in srgb, var(--c-warning) 12%, transparent);
     color: var(--color-warning);
 }
 

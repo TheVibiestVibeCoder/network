@@ -216,7 +216,7 @@
 .review-bulk-btn--reject:hover:not(:disabled) {
     border-color: var(--c-danger);
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .review-bulk-btn:disabled {
@@ -276,7 +276,7 @@
     stroke-linejoin: round;
 }
 
-.review-empty--accept .review-done-mark { color: var(--c-success); }
+.review-empty--accept .review-done-mark { color: var(--c-success-ink); }
 .review-empty--reject .review-done-mark { color: var(--c-ink-3); }
 
 .review-done-ring,
@@ -346,12 +346,12 @@
    label and the sheet's header. These stay the app's own colours: Claude's
    colour marks where something came from, not what kind of change it is. */
 
-.review-tone--created  { --review-tone: var(--c-success);   --review-tone-soft: var(--c-success-soft); }
+.review-tone--created  { --review-tone: var(--c-success-ink);   --review-tone-soft: var(--c-success-soft); }
 .review-tone--new      { --review-tone: var(--c-accent);    --review-tone-soft: var(--c-accent-soft); }
-.review-tone--change   { --review-tone: var(--c-warning);   --review-tone-soft: var(--c-warning-soft); }
+.review-tone--change   { --review-tone: var(--c-warning-ink);   --review-tone-soft: var(--c-warning-soft); }
 .review-tone--remove,
-.review-tone--rejected { --review-tone: var(--c-danger);    --review-tone-soft: var(--c-danger-soft); }
-.review-tone--accepted { --review-tone: var(--c-success);   --review-tone-soft: var(--c-success-soft); }
+.review-tone--rejected { --review-tone: var(--c-danger-ink);    --review-tone-soft: var(--c-danger-soft); }
+.review-tone--accepted { --review-tone: var(--c-success-ink);   --review-tone-soft: var(--c-success-soft); }
 .review-tone--neutral  { --review-tone: var(--c-ink-3);     --review-tone-soft: var(--c-tint-2); }
 
 /* The record type, on the tone's tint - the row's counterpart to an avatar. */
@@ -496,7 +496,7 @@
     padding: 0 7px 0 5px;
     border-radius: var(--r-full);
     background: var(--c-warning-soft);
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -546,13 +546,13 @@
 .review-act--accept:hover:not(:disabled) {
     border-color: var(--c-success);
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .review-act--reject:hover:not(:disabled) {
     border-color: var(--c-danger);
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .review-act:disabled {
@@ -578,8 +578,8 @@
     white-space: nowrap;
 }
 
-.review-pill--accepted { background: var(--c-success-soft); color: var(--c-success); }
-.review-pill--rejected { background: var(--c-danger-soft); color: var(--c-danger); }
+.review-pill--accepted { background: var(--c-success-soft); color: var(--c-success-ink); }
+.review-pill--rejected { background: var(--c-danger-soft); color: var(--c-danger-ink); }
 
 .review-row > .review-error {
     margin: 0 16px 12px 66px;
@@ -756,7 +756,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
     font-size: var(--t-xs);
     font-weight: 500;
 }
@@ -788,8 +788,8 @@
     margin: 0;
 }
 
-.review-callout--warning { background: var(--c-warning-soft); color: var(--c-warning); }
-.review-callout--danger  { background: var(--c-danger-soft);  color: var(--c-danger); }
+.review-callout--warning { background: var(--c-warning-soft); color: var(--c-warning-ink); }
+.review-callout--danger  { background: var(--c-danger-soft);  color: var(--c-danger-ink); }
 
 /* History: how it ended. */
 .review-outcome {
@@ -816,7 +816,7 @@
     padding: 8px 12px;
     border-radius: var(--r-md);
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-size: var(--t-sm);
 }
 
@@ -1028,13 +1028,13 @@
 .review-inline-btn--accept:hover {
     background: var(--c-success-soft);
     border-color: var(--c-success);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .review-inline-btn--reject:hover {
     background: var(--c-danger-soft);
     border-color: var(--c-danger);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 

@@ -6,11 +6,23 @@
    surfaces and the app shell are decided here, once, and every screen draws
    from the same small set of parts.
 
-   Palette - a cold winter set:
-     navy  #112D4E   ink and primary actions
-     blue  #3F72AF   the one accent: focus, selection, "in progress"
-     mist  #DBE2EF   tinted surfaces
-     snow  #F9F7F7   the page itself
+   Palette - the company colours:
+     navy   #1C3258   ink and primary actions (the main colour)
+     blue   #30599D   the one accent: focus, selection, the "Proposal" stage
+     grey   #EEEEEE   the page itself
+     green  #63A375   positives: done, accepted, paid
+     red    #D76262   negatives: overdue, rejected, delete
+   Everything else is derived from these. The neutrals (ink, lines, tints)
+   carry the navy's hue. The extra colours are matched in OKLCH: the brand
+   colours sit at hues 22 (red), 152 (green) and 260 (blue), so the others
+   fill the gaps between them - gold 82, teal 200, violet 305, berry 340,
+   orange 60 -
+   at the brand's own lightness and strength (L ~0.6-0.68, C ~0.09-0.13),
+   and slate is the navy's hue with almost no colour. Claude's orange (39)
+   stays its own signal.
+   Green and red are too light for small text, so each has an -ink shade of
+   the same hue for text (AA); the brand value itself is for fills, marks
+   and icons.
 
    Principles
      - One accent. Blue marks what is selected or active, nothing else.
@@ -99,100 +111,109 @@
     --control-h: 40px;
 }
 
-/* Winter day. */
+/* Light: the company colours. */
 :root,
 :root[data-theme="light"] {
-    --c-bg: #F9F7F7;
+    --c-bg: #EEEEEE;
     --c-surface: #FFFFFF;
     --c-raised: #FFFFFF;
-    --c-sunken: #F2F4F8;
-    --c-tint: #DBE2EF;
-    --c-tint-2: #E9EEF6;
-    --c-tint-3: #F2F5FA;
+    --c-sunken: #F3F4F6;
+    --c-tint: #DCE1EA;
+    --c-tint-2: #E7EAF0;
+    --c-tint-3: #F2F4F7;
 
-    --c-ink: #112D4E;
-    --c-ink-2: #3A5173;
-    --c-ink-3: #5E7190;
-    --c-ink-4: #8594AA;
+    --c-ink: #1C3258;
+    --c-ink-2: #364765;
+    --c-ink-3: #5C6A84;
+    --c-ink-4: #828C9F;
 
-    --c-line: #E2E7EF;
-    --c-line-2: #ECEFF4;
-    --c-line-strong: #CBD4E1;
+    --c-line: #DDE0E6;
+    --c-line-2: #E8EAEE;
+    --c-line-strong: #C5CBD5;
 
-    --c-accent: #3F72AF;
-    --c-accent-2: #2D5D95;
-    --c-accent-soft: rgba(63, 114, 175, 0.11);
-    --c-accent-softer: rgba(63, 114, 175, 0.06);
+    --c-accent: #30599D;
+    --c-accent-2: #254579;
+    --c-accent-soft: rgba(48, 89, 157, 0.11);
+    --c-accent-softer: rgba(48, 89, 157, 0.06);
 
     /* Claude: everything it proposed or wrote, and the From Claude screen.
-       -2 is for text, darker on light backgrounds so it stays readable. */
+       -2 is for text, darker on light backgrounds so it stays readable.
+       Claude's own colour, apart from the company palette on purpose. */
     --c-claude: #D97757;
     --c-claude-2: #B4583A;
     --c-claude-soft: rgba(217, 119, 87, 0.13);
     --c-claude-softer: rgba(217, 119, 87, 0.07);
     --c-on-claude: #FFFFFF;
 
-    --c-primary: #112D4E;
-    --c-primary-2: #1D426F;
-    --c-on-primary: #F9F7F7;
+    --c-primary: #1C3258;
+    --c-primary-2: #27426F;
+    --c-on-primary: #FFFFFF;
 
-    --c-danger: #B3453B;
-    --c-danger-soft: rgba(179, 69, 59, 0.10);
-    --c-warning: #94600F;
-    --c-warning-soft: rgba(167, 108, 30, 0.12);
-    --c-success: #2A7550;
-    --c-success-soft: rgba(42, 117, 80, 0.11);
+    /* The brand value for fills and marks; -ink for text and for solid
+       buttons with white text on them. */
+    --c-danger: #D76262;
+    --c-danger-ink: #BC3F3F;
+    --c-danger-soft: rgba(215, 98, 98, 0.12);
+    --c-warning: #B48B39;
+    --c-warning-ink: #89640D;
+    --c-warning-soft: rgba(180, 139, 57, 0.14);
+    --c-success: #63A375;
+    --c-success-ink: #457553;
+    --c-success-soft: rgba(99, 163, 117, 0.14);
 
-    --c-scrim: rgba(17, 45, 78, 0.34);
+    --c-scrim: rgba(28, 50, 88, 0.34);
 
-    /* The pipeline: one distinct hue per stage, so they tell apart at a
-       glance - slate for a lead, amber for an offer out, violet while it is
-       negotiated, blue while it runs, green when done. Muted to sit with the
-       winter palette. The label is always shown next to the colour, so colour
-       is never the only signal. */
-    --stage-lead: #8A94A6;
-    --stage-proposal: #C98A2B;
-    --stage-negotiation: #7B5CC0;
-    --stage-progress: #2F6FD0;
-    --stage-complete: #2E8A5C;
+    /* The pipeline follows the project: a plain grey for a lead, a light
+       tint of the accent while it is negotiated, the accent blue for an
+       offer out, a teal while it runs, the company green when done - one
+       run from light blue through blue and teal to green. The teal is
+       deeper than the green so the last two stages stay apart. The label
+       is always shown next to the colour, so colour is never the only
+       signal; the light blue is a fill colour only, never text. */
+    --stage-lead: #8E929A;
+    --stage-negotiation: #8FB4E4;
+    --stage-proposal: #30599D;
+    --stage-progress: #1C7E7E;
+    --stage-complete: #63A375;
 
     /* Medium priority: a light orange of its own, apart from the warning
        colour. -ink is the same hue deep enough for text on -soft (AA). */
-    --pri-medium: #E8973A;
-    --pri-medium-ink: #9A5A12;
-    --pri-medium-soft: rgba(232, 151, 58, 0.16);
+    --pri-medium: #D08440;
+    --pri-medium-ink: #9E5A12;
+    --pri-medium-soft: rgba(208, 132, 64, 0.16);
 
-    --e-1: 0 1px 2px rgba(17, 45, 78, 0.05);
-    --e-2: 0 1px 2px rgba(17, 45, 78, 0.04), 0 6px 16px -6px rgba(17, 45, 78, 0.10);
-    --e-3: 0 2px 6px rgba(17, 45, 78, 0.05), 0 18px 40px -14px rgba(17, 45, 78, 0.22);
-    --e-4: 0 28px 64px -18px rgba(17, 45, 78, 0.34);
+    --e-1: 0 1px 2px rgba(28, 50, 88, 0.05);
+    --e-2: 0 1px 2px rgba(28, 50, 88, 0.04), 0 6px 16px -6px rgba(28, 50, 88, 0.10);
+    --e-3: 0 2px 6px rgba(28, 50, 88, 0.05), 0 18px 40px -14px rgba(28, 50, 88, 0.22);
+    --e-4: 0 28px 64px -18px rgba(28, 50, 88, 0.34);
 
     --map-filter: none;
 }
 
-/* Winter night. */
+/* Dark: the same colours at night. The neutrals are deep navy; green, red
+   and amber read on them as they are, the accent is lifted to read. */
 :root[data-theme="dark"] {
-    --c-bg: #0A1422;
-    --c-surface: #0F1D31;
-    --c-raised: #142540;
-    --c-sunken: #0C1829;
-    --c-tint: #1A3050;
-    --c-tint-2: #152843;
-    --c-tint-3: #122239;
+    --c-bg: #0B111C;
+    --c-surface: #101928;
+    --c-raised: #152032;
+    --c-sunken: #0D1421;
+    --c-tint: #1E2C43;
+    --c-tint-2: #192437;
+    --c-tint-3: #151E2E;
 
-    --c-ink: #EEF2F8;
-    --c-ink-2: #C3CEDD;
-    --c-ink-3: #93A2B8;
-    --c-ink-4: #6F809A;
+    --c-ink: #EEEEEE;
+    --c-ink-2: #B8C1D0;
+    --c-ink-3: #8C98AD;
+    --c-ink-4: #5F6B7E;
 
-    --c-line: #1D3252;
-    --c-line-2: #172A45;
-    --c-line-strong: #2A4468;
+    --c-line: #1E2A3E;
+    --c-line-2: #192334;
+    --c-line-strong: #2E3D56;
 
-    --c-accent: #83A9DC;
-    --c-accent-2: #A6C2E9;
-    --c-accent-soft: rgba(131, 169, 220, 0.16);
-    --c-accent-softer: rgba(131, 169, 220, 0.08);
+    --c-accent: #6C92D2;
+    --c-accent-2: #96B1DF;
+    --c-accent-soft: rgba(108, 146, 210, 0.16);
+    --c-accent-softer: rgba(108, 146, 210, 0.08);
 
     --c-claude: #D97757;
     --c-claude-2: #E8957A;
@@ -200,28 +221,31 @@
     --c-claude-softer: rgba(217, 119, 87, 0.09);
     --c-on-claude: #FFFFFF;
 
-    --c-primary: #DBE2EF;
-    --c-primary-2: #F9F7F7;
-    --c-on-primary: #112D4E;
+    --c-primary: #EEEEEE;
+    --c-primary-2: #FFFFFF;
+    --c-on-primary: #1C3258;
 
-    --c-danger: #EE8A80;
-    --c-danger-soft: rgba(238, 138, 128, 0.14);
-    --c-warning: #E2B26A;
-    --c-warning-soft: rgba(226, 178, 106, 0.14);
-    --c-success: #7ACFA2;
-    --c-success-soft: rgba(122, 207, 162, 0.14);
+    --c-danger: #D76262;
+    --c-danger-ink: #DE7676;
+    --c-danger-soft: rgba(215, 98, 98, 0.16);
+    --c-warning: #D4AA5A;
+    --c-warning-ink: #D4AA5A;
+    --c-warning-soft: rgba(212, 170, 90, 0.16);
+    --c-success: #63A375;
+    --c-success-ink: #7AB78B;
+    --c-success-soft: rgba(99, 163, 117, 0.16);
 
-    --c-scrim: rgba(3, 8, 16, 0.62);
+    --c-scrim: rgba(3, 7, 14, 0.62);
 
-    --stage-lead: #8E9AB0;
-    --stage-proposal: #E2A857;
-    --stage-negotiation: #A890E8;
-    --stage-progress: #6FA2F2;
-    --stage-complete: #6CCB97;
+    --stage-lead: #83868C;
+    --stage-negotiation: #B5D4F8;
+    --stage-proposal: #6C92D2;
+    --stage-progress: #6BCAC9;
+    --stage-complete: #63A375;
 
-    --pri-medium: #F2B46E;
-    --pri-medium-ink: #F5C58D;
-    --pri-medium-soft: rgba(242, 180, 110, 0.16);
+    --pri-medium: #EB9D5A;
+    --pri-medium-ink: #EB9D5A;
+    --pri-medium-soft: rgba(235, 157, 90, 0.16);
 
     --e-1: 0 1px 2px rgba(0, 0, 0, 0.30);
     --e-2: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 20px -8px rgba(0, 0, 0, 0.45);
@@ -253,6 +277,7 @@
     --color-text-secondary: var(--c-ink-2);
     --color-text-tertiary: var(--c-ink-3);
     --color-text-muted: var(--c-ink-3);
+    --color-text-primary: var(--c-ink);
 
     --color-accent: var(--c-primary);
     --color-accent-subtle: var(--c-accent-soft);
@@ -262,12 +287,14 @@
     --color-primary-hover: var(--c-primary-2);
     --color-primary-subtle: var(--c-accent-soft);
 
-    --color-danger: var(--c-danger);
-    --color-danger-hover: var(--c-danger);
+    /* The older rules use these for text and under white text: the -ink shades. */
+    --color-danger: var(--c-danger-ink);
+    --color-danger-hover: var(--c-danger-ink);
     --color-danger-subtle: var(--c-danger-soft);
-    --color-success: var(--c-success);
+    --color-success: var(--c-success-ink);
     --color-success-subtle: var(--c-success-soft);
-    --color-warning: var(--c-warning);
+    --color-warning: var(--c-warning-ink);
+    --color-warning-subtle: var(--c-warning-soft);
     --color-on-danger: var(--c-surface);
     --color-on-success: var(--c-surface);
 
@@ -1034,14 +1061,14 @@ h1, h2, h3, h4 {
 }
 
 .btn-danger {
-    background: var(--c-danger);
-    border-color: var(--c-danger);
-    color: var(--c-surface);
+    background: var(--c-danger-ink);
+    border-color: var(--c-danger-ink);
+    color: #FFFFFF;
 }
 
 .btn-danger:hover:not(:disabled) {
     filter: brightness(0.94);
-    background: var(--c-danger);
+    background: var(--c-danger-ink);
 }
 
 .btn-small {
@@ -1252,7 +1279,7 @@ input[type="checkbox"] {
     background: var(--stage-lead);
 }
 
-.project-stage-badge.stage-in-progress { background: var(--c-accent-soft); color: var(--c-ink); }
+.project-stage-badge.stage-in-progress { background: color-mix(in srgb, var(--stage-progress) 13%, transparent); color: var(--c-ink); }
 .project-stage-badge.stage-in-progress::before { background: var(--stage-progress); }
 .project-stage-badge.stage-proposal::before { background: var(--stage-proposal); }
 .project-stage-badge.stage-negotiation::before { background: var(--stage-negotiation); }
@@ -2425,7 +2452,7 @@ input[type="checkbox"] {
     padding: 12px 22px;
     border-top: 1px solid var(--c-line-2);
     font-size: var(--t-sm);
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .rf-missing summary {
@@ -2634,7 +2661,7 @@ input[type="checkbox"] {
     background: var(--stage-lead);
 }
 
-.stage-dot.stage-in-progress { background: var(--stage-progress); box-shadow: 0 0 0 4px var(--c-accent-soft); }
+.stage-dot.stage-in-progress { background: var(--stage-progress); box-shadow: 0 0 0 4px color-mix(in srgb, var(--stage-progress) 16%, transparent); }
 .stage-dot.stage-proposal { background: var(--stage-proposal); }
 .stage-dot.stage-negotiation { background: var(--stage-negotiation); }
 .stage-dot.stage-lead { background: var(--stage-lead); }
@@ -2812,7 +2839,7 @@ input[type="checkbox"] {
 .project-when-part.is-late,
 .project-when-part.is-late .project-when-label,
 .project-when-status.is-late {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .project-when-status {
@@ -2820,11 +2847,11 @@ input[type="checkbox"] {
 }
 
 .project-when-status.is-soon {
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .project-when-status.is-done {
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 /* ---- Figures ---- */
@@ -3027,7 +3054,7 @@ input[type="checkbox"] {
 .todo-priority--low::before { background: var(--c-ink-4); }
 
 .todo-due-overdue {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -3161,8 +3188,8 @@ input[type="checkbox"] {
    language as dropping onto a row in the Bookkeeping tab. */
 #workloadView .workload-row.is-drop-target {
     position: relative;
-    background: rgba(37, 99, 235, 0.08);
-    box-shadow: inset 0 0 0 2px #2563eb;
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
     border-radius: var(--r-md);
 }
 
@@ -3174,8 +3201,8 @@ input[type="checkbox"] {
     transform: translateY(-50%);
     padding: 5px 11px;
     border-radius: var(--r-full);
-    background: #2563eb;
-    color: #fff;
+    background: var(--c-accent);
+    color: #FFFFFF;
     font-size: var(--t-xs);
     font-weight: 600;
     pointer-events: none;
@@ -3219,7 +3246,7 @@ input[type="checkbox"] {
 }
 
 #workloadView .workload-due.is-overdue {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -3494,7 +3521,7 @@ input[type="checkbox"] {
 #todoView .todo-due-overdue {
     background: none;
     border: 0;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -4739,7 +4766,7 @@ a.detail-value:hover,
 /* Required marks stay, but quietly. */
 .form-group label .required,
 .required-mark {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 
@@ -4833,7 +4860,7 @@ a.detail-value:hover,
     #projectOverviewModal .modal-backdrop,
     #companyNotesModal .modal-backdrop,
     #usersModal .modal-backdrop {
-        background: rgba(17, 45, 78, 0.18);
+        background: rgba(28, 50, 88, 0.18);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
@@ -5202,13 +5229,13 @@ textarea.form-input:focus {
 .alert-error {
     background: var(--c-danger-soft);
     border: 1px solid transparent;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .alert-success {
     background: var(--c-success-soft);
     border: 1px solid transparent;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 
@@ -5240,16 +5267,16 @@ textarea.form-input:focus {
     min-height: 100dvh;
     padding: 24px 16px;
     background:
-        radial-gradient(1200px 520px at 50% -140px, rgba(63, 114, 175, 0.30), transparent 70%),
-        radial-gradient(700px 420px at 100% 100%, rgba(219, 226, 239, 0.9), transparent 70%),
-        linear-gradient(180deg, #DBE2EF 0%, #F9F7F7 58%);
+        radial-gradient(1200px 520px at 50% -140px, rgba(48, 89, 157, 0.30), transparent 70%),
+        radial-gradient(700px 420px at 100% 100%, rgba(220, 225, 234, 0.9), transparent 70%),
+        linear-gradient(180deg, #DCE1EA 0%, #EEEEEE 58%);
     overflow: hidden;
 }
 
 :root[data-theme="dark"] .login-container {
     background:
-        radial-gradient(1200px 520px at 50% -140px, rgba(131, 169, 220, 0.20), transparent 70%),
-        linear-gradient(180deg, #112D4E 0%, #0A1422 62%);
+        radial-gradient(1200px 520px at 50% -140px, rgba(108, 146, 210, 0.20), transparent 70%),
+        linear-gradient(180deg, #1C3258 0%, #0B111C 62%);
 }
 
 /* The older stylesheet paints its own blurred backdrop; this one replaces it. */
@@ -5263,9 +5290,9 @@ textarea.form-input:focus {
     max-width: 400px;
     padding: 36px 32px 28px;
     background: var(--c-surface);
-    border: 1px solid rgba(17, 45, 78, 0.06);
+    border: 1px solid rgba(28, 50, 88, 0.06);
     border-radius: var(--r-xl);
-    box-shadow: 0 30px 70px -28px rgba(17, 45, 78, 0.35), 0 2px 6px rgba(17, 45, 78, 0.05);
+    box-shadow: 0 30px 70px -28px rgba(28, 50, 88, 0.35), 0 2px 6px rgba(28, 50, 88, 0.05);
     text-align: center;
     animation: loginBoxIn var(--dur-3) var(--ease) both;
 }
@@ -5746,7 +5773,7 @@ details.import-instructions p {
 
 /* One hue per label, by its position in the list (Angebot, Hintergrund,
    Rechnung) and borrowed from the pipeline, so no new colour enters the
-   palette: amber for an offer, slate for background, green for an invoice.
+   palette: blue for an offer, grey for background, green for an invoice.
    The name is always written next to the dot - colour is never the only
    signal - and a label added later simply gets the neutral dot. */
 :is(.pdoc-label, .pdoc-chip, .pdoc-drop-target)[data-label-index="0"] { --pdoc-hue: var(--stage-proposal); }
@@ -5981,7 +6008,7 @@ details.import-instructions p {
 .pdoc-act--danger:hover,
 .pdoc-item:hover .pdoc-act--danger:hover {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .pdoc-act:focus-visible {
@@ -6640,7 +6667,7 @@ details.import-instructions p {
     margin-right: auto;
     border-color: transparent;
     background: transparent;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .ov-footer .ov-delete-btn:hover {
@@ -6845,7 +6872,7 @@ details.import-instructions p {
     font-size: var(--t-sm);
     font-weight: 500;
     line-height: 1.45;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .ppay-open strong {
@@ -6876,7 +6903,7 @@ details.import-instructions p {
 
 .ppay-flag.is-warn {
     background: var(--c-warning-soft);
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .ppay-flag svg {
@@ -6950,12 +6977,12 @@ details.import-instructions p {
 
 .ppay-item.is-paid .ppay-num {
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .ppay-item.is-paid .ppay-item-status {
     font-weight: 600;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 /* Editing */
@@ -6986,7 +7013,7 @@ details.import-instructions p {
 
 .ppay-row.is-paid .ppay-num {
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 #projectOverviewModal .ppay-month.is-outside {
@@ -7062,7 +7089,7 @@ details.import-instructions p {
 .ppay-paid[aria-checked="true"] {
     border-color: transparent;
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
     font-weight: 600;
 }
 
@@ -7088,7 +7115,7 @@ details.import-instructions p {
 
 .ppay-remove:hover {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 :is(.ppay-paid, .ppay-remove):focus-visible {
@@ -7141,7 +7168,7 @@ details.import-instructions p {
 
 .ppay-sum-open {
     font-weight: 500;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .ppay-sum-open strong {
@@ -7256,7 +7283,7 @@ details.import-instructions p {
 
 .ppay-note.is-warn,
 .ppay-note.is-warn strong {
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .ppay-note strong {
@@ -7294,7 +7321,7 @@ details.import-instructions p {
     gap: 5px;
     font-size: var(--t-sm);
     font-weight: 500;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .ppay-card-open strong {
@@ -7386,7 +7413,7 @@ details.import-instructions p {
 
 .ppaid-income-amount {
     font-weight: 700;
-    color: var(--c-success);
+    color: var(--c-success-ink);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
@@ -7496,7 +7523,7 @@ details.import-instructions p {
     margin-top: 3px;
     font-size: var(--t-xs);
     font-weight: 600;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .ppaid-row-month {
@@ -7521,12 +7548,12 @@ details.import-instructions p {
     margin-right: auto;
     font-size: var(--t-sm);
     font-weight: 600;
-    color: var(--c-success);
+    color: var(--c-success-ink);
     font-variant-numeric: tabular-nums;
 }
 
 .ppaid-count.is-error {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 @media (max-width: 560px) {
@@ -7678,7 +7705,7 @@ details.import-instructions p {
 
     #todoDetailModal .modal-backdrop,
     #reviewDetailModal .modal-backdrop {
-        background: rgba(17, 45, 78, 0.18);
+        background: rgba(28, 50, 88, 0.18);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
@@ -7887,17 +7914,17 @@ details.import-instructions p {
    -------------------------------------------------------------------------- */
 
 :root {
-    --type-todo: #3F72AF;
-    --type-project: #6D5BD0;
-    --type-bookkeeping: #B7791F;
-    --type-contact: #1F8A84;
+    --type-todo: var(--c-accent);
+    --type-project: #8A68AE;
+    --type-bookkeeping: #B48B39;
+    --type-contact: #A55F8F;
 }
 
 :root[data-theme="dark"] {
-    --type-todo: #83A9DC;
-    --type-project: #A795F0;
-    --type-bookkeeping: #E2B26A;
-    --type-contact: #6CC7BF;
+    --type-todo: var(--c-accent);
+    --type-project: #A886CF;
+    --type-bookkeeping: #D4AA5A;
+    --type-contact: #BF77A7;
 }
 
 #workloadView .workload-wrap {
@@ -8015,7 +8042,7 @@ details.import-instructions p {
 .deleted-project-purge {
     border: 1px solid transparent;
     background: transparent;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .deleted-project-purge:hover:not(:disabled) {
@@ -8723,7 +8750,7 @@ details.import-instructions p {
 }
 
 .home-week-overdue {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 600;
 }
 
@@ -8764,7 +8791,7 @@ details.import-instructions p {
 }
 
 .home-day-btn.is-today .home-day-initial {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .home-day-btn.is-today .home-day-num {
@@ -8793,7 +8820,7 @@ details.import-instructions p {
 
 .home-day-badge.has-due {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 /* ---- Filter bar ---- */
@@ -8854,7 +8881,7 @@ details.import-instructions p {
 }
 
 .home-group-head.is-urgent .home-group-name {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .home-group-date {
@@ -9004,7 +9031,7 @@ details.import-instructions p {
 
 .home-prio-pill[data-tone="high"] {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .home-prio-pill[data-tone="medium"] {
@@ -9014,7 +9041,7 @@ details.import-instructions p {
 
 .home-prio-pill[data-tone="low"] {
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 /* Just ticked off: greyed and struck through until the next refresh. */
@@ -9288,9 +9315,9 @@ details.import-instructions p {
 /* The dashed-blue drop language of the Bookkeeping tab; the tile's own
    border takes the colour, so there is one frame, not two. */
 #workloadView .home-bk .workload-row.is-drop-target {
-    background: rgba(37, 99, 235, 0.08);
-    border-color: #2563eb;
-    box-shadow: inset 0 0 0 1px #2563eb;
+    background: var(--c-accent-soft);
+    border-color: var(--c-accent);
+    box-shadow: inset 0 0 0 1px var(--c-accent);
 }
 
 #workloadView .home-bk .workload-row-mark.is-icon {
@@ -9540,12 +9567,12 @@ details.import-instructions p {
 
 .fin-kpi--in .fin-kpi-icon {
     background: var(--c-success-soft);
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .fin-kpi--out .fin-kpi-icon {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .fin-kpi--low .fin-kpi-icon {
@@ -9553,11 +9580,11 @@ details.import-instructions p {
     color: var(--c-accent-2);
 }
 
-.fin-kpi--low.is-ok .fin-kpi-value { color: var(--c-success); }
-.fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning); }
-.fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger); }
-.fin-kpi--low.is-warn .fin-kpi-icon { background: var(--c-warning-soft); color: var(--c-warning); }
-.fin-kpi--low.is-danger .fin-kpi-icon { background: var(--c-danger-soft); color: var(--c-danger); }
+.fin-kpi--low.is-ok .fin-kpi-value { color: var(--c-success-ink); }
+.fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning-ink); }
+.fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger-ink); }
+.fin-kpi--low.is-warn .fin-kpi-icon { background: var(--c-warning-soft); color: var(--c-warning-ink); }
+.fin-kpi--low.is-danger .fin-kpi-icon { background: var(--c-danger-soft); color: var(--c-danger-ink); }
 
 /* The bank balance carries the page: navy, with a soft glow. */
 .fin-kpi--balance {
@@ -9660,8 +9687,8 @@ details.import-instructions p {
     margin-top: 2px;
 }
 
-.fin-alert.is-danger { background: var(--c-danger-soft); color: var(--c-danger); }
-.fin-alert.is-warn { background: var(--c-warning-soft); color: var(--c-warning); }
+.fin-alert.is-danger { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.fin-alert.is-warn { background: var(--c-warning-soft); color: var(--c-warning-ink); }
 .fin-alert.is-info { background: var(--c-accent-softer); color: var(--c-accent-2); }
 
 .fin-error {
@@ -9672,7 +9699,7 @@ details.import-instructions p {
     padding: 16px;
     border-radius: var(--r-lg);
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 /* ---- Cards ---- */
@@ -9769,8 +9796,8 @@ details.import-instructions p {
     color: var(--c-ink);
 }
 
-.fin-readout .is-pos { color: var(--c-success); }
-.fin-readout .is-neg { color: var(--c-danger); }
+.fin-readout .is-pos { color: var(--c-success-ink); }
+.fin-readout .is-neg { color: var(--c-danger-ink); }
 
 .fin-plot {
     position: relative;
@@ -9935,16 +9962,16 @@ details.import-instructions p {
 }
 
 .fin-table td { color: var(--c-ink-2); }
-.fin-table td.is-pos { color: var(--c-success); }
-.fin-table td.is-neg { color: var(--c-danger); }
+.fin-table td.is-pos { color: var(--c-success-ink); }
+.fin-table td.is-neg { color: var(--c-danger-ink); }
 
 .fin-col-balance {
     font-weight: 700;
     color: var(--c-ink) !important;
 }
 
-.fin-col-balance.is-low { color: var(--c-warning) !important; }
-.fin-col-balance.is-neg { color: var(--c-danger) !important; }
+.fin-col-balance.is-low { color: var(--c-warning-ink) !important; }
+.fin-col-balance.is-neg { color: var(--c-danger-ink) !important; }
 
 .fin-month.is-now th,
 .fin-month.is-now td {
@@ -10034,7 +10061,7 @@ details.import-instructions p {
     white-space: nowrap;
 }
 
-.fin-detail .is-in .fin-detail-amount { color: var(--c-success); }
+.fin-detail .is-in .fin-detail-amount { color: var(--c-success-ink); }
 .fin-detail .is-out .fin-detail-amount { color: var(--c-ink-2); }
 .fin-detail .is-paid { opacity: 0.55; }
 
@@ -10068,7 +10095,7 @@ details.import-instructions p {
     font-size: var(--t-sm);
     letter-spacing: 0;
     text-transform: none;
-    color: var(--c-success);
+    color: var(--c-success-ink);
     font-variant-numeric: tabular-nums;
 }
 
@@ -10160,7 +10187,7 @@ details.import-instructions p {
 
 .fin-income-amount strong {
     font-weight: 700;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 .fin-income.is-off .fin-income-amount strong {
@@ -10186,7 +10213,7 @@ details.import-instructions p {
 
 .fin-tag.is-warn {
     background: var(--c-warning-soft);
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .fin-cost {
@@ -10360,13 +10387,13 @@ details.import-instructions p {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--c-danger) !important;
+    color: var(--c-danger-ink) !important;
 }
 
 .fin-form-error {
     margin: 10px 0 0;
     font-size: var(--t-sm);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .fin-hint {
@@ -10415,7 +10442,7 @@ details.import-instructions p {
 
 .fin-icon-btn:hover {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 :is(.fin-link, .fin-icon-btn, .fin-month-toggle):focus-visible {
