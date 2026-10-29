@@ -402,7 +402,7 @@ function assetUrl(string $path): string
 
     <!--
         The CRM's mark: projects, to-dos, calendar and contacts as four tiles in
-        the company colours. favicon.ico (16/32/48, plain tiles at 16) for
+        the company colours on the CRM's light background. favicon.ico (16/32/48, plain tiles at 16) for
         browsers without SVG favicons; the apple-touch-icon is what Safari shows
         in Favourites and on the home screen, full bleed because the system
         rounds the corners itself.
