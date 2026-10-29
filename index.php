@@ -2225,8 +2225,24 @@ function assetUrl(string $path): string
                     <iframe id="bkPdfPreviewFrame" class="bk-pdf-preview-frame" title="PDF preview" hidden></iframe>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" class="btn btn-secondary" id="bkPdfPreviewOpenBtn" target="_blank" rel="noopener">Open in new tab</a>
-                    <button type="button" class="btn btn-primary" id="bkPdfPreviewDoneBtn">Close</button>
+                    <a href="#" class="btn btn-secondary" id="bkPdfPreviewDownloadBtn" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/>
+                        </svg>
+                        <span>Download</span>
+                    </a>
+                    <a href="#" class="btn btn-secondary" id="bkPdfPreviewOpenBtn" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M13.5 4.5h6v6"/><path d="M19.5 4.5 11 13"/><path d="M17.5 14v4a2 2 0 0 1-2 2h-9.5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2H10"/>
+                        </svg>
+                        <span>Open in new tab</span>
+                    </a>
+                    <button type="button" class="btn btn-primary" id="bkPdfPreviewDoneBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>
+                        </svg>
+                        <span>Close</span>
+                    </button>
                 </div>
             </div>
         </div>

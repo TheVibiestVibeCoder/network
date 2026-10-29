@@ -1037,6 +1037,19 @@
     color: var(--c-danger-ink);
 }
 
+/* Decided with the inline buttons, waiting the few seconds Undo has: the
+   buttons make way, and a rejected record fades as it is about to go. */
+.review-held .review-inline {
+    display: none;
+}
+
+/* The contents rather than the record: some lists animate the record in with
+   a fill mode that would hold its own opacity at 1. */
+.review-held--reject > * {
+    opacity: 0.45;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
 
 /* ---- The box in a contact's or project's detail view ---------------------- */
 

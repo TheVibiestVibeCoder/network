@@ -1020,7 +1020,7 @@
         try {
             const result = await request(`${API}?action=list&status=${state.tab === 'resolved' ? 'resolved' : 'pending'}`);
             // A decision still waiting for Undo keeps its proposals off the screen.
-            state.items = (Array.isArray(result.data) ? result.data : []).filter(i => !heldIds.has(i.id));
+            state.items = (Array.isArray(result.data) ? result.data : []).filter(i => !isHeld(i));
             state.errors = {};
         } catch (error) {
             state.items = [];
@@ -1245,11 +1245,24 @@
 
     const UNDO_MS = 5000;
 
-    // The decision that can still be undone: { items, action, values, timer }.
-    // Only one at a time; the next decision sends it straight away.
+    // The decision that can still be undone: { items, action, values, timer },
+    // or { inline: {entityType, entityId, host}, action, timer } for the
+    // buttons on a proposed record where it is listed. Only one at a time;
+    // the next decision sends it straight away.
     let held = null;
     // Proposals decided but not sent yet, kept off the screen meanwhile.
     const heldIds = new Set();
+    // The same for the inline buttons, which only know the record: "type:id".
+    const heldInline = new Set();
+
+    function inlineKey(entityType, entityId) {
+        return `${entityType}:${Number(entityId)}`;
+    }
+
+    function isHeld(item) {
+        return heldIds.has(item.id)
+            || (item.kind === 'create' && heldInline.has(inlineKey(item.entity_type, item.entity_id)));
+    }
 
     function hold(items, action, values, message) {
         flushHeld();
@@ -1276,7 +1289,12 @@
         const entry = held;
         held = null;
         clearTimeout(entry.timer);
-        entry.items.forEach(item => heldIds.delete(item.id));
+        if (entry.inline) {
+            heldInline.delete(inlineKey(entry.inline.entityType, entry.inline.entityId));
+            showInlineHeld(entry.inline, null);
+        } else {
+            entry.items.forEach(item => heldIds.delete(item.id));
+        }
         hideToast();
         // Nothing was sent: the proposals are simply still open.
         load();
@@ -1285,6 +1303,10 @@
 
     async function commitHeld(entry) {
         if (held === entry) held = null;
+        if (entry.inline) {
+            await commitInline(entry);
+            return;
+        }
         const items = entry.items;
         const failed = [];
 
@@ -1670,12 +1692,17 @@
         return `<span class="review-change-badge" title="Claude proposes ${kinds.length === 1 ? 'a change' : kinds.length + ' changes'} here - open it to accept or reject">${ICON_SPARK}<span>${escapeHtml(label)}</span></span>`;
     }
 
-    /** Accept / reject buttons for a proposed note, to-do, invoice or document, where it is listed. */
+    /**
+     * Reject / accept buttons for a proposed note, to-do, invoice or document,
+     * where it is listed. Reject first and accept last, as everywhere else.
+     */
     function inlineActions(entityType, id) {
+        // Drawn again while its decision waits for Undo: nothing to decide.
+        if (heldInline.has(inlineKey(entityType, id))) return '';
         return `
             <span class="review-inline" data-review-inline-type="${escapeHtml(entityType)}" data-review-inline-id="${Number(id)}">
-                <button type="button" class="review-inline-btn review-inline-btn--accept" data-review-inline="accept" title="Accept Claude's proposal" aria-label="Accept Claude's proposal">${ICON_CHECK}</button>
                 <button type="button" class="review-inline-btn review-inline-btn--reject" data-review-inline="reject" title="Reject Claude's proposal" aria-label="Reject Claude's proposal">${ICON_X}</button>
+                <button type="button" class="review-inline-btn review-inline-btn--accept" data-review-inline="accept" title="Accept Claude's proposal" aria-label="Accept Claude's proposal">${ICON_CHECK}</button>
             </span>`;
     }
 
@@ -1694,7 +1721,7 @@
         let items = [];
         try {
             const result = await request(`${API}?action=list&entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
-            items = (Array.isArray(result.data) ? result.data : []).filter(i => !heldIds.has(i.id));
+            items = (Array.isArray(result.data) ? result.data : []).filter(i => !isHeld(i));
         } catch (e) {
             return;
         }
@@ -1859,20 +1886,47 @@
         }, 90000);
     }
 
-    async function decideInline(entityType, entityId, action, button) {
+    /**
+     * The buttons on a proposed record where it is listed hold their decision
+     * for Undo like the From Claude screen does. Meanwhile the buttons make
+     * way and a rejected record fades; the lists catch up once it is sent.
+     */
+    function decideInline(entityType, entityId, action, button) {
         const wrap = button.closest('.review-inline');
-        if (wrap) wrap.classList.add('is-busy');
+        const host = wrap && (wrap.closest('.todo-item, .ptodo, .note-item, .pdoc-item, .bk-pool-item, .home-todo') || wrap.parentElement);
+
+        flushHeld();
+        const inline = { entityType, entityId, host };
+        heldInline.add(inlineKey(entityType, entityId));
+        showInlineHeld(inline, action);
+
+        const entry = { inline, action, timer: null };
+        entry.timer = setTimeout(() => commitHeld(entry), UNDO_MS);
+        held = entry;
+        toast(action === 'reject' ? 'Rejected' : 'Accepted', { undo: true });
+    }
+
+    /** Mark the record as decided (action) or put it back as it was (null). */
+    function showInlineHeld(inline, action) {
+        const host = inline.host;
+        if (!host || !host.isConnected) return;
+        host.classList.remove('review-held', 'review-held--accept', 'review-held--reject');
+        if (action) host.classList.add('review-held', `review-held--${action}`);
+    }
+
+    async function commitInline(entry) {
+        const { entityType, entityId } = entry.inline;
         try {
-            await request(`${API}?action=${action === 'reject' ? 'reject' : 'accept'}`, {
+            await request(`${API}?action=${entry.action === 'reject' ? 'reject' : 'accept'}`, {
                 method: 'POST',
                 json: { entity_type: entityType, entity_id: entityId }
             });
-            toast(action === 'reject' ? 'Rejected' : 'Accepted');
-            notifyChanged({ action, kind: 'create', entity_type: entityType, entity_id: entityId });
         } catch (error) {
-            if (wrap) wrap.classList.remove('is-busy');
-            window.alert(error.message);
+            toast('Could not be saved - ' + error.message);
         }
+        heldInline.delete(inlineKey(entityType, entityId));
+        showInlineHeld(entry.inline, null);
+        notifyChanged({ action: entry.action, kind: 'create', entity_type: entityType, entity_id: entityId });
     }
 
     window.CRMReview = {

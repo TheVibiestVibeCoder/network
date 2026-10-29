@@ -2363,6 +2363,10 @@
 
         els.pdfPreviewTitle.textContent = name || 'PDF';
         els.pdfPreviewOpenBtn.href = url;
+        // Same origin, so the download attribute saves the file instead of
+        // opening it, whatever the server's "inline" disposition says.
+        els.pdfPreviewDownloadBtn.href = url;
+        els.pdfPreviewDownloadBtn.download = name || '';
         els.pdfPreviewFrame.hidden = true;
         els.pdfPreviewPages.hidden = false;
         els.pdfPreviewPages.innerHTML = '<p class="bk-pdf-preview-status">Loading preview…</p>';
@@ -3054,6 +3058,7 @@
             pdfPreviewFrame: $('bkPdfPreviewFrame'),
             pdfPreviewPages: $('bkPdfPreviewPages'),
             pdfPreviewOpenBtn: $('bkPdfPreviewOpenBtn'),
+            pdfPreviewDownloadBtn: $('bkPdfPreviewDownloadBtn'),
             pdfPreviewCloseBtn: $('bkPdfPreviewCloseBtn'),
             pdfPreviewDoneBtn: $('bkPdfPreviewDoneBtn'),
             // Import modal
