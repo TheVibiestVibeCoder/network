@@ -340,6 +340,27 @@ function maskEmail(string $email): string
 }
 
 /**
+ * APP_NAME split up for the sidebar wordmark: "Disinfo CRM (Test)" gives
+ * ['Disinfo', 'CRM', 'Test']. The last word is set in the accent colour and a
+ * trailing "(...)" the small tag; a one-word name is just the word.
+ *
+ * @return array{0: string, 1: string, 2: string}
+ */
+function brandParts(string $name): array
+{
+    $tag = '';
+    if (preg_match('/^(.*?)\s*\(([^()]+)\)\s*$/u', $name, $m) && trim($m[1]) !== '') {
+        $name = $m[1];
+        $tag = trim($m[2]);
+    }
+
+    $words = preg_split('/\s+/u', trim($name)) ?: [];
+    $accent = count($words) > 1 ? (string) array_pop($words) : '';
+
+    return [implode(' ', $words), $accent, $tag];
+}
+
+/**
  * Initials for the header avatar, matching getInitials() in app.js.
  */
 function userInitials(string $name): string
@@ -700,7 +721,19 @@ function assetUrl(string $path): string
             -->
             <aside class="sidebar" id="sidebar" aria-label="Main navigation">
                 <div class="sidebar-brand">
-                    <span class="brand-name"><?= htmlspecialchars(APP_NAME) ?></span>
+                    <?php [$brandWord, $brandAccent, $brandTag] = brandParts(APP_NAME); ?>
+                    <span class="brand-name" title="<?= htmlspecialchars(APP_NAME) ?>">
+                        <!-- The touch icon's tossed tiles, in small -->
+                        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+                            <rect class="brand-tile brand-tile--navy" x="3.5" y="16.5" width="8.5" height="8.5" rx="2.4"/>
+                            <rect class="brand-tile brand-tile--red" x="13" y="12.5" width="12" height="12" rx="3.2"/>
+                            <rect class="brand-tile brand-tile--blue" x="3" y="3" width="13.5" height="13.5" rx="3.6"/>
+                            <rect class="brand-tile brand-tile--green" x="16" y="3.5" width="9" height="9" rx="2.4"/>
+                        </svg>
+                        <span class="brand-word"><?= htmlspecialchars($brandWord) ?></span>
+                        <?php if ($brandAccent !== ''): ?><span class="brand-accent"><?= htmlspecialchars($brandAccent) ?></span><?php endif; ?>
+                        <?php if ($brandTag !== ''): ?><span class="brand-tag"><?= htmlspecialchars($brandTag) ?></span><?php endif; ?>
+                    </span>
                     <!-- Desktop only: folds the sidebar into the same icon rail tablets get -->
                     <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn"
                             aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">

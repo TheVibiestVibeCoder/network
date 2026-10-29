@@ -140,7 +140,7 @@ function envBool(string $key, bool $default): bool
 }
 
 // Application constants
-define('APP_NAME', $_ENV['APP_NAME'] ?? 'Simple CRM');
+define('APP_NAME', $_ENV['APP_NAME'] ?? 'Disinfo CRM');
 define('APP_PASSWORD', $_ENV['APP_PASSWORD'] ?? '');
 // The database, invoice PDFs and profile pictures all live under DATA_DIR.
 define('DATA_DIR', (PRIVATE_DIR ?? APP_ROOT) . '/data');

@@ -463,14 +463,62 @@ h1, h2, h3, h4 {
     min-width: 0;
 }
 
+/* The wordmark: the touch icon's tiles in small, the name, and its last word
+   in the accent colour. */
 .brand-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     font-size: var(--t-md);
     font-weight: 600;
     color: var(--c-ink);
     letter-spacing: -0.01em;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.brand-mark {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.brand-tile {
+    stroke: var(--c-surface);
+    stroke-width: 1.4;
+    paint-order: stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: rotate(var(--turn));
+}
+
+.brand-tile--blue  { fill: var(--c-accent);  --turn: -6deg; }
+.brand-tile--green { fill: var(--c-success); --turn: 8deg; }
+.brand-tile--red   { fill: var(--c-danger);  --turn: 4deg; }
+.brand-tile--navy  { fill: var(--c-ink);     --turn: -7deg; }
+
+.brand-word {
+    flex-shrink: 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.brand-accent {
+    flex-shrink: 0;
+    margin-left: -3px;
+    color: var(--c-accent);
+    font-weight: 600;
+}
+
+/* "(Test)" and the like, kept quiet. */
+.brand-tag {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 /* Folds the desktop sidebar into the icon rail. Desktop only: tablets always
