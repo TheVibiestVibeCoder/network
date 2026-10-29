@@ -89,7 +89,7 @@ try {
 // -----------------------------------------------------------------------------
 
 /**
- * Set or clear the assignee on one record.
+ * Set or clear the assignee on one record, or on several ({ids: [...]}).
  */
 function handleAssign(): void
 {
@@ -107,22 +107,78 @@ function handleAssign(): void
         respond(['error' => 'Administrator access required'], 403);
     }
 
-    $id = isset($input['id']) ? (int) $input['id'] : 0;
-    if ($id <= 0) {
-        respond(['error' => 'A record id is required.'], 422);
-    }
-
     // resolveAssignee refuses anything that is not a real, active account.
     $assignee = resolveAssignee($input['assigned_to'] ?? null);
     if ($assignee === false) {
         respond(['error' => 'That person cannot be assigned work.'], 422);
     }
 
+    $db = Database::getInstance();
+
+    // Several records at once, from the bookkeeping selection bar. Records that
+    // are gone or cannot take the assignee are skipped rather than failing the
+    // lot, and the caller is told how many.
+    if (array_key_exists('ids', $input)) {
+        $ids = is_array($input['ids'])
+            ? array_values(array_unique(array_filter(array_map('intval', $input['ids']), fn($id) => $id > 0)))
+            : [];
+        if (!$ids || count($ids) > 1000) {
+            respond(['error' => 'A list of record ids is required.'], 422);
+        }
+
+        $assigned = [];
+        foreach ($ids as $id) {
+            if (assignRecord($db, $type, $id, $assignee) === 'ok') {
+                $assigned[] = $id;
+            }
+        }
+
+        respond([
+            'success' => true,
+            'data' => [
+                'ids' => $assigned,
+                'skipped' => count($ids) - count($assigned),
+                'type' => $type,
+                'assigned_to' => $assignee['id'],
+                'assigned_to_name' => $assignee['name'],
+            ],
+        ]);
+    }
+
+    $id = isset($input['id']) ? (int) $input['id'] : 0;
+    if ($id <= 0) {
+        respond(['error' => 'A record id is required.'], 422);
+    }
+
+    $result = assignRecord($db, $type, $id, $assignee);
+    if ($result === 'missing') {
+        respond(['error' => ucfirst($type) . ' not found.'], 404);
+    }
+    if ($result === 'has_pdf') {
+        respond(['error' => 'That row already has its invoice, so there is nothing to hand over.'], 409);
+    }
+
+    respond([
+        'success' => true,
+        'data' => [
+            'id' => $id,
+            'type' => $type,
+            'assigned_to' => $assignee['id'],
+            'assigned_to_name' => $assignee['name'],
+        ],
+    ]);
+}
+
+/**
+ * Put one record on somebody's plate (or nobody's), log it and tell the
+ * assignee. Says 'missing' when there is no such record and 'has_pdf' for a
+ * bookkeeping row whose invoice is already filed.
+ */
+function assignRecord(PDO $db, string $type, int $id, array $assignee): string
+{
     $spec = ASSIGNABLE[$type];
     $table = $spec['table'];
     $titleColumn = $spec['title'];
-
-    $db = Database::getInstance();
 
     $stmt = $db->prepare(
         "SELECT id, " . $titleColumn . " AS title, assigned_to, assigned_to_name FROM " . $table . " WHERE id = :id"
@@ -131,14 +187,14 @@ function handleAssign(): void
     $record = $stmt->fetch();
 
     if (!$record) {
-        respond(['error' => ucfirst($type) . ' not found.'], 404);
+        return 'missing';
     }
 
     // A bookkeeping row whose invoice is already filed is finished work. It
     // would be accepted here and then never show up on the home page, which
     // reads as the assignment having silently failed - so say so instead.
     if ($type === 'bookkeeping' && $assignee['id'] !== null && bookkeepingRowHasPdf($db, $id)) {
-        respond(['error' => 'That row already has its invoice, so there is nothing to hand over.'], 409);
+        return 'has_pdf';
     }
 
     $update = $db->prepare(
@@ -161,15 +217,7 @@ function handleAssign(): void
         AssignmentFeed::record($db, $type, $id, $assignee['id'], (int) $me['id'], $me['name']);
     }
 
-    respond([
-        'success' => true,
-        'data' => [
-            'id' => $id,
-            'type' => $type,
-            'assigned_to' => $assignee['id'],
-            'assigned_to_name' => $assignee['name'],
-        ],
-    ]);
+    return 'ok';
 }
 
 /**

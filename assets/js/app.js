@@ -4676,9 +4676,10 @@
             return `
                 <section class="project-group">
                     <header class="project-group-head">
-                        <span class="stage-dot stage-${escapeHtml(stageClass)}" aria-hidden="true"></span>
-                        <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
-                        <span class="project-group-count">${group.items.length}</span>
+                        <div class="project-group-pill stage-${escapeHtml(stageClass)}">
+                            <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
+                            <span class="project-group-count" title="${group.items.length === 1 ? '1 project' : group.items.length + ' projects'}">${group.items.length}</span>
+                        </div>
                     </header>
                     <div class="project-grid">${group.items.map(createProjectCard).join('')}</div>
                 </section>
@@ -6239,13 +6240,17 @@
         return `<span class="edited-by">${label} ${byLine(name, actorId)}${stamp ? `<span class="edited-by-when">${escapeHtml(stamp)}</span>` : ''}</span>`;
     }
 
+    /**
+     * Two letters wherever a face has no photo: first and last initial, or the
+     * first two letters of a one-word name. profile.js, users.js, workload.js,
+     * bookkeeping.js, review.js and userInitials() in index.php do the same.
+     */
     function getInitials(name) {
         if (!name) return '?';
-        const parts = name.trim().split(/\s+/);
-        if (parts.length === 1) {
-            return parts[0].charAt(0).toUpperCase();
-        }
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
     function debounce(func, wait) {

@@ -1390,6 +1390,20 @@ body.bk-col-resizing * {
     color: var(--color-text);
 }
 
+/* "Waiting on" while its people list is open above it. */
+.bk-sel-btn.is-open {
+    background: var(--color-accent-subtle);
+    color: var(--color-text);
+}
+
+.bk-sel-btn:disabled,
+.bk-sel-btn:disabled:hover {
+    background: transparent;
+    color: var(--color-text-muted);
+    opacity: 0.5;
+    cursor: default;
+}
+
 .bk-sel-btn-danger:hover {
     background: var(--color-danger-subtle);
     color: var(--color-danger);

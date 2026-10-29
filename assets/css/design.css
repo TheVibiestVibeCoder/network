@@ -2630,42 +2630,50 @@ input[type="checkbox"] {
     padding: 0 2px;
 }
 
+/* The stage's name and how many projects are in it, as one pill in the
+   stage's colour. The text mixes that colour with the ink, which darkens it
+   in light mode and lightens it in dark mode - so the pale stages stay
+   readable in both. */
+.project-group-pill {
+    --stage-tone: var(--stage-lead);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 5px 0 14px;
+    border: 1px solid color-mix(in srgb, var(--stage-tone) 45%, transparent);
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
+}
+
+.project-group-pill.stage-in-progress { --stage-tone: var(--stage-progress); }
+.project-group-pill.stage-proposal { --stage-tone: var(--stage-proposal); }
+.project-group-pill.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.project-group-pill.stage-complete { --stage-tone: var(--stage-complete); }
+
 .project-group-title {
     margin: 0;
-    font-size: var(--t-lg);
+    font-size: var(--t-md);
     font-weight: 600;
     letter-spacing: -0.01em;
-    color: var(--c-ink);
+    color: inherit;
 }
 
 .project-group-count {
-    min-width: 24px;
+    min-width: 22px;
     height: 22px;
-    padding: 0 8px;
+    padding: 0 7px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
-    background: var(--c-surface);
-    color: var(--c-ink-2);
-    font-size: var(--t-xs);
-    font-weight: 600;
-}
-
-.stage-dot {
-    width: 9px;
-    height: 9px;
-    flex-shrink: 0;
     border-radius: var(--r-full);
-    background: var(--stage-lead);
+    background: color-mix(in srgb, var(--stage-tone) 26%, var(--c-surface));
+    color: inherit;
+    font-size: var(--t-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
-
-.stage-dot.stage-in-progress { background: var(--stage-progress); box-shadow: 0 0 0 4px color-mix(in srgb, var(--stage-progress) 16%, transparent); }
-.stage-dot.stage-proposal { background: var(--stage-proposal); }
-.stage-dot.stage-negotiation { background: var(--stage-negotiation); }
-.stage-dot.stage-lead { background: var(--stage-lead); }
-.stage-dot.stage-complete { background: var(--stage-complete); }
 
 /* ---- Cards -------------------------------------------------------------- */
 

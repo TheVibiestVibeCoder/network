@@ -544,10 +544,11 @@
         }
     }
 
+    /** The same two letters as getInitials() in app.js. */
     function initials(name) {
         const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
         if (!parts.length) return '?';
-        return (parts.length === 1 ? parts[0].charAt(0) : parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+        return (parts.length === 1 ? parts[0].substring(0, 2) : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
     /** "Proposed by [Claude] 6 d ago" - the same line app.js draws as "Last edited by". */

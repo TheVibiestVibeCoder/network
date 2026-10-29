@@ -1324,16 +1324,25 @@
      * submenus, so there is nothing new to learn about how it behaves.
      */
     function assignSubmenuContent(row) {
+        return peopleMenuContent(assigneeKey(row), row.assigned_to_name, row.id,
+            'They see the row on their home page until a PDF is attached.');
+    }
+
+    /**
+     * The people list itself, shared by one row's menu and the selection bar.
+     * `current` is the key that gets the tick (null: none does, as when the
+     * selected rows are on different people's plates).
+     */
+    function peopleMenuContent(current, currentName, rowId, note) {
         const people = window.CRMPeople ? window.CRMPeople.list() : [];
-        const current = assigneeKey(row);
 
         let html = '<p class="bk-rowmenu-subhead">Waiting on</p>';
 
-        html += assignOption(row, '', 'Nobody', ICON_NOBODY, current === '', 'is-nobody');
+        html += assignOption(rowId, '', 'Nobody', ICON_NOBODY, current === '', 'is-nobody');
 
         people.forEach(person => {
             const key = person.id === null ? 'owner' : String(person.id);
-            html += assignOption(row, key, person.name, personFace(key, person.name), key === current);
+            html += assignOption(rowId, key, person.name, personFace(key, person.name), key === current);
         });
 
         // Somebody whose account has since been removed still has to appear,
@@ -1341,20 +1350,20 @@
         // it - and there would be no tick anywhere to explain the face on the
         // row.
         if (current && !people.some(p => (p.id === null ? 'owner' : String(p.id)) === current)) {
-            const name = row.assigned_to_name || 'Unknown';
-            html += assignOption(row, current, name, personFace(current, name), true);
+            const name = currentName || 'Unknown';
+            html += assignOption(rowId, current, name, personFace(current, name), true);
         }
 
-        html += '<p class="bk-rowmenu-subnote">They see the row on their home page until a PDF is attached.</p>';
+        html += `<p class="bk-rowmenu-subnote">${escapeHtml(note)}</p>`;
 
         return html;
     }
 
-    function assignOption(row, value, name, icon, isCurrent, extraClass) {
+    function assignOption(rowId, value, name, icon, isCurrent, extraClass) {
         return `
             <button type="button" class="bk-rowmenu-item bk-rowmenu-option${isCurrent ? ' is-current' : ''}${extraClass ? ' ' + extraClass : ''}"
                     role="menuitemradio" aria-checked="${isCurrent ? 'true' : 'false'}"
-                    data-assign-value="${escapeHtml(value)}" data-row-id="${row.id}">
+                    data-assign-value="${escapeHtml(value)}" data-row-id="${escapeHtml(String(rowId))}">
                 <span class="bk-rowmenu-item-icon">${icon}</span>
                 <span class="bk-rowmenu-item-label">${escapeHtml(name)}</span>
                 <span class="bk-rowmenu-item-tick">${isCurrent ? ICON_TICK : ''}</span>
@@ -1529,6 +1538,9 @@
         const returnFocus = panel.contains(document.activeElement);
         panel.remove();
 
+        els.assignSelectedBtn.classList.remove('is-open');
+        els.assignSelectedBtn.setAttribute('aria-expanded', 'false');
+
         els.tableWrap.querySelectorAll('.bk-row-menu-btn.is-open').forEach(btn => {
             btn.classList.remove('is-open');
             btn.setAttribute('aria-expanded', 'false');
@@ -1611,6 +1623,170 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // Actions on the selected rows (the selection bar)
+    // ------------------------------------------------------------------
+
+    function selectedRows() {
+        return state.rows.filter(r => state.selection.has(r.id));
+    }
+
+    function plural(count, word) {
+        return `${count} ${word}${count === 1 ? '' : 's'}`;
+    }
+
+    /**
+     * The people list for the whole selection, opened above its button. It
+     * takes the row menu's place (and id), so it closes the way that does: on
+     * Escape, a click elsewhere, scrolling the table or resizing the window.
+     */
+    function openBulkAssignMenu(button) {
+        const wasOpen = !!document.getElementById('bkRowMenu') && button.classList.contains('is-open');
+        closeRowMenu();
+        if (wasOpen) return;
+
+        const rows = selectedRows();
+        if (rows.length === 0) return;
+
+        // Ticked only when every selected row is on the same person's plate.
+        const keys = new Set(rows.map(assigneeKey));
+        const current = keys.size === 1 ? assigneeKey(rows[0]) : null;
+        const currentName = keys.size === 1 ? rows[0].assigned_to_name : null;
+
+        const panel = document.createElement('div');
+        panel.className = 'bk-rowmenu bk-rowmenu-sub';
+        panel.id = 'bkRowMenu';
+        panel.setAttribute('role', 'menu');
+        panel.setAttribute('aria-label', 'Waiting on');
+        panel.innerHTML = peopleMenuContent(current, currentName, '',
+            'Rows that already have their PDF are left as they are.');
+        document.body.appendChild(panel);
+
+        const r = button.getBoundingClientRect();
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - panel.offsetWidth - 8);
+        panel.style.left = `${left}px`;
+        panel.style.top = `${Math.max(8, r.top - panel.offsetHeight - 8)}px`;
+
+        button.classList.add('is-open');
+        button.setAttribute('aria-expanded', 'true');
+
+        panel.addEventListener('click', event => {
+            const option = event.target.closest('[data-assign-value]');
+            if (!option) return;
+            closeRowMenu();
+            assignRows(rows.map(row => row.id), option.dataset.assignValue);
+        });
+
+        const first = panel.querySelector('.bk-rowmenu-item');
+        if (first) first.focus();
+    }
+
+    async function assignRows(ids, value) {
+        try {
+            const response = await fetch('api/assign.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({
+                    type: 'bookkeeping',
+                    ids,
+                    assigned_to: value === '' ? null : value
+                })
+            });
+
+            const text = await response.text();
+            let payload;
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch (e) {
+                throw new Error('The server returned an unexpected response.');
+            }
+
+            if (!response.ok || payload.error) {
+                throw new Error(payload.error || 'Could not change the assignment.');
+            }
+
+            const data = payload.data || {};
+            const done = new Set(data.ids || []);
+            state.rows.forEach(row => {
+                if (!done.has(row.id)) return;
+                row.assigned_to = data.assigned_to;
+                row.assigned_to_name = data.assigned_to_name;
+            });
+            render();
+
+            let message = data.assigned_to_name
+                ? `${plural(done.size, 'row')} now waiting on ${data.assigned_to_name}`
+                : `${plural(done.size, 'row')} no longer assigned`;
+            if (data.skipped > 0) {
+                message += ` - ${plural(data.skipped, 'row')} already ${data.skipped === 1 ? 'has its' : 'have their'} PDF`;
+            }
+            showToast(message);
+
+            if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /**
+     * A row with its PDF has nothing to mark, so only the others count: when
+     * all of those are marked already, the button takes the mark off instead.
+     */
+    async function toggleNoPdfSelected() {
+        const rows = selectedRows().filter(r => !r.pdf);
+        if (rows.length === 0) {
+            showToast('All selected rows already have their PDF', true);
+            return;
+        }
+
+        const value = !rows.every(r => r.no_pdf_needed);
+        try {
+            await postJson('set-no-pdf', { ids: rows.map(r => r.id), value });
+            await load();
+            showToast(value
+                ? `${plural(rows.length, 'row')} marked as no PDF needed`
+                : `${plural(rows.length, 'row')} need a PDF again`);
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /** Like one row's exclude: asks before taking rows out, not before putting them back. */
+    function toggleExcludedSelected() {
+        const rows = selectedRows();
+        if (rows.length === 0) return;
+
+        if (rows.every(r => r.excluded)) {
+            setExcludedRows(rows.map(r => r.id), false);
+            return;
+        }
+
+        const ids = rows.filter(r => !r.excluded).map(r => r.id);
+        showConfirm({
+            title: 'Exclude from totals?',
+            message: `<p>${ids.length === 1 ? 'This entry stays' : `These <strong>${ids.length} entries</strong> stay`}
+                      in the list and keep any PDF, but stop counting towards their month's
+                      income, expenses and result.</p>`,
+            actions: [{
+                label: 'Exclude',
+                className: 'btn-primary',
+                handler: () => setExcludedRows(ids, true)
+            }]
+        });
+    }
+
+    async function setExcludedRows(ids, value) {
+        try {
+            await postJson('set-excluded', { ids, value });
+            closeMonthBreakdown();
+            await load();
+            const entries = ids.length === 1 ? '1 entry' : `${ids.length} entries`;
+            showToast(value ? `${entries} excluded from the totals` : `${entries} counted again`);
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
     /**
      * Open the table on one particular row and light it up briefly.
      *
@@ -1647,6 +1823,21 @@
         const count = state.selection.size;
         els.selectionBar.style.display = count > 0 ? 'flex' : 'none';
         els.selectionCount.textContent = count === 1 ? '1 row selected' : `${count} rows selected`;
+
+        // The two toggles say what a click would do to the selection now.
+        const rows = selectedRows();
+        const withoutPdf = rows.filter(r => !r.pdf);
+        const allMarked = withoutPdf.length > 0 && withoutPdf.every(r => r.no_pdf_needed);
+        els.noPdfSelectedLabel.textContent = allMarked ? 'PDF required' : 'No PDF needed';
+        els.noPdfSelectedBtn.disabled = withoutPdf.length === 0;
+        els.noPdfSelectedBtn.title = withoutPdf.length === 0
+            ? 'All selected rows already have their PDF'
+            : (allMarked ? 'Mark the selected rows as needing a PDF again' : 'Mark the selected rows as not needing a PDF');
+        const allExcluded = rows.length > 0 && rows.every(r => r.excluded);
+        els.excludeSelectedLabel.textContent = allExcluded ? 'Include' : 'Exclude';
+        els.excludeSelectedBtn.title = allExcluded
+            ? 'Count the selected rows in their month totals again'
+            : 'Leave the selected rows out of their month totals';
         els.rowCount.textContent = state.rows.length === 1 ? '1 entry' : `${state.rows.length} entries`;
     }
 
@@ -2832,6 +3023,11 @@
             dropPill: $('bkRowDropPill'),
             rowCount: $('bkRowCount'),
             selectionBar: $('bkSelectionBar'),
+            assignSelectedBtn: $('bkAssignSelectedBtn'),
+            noPdfSelectedBtn: $('bkNoPdfSelectedBtn'),
+            noPdfSelectedLabel: $('bkNoPdfSelectedLabel'),
+            excludeSelectedBtn: $('bkExcludeSelectedBtn'),
+            excludeSelectedLabel: $('bkExcludeSelectedLabel'),
             selectionCount: $('bkSelectionCount'),
             csvInput: $('bkCsvInput'),
             importCsvBtn: $('bkImportCsvBtn'),
@@ -2958,6 +3154,9 @@
             if (state.selection.size > 0) confirmDeleteRows(Array.from(state.selection));
         });
         els.exportSelectedBtn.addEventListener('click', exportSelected);
+        els.assignSelectedBtn.addEventListener('click', () => openBulkAssignMenu(els.assignSelectedBtn));
+        els.noPdfSelectedBtn.addEventListener('click', toggleNoPdfSelected);
+        els.excludeSelectedBtn.addEventListener('click', toggleExcludedSelected);
         els.clearSelectionBtn.addEventListener('click', () => {
             state.selection.clear();
             render();
@@ -3014,7 +3213,8 @@
             if (event.target.closest?.('#bkRowSubmenu')) return;
             // The dots themselves toggle the menu; leave that to the handler
             // on the table, or this would close what that is about to open.
-            if (event.target.closest?.('.bk-row-menu-btn')) return;
+            // The same goes for the selection bar's "Waiting on".
+            if (event.target.closest?.('.bk-row-menu-btn, #bkAssignSelectedBtn')) return;
             closeRowMenu();
         });
 

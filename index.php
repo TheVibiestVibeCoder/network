@@ -1062,6 +1062,25 @@ function assetUrl(string $path): string
                         <div class="bk-selection-bar" id="bkSelectionBar">
                             <span class="bk-selection-count" id="bkSelectionCount"></span>
                             <span class="bk-selection-sep" aria-hidden="true"></span>
+                            <button type="button" class="bk-sel-btn" id="bkAssignSelectedBtn" aria-haspopup="menu" aria-expanded="false" title="Hand the selected rows to somebody">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                </svg>
+                                <span>Waiting on</span>
+                            </button>
+                            <button type="button" class="bk-sel-btn" id="bkNoPdfSelectedBtn">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3.5" y1="20.5" x2="20.5" y2="3.5"/>
+                                </svg>
+                                <span id="bkNoPdfSelectedLabel">No PDF needed</span>
+                            </button>
+                            <button type="button" class="bk-sel-btn" id="bkExcludeSelectedBtn">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+                                    <path d="M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.8 11.8 0 0 0 23 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2.7 3.42 1.29 4.83l2.53 2.53A11.77 11.77 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.52 0 2.98-.29 4.32-.82l3.02 3.02 1.41-1.41L2.7 3.42zM7.53 11.07A4.6 4.6 0 0 0 7.5 12a4.5 4.5 0 0 0 6.44 4.06l-1.5-1.5A3 3 0 0 1 9 12l-.02-.2-1.45-1.45z"/>
+                                </svg>
+                                <span id="bkExcludeSelectedLabel">Exclude</span>
+                            </button>
+                            <span class="bk-selection-sep" aria-hidden="true"></span>
                             <button type="button" class="bk-sel-btn" id="bkExportSelectedBtn" title="Download all PDFs of the selected rows as a ZIP file">
                                 <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
                                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
