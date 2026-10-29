@@ -401,6 +401,17 @@ function assetUrl(string $path): string
     <title><?= htmlspecialchars(APP_NAME) ?></title>
 
     <!--
+        The CRM's mark: projects, to-dos, calendar and contacts as four tiles in
+        the company colours. favicon.ico (16/32/48, plain tiles at 16) for
+        browsers without SVG favicons; the apple-touch-icon is what Safari shows
+        in Favourites and on the home screen, full bleed because the system
+        rounds the corners itself.
+    -->
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+
+    <!--
         General Sans, served from this server rather than a font CDN: no
         third party learns who opens the CRM, and the page does not wait on
         anyone else's servers. The two weights used above the fold are
