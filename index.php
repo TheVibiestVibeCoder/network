@@ -11,6 +11,9 @@ require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Contact.php';
 require_once APP_ROOT . '/includes/Mailer.php';
+// Meeting assistant (test): see includes/MeetingAssistant.php
+require_once APP_ROOT . '/includes/Project.php';
+require_once APP_ROOT . '/includes/MeetingAssistant.php';
 
 // Start session
 Auth::startSession();
@@ -274,6 +277,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $isAuthenticated = Auth::isAuthenticated();
 $currentUser = Auth::currentUser();
 $isAdmin = Auth::isAdmin();
+// Meeting assistant (test): on while ANTHROPIC_API_KEY is set in .env.
+$meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
 
 // Get contact count for dashboard
 $contactCount = 0;
@@ -474,6 +479,10 @@ function assetUrl(string $path): string
          final word over the two stylesheets above. -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/design.css') ?>">
     <link rel="stylesheet" href="<?= assetUrl('assets/css/review.css') ?>">
+    <?php if ($meetingEnabled): ?>
+    <!-- Meeting assistant (test) -->
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/meeting.css') ?>">
+    <?php endif; ?>
 </head>
 <body>
     <?php if (!$isAuthenticated): ?>
@@ -807,7 +816,7 @@ function assetUrl(string $path): string
 
                 <div class="sidebar-foot">
                     <?php if ($isAdmin): ?>
-                    <button type="button" class="nav-item nav-item--quiet" id="manageUsersBtn" title="Manage users">
+                    <button type="button" class="toggle-btn nav-item nav-item--quiet" data-view="users" id="manageUsersBtn" title="Manage users">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.2 0 2.3.3 3.2.8"/><circle cx="17.5" cy="17" r="2.5"/><path d="M17.5 13v1.5M17.5 19.5V21M21.5 17H20M15 17h-1.5"/>
                         </svg>
@@ -944,6 +953,60 @@ function assetUrl(string $path): string
                 <!-- Bookkeeping View -->
                 <!-- From Claude: everything the MCP API proposed, waiting for a person.
                      Filled in by review.js. -->
+                <?php if ($isAdmin): ?>
+                <!-- Users (admins only): invite people, roles, access, and who may
+                     use which feature. Drawn by assets/js/users.js. -->
+                <div class="view-panel" id="usersView">
+                    <div class="view-head">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Users</h1>
+                            <p class="view-sub">Invite people and manage what they can do.</p>
+                        </div>
+                    </div>
+                    <div class="users-page">
+                        <!-- Invite -->
+                        <div class="users-invite">
+                            <form class="users-invite-form" id="inviteUserForm" autocomplete="off">
+                                <div class="users-invite-fields">
+                                    <input type="text" id="inviteName" class="form-input" placeholder="Name" maxlength="120" required>
+                                    <input type="email" id="inviteEmail" class="form-input" placeholder="Email" maxlength="255" required>
+                                    <select id="inviteRole" class="form-select">
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-primary" id="inviteSubmitBtn">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                        </svg>
+                                        Invite
+                                    </button>
+                                </div>
+                                <p class="users-invite-hint">
+                                    They receive an email with a link to choose their own password &mdash;
+                                    you never see or set it.
+                                </p>
+                            </form>
+                        </div>
+
+                        <!-- The generated link, shown after an invite or a resend -->
+                        <div class="users-link-box" id="usersLinkBox" hidden>
+                            <div class="users-link-head">
+                                <span class="users-link-title" id="usersLinkTitle">Invite link</span>
+                                <button type="button" class="users-link-dismiss" id="usersLinkDismiss" title="Dismiss">&times;</button>
+                            </div>
+                            <p class="users-link-note" id="usersLinkNote"></p>
+                            <div class="users-link-row">
+                                <input type="text" class="form-input" id="usersLinkInput" readonly>
+                                <button type="button" class="btn btn-secondary" id="usersLinkCopy">Copy</button>
+                            </div>
+                        </div>
+
+                        <!-- Account list -->
+                        <div class="users-list" id="usersList"></div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <div class="view-panel" id="reviewView">
                     <div class="view-head">
                         <div class="view-head-text">
@@ -1314,6 +1377,15 @@ function assetUrl(string $path): string
                                 <input type="text" id="searchProjectsInput" placeholder="Search projects..." class="search-input">
                             </div>
                             <div class="list-header-actions">
+                                <?php if ($meetingEnabled): ?>
+                                <!-- Meeting assistant (test): assets/js/meeting.js -->
+                                <button type="button" class="btn btn-secondary" id="startMeetingBtn" title="Go through the projects with Claude">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H11l-4.5 3.5V16.5h-2a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>
+                                    </svg>
+                                    <span id="startMeetingLabel">Start meeting</span>
+                                </button>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-primary" id="addProjectBtn" title="Add Project">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -2320,71 +2392,6 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <?php if ($isAdmin): ?>
-        <!-- User Management (admin only) -->
-        <div class="modal" id="usersModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <div class="overview-header-info">
-                        <div class="import-export-icon">
-                            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                            </svg>
-                        </div>
-                        <div class="overview-title-info">
-                            <h2>Users</h2>
-                            <p class="overview-company">Invite people and manage what they can do</p>
-                        </div>
-                    </div>
-                    <button type="button" class="modal-close" id="closeUsersModal">&times;</button>
-                </div>
-
-                <div class="modal-body">
-                    <!-- Invite -->
-                    <div class="users-invite">
-                        <form class="users-invite-form" id="inviteUserForm" autocomplete="off">
-                            <div class="users-invite-fields">
-                                <input type="text" id="inviteName" class="form-input" placeholder="Name" maxlength="120" required>
-                                <input type="email" id="inviteEmail" class="form-input" placeholder="Email" maxlength="255" required>
-                                <select id="inviteRole" class="form-select">
-                                    <option value="member">Member</option>
-                                    <option value="admin">Admin</option>
-                                </select>
-                                <button type="submit" class="btn btn-primary" id="inviteSubmitBtn">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                                    </svg>
-                                    Invite
-                                </button>
-                            </div>
-                            <p class="users-invite-hint">
-                                They receive an email with a link to choose their own password &mdash;
-                                you never see or set it.
-                            </p>
-                        </form>
-                    </div>
-
-                    <!-- The generated link, shown after an invite or a resend -->
-                    <div class="users-link-box" id="usersLinkBox" hidden>
-                        <div class="users-link-head">
-                            <span class="users-link-title" id="usersLinkTitle">Invite link</span>
-                            <button type="button" class="users-link-dismiss" id="usersLinkDismiss" title="Dismiss">&times;</button>
-                        </div>
-                        <p class="users-link-note" id="usersLinkNote"></p>
-                        <div class="users-link-row">
-                            <input type="text" class="form-input" id="usersLinkInput" readonly>
-                            <button type="button" class="btn btn-secondary" id="usersLinkCopy">Copy</button>
-                        </div>
-                    </div>
-
-                    <!-- Account list -->
-                    <div class="users-list" id="usersList"></div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- Bookkeeping: Toast -->
         <div class="bk-toast" id="bkToast"></div>
 
@@ -2413,6 +2420,10 @@ function assetUrl(string $path): string
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
+        <?php if ($meetingEnabled): ?>
+        <!-- Meeting assistant (test) -->
+        <script src="<?= assetUrl('assets/js/meeting.js') ?>"></script>
+        <?php endif; ?>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>

@@ -15,6 +15,10 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Mailer.php';
+// Meeting assistant (test): for the "Meeting" permission on the Users page.
+if (is_file(APP_ROOT . '/includes/MeetingAssistant.php')) {
+    require_once APP_ROOT . '/includes/MeetingAssistant.php';
+}
 
 header('Content-Type: application/json');
 Auth::sendSecurityHeaders();
@@ -87,6 +91,8 @@ function handleList(User $model): void
             'is_owner' => (bool) ($me['is_owner'] ?? false),
         ],
         'owner_name' => OWNER_DISPLAY_NAME,
+        // Meeting assistant (test): the permission is only offered while it is on.
+        'meeting_available' => class_exists('MeetingAssistant') && MeetingAssistant::enabled(),
     ]);
 }
 
@@ -186,6 +192,17 @@ function handleUpdate(User $model, ?int $id, string $action): void
     $input = Auth::getJsonInput();
     if (!is_array($input)) {
         respondError('Invalid request body.', 400);
+    }
+
+    // --- Meeting assistant (test): permission to use it --------------------
+    if (array_key_exists('can_meeting', $input)) {
+        $allowed = (bool) $input['can_meeting'];
+        $model->setMeetingAccess($id, $allowed);
+        $updated = $model->getById($id);
+        logAccountEvent('updated', $updated, ($allowed ? 'Meeting-Funktion freigegeben: ' : 'Meeting-Funktion entzogen: ') . $updated['name']);
+
+        echo json_encode(['success' => true, 'data' => $updated]);
+        return;
     }
 
     // --- Status change (enable / disable) ---------------------------------

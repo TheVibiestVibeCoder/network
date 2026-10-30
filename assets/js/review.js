@@ -1488,7 +1488,9 @@
 
     async function decideCluster(key, action) {
         if (state.bulk) return;
-        const items = state.items.filter(i => i.status === 'pending' && recordKey(i) === key && !state.busy.has(i.id));
+        // A cluster can also be listed outside this screen (renderItems).
+        const known = state.items.concat([...panelItems.values()].filter(p => !state.items.some(i => i.id === p.id)));
+        const items = known.filter(i => i.status === 'pending' && recordKey(i) === key && !state.busy.has(i.id));
         if (items.length === 0) return;
 
         const ask = confirmFor(items, action);
@@ -1929,13 +1931,63 @@
         notifyChanged({ action: entry.action, kind: 'create', entity_type: entityType, entity_id: entityId });
     }
 
+    // ------------------------------------------------------------------
+    // Proposals listed somewhere else (the project meeting's summary)
+    // ------------------------------------------------------------------
+
+    /**
+     * Decide on proposals shown outside this screen, on the same path as
+     * here: the same questions first where a decision outlasts Undo, then
+     * the few seconds Undo has. Resolves to whether the decision was made.
+     */
+    async function decideItems(items, action) {
+        const open = (items || []).filter(i => i && i.status === 'pending' && !heldIds.has(i.id));
+        if (open.length === 0) return false;
+
+        const ask = confirmFor(open, action);
+        if (ask && !(await askConfirm(ask))) return false;
+
+        // Known here for as long as the decision waits, like the panel's rows.
+        open.forEach(item => panelItems.set(item.id, item));
+        const verb = action === 'reject' ? 'Rejected' : 'Accepted';
+        hold(open, action, null, open.length === 1 ? verb : `${verb} ${open.length}`);
+        return true;
+    }
+
+    /**
+     * Proposals drawn exactly as this screen draws them - a row each, several
+     * about one record as a cluster - for another place (the meeting's
+     * summary). Their own buttons decide them, like a record panel's rows.
+     */
+    function renderItems(items) {
+        const byRecord = new Map();
+        (items || []).forEach(item => {
+            panelItems.set(item.id, item);
+            const key = recordKey(item);
+            if (!byRecord.has(key)) byRecord.set(key, []);
+            byRecord.get(key).push(item);
+        });
+        const records = [...byRecord.values()].map(list => list.sort((a, b) => kindRank(a) - kindRank(b)));
+        return `<div class="review-list-card">${records.map(list =>
+            list.length > 1 && list.every(i => i.status === 'pending') ? renderCluster(list) : list.map(renderRow).join('')
+        ).join('')}</div>`;
+    }
+
+    /** Decided, but still within its Undo seconds. */
+    function isHeld(id) {
+        return heldIds.has(Number(id));
+    }
+
     window.CRMReview = {
         load,
         refreshBadge,
         renderRecordPanel,
         badge,
         changeBadge,
-        inlineActions
+        inlineActions,
+        decideItems,
+        isHeld,
+        renderItems
     };
 
     if (document.readyState === 'loading') {

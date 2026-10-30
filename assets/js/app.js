@@ -83,7 +83,11 @@
         // exists, applied right after (saveProjectEdit). null otherwise.
         projectDraft: null,
         // How the to-do sheet was opened for a new to-do (openNewTodo).
-        todoSheetContext: null
+        todoSheetContext: null,
+        // The project sheet was opened just to edit, and closes after it.
+        projectCloseAfterEdit: false,
+        // Links added to a new to-do, saved once it is created: [{ key, url, title }].
+        newTodoLinks: []
     };
 
     // ============================================
@@ -97,6 +101,7 @@
         bookkeepingView: document.getElementById('bookkeepingView'),
         financialsView: document.getElementById('financialsView'),
         reviewView: document.getElementById('reviewView'),
+        usersView: document.getElementById('usersView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -1389,7 +1394,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'financials', 'review'];
+    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'financials', 'review', 'users'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1407,8 +1412,8 @@
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
 
-        // Bookkeeping and Financials are only on the page for admins.
-        if ((stored === 'financials' || stored === 'bookkeeping') && !document.getElementById(stored + 'View')) return HOME_VIEW;
+        // Bookkeeping, Financials and Users are only on the page for admins.
+        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1461,6 +1466,9 @@
         if (elements.reviewView) {
             elements.reviewView.classList.toggle('active', view === 'review');
         }
+        if (elements.usersView) {
+            elements.usersView.classList.toggle('active', view === 'users');
+        }
 
         // Refresh data for the active view
         if (view === 'workload') {
@@ -1489,6 +1497,10 @@
         } else if (view === 'review') {
             if (window.CRMReview) {
                 window.CRMReview.load();
+            }
+        } else if (view === 'users') {
+            if (window.CRMUsers) {
+                window.CRMUsers.open();
             }
         } else {
             // Contacts always opens as the list; the map is one tap away.
@@ -2357,6 +2369,7 @@
         state.todoSheetContext = null;
         state.viewingTodoId = null;
         state.viewingTodo = null;
+        state.newTodoLinks = [];
     }
 
     // ---- Editing and creating a to-do in its sheet ---------------------------
@@ -2420,8 +2433,8 @@
     }
 
     /**
-     * A new to-do: the sheet in edit mode with empty fields. Links belong to
-     * a saved to-do, so they appear once it has been created.
+     * A new to-do: the sheet in edit mode with empty fields. Links added now
+     * are held (state.newTodoLinks) and saved right after the to-do is created.
      */
     async function openNewTodo(context = null) {
         if (!elements.todoDetailModal) return;
@@ -2432,6 +2445,8 @@
         state.viewingTodoId = null;
         state.viewingTodo = null;
         state.todoSheetContext = context;
+        state.newTodoLinks = [];
+        renderTodoDetailLinks([]);
 
         elements.todoDetailTitle.textContent = 'New To-Do';
         elements.todoDetailContext.innerHTML = '';
@@ -2496,7 +2511,8 @@
             stageProjectTodo({
                 ...payload,
                 assign_to: assignOption ? assignSelect.value : '',
-                assigned_to_name: assignOption ? assignOption.textContent : ''
+                assigned_to_name: assignOption ? assignOption.textContent : '',
+                links: state.newTodoLinks.slice()
             });
             closeTodoDetail();
             return;
@@ -2531,7 +2547,24 @@
                     }
                 }
 
-                // A created to-do opens as itself, ready for links.
+                // The links added while creating it, now that it exists. The
+                // server reads a document's name where none was given.
+                const links = state.newTodoLinks.slice();
+                const failedLinks = [];
+                for (const link of newId ? links : []) {
+                    try {
+                        const added = await api.addTodoLink(newId, link.url, link.title);
+                        if (!added.success) failedLinks.push(link.url);
+                    } catch (error) {
+                        failedLinks.push(link.url);
+                    }
+                }
+                state.newTodoLinks = [];
+                if (failedLinks.length > 0) {
+                    alert('The to-do was created, but these links could not be added:\n' + failedLinks.join('\n'));
+                }
+
+                // A created to-do opens as itself, with its links.
                 exitTodoEdit();
                 elements.todoDetailModal.classList.remove('is-new');
                 if (newId) await openTodoDetail(newId);
@@ -2566,12 +2599,17 @@
         e.preventDefault();
         const todoId = state.viewingTodoId;
         const url = elements.todoLinkUrl.value.trim();
-        if (!todoId) return;
         if (!url) {
             elements.todoLinkUrl.classList.add('is-invalid');
             elements.todoLinkUrl.focus();
             return;
         }
+
+        if (isNewTodo()) {
+            holdNewTodoLink(url, elements.todoLinkTitle.value.trim());
+            return;
+        }
+        if (!todoId) return;
 
         // Reading a document's name from Google can take a moment.
         elements.saveTodoLinkBtn.disabled = true;
@@ -2592,6 +2630,51 @@
             elements.saveTodoLinkBtn.disabled = false;
             elements.saveTodoLinkBtn.textContent = 'Add link';
         }
+    }
+
+    /**
+     * A link for a to-do not created yet: checked like the server does
+     * (TodoLink::normalizeUrl - http(s), an address without a scheme taken as
+     * https) and listed until the to-do is created.
+     */
+    function holdNewTodoLink(rawUrl, title) {
+        const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawUrl) ? rawUrl : 'https://' + rawUrl;
+        let valid = false;
+        try {
+            const parsed = new URL(url);
+            // The browser would quietly encode a space in the host ("a%20b");
+            // the server refuses such an address, so it is refused here too.
+            valid = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !!parsed.hostname
+                && !/\s/.test(url) && !parsed.hostname.includes('%') && url.length <= 2000;
+        } catch (error) {
+            valid = false;
+        }
+        if (!valid) {
+            elements.todoLinkUrl.classList.add('is-invalid');
+            elements.todoLinkUrl.focus();
+            return;
+        }
+
+        state.newTodoLinks.push({ key: 'new-' + (++newTodoLinkSeq), url, title });
+        closeTodoLinkForm();
+        renderNewTodoLinks();
+    }
+
+    let newTodoLinkSeq = 0;
+
+    /** The held links, as the sheet's ordinary link rows. */
+    function renderNewTodoLinks() {
+        renderTodoDetailLinks(state.newTodoLinks.map(link => {
+            const kind = window.TodoLinks.kindOf(link.url);
+            return {
+                id: link.key,
+                url: link.url,
+                kind,
+                // Without a name of its own, the kind stands in until the
+                // server reads the document's name on creation.
+                title: link.title || window.TodoLinks.kindLabel({ kind, url: link.url })
+            };
+        }));
     }
 
     async function deleteTodoLink(linkId) {
@@ -2696,7 +2779,11 @@
 
         elements.todoLinksList.addEventListener('click', (e) => {
             const remove = e.target.closest('[data-link-delete]');
-            if (remove) {
+            if (!remove) return;
+            if (isNewTodo()) {
+                state.newTodoLinks = state.newTodoLinks.filter(link => link.key !== remove.dataset.linkDelete);
+                renderNewTodoLinks();
+            } else {
                 deleteTodoLink(Number(remove.dataset.linkDelete));
             }
         });
@@ -4873,10 +4960,16 @@
         }
     }
 
-    async function openProjectOverview(projectId) {
+    /**
+     * Open a project's sheet. { edit: true } opens it straight in edit mode;
+     * with { closeAfterEdit: true } saving or cancelling then closes it again,
+     * for callers that only open it to change something (the meeting).
+     */
+    async function openProjectOverview(projectId, { edit = false, closeAfterEdit = false } = {}) {
         try {
             state.projectDraft = null;
             state.viewingProjectId = projectId;
+            state.projectCloseAfterEdit = closeAfterEdit;
 
             // Ensure contacts are loaded for autocomplete
             if (!state.contacts || state.contacts.length === 0) {
@@ -4901,6 +4994,7 @@
                     todosResult.success ? (todosResult.data || []) : []
                 );
                 elements.projectOverviewModal.classList.add('active');
+                if (edit) enterProjectEdit();
             } else {
                 alert('Error: ' + projectResult.error);
             }
@@ -5209,6 +5303,7 @@
 
     function closeProjectOverview() {
         state.projectDraft = null;
+        state.projectCloseAfterEdit = false;
         elements.projectOverviewModal.classList.remove('active');
         exitProjectEdit();
         elements.projectOverviewModal.classList.remove('is-new');
@@ -5330,7 +5425,7 @@
 
     /** Cancel leaves edit mode; for a project not yet created, it closes the sheet. */
     function cancelProjectEdit() {
-        if (isNewProject()) {
+        if (isNewProject() || state.projectCloseAfterEdit) {
             closeProjectOverview();
         } else {
             exitProjectEdit();
@@ -5405,9 +5500,14 @@
                 }
                 exitProjectEdit();
                 elements.projectOverviewModal.classList.remove('is-new');
-                await openProjectOverview(savedId);
                 loadProjects();
                 refreshHome();
+                // Opened only to change something: done once it is saved.
+                if (!creating && state.projectCloseAfterEdit) {
+                    closeProjectOverview();
+                    return;
+                }
+                await openProjectOverview(savedId);
             } else {
                 alert('Error: ' + result.error);
             }
@@ -5559,6 +5659,11 @@
                 });
                 if (created.success && todo.assign_to && created.data && created.data.id) {
                     await saveAssignment('todo', created.data.id, todo.assign_to);
+                }
+                if (created.success && created.data && created.data.id) {
+                    for (const link of todo.links || []) {
+                        await attempt(`Link on "${todo.title}"`, () => api.addTodoLink(created.data.id, link.url, link.title));
+                    }
                 }
                 return created;
             });

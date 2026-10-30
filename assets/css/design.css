@@ -4373,8 +4373,7 @@ input[type="checkbox"] {
 @media (min-width: 769px) {
     #overviewModal,
     #projectOverviewModal,
-    #companyNotesModal,
-    #usersModal {
+    #companyNotesModal {
         justify-content: flex-end;
         align-items: stretch;
         padding: 12px;
@@ -4382,19 +4381,13 @@ input[type="checkbox"] {
 
     #overviewModal .modal-content,
     #projectOverviewModal .modal-content,
-    #companyNotesModal .modal-content,
-    #usersModal .modal-content {
+    #companyNotesModal .modal-content {
         width: min(600px, 100%);
         max-width: 600px;
         height: 100%;
         max-height: none;
         border-radius: var(--r-xl);
         animation: dsSheetIn var(--dur-3) var(--ease) both;
-    }
-
-    #usersModal .modal-content {
-        width: min(680px, 100%);
-        max-width: 680px;
     }
 }
 
@@ -4914,8 +4907,7 @@ a.detail-value:hover,
 @media (min-width: 769px) {
     #overviewModal .modal-backdrop,
     #projectOverviewModal .modal-backdrop,
-    #companyNotesModal .modal-backdrop,
-    #usersModal .modal-backdrop {
+    #companyNotesModal .modal-backdrop {
         background: rgba(28, 50, 88, 0.18);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -4923,8 +4915,7 @@ a.detail-value:hover,
 
     :root[data-theme="dark"] #overviewModal .modal-backdrop,
     :root[data-theme="dark"] #projectOverviewModal .modal-backdrop,
-    :root[data-theme="dark"] #companyNotesModal .modal-backdrop,
-    :root[data-theme="dark"] #usersModal .modal-backdrop {
+    :root[data-theme="dark"] #companyNotesModal .modal-backdrop {
         background: rgba(3, 8, 16, 0.45);
     }
 }
@@ -6868,9 +6859,8 @@ details.import-instructions p {
     justify-content: flex-end;
 }
 
-/* A to-do not yet created: no status, links, history or Claude proposals
-   yet. The assignee stays - it is applied right after the to-do is created. */
-#todoDetailModal.is-new .ov-section,
+/* A to-do not yet created: no status, history or Claude proposals yet. The
+   assignee and links stay - both are saved right after the to-do is created. */
 #todoDetailModal.is-new .tdetail-status-item,
 #todoDetailModal.is-new #todoDetailEdited,
 #todoDetailModal.is-new #todoDetailReview,
@@ -10592,5 +10582,58 @@ details.import-instructions p {
 
     .fin-head-tools {
         width: 100%;
+    }
+}
+
+/* ---- Users page --------------------------------------------------------- */
+
+/* What used to fill the users sheet, as one card on its own page. */
+.users-page {
+    max-width: 980px;
+    padding: 22px 24px 24px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+}
+
+/* A permission someone has or not: a checkbox with its name, before the role. */
+.user-permission {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    margin-right: 6px;
+    padding: 0 10px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.user-permission:hover {
+    border-color: var(--c-line-strong, var(--c-line));
+}
+
+.user-permission input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--c-accent);
+    cursor: pointer;
+}
+
+.user-permission:has(input:checked) {
+    background: var(--c-accent-soft);
+    border-color: color-mix(in srgb, var(--c-accent) 40%, transparent);
+    color: var(--c-accent);
+}
+
+@media (max-width: 720px) {
+    .users-page {
+        padding: 16px;
     }
 }

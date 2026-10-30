@@ -1,0 +1,653 @@
+/* ==========================================================================
+   Meeting assistant (TEST) - assets/js/meeting.js
+   A wide window over the Projects tab: the project's details on the left,
+   what Claude should do on the right, the way through at the foot.
+   ========================================================================== */
+
+#meetingModal .meeting-content {
+    display: flex;
+    flex-direction: column;
+    width: min(1120px, 100%);
+    max-width: none;
+    height: min(820px, calc(100dvh - 48px));
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ---- Head ------------------------------------------------------------------ */
+
+.meeting-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--c-line);
+}
+
+.meeting-head-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.meeting-position {
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.meeting-test-tag {
+    padding: 1px 7px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.meeting-title {
+    margin: 0;
+    color: var(--c-ink);
+    font-size: var(--t-xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.meeting-company {
+    margin: 2px 0 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+.meeting-stage {
+    --stage-tone: var(--stage-lead);
+    padding: 2px 9px;
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--stage-tone) 16%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.meeting-stage.stage-in-progress { --stage-tone: var(--stage-progress); }
+.meeting-stage.stage-proposal { --stage-tone: var(--stage-proposal); }
+.meeting-stage.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.meeting-stage.stage-complete { --stage-tone: var(--stage-complete); }
+
+.meeting-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.meeting-icon-btn:hover {
+    background: var(--c-tint);
+    color: var(--c-ink);
+}
+
+/* ---- Body: details | input --------------------------------------------- */
+
+.meeting-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    flex: 1;
+    min-height: 0;
+}
+
+.meeting-details {
+    padding: 18px 24px 24px;
+    overflow-y: auto;
+    border-right: 1px solid var(--c-line);
+    background: var(--c-sunken);
+}
+
+/* The details read like the project's own sheet: the same sections, fact
+   grid, to-do rows and notes (design.css). What that sheet scopes to
+   #projectOverviewModal is repeated here for this window. */
+#meetingModal .overview-section {
+    margin-bottom: 22px;
+}
+
+#meetingModal .overview-section:last-child {
+    margin-bottom: 0;
+}
+
+#meetingModal .overview-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#meetingModal .ptodo {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--c-line-2);
+    border-radius: 0;
+}
+
+#meetingModal .ptodo:last-child {
+    border-bottom: 0;
+}
+
+/* A to-do's title opens its sheet, to edit or reassign it. */
+#meetingModal .ptodo-title {
+    cursor: pointer;
+}
+
+#meetingModal .ptodo.todo-completed .ptodo-title {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+    text-decoration-color: var(--c-ink-4);
+}
+
+/* Contacts as chips side by side, as in the project sheet. */
+#meetingModal .project-contacts-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#meetingModal .pcontact-chip {
+    cursor: default;
+}
+
+.meeting-notes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#meetingModal .note-item {
+    padding: 8px 12px;
+}
+
+#meetingModal .note-header {
+    margin-bottom: 2px;
+}
+
+#meetingModal .note-item {
+    cursor: pointer;
+}
+
+#meetingModal .note-content {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+/* Clicked open: the whole note. */
+#meetingModal .note-item.is-open .note-content {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+}
+
+/* A project or to-do sheet opened from the meeting goes over it. */
+#meetingModal.is-under {
+    z-index: 990;
+}
+
+.meeting-note-author {
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+}
+
+.meeting-description {
+    white-space: pre-line;
+}
+
+.meeting-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meeting-claude-mark {
+    color: var(--c-claude);
+}
+
+.meeting-input {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    padding: 18px 24px 20px;
+    overflow-y: auto;
+}
+
+.meeting-label {
+    color: var(--c-ink-2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+}
+
+.meeting-text {
+    flex: 1 0 220px;
+    width: 100%;
+    resize: none;
+    line-height: 1.55;
+}
+
+.meeting-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    line-height: 1.45;
+}
+
+.meeting-hint svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--c-claude);
+}
+
+/* ---- What was handed to Claude ----------------------------------------- */
+
+.meeting-jobs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.meeting-job {
+    padding: 10px 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    font-size: var(--t-sm);
+}
+
+.meeting-job-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-ink-2);
+    font-weight: 600;
+}
+
+.meeting-job-head .btn {
+    margin-left: auto;
+}
+
+.meeting-job--done .meeting-job-head { color: var(--c-success-ink); }
+.meeting-job--failed { border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); background: var(--c-danger-soft); }
+.meeting-job--failed .meeting-job-head { color: var(--c-danger-ink); }
+
+.meeting-job-text {
+    margin: 6px 0 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    white-space: pre-line;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.meeting-job-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.meeting-job-items li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    color: var(--c-ink);
+    font-size: var(--t-xs);
+}
+
+.meeting-kind {
+    flex-shrink: 0;
+    min-width: 72px;
+    color: var(--c-claude);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.meeting-job-failed {
+    margin: 6px 0 0;
+    color: var(--c-danger-ink);
+    font-size: var(--t-xs);
+}
+
+.meeting-error {
+    color: var(--c-danger-ink);
+    font-size: var(--t-sm);
+}
+
+.meeting-spinner {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border: 2px solid color-mix(in srgb, var(--c-claude) 30%, transparent);
+    border-top-color: var(--c-claude);
+    border-radius: var(--r-full);
+    animation: meeting-spin 0.8s linear infinite;
+}
+
+@keyframes meeting-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .meeting-spinner { animation: none; }
+}
+
+/* ---- Foot --------------------------------------------------------------- */
+
+.meeting-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--c-line);
+    background: var(--c-surface);
+}
+
+.meeting-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    font-weight: 500;
+}
+
+.meeting-nav {
+    display: flex;
+    gap: 8px;
+}
+
+/* ---- After the meeting ---------------------------------------------------- */
+
+.meeting-summary {
+    flex: 1;
+    min-height: 0;
+    padding: 18px 24px;
+    overflow-y: auto;
+}
+
+.meeting-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--c-line);
+    font-size: var(--t-sm);
+}
+
+.meeting-summary-name {
+    color: var(--c-ink);
+    font-weight: 600;
+}
+
+.meeting-summary-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-ink-2);
+}
+
+.meeting-summary-row.meeting-job--done .meeting-summary-state { color: var(--c-success-ink); }
+.meeting-summary-row.meeting-job--failed .meeting-summary-state { color: var(--c-danger-ink); }
+
+/* ---- Narrow screens: one column, details above ---------------------------- */
+
+@media (max-width: 820px) {
+    #meetingModal .meeting-content {
+        height: calc(100dvh - 24px);
+    }
+
+    .meeting-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    }
+
+    .meeting-details {
+        border-right: 0;
+        border-bottom: 1px solid var(--c-line);
+    }
+
+    .meeting-foot {
+        flex-wrap: wrap;
+    }
+
+    .meeting-status {
+        order: -1;
+        flex-basis: 100%;
+    }
+
+    .meeting-nav {
+        margin-left: auto;
+    }
+}
+
+/* ---- Head buttons ----------------------------------------------------------- */
+
+.meeting-head-actions {
+    display: flex;
+    gap: 2px;
+}
+
+/* ---- Minimized: a small panel in the corner -------------------------------
+   Project and text field only, so the CRM stays usable behind it. */
+
+.meeting-mini {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 950;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 12px 12px 14px 14px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    box-shadow: var(--e-4, 0 12px 32px rgba(28, 50, 88, 0.18));
+    animation: dsDialogIn var(--dur-3) var(--ease) both;
+}
+
+.meeting-mini[hidden] {
+    display: none;
+}
+
+.meeting-mini-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meeting-mini-dot {
+    --stage-tone: var(--stage-lead);
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: var(--r-full);
+    background: var(--stage-tone);
+}
+
+.meeting-mini-dot.stage-in-progress { --stage-tone: var(--stage-progress); }
+.meeting-mini-dot.stage-proposal { --stage-tone: var(--stage-proposal); }
+.meeting-mini-dot.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+
+.meeting-mini-title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.meeting-mini-name {
+    overflow: hidden;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meeting-mini-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+}
+
+.meeting-mini .meeting-icon-btn {
+    width: 30px;
+    height: 30px;
+}
+
+.meeting-mini-text {
+    width: 100%;
+    min-height: 96px;
+    resize: vertical;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+    .meeting-mini {
+        right: 12px;
+        bottom: calc(var(--tabbar-h, 0px) + 12px + env(safe-area-inset-bottom));
+    }
+}
+
+/* "Go to From Claude" in Claude's own colour: outlined, not filled, so the
+   ways to finish stay the main buttons. */
+.btn.meeting-claude-btn {
+    background: var(--c-surface);
+    border-color: var(--c-claude);
+    color: var(--c-claude);
+}
+
+.btn.meeting-claude-btn:hover:not(:disabled) {
+    background: var(--c-claude-soft, color-mix(in srgb, var(--c-claude) 10%, var(--c-surface)));
+    border-color: var(--c-claude-2, var(--c-claude));
+    color: var(--c-claude-2, var(--c-claude));
+}
+
+.btn.meeting-claude-btn .meeting-claude-mark {
+    color: currentColor;
+}
+
+/* From Claude's own questions ("Delete for good?") must come up over the
+   meeting when a decision is made from its summary. */
+.modal.review-confirm.active {
+    z-index: 1050;
+}
+
+/* ---- Summary: this meeting's proposals, project by project ----------------
+   Drawn by From Claude itself (CRMReview.renderItems): the same rows,
+   clusters, buttons and detail sheet. This only arranges them - one group
+   per project, on the app's background like the From Claude screen. */
+
+#meetingModal .meeting-summary {
+    background: var(--c-bg);
+}
+
+.mrev-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+}
+
+.mrev-group-head .review-group-title {
+    margin: 0;
+}
+
+.mrev-group-head .meeting-stage {
+    font-size: var(--t-xs);
+}
+
+/* What was already decided reads quieter than what still waits. */
+.mrev-decided {
+    margin-top: 12px;
+}
+
+.mrev-decided .review-list-card {
+    box-shadow: none;
+    opacity: 0.85;
+}
+
+.mrev-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+.mrev-problem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--c-danger) 40%, transparent);
+    border-radius: var(--r-md);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+    font-size: var(--t-sm);
+}
+
+.mrev-unsent {
+    margin-top: 18px;
+}
+
+/* A proposal's detail sheet, opened from a row here, comes up over the meeting. */
+#reviewDetailModal.active {
+    z-index: 1050;
+}
+
+/* "Finish & accept all" in the positive green, like accepting elsewhere. */
+.btn.meeting-accept-btn,
+.btn.meeting-accept-btn:hover:not(:disabled) {
+    background: var(--c-success);
+    border-color: var(--c-success);
+    color: #FFFFFF;
+}
+
+.btn.meeting-accept-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--c-success) 86%, #000);
+    border-color: color-mix(in srgb, var(--c-success) 86%, #000);
+}

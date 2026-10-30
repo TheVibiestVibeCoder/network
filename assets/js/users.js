@@ -5,8 +5,9 @@
  * Passwords never pass through here: an invite produces a one-time link and the
  * person on the other end chooses their own.
  *
- * Self-contained module; the panel is opened from the header button, which
- * index.php only renders for administrators.
+ * Self-contained module drawing the Users page (#usersView), which index.php
+ * only renders for administrators; app.js switches to it like any other view
+ * and calls CRMUsers.open() to fill it.
  */
 (function () {
     'use strict';
@@ -16,7 +17,9 @@
     const state = {
         users: [],
         me: null,
-        busy: false
+        busy: false,
+        // Meeting assistant (test): whether its permission is offered at all.
+        meetingAvailable: false
     };
 
     const els = {};
@@ -152,6 +155,14 @@
 
         const resendTitle = isPending ? 'Resend invite link' : 'Send a password reset link';
 
+        // Meeting assistant (test): who may run a project meeting with Claude.
+        const meetingControl = state.meetingAvailable
+            ? `<label class="user-permission" title="${user.can_meeting ? 'Can run project meetings with Claude - click to take it away' : 'Let them run project meetings with Claude'}">
+                   <input type="checkbox" data-user-action="meeting" data-user-id="${user.id}" ${user.can_meeting ? 'checked' : ''}>
+                   <span>Meeting</span>
+               </label>`
+            : '';
+
         const toggleBtn = isSelf
             ? ''
             : `<button type="button" class="user-action-btn" data-user-action="${isDisabled ? 'enable' : 'disable'}" data-user-id="${user.id}" title="${isDisabled ? 'Enable account' : 'Disable account'}">
@@ -183,6 +194,7 @@
                 </div>
                 <div class="user-row-meta">${meta}</div>
                 <div class="user-row-actions">
+                    ${meetingControl}
                     ${roleControl}
                     <button type="button" class="user-action-btn" data-user-action="resend" data-user-id="${user.id}" title="${resendTitle}">
                         ${ICON_LINK}
@@ -259,6 +271,7 @@
             const result = await api('');
             state.users = result.data || [];
             state.me = result.me || null;
+            state.meetingAvailable = !!result.meeting_available;
             render();
         } catch (e) {
             els.list.innerHTML =
@@ -314,6 +327,21 @@
         }
     }
 
+    /** Meeting assistant (test): give or take away the meeting permission. */
+    async function setMeetingAccess(userId, allowed) {
+        try {
+            await api('?id=' + encodeURIComponent(userId), {
+                method: 'PATCH',
+                body: JSON.stringify({ can_meeting: allowed })
+            });
+            showToast(allowed ? 'Can now run project meetings.' : 'Meeting permission removed.');
+            await load();
+        } catch (e) {
+            showToast(e.message, true);
+            await load();
+        }
+    }
+
     async function setStatus(userId, status) {
         try {
             await api('?id=' + encodeURIComponent(userId), {
@@ -362,9 +390,12 @@
     // Wiring
     // ------------------------------------------------------------------
 
+    /** Fill the Users page; app.js calls this whenever it is switched to. */
     async function openPanel() {
-        if (!els.modal) return;
-        els.modal.classList.add('active');
+        // app.js may switch to the page on load before this script's own
+        // DOMContentLoaded handler has run.
+        init();
+        if (!els.page) return;
         hideLink();
 
         // Refresh faces first so the list paints with current pictures.
@@ -379,14 +410,13 @@
         load();
     }
 
-    function closePanel() {
-        if (!els.modal) return;
-        els.modal.classList.remove('active');
-    }
+    let initialised = false;
 
     function init() {
-        els.modal = $('usersModal');
-        if (!els.modal) return; // Not an admin - the panel is not in the DOM.
+        if (initialised) return;
+        initialised = true;
+        els.page = $('usersView');
+        if (!els.page) return; // Not an admin - the page is not in the DOM.
 
         els.list = $('usersList');
         els.inviteForm = $('inviteUserForm');
@@ -398,15 +428,6 @@
         els.linkTitle = $('usersLinkTitle');
         els.linkNote = $('usersLinkNote');
         els.linkInput = $('usersLinkInput');
-
-        const openBtn = $('manageUsersBtn');
-        if (openBtn) openBtn.addEventListener('click', openPanel);
-
-        const closeBtn = $('closeUsersModal');
-        if (closeBtn) closeBtn.addEventListener('click', closePanel);
-
-        const backdrop = els.modal.querySelector('.modal-backdrop');
-        if (backdrop) backdrop.addEventListener('click', closePanel);
 
         els.inviteForm.addEventListener('submit', invite);
 
@@ -432,15 +453,14 @@
         });
 
         els.list.addEventListener('change', function (event) {
+            const meeting = event.target.closest('input[data-user-action="meeting"]');
+            if (meeting) {
+                setMeetingAccess(meeting.getAttribute('data-user-id'), meeting.checked);
+                return;
+            }
             const select = event.target.closest('select[data-user-action="role"]');
             if (!select) return;
             changeRole(select.getAttribute('data-user-id'), select.value);
-        });
-
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && els.modal.classList.contains('active')) {
-                closePanel();
-            }
         });
     }
 

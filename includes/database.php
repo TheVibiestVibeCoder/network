@@ -410,6 +410,15 @@ class Database
         // Profile picture: the stored filename inside data/avatars, or NULL.
         // The file itself lives outside anything the web server will serve.
         self::addColumnIfMissing($db, 'users', 'avatar', 'VARCHAR(255)');
+
+        // Meeting assistant (test): who may use it - granted to each person by
+        // an admin. Whoever is an admin when it arrives starts with it, so the
+        // people who set it up are not locked out of it.
+        $userColumns = array_column($db->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+        if (!in_array('can_meeting', $userColumns, true)) {
+            self::addColumnIfMissing($db, 'users', 'can_meeting', 'INTEGER NOT NULL DEFAULT 0');
+            $db->exec("UPDATE users SET can_meeting = 1 WHERE role = 'admin'");
+        }
         $db->exec("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)");
 
         // Only the SHA-256 of a token is stored. A leaked database therefore

@@ -51,6 +51,33 @@
         return isGoogle(link) ? ICON_DRIVE : ICON_LINK;
     }
 
+    /**
+     * What a link points to, worked out the way includes/TodoLink.php does -
+     * for links held on a to-do that is not created yet, which have no
+     * server answer to carry it.
+     */
+    function kindOf(url) {
+        let parsed;
+        try {
+            parsed = new URL(url);
+        } catch (e) {
+            return 'web';
+        }
+        const host = parsed.hostname.toLowerCase();
+        const path = parsed.pathname;
+        if (host === 'docs.google.com') {
+            if (path.startsWith('/document/')) return 'doc';
+            if (path.startsWith('/spreadsheets/')) return 'sheet';
+            if (path.startsWith('/presentation/')) return 'slides';
+            if (path.startsWith('/forms/')) return 'form';
+            return 'drive';
+        }
+        if (host === 'drive.google.com') {
+            return path.includes('/folders/') ? 'folder' : 'drive';
+        }
+        return 'web';
+    }
+
     /** What a link is, in words: "Google Doc", "Drive folder", the host. */
     function kindLabel(link) {
         switch (link && link.kind) {
@@ -107,5 +134,5 @@
             </div>`;
     }
 
-    window.TodoLinks = { icon, isGoogle, kindLabel, quickLink, row };
+    window.TodoLinks = { icon, isGoogle, kindLabel, kindOf, quickLink, row };
 })();
