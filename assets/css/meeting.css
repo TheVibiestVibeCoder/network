@@ -540,6 +540,75 @@
     line-height: 1.5;
 }
 
+/* The reminder: what is left of a meeting put away, until it is finished.
+   One line, in the corner, Claude's mark as on "Start meeting". */
+.meeting-mini.is-pill {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: auto;
+    max-width: min(380px, calc(100vw - 32px));
+    padding: 7px 7px 7px 12px;
+    border-color: var(--c-line);
+    border-radius: var(--r-full);
+    box-shadow: var(--e-3);
+}
+
+.meeting-pill-mark {
+    flex-shrink: 0;
+    display: inline-flex;
+    color: var(--c-claude);
+}
+
+.meeting-pill-mark .meeting-claude-mark {
+    width: 16px;
+    height: 16px;
+}
+
+.meeting-pill-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font);
+    text-align: left;
+    cursor: pointer;
+}
+
+.meeting-pill-title {
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.meeting-pill-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn.meeting-pill-btn {
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    border-color: var(--c-claude);
+    background: var(--c-claude);
+    color: #fff;
+}
+
+.btn.meeting-pill-btn:hover:not(:disabled) {
+    border-color: var(--c-claude-2);
+    background: var(--c-claude-2);
+    color: #fff;
+}
+
 @media (max-width: 720px) {
     .meeting-mini {
         right: 12px;

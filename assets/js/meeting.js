@@ -14,6 +14,11 @@
  * window can also shrink into a small panel in the corner (project and text
  * field only) while something else in the CRM is looked up.
  *
+ * A meeting is never out of sight until it is finished: closing the window
+ * leaves a small reminder in the corner. Once a meeting has ended and
+ * everything it proposed has been decided under From Claude, it finishes by
+ * itself.
+ *
  * To remove the test, see the list at the top of includes/MeetingAssistant.php.
  */
 (function () {
@@ -52,7 +57,8 @@
     const state = {
         active: false,
         ended: false,
-        // 'open' (the big window), 'mini' (the corner panel) or 'hidden'.
+        // 'open' (the big window), 'mini' (the corner panel), 'pill' (the
+        // reminder in the corner) or 'hidden' (no meeting).
         mode: 'hidden',
         projects: [],
         index: 0,
@@ -66,7 +72,8 @@
         jobs: [],
         // The From Claude proposals this meeting made, for the summary:
         // { items: [...review items], loading, error }.
-        review: { items: [], loading: false, error: '' }
+        // loaded: fetched at least once, so "nothing waiting" can be trusted.
+        review: { items: [], loading: false, error: '', loaded: false }
     };
 
     let modal = null;
@@ -200,14 +207,18 @@
         state.mode = 'hidden';
 
         updateStartButton();
-        // The corner panel comes back as it was; the big window waits for
-        // "Continue meeting".
+        // The corner panel comes back as it was; otherwise the reminder.
+        buildElements();
         if (saved.mode === 'mini' && !state.ended) {
-            buildElements();
             minimize();
             prefetchContexts();
             loadContext();
+        } else {
+            collapse();
         }
+        // Proposals may have been decided since - in another tab, or by
+        // someone else on the team. All decided finishes the meeting.
+        if (state.ended) loadProposals();
     }
 
     // ------------------------------------------------------------------
@@ -232,6 +243,7 @@
         state.index = 0;
         state.drafts = {};
         state.jobs = [];
+        state.review = { items: [], loading: false, error: '', loaded: false };
         try {
             state.projects = (await request(`${API}?action=projects`)).data || [];
         } catch (error) {
@@ -266,22 +278,36 @@
         saveDraft();
         state.mode = 'mini';
         modal.classList.remove('active');
-        mini.hidden = false;
-        render();
+        showCorner();
         persist();
         updateStartButton();
         const input = mini.querySelector('.meeting-draft');
         if (input) input.focus();
     }
 
-    /** Put the meeting away; it stays where it was, with what was typed. */
-    function hide() {
+    /**
+     * Put the meeting away into the reminder in the corner; it stays where it
+     * was, with what was typed. An ended meeting with nothing left to decide
+     * has nothing to come back to, so it is finished instead.
+     */
+    function collapse() {
         saveDraft();
-        state.mode = 'hidden';
+        if (readyToFinish()) {
+            autoFinish();
+            return;
+        }
+        state.mode = 'pill';
         modal.classList.remove('active');
-        mini.hidden = true;
+        showCorner();
         persist();
         updateStartButton();
+    }
+
+    /** The corner panel or the reminder, whichever the mode asks for. */
+    function showCorner() {
+        mini.classList.toggle('is-pill', state.mode === 'pill');
+        mini.hidden = false;
+        render();
     }
 
     // Every project's details, by id: loaded all at once when the meeting
@@ -538,6 +564,7 @@
         state.mode = 'hidden';
         state.jobs = [];
         state.drafts = {};
+        state.review = { items: [], loading: false, error: '', loaded: false };
         meetingOrigins.clear();
         modal.classList.remove('active');
         mini.hidden = true;
@@ -548,11 +575,41 @@
         }
     }
 
+    /**
+     * The meeting has ended and nothing of it is left: Claude is done, every
+     * text went through, and From Claude has decided (accepted or rejected)
+     * everything it proposed - not just held for its Undo seconds.
+     */
+    function readyToFinish() {
+        if (!state.active || !state.ended) return false;
+        if (!state.review.loaded || state.review.loading || state.review.error) return false;
+        if (working()) return false;
+        if (state.jobs.some(job => job.status === 'failed' || job.status === 'interrupted')) return false;
+        if (state.projects.some(p => (state.drafts[p.id] || '').trim())) return false;
+        return state.review.items.every(item => item.status !== 'pending');
+    }
+
+    function autoFinish() {
+        finish();
+        announce('Meeting finished - everything it proposed has been decided.');
+    }
+
+    /** A short line at the bottom of the screen (the CRM's shared toast). */
+    function announce(message) {
+        const toast = document.getElementById('bkToast');
+        if (!toast) return;
+        toast.textContent = message;
+        toast.classList.remove('bk-toast-error');
+        toast.classList.add('visible');
+        clearTimeout(announce.timer);
+        announce.timer = setTimeout(() => toast.classList.remove('visible'), 4000);
+    }
+
     /** Keep what is in the field on screen, for the project it was drawn for. */
     function saveDraft() {
         // Put away, neither field is the one being typed in; the drafts were
         // taken when it was put away.
-        if (state.mode === 'hidden') return;
+        if (state.mode === 'hidden' || state.mode === 'pill') return;
         let input = null;
         if (state.mode === 'mini' && mini) input = mini.querySelector('.meeting-draft');
         else if (modal) input = modal.querySelector('.meeting-draft');
@@ -619,6 +676,8 @@
 
         if (state.mode === 'mini') {
             mini.innerHTML = miniHtml();
+        } else if (state.mode === 'pill') {
+            mini.innerHTML = pillHtml();
         } else {
             modal.querySelector('.meeting-content').innerHTML = state.ended ? summaryHtml() : projectHtml();
         }
@@ -664,7 +723,7 @@
                 </div>
                 <div class="meeting-head-actions">
                     <button type="button" class="meeting-icon-btn" data-meeting-minimize title="Minimize - keep typing while you look something up" aria-label="Minimize">${ICON_MINIMIZE}</button>
-                    <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - the meeting and your text stay" aria-label="Close">${ICON_CLOSE}</button>
+                    <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - the meeting stays as a reminder in the corner" aria-label="Close">${ICON_CLOSE}</button>
                 </div>
             </header>
 
@@ -706,9 +765,45 @@
                     <span class="meeting-mini-meta">Project ${state.index + 1} of ${state.projects.length}${busy ? ` · <span class="meeting-spinner" aria-hidden="true"></span> Claude working` : ''}</span>
                 </div>
                 <button type="button" class="meeting-icon-btn" data-meeting-expand title="Back to the meeting" aria-label="Expand">${ICON_EXPAND}</button>
-                <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - the meeting and your text stay" aria-label="Close">${ICON_CLOSE}</button>
+                <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - the meeting stays as a reminder in the corner" aria-label="Close">${ICON_CLOSE}</button>
             </div>
             ${draftField(project, 'meeting-mini-text', 4)}`;
+    }
+
+    /**
+     * The reminder in the corner: a meeting is still going, or has ended and
+     * still waits to be finished. A click brings the meeting back.
+     */
+    function pillHtml() {
+        const busy = working();
+        let title;
+        let meta;
+        let action;
+        if (state.ended) {
+            const open = openProposals(state.review.items).length;
+            title = 'Meeting not finished yet';
+            action = 'Review';
+            if (busy) meta = `<span class="meeting-spinner" aria-hidden="true"></span> Claude is still working`;
+            else if (!state.review.loaded) meta = 'Checking From Claude…';
+            else if (open) meta = `${plural(open, 'proposal')} waiting under From Claude`;
+            else if (state.projects.some(p => (state.drafts[p.id] || '').trim())) meta = 'Text not sent to Claude yet';
+            else if (state.jobs.some(job => job.status === 'failed' || job.status === 'interrupted')) meta = 'Some texts did not go through';
+            else meta = 'Ready to finish';
+        } else {
+            const project = currentProject();
+            if (!project) return '';
+            title = 'Meeting in progress';
+            action = 'Continue';
+            meta = `Project ${state.index + 1} of ${state.projects.length} · ${escapeHtml(project.name)}`
+                + (busy ? ` · <span class="meeting-spinner" aria-hidden="true"></span>` : '');
+        }
+        return `
+            <span class="meeting-pill-mark" aria-hidden="true">${ICON_CLAUDE}</span>
+            <button type="button" class="meeting-pill-text" data-meeting-expand title="Back to the meeting">
+                <span class="meeting-pill-title">${title}</span>
+                <span class="meeting-pill-meta">${meta}</span>
+            </button>
+            <button type="button" class="btn btn-small meeting-pill-btn" data-meeting-expand>${action}</button>`;
     }
 
     /** Two letters, as on every face without a photo (app.js getInitials). */
@@ -875,8 +970,9 @@
     async function loadProposals() {
         const origins = proposalOrigins();
         if (!state.jobs.some(job => job.status === 'done')) {
-            state.review = { items: [], loading: false, error: '' };
+            state.review = { items: [], loading: false, error: '', loaded: true };
             render();
+            if (state.mode !== 'open' && readyToFinish()) autoFinish();
             return;
         }
         state.review.loading = true;
@@ -896,11 +992,14 @@
                     return true;
                 })
                 .sort((a, b) => a.id - b.id);
-            state.review = { items, loading: false, error: '' };
+            state.review = { items, loading: false, error: '', loaded: true };
         } catch (error) {
-            state.review = { items: state.review.items, loading: false, error: error.message };
+            state.review = { ...state.review, loading: false, error: error.message };
         }
         render();
+        // On screen, the summary's own buttons finish it; put away, the last
+        // decision does (closing the summary checks again).
+        if (state.mode !== 'open' && readyToFinish()) autoFinish();
     }
 
     function openProposals(items) {
@@ -980,7 +1079,7 @@
                     <p class="meeting-company" data-meeting-summary-line>${summaryLine(busy, items.length, open.length, decidedCount)}</p>
                 </div>
                 <div class="meeting-head-actions">
-                    <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - you can come back to this" aria-label="Close">${ICON_CLOSE}</button>
+                    <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - finishes by itself once everything is decided" aria-label="Close">${ICON_CLOSE}</button>
                 </div>
             </header>
             <div class="meeting-summary">
@@ -1055,7 +1154,7 @@
 
     function handleClick(event) {
         const target = event.target;
-        if (target.closest('[data-meeting-close]')) hide();
+        if (target.closest('[data-meeting-close]')) collapse();
         else if (target.closest('[data-meeting-minimize]')) minimize();
         else if (target.closest('[data-meeting-expand]')) open();
         else if (target.closest('[data-meeting-prev]')) go(-1);
@@ -1070,7 +1169,8 @@
         } else if (target.closest('[data-meeting-finish-accept]')) {
             finishAccepting();
         } else if (target.closest('[data-meeting-review]')) {
-            finish();
+            // Stays as the reminder, and finishes once all is decided there.
+            collapse();
             const reviewNav = document.querySelector('.toggle-btn[data-view="review"]');
             if (reviewNav) reviewNav.click();
         } else {
@@ -1328,7 +1428,7 @@
             if (event.key !== 'Escape' || !modal.classList.contains('active') || modal.classList.contains('is-under')) return;
             event.preventDefault();
             event.stopImmediatePropagation();
-            hide();
+            collapse();
         }, true);
     }
 
@@ -1341,9 +1441,10 @@
         // count it as decided straight away.
         document.addEventListener('crm:review-held', refreshSummaryChrome);
 
-        // A decision made (or undone) - here or anywhere - shows in the summary.
+        // A decision made (or undone) - here or anywhere - shows in the
+        // summary and the reminder, and the last one finishes the meeting.
         document.addEventListener('crm:review-changed', event => {
-            if (!state.active || !state.ended || !modal || !modal.classList.contains('active')) return;
+            if (!state.active || !state.ended || !modal) return;
             if (event.detail && event.detail.action === 'meeting') return;
             loadProposals();
         });

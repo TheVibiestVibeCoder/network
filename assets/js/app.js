@@ -104,6 +104,7 @@
         bookkeepingView: document.getElementById('bookkeepingView'),
         financialsView: document.getElementById('financialsView'),
         reviewView: document.getElementById('reviewView'),
+        composeView: document.getElementById('composeView'),
         usersView: document.getElementById('usersView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
@@ -1397,7 +1398,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'financials', 'review', 'users'];
+    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'bookkeeping', 'financials', 'review', 'users'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1415,8 +1416,9 @@
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
 
-        // Bookkeeping, Financials and Users are only on the page for admins.
-        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users') && !document.getElementById(stored + 'View')) return HOME_VIEW;
+        // Bookkeeping, Financials and Users are only on the page for admins,
+        // Quick add only while it is switched on.
+        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1469,6 +1471,9 @@
         if (elements.reviewView) {
             elements.reviewView.classList.toggle('active', view === 'review');
         }
+        if (elements.composeView) {
+            elements.composeView.classList.toggle('active', view === 'compose');
+        }
         if (elements.usersView) {
             elements.usersView.classList.toggle('active', view === 'users');
         }
@@ -1500,6 +1505,10 @@
         } else if (view === 'review') {
             if (window.CRMReview) {
                 window.CRMReview.load();
+            }
+        } else if (view === 'compose') {
+            if (window.CRMCompose) {
+                window.CRMCompose.open();
             }
         } else if (view === 'users') {
             if (window.CRMUsers) {

@@ -280,6 +280,9 @@ $currentUser = Auth::currentUser();
 $isAdmin = Auth::isAdmin();
 // Meeting assistant (test): on while ANTHROPIC_API_KEY is set in .env.
 $meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
+// Quick add (test, assets/js/compose.js): hidden for now. true brings the
+// tab and its page back.
+$quickAddEnabled = false;
 
 // Get contact count for dashboard
 $contactCount = 0;
@@ -483,6 +486,8 @@ function assetUrl(string $path): string
          final word over the two stylesheets above. -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/design.css') ?>">
     <link rel="stylesheet" href="<?= assetUrl('assets/css/review.css') ?>">
+    <!-- Quick add (test) -->
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/compose.css') ?>">
     <?php if ($meetingEnabled): ?>
     <!-- Meeting assistant (test) -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/meeting.css') ?>">
@@ -776,6 +781,14 @@ function assetUrl(string $path): string
                         </svg>
                         <span class="nav-label">To-dos</span>
                     </button>
+                    <?php if ($quickAddEnabled): ?>
+                    <button type="button" class="toggle-btn nav-item" data-view="compose" title="Quick add (test)">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3.5 7h10M3.5 12h7M3.5 17h9"/><path d="M18 9.5v8M14 13.5h8"/>
+                        </svg>
+                        <span class="nav-label">Quick add</span>
+                    </button>
+                    <?php endif; ?>
                     <button type="button" class="toggle-btn nav-item" data-view="list" title="Contacts">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/>
@@ -902,6 +915,31 @@ function assetUrl(string $path): string
                         <div class="workload-body" id="workloadBody"></div>
                     </div>
                 </div>
+
+                <!-- Quick add (test): one line of text becomes a to-do.
+                     Filled in by assets/js/compose.js. -->
+                <?php if ($quickAddEnabled): ?>
+                <div class="view-panel" id="composeView">
+                    <div class="compose-wrap">
+                        <div class="view-head">
+                            <div class="view-head-text">
+                                <h1 class="view-title">Quick add</h1>
+                                <p class="view-sub">Write it the way you would say it. What is missing is asked for one step at a time.</p>
+                            </div>
+                        </div>
+                        <div class="compose-card" id="composeCard">
+                            <div class="compose-field">
+                                <div class="compose-backdrop" id="composeBackdrop" aria-hidden="true"></div>
+                                <input type="text" class="compose-input" id="composeInput" autocomplete="off" spellcheck="false"
+                                       placeholder="Create a new to-do…" aria-label="What do you want to create?">
+                            </div>
+                            <p class="compose-hint" id="composeHint"></p>
+                            <div class="compose-trail" id="composeTrail" hidden></div>
+                            <div class="compose-step" id="composeStep" hidden></div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Calendar View -->
                 <div class="view-panel" id="calendarView">
@@ -2439,6 +2477,8 @@ function assetUrl(string $path): string
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
+        <!-- Quick add (test) -->
+        <script src="<?= assetUrl('assets/js/compose.js') ?>"></script>
         <?php if ($meetingEnabled): ?>
         <!-- Meeting assistant (test) -->
         <script src="<?= assetUrl('assets/js/meeting.js') ?>"></script>

@@ -1,0 +1,475 @@
+/* ==========================================================================
+   Quick add (test) - assets/js/compose.js
+
+   One line of text, the recognised words marked in it, then a short list per
+   missing field. Colours from the design tokens only; the one accent marks
+   the recognised keyword and the step in progress.
+   ========================================================================== */
+
+.compose-wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-top: 8px;
+}
+
+.compose-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-2);
+    padding: 20px;
+}
+
+/* ---- The sentence ------------------------------------------------------- */
+/* The input's own text is transparent; what shows is the mirror behind it,
+   so single words can take a colour. Both must share every metric that
+   affects where a letter lands: font, size, padding, letter-spacing. */
+
+.compose-field {
+    position: relative;
+    border: 1px solid var(--c-line-strong);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.compose-field:focus-within {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.compose-backdrop,
+.compose-input {
+    font-family: var(--font);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    padding: 14px 16px;
+    margin: 0;
+    border: 0;
+    box-sizing: border-box;
+}
+
+.compose-backdrop {
+    position: absolute;
+    inset: 0;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--c-ink);
+    pointer-events: none;
+}
+
+.compose-input {
+    position: relative;
+    display: block;
+    width: 100%;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--c-ink);
+    outline: none;
+}
+
+.compose-input::placeholder {
+    color: var(--c-ink-4);
+}
+
+.compose-input::selection {
+    background: var(--c-accent-soft);
+    color: transparent;
+}
+
+.compose-hl {
+    color: inherit;
+    background: var(--c-tint);
+    border-radius: 4px;
+    /* An outline drawn with a shadow takes no room, so the mirror stays
+       letter for letter under the input. */
+    box-shadow: 0 0 0 2px var(--c-tint);
+}
+
+.compose-hl--intent {
+    color: var(--c-accent);
+    background: var(--c-accent-soft);
+    box-shadow: 0 0 0 1.5px var(--c-accent);
+}
+
+.compose-card.is-stepping .compose-field,
+.compose-card.is-done .compose-field {
+    background: var(--c-tint-3);
+}
+
+.compose-card.is-stepping .compose-input {
+    cursor: pointer;
+}
+
+.compose-hint {
+    margin: 10px 2px 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.compose-card.is-stepping .compose-hint,
+.compose-card.is-done .compose-hint {
+    display: none;
+}
+
+.compose-hint em {
+    font-style: normal;
+    color: var(--c-ink-2);
+}
+
+.compose-card kbd {
+    display: inline-block;
+    font-family: var(--font);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1;
+    padding: 3px 6px;
+    border: 1px solid var(--c-line-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--r-xs);
+    color: var(--c-ink-2);
+    background: var(--c-surface);
+}
+
+/* ---- The trail: one chip per field -------------------------------------- */
+
+.compose-trail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+}
+
+.compose-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    max-width: 100%;
+    padding: 5px 11px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    font-family: var(--font);
+    font-size: var(--t-sm);
+    color: var(--c-ink);
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+
+.compose-chip:hover:not(:disabled) {
+    border-color: var(--c-line-strong);
+}
+
+.compose-chip:disabled {
+    cursor: default;
+}
+
+.compose-chip-label {
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.compose-chip-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 260px;
+}
+
+.compose-chip.is-open {
+    border-style: dashed;
+}
+
+.compose-chip.is-open .compose-chip-value {
+    color: var(--c-ink-4);
+}
+
+.compose-chip.is-current {
+    border-color: var(--c-accent);
+    border-style: solid;
+    background: var(--c-accent-softer);
+}
+
+.compose-chip--kind {
+    cursor: default;
+    font-weight: 600;
+    color: var(--c-accent);
+    border-color: var(--c-accent);
+    background: var(--c-accent-soft);
+}
+
+.compose-chip--pri-high .compose-chip-value,
+.compose-chip--pri-medium .compose-chip-value,
+.compose-chip--pri-low .compose-chip-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.compose-chip--pri-high .compose-chip-value::before,
+.compose-chip--pri-medium .compose-chip-value::before,
+.compose-chip--pri-low .compose-chip-value::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-full);
+}
+
+.compose-chip--pri-high .compose-chip-value::before { background: var(--c-danger); }
+.compose-chip--pri-medium .compose-chip-value::before { background: var(--pri-medium); }
+.compose-chip--pri-low .compose-chip-value::before { background: var(--c-ink-4); }
+
+/* ---- The step in progress ----------------------------------------------- */
+
+.compose-step {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.compose-step-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.compose-step-question {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.compose-step-count {
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.compose-filter {
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 12px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    font-family: var(--font);
+    font-size: var(--t-base);
+    color: var(--c-ink);
+    box-sizing: border-box;
+    outline: none;
+}
+
+.compose-filter:focus {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.compose-filter::placeholder {
+    color: var(--c-ink-4);
+}
+
+.compose-options {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.compose-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: var(--t-base);
+}
+
+.compose-option:hover {
+    background: var(--c-tint-3);
+}
+
+.compose-option.is-active {
+    background: var(--c-accent-soft);
+}
+
+.compose-option-label {
+    font-weight: 500;
+    color: var(--c-ink);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compose-option-meta {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.compose-option.is-active .compose-option-meta {
+    color: var(--c-ink-2);
+}
+
+.compose-option-tag {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.compose-empty {
+    padding: 12px 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.compose-face {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+    color: var(--c-ink-2);
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
+}
+
+.compose-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.compose-face.is-empty {
+    background: transparent;
+    border: 1px dashed var(--c-line-strong);
+    box-sizing: border-box;
+}
+
+.compose-dot {
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    margin: 0 4px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--c-line-strong);
+    box-sizing: border-box;
+}
+
+.compose-dot--high { background: var(--c-danger); border-color: var(--c-danger); }
+.compose-dot--medium { background: var(--pri-medium); border-color: var(--pri-medium); }
+.compose-dot--low { background: var(--c-ink-4); border-color: var(--c-ink-4); }
+
+.compose-date-pick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 0 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.compose-date-pick input {
+    font-family: var(--font);
+    font-size: var(--t-sm);
+    color: var(--c-ink);
+    padding: 5px 8px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+}
+
+.compose-error {
+    margin: 10px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-danger-ink);
+}
+
+/* ---- Confirm and done --------------------------------------------------- */
+
+.compose-summary {
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.compose-summary-title {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.compose-summary-meta {
+    margin-top: 4px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.compose-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.compose-done {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.compose-done-mark {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-full);
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+.compose-done-title {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.compose-done-sub {
+    margin-top: 2px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 640px) {
+    .compose-card {
+        padding: 14px;
+    }
+
+    .compose-backdrop,
+    .compose-input {
+        font-size: var(--t-lg);
+        padding: 12px 13px;
+    }
+
+    .compose-option-meta {
+        display: none;
+    }
+}
