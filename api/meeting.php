@@ -4,6 +4,7 @@
  *
  *   GET  ?action=projects                    the projects to go through, in meeting order
  *   GET  ?action=context&id=..               one project: fields, contacts, open to-dos, notes, team
+ *   GET  ?action=contexts                    all of them at once, keyed by project id
  *   POST ?action=submit {project_id, text}   Claude turns the text into proposals under "From Claude"
  */
 
@@ -57,6 +58,18 @@ $db = Database::getInstance();
 try {
     if ($method === 'GET' && $action === 'projects') {
         echo json_encode(['success' => true, 'data' => MeetingAssistant::projects($db)]);
+    } elseif ($method === 'GET' && $action === 'contexts') {
+        // Everything the meeting will show, in one go at its start, so moving
+        // between projects never waits on the server - not even while it is
+        // busy with Claude.
+        $all = [];
+        foreach (MeetingAssistant::projects($db) as $project) {
+            $context = MeetingAssistant::context($db, $project['id']);
+            if ($context !== null) {
+                $all[(string) $project['id']] = $context;
+            }
+        }
+        echo json_encode(['success' => true, 'data' => (object) $all]);
     } elseif ($method === 'GET' && $action === 'context') {
         $context = MeetingAssistant::context($db, (int) ($_GET['id'] ?? 0));
         if ($context === null) {

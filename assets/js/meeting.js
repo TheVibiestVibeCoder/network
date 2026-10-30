@@ -205,6 +205,7 @@
         if (saved.mode === 'mini' && !state.ended) {
             buildElements();
             minimize();
+            prefetchContexts();
             loadContext();
         }
     }
@@ -218,8 +219,12 @@
         buildElements();
         if (state.active) {
             open();
-            if (state.ended) loadProposals();
-            else if (!state.context) loadContext();
+            if (state.ended) {
+                loadProposals();
+            } else {
+                if (contexts.size === 0) prefetchContexts();
+                if (!state.context) loadContext();
+            }
             return;
         }
 
@@ -239,7 +244,9 @@
         }
 
         state.active = true;
+        contexts.clear();
         open();
+        prefetchContexts();
         await loadContext();
     }
 
@@ -277,13 +284,45 @@
         updateStartButton();
     }
 
+    // Every project's details, by id: loaded all at once when the meeting
+    // starts (prefetchContexts), so moving on shows the next project at once -
+    // also while the server is still busy with Claude for the last one.
+    const contexts = new Map();
+
+    async function prefetchContexts() {
+        try {
+            const result = await request(`${API}?action=contexts`);
+            Object.entries(result.data || {}).forEach(([id, context]) => {
+                // A fresher copy fetched meanwhile wins.
+                if (!contexts.has(Number(id))) contexts.set(Number(id), context);
+            });
+        } catch (error) {
+            return; // Each project still loads on its own when it comes up.
+        }
+        const project = currentProject();
+        if (project && !state.context && contexts.has(project.id)) {
+            state.context = contexts.get(project.id);
+            render();
+        }
+    }
+
+    /**
+     * Show the project on screen: straight from what was loaded ahead, then
+     * quietly brought up to date; fetched first only if it was not.
+     */
     async function loadContext() {
         const project = currentProject();
-        state.context = null;
+        state.context = project ? (contexts.get(project.id) || null) : null;
         render();
         if (!project) return;
+        if (state.context) {
+            if (state.mode === 'open') focusText();
+            refreshContext();
+            return;
+        }
         try {
             const result = await request(`${API}?action=context&id=${encodeURIComponent(project.id)}`);
+            contexts.set(project.id, result.data);
             if (currentProject() === project) state.context = result.data;
         } catch (error) {
             if (currentProject() === project) state.context = { error: error.message };
@@ -292,12 +331,13 @@
         if (state.mode === 'open') focusText();
     }
 
-    /** Fetch the project again after a change, keeping what is on screen meanwhile. */
+    /** Fetch the project again - after a change, or to freshen what was loaded ahead. */
     async function refreshContext() {
         const project = currentProject();
         if (!project) return;
         try {
             const result = await request(`${API}?action=context&id=${encodeURIComponent(project.id)}`);
+            contexts.set(project.id, result.data);
             if (currentProject() === project) {
                 state.context = result.data;
                 render();
@@ -503,10 +543,43 @@
     function render() {
         if (!modal) return;
         saveDraft();
+
+        // Someone may be typing while Claude finishes or the project is
+        // brought up to date: the redrawn field keeps their place.
+        const typing = document.activeElement && document.activeElement.classList.contains('meeting-draft')
+            ? {
+                projectId: document.activeElement.dataset.projectId,
+                start: document.activeElement.selectionStart,
+                end: document.activeElement.selectionEnd,
+                scroll: document.activeElement.scrollTop
+            }
+            : null;
+
+        // Nor do the scrolled panes jump back to the top.
+        const scrolled = {};
+        ['.meeting-details', '.meeting-summary', '.meeting-input'].forEach(sel => {
+            const pane = modal.querySelector(sel);
+            if (pane) scrolled[sel] = { top: pane.scrollTop, project: pane.closest('.meeting-content') && state.index };
+        });
+
         if (state.mode === 'mini') {
             mini.innerHTML = miniHtml();
         } else {
             modal.querySelector('.meeting-content').innerHTML = state.ended ? summaryHtml() : projectHtml();
+        }
+
+        Object.entries(scrolled).forEach(([sel, was]) => {
+            const pane = modal.querySelector(sel);
+            if (pane && was.project === state.index) pane.scrollTop = was.top;
+        });
+
+        if (typing) {
+            const field = (state.mode === 'mini' ? mini : modal).querySelector('.meeting-draft');
+            if (field && field.dataset.projectId === typing.projectId) {
+                field.focus();
+                field.setSelectionRange(typing.start, typing.end);
+                field.scrollTop = typing.scroll;
+            }
         }
     }
 
