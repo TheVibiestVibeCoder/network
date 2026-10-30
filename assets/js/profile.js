@@ -312,6 +312,11 @@
             els.removeBtn.addEventListener('click', removePhoto);
         }
 
+        // Going to the Users page from the menu puts the menu away.
+        els.pop.addEventListener('click', function (event) {
+            if (event.target.closest('[data-view]')) closePop();
+        });
+
         // Click outside or press Escape to dismiss.
         document.addEventListener('click', function (event) {
             if (els.pop && !els.pop.hidden && !els.pop.contains(event.target)) {

@@ -67,8 +67,8 @@
     margin: 0 0 6px;
     color: var(--c-ink-2);
     font: 600 var(--t-xs)/1.3 var(--font);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 .review-subgroup-count {
@@ -78,7 +78,7 @@
 
 .review-list-card {
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -189,13 +189,14 @@
 
 /* ---- Accept all / Reject all --------------------------------------------- */
 
+/* In the page head, between the title and Waiting / History. */
 .review-bulk {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
-    margin: -6px 0 18px;
+    margin: 0 0 0 auto;
 }
 
 .review-bulk[hidden] {
@@ -213,11 +214,6 @@
     gap: 6px;
 }
 
-.review-bulk-btn--reject:hover:not(:disabled) {
-    border-color: var(--c-danger);
-    background: var(--c-danger-soft);
-    color: var(--c-danger-ink);
-}
 
 .review-bulk-btn:disabled {
     opacity: 0.5;
@@ -530,9 +526,9 @@
     width: 34px;
     height: 34px;
     padding: 0;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: color-mix(in srgb, var(--c-ink) 6%, transparent);
     color: var(--c-ink-2);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -543,17 +539,36 @@
     height: 16px;
 }
 
-.review-act--accept:hover:not(:disabled) {
-    border-color: var(--c-success);
-    background: var(--c-success-soft);
-    color: var(--c-success-ink);
+/* ---- Accept and reject, everywhere Claude's proposals are decided ----
+   Quiet at rest - a pale round button like any secondary action - and on
+   hover filled solid in green or red with a white mark, so the decision
+   about to be made is unmistakable. Round buttons in rows (.review-act,
+   .review-inline-btn) and the worded ones in the sheet and above the list
+   (.review-decide). */
+:is(.review-act, .review-inline-btn, .btn.review-decide) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--c-ink) 7%, transparent);
+    color: var(--c-ink-2);
 }
 
-.review-act--reject:hover:not(:disabled) {
-    border-color: var(--c-danger);
-    background: var(--c-danger-soft);
-    color: var(--c-danger-ink);
+:is(.review-act--accept, .review-inline-btn--accept, .btn.review-decide--accept):hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--c-success);
+    color: #FFFFFF;
 }
+
+:is(.review-act--reject, .review-inline-btn--reject, .btn.review-decide--reject):hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--c-danger);
+    color: #FFFFFF;
+}
+
+/* A heavier mark, so it holds up in white on the fill. */
+:is(.review-act, .review-inline-btn, .btn.review-decide) svg {
+    stroke-width: 2.6;
+}
+
+
 
 .review-act:disabled {
     opacity: 0.5;
@@ -659,11 +674,12 @@
 /* A note: the text itself, in the card the facts use. */
 .review-sheet-text {
     padding: 14px 16px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     color: var(--c-ink);
     font-size: var(--t-base);
     overflow-wrap: anywhere;
+    background: var(--c-tint-3);
 }
 
 .review-sheet-hint {
@@ -701,9 +717,10 @@
 
 /* Before and after: one field per line, in the card the facts use. */
 .review-changes {
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
+    background: var(--c-tint-3);
 }
 
 .review-change {
@@ -886,9 +903,8 @@
     height: 11px;
 }
 
-/* A proposed record: a solid frame in Claude's colour and a tint, so it stands apart from
-   accepted records at a glance. The frame is an inset ring rather than a
-   border, so nothing shifts or resizes; it follows each element's own radius.
+/* A proposed record: a tint in Claude's colour - no frame - so it stands
+   apart from accepted records at a glance; the orange badge says why.
    The id-scoped selectors match design.css, which restyles these elements
    (hover included) by id and would otherwise win. */
 .is-proposed,
@@ -897,27 +913,27 @@
 #listView .contact-card.is-proposed:hover,
 #todoView .todo-item.is-proposed,
 #todoView .todo-item.is-proposed:hover {
-    background: var(--c-claude-softer);
-    box-shadow: inset 0 0 0 2px var(--c-claude);
+    background: color-mix(in srgb, var(--c-claude) 10%, var(--c-surface));
+    box-shadow: none;
 }
 
-/* Cards already have a border and a lift; colour the border and keep the lift. */
+/* Cards keep their lift. */
 #projectsView .project-card.is-proposed,
 #projectsView .project-card.is-proposed:hover {
-    background: color-mix(in srgb, var(--c-claude) 6%, var(--c-surface));
-    border-color: var(--c-claude);
-    box-shadow: inset 0 0 0 1px var(--c-claude), var(--e-1);
+    background: color-mix(in srgb, var(--c-claude) 10%, var(--c-surface));
+    border-color: transparent;
+    box-shadow: var(--e-1);
 }
 
-/* Home page rows: the same frame and tint, scoped by id to beat design.css. */
+/* Home page rows: the same tint, scoped by id to beat design.css. */
 #workloadView .home-todo.is-proposed,
 #workloadView .home-todo.is-proposed:hover,
 #workloadView .home-project.is-proposed,
 #workloadView .home-project.is-proposed:hover,
 #workloadView .workload-row.is-proposed,
 #workloadView .workload-row.is-proposed:hover {
-    background: var(--c-claude-softer);
-    box-shadow: inset 0 0 0 2px var(--c-claude);
+    background: color-mix(in srgb, var(--c-claude) 10%, var(--c-surface));
+    box-shadow: none;
 }
 
 /* The frame has to follow the shape of whatever it marks, or its corners and
@@ -949,12 +965,11 @@
     border-bottom-right-radius: calc(var(--r-lg) - 1px);
 }
 
-/* Items with a border of their own: the border becomes the frame, as on the
-   project cards, instead of a second line just inside it. */
+/* Items with a border of their own lose it: the tint is the mark. */
 #overviewModal .todo-item.is-proposed,
 #overviewModal .todo-item.is-proposed:hover {
-    border-color: var(--c-claude);
-    box-shadow: inset 0 0 0 1px var(--c-claude);
+    border-color: transparent;
+    box-shadow: none;
 }
 
 /* Badge and accept / reject follow the title, as the link pill does. */
@@ -964,9 +979,9 @@
     vertical-align: middle;
 }
 
-/* An accepted record Claude proposes to change: an outline in Claude's
-   colour and nothing else - no fill, no frame or tint on the row - so it
-   reads as a note on the record, well below a record that is itself new. */
+/* An accepted record Claude proposes to change: a soft orange pill and
+   nothing else - no tint on the row - so it reads as a note on the record,
+   well below a record that is itself new. */
 .review-change-badge {
     display: inline-flex;
     align-items: center;
@@ -974,7 +989,7 @@
     height: 18px;
     padding: 0 7px 0 5px;
     border-radius: var(--r-full);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-claude) 55%, transparent);
+    background: var(--c-claude-soft);
     color: var(--c-claude-2);
     font: 500 11px/1 var(--font);
     white-space: nowrap;
@@ -992,6 +1007,59 @@
 .is-proposed .review-badge {
     background: var(--c-claude);
     color: var(--c-on-claude);
+}
+
+/* ---- "Awaiting review" and its decision as one pill ----
+   Where the badge is followed straight away by the reject / accept buttons
+   (to-do rows, home, contact rows), the two join into a single orange pill:
+   the label on the left, the two buttons inside it on the right. */
+.review-badge:has(+ .review-inline) {
+    height: 24px;
+    margin-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-right: 6px;
+}
+
+.review-badge + .review-inline {
+    gap: 3px;
+    height: 24px;
+    margin-left: 0 !important;
+    padding: 0 2px 0 0;
+    border-radius: 0 var(--r-full) var(--r-full) 0;
+    background: var(--c-claude-soft);
+    vertical-align: middle;
+}
+
+.is-proposed .review-badge + .review-inline {
+    background: var(--c-claude);
+}
+
+.review-badge + .review-inline .review-inline-btn {
+    width: 20px;
+    height: 20px;
+    background: color-mix(in srgb, #FFFFFF 28%, transparent);
+    color: #FFFFFF;
+}
+
+.review-badge + .review-inline .review-inline-btn svg {
+    width: 11px;
+    height: 11px;
+}
+
+/* A hovered proposed row stays orange, a shade deeper - not grey. */
+.ptodo.is-proposed .ptodo-row:hover {
+    background: color-mix(in srgb, var(--c-claude) 7%, transparent);
+}
+
+/* In a flex row the row's own gap would split the pill in two. */
+.ptodo-row .review-badge + .review-inline {
+    margin-left: -10px !important;
+}
+
+/* Hover: solid, as everywhere, with a thin white ring to sit on the orange. */
+.review-badge + .review-inline .review-inline-btn:hover {
+    box-shadow: 0 0 0 1px #FFFFFF;
 }
 
 .review-inline {
@@ -1012,9 +1080,9 @@
     width: 26px;
     height: 26px;
     padding: 0;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: color-mix(in srgb, var(--c-ink) 6%, transparent);
     color: var(--c-ink-2);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
@@ -1025,17 +1093,7 @@
     height: 14px;
 }
 
-.review-inline-btn--accept:hover {
-    background: var(--c-success-soft);
-    border-color: var(--c-success);
-    color: var(--c-success-ink);
-}
 
-.review-inline-btn--reject:hover {
-    background: var(--c-danger-soft);
-    border-color: var(--c-danger);
-    color: var(--c-danger-ink);
-}
 
 /* Decided with the inline buttons, waiting the few seconds Undo has: the
    buttons make way, and a rejected record fades as it is about to go. */
@@ -1079,9 +1137,10 @@
     flex-shrink: 0;
 }
 
+/* In a sheet: a faint Claude tint marks the proposals - no frame. */
 .review-panel .review-list-card {
-    border-style: dashed;
-    border-color: var(--c-claude);
+    border-color: transparent;
+    background: var(--c-claude-softer);
     box-shadow: none;
 }
 

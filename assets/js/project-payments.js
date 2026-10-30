@@ -250,24 +250,61 @@
             : { done: false, html: `<strong>${esc(euroRange(sum.open))}</strong> <span class="ppay-nowrap">still open</span>` };
     }
 
-    // ---- A project card: what is still open, prominently ----
+    // ---- A project card or list row: one dash per payment, and a line ----
 
     /**
-     * Under the card's figures: what is still open, the payment count and
-     * the budget bar of the project sheet; '' for a project without payments.
+     * Under the card's figures (and in the list view's row): one dash per
+     * payment in month order - received green, overdue red, still expected
+     * grey - with a hatched dash for budget no payment covers yet, then one
+     * line for what matters most:
+     *   everything paid       "Fully paid"
+     *   a payment overdue     "6.400 € received · 4.000 € overdue"
+     *   some received         "6.400 € received"
+     *   nothing received yet  "First 4.000 € in Nov 2026"
+     * and "over budget" when the payments add up to more than the budget.
+     * The tooltip lists every payment. '' for a project without payments.
      */
-    function cardSummary(project) {
-        const list = parse(project && project.payments);
+    function cardSummary(project, today) {
+        const list = parse(project && project.payments)
+            .slice()
+            .sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
         if (!list.length) return '';
         const sum = summarize(project, list);
-        const open = openLabel(sum);
+        const now = monthIndex(today || new Date().toISOString());
+        const isLate = x => !x.paid && monthIndex(x.month) !== null && monthIndex(x.month) < now;
+        const late = list.filter(isLate);
+        const lateSum = late.reduce((t, x) => t + x.amount, 0);
+        const unplanned = sum.budget && sum.unplanned.max > 0.005;
+        const done = sum.open.max <= 0.005;
+
+        const dashes = list.map(x => `<span class="ppay-dash ${x.paid ? 'is-paid' : isLate(x) ? 'is-late' : 'is-due'}"></span>`).join('')
+            + (unplanned ? '<span class="ppay-dash is-unplanned"></span>' : '');
+
+        let text;
+        if (done) {
+            text = `<span class="is-paid">${ICON_CHECK}Fully paid</span>`;
+        } else if (late.length) {
+            text = (sum.paid > 0 ? `<span class="is-paid">${esc(euro(sum.paid))} received</span><span class="ppay-sep">·</span>` : '')
+                + `<span class="is-late">${esc(euro(lateSum))} overdue</span>`;
+        } else if (sum.paid > 0) {
+            text = `<span class="is-paid">${esc(euro(sum.paid))} received</span>`;
+        } else {
+            const next = list.find(x => !x.paid);
+            text = `<span class="is-due">First ${esc(euro(next.amount))} in ${esc(monthName(next.month))}</span>`;
+        }
+        if (sum.above > 0) {
+            text += `<span class="ppay-sep">·</span><span class="is-warn">over budget</span>`;
+        }
+
+        const tip = list.map(x => `${monthName(x.month)}: ${euro(x.amount)} · ${x.paid ? 'received' : isLate(x) ? 'overdue' : 'expected'}`);
+        if (unplanned) tip.push(`Not planned yet: ${sum.unplanned.min > 0 ? euroRange(sum.unplanned) : 'up to ' + euro(sum.unplanned.max)}`);
+        if (sum.above > 0) tip.push(`${euro(sum.above)} above the budget of ${euro(sum.budget.max)}`);
+        if (!done) tip.push(`Still open: ${euroRange(sum.open)}`);
+
         return `
-            <div class="ppay-card${open.done ? ' is-done' : ''}">
-                <div class="ppay-card-head">
-                    <span class="ppay-card-open">${open.html}</span>
-                    <span class="ppay-card-count">${esc(plural(list.length, 'expected payment'))}${sum.paidCount ? ` · ${sum.paidCount} paid` : ''}</span>
-                </div>
-                ${budgetBar(sum)}
+            <div class="ppay-card" title="${esc(tip.join('\n'))}">
+                <span class="ppay-dashes" aria-hidden="true">${dashes}</span>
+                <span class="ppay-card-text">${text}</span>
             </div>`;
     }
 

@@ -272,9 +272,9 @@
 
 .meeting-job {
     padding: 10px 12px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
-    background: var(--c-surface);
+    background: var(--c-tint-3);
     font-size: var(--t-sm);
 }
 
@@ -291,7 +291,7 @@
 }
 
 .meeting-job--done .meeting-job-head { color: var(--c-success-ink); }
-.meeting-job--failed { border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); background: var(--c-danger-soft); }
+.meeting-job--failed { background: var(--c-danger-soft); }
 .meeting-job--failed .meeting-job-head { color: var(--c-danger-ink); }
 
 .meeting-job-text {
@@ -328,8 +328,8 @@
     color: var(--c-claude);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 .meeting-job-failed {
@@ -473,7 +473,7 @@
     gap: 10px;
     width: min(360px, calc(100vw - 32px));
     padding: 12px 12px 14px 14px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     background: var(--c-surface);
     box-shadow: var(--e-4, 0 12px 32px rgba(28, 50, 88, 0.18));
@@ -650,4 +650,244 @@
 .btn.meeting-accept-btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--c-success) 86%, #000);
     border-color: color-mix(in srgb, var(--c-success) 86%, #000);
+}
+
+
+/* ==========================================================================
+   One project, from its card - the Claude button over the assignee
+   ========================================================================== */
+
+.project-card-assignee {
+    position: relative;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin-top: -2px;
+}
+
+#projectsView .project-card-assignee .assignee-chip {
+    margin-top: 0;
+}
+
+/* Over the face, hidden until the face is hovered; on a card without an
+   assignee, until the card is. */
+/* The face inside the chip is 24px within a 2px white ring; the button
+   covers exactly the face, not the ring. */
+.project-card-claude {
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--c-claude);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.project-card-claude .meeting-claude-mark {
+    width: 13px;
+    height: 13px;
+    color: inherit;
+}
+
+/* While the button shows, the face and its white ring step aside. */
+.project-card-assignee:hover .assignee-chip,
+.project-card-assignee:has(.project-card-claude:focus-visible) .assignee-chip,
+.project-card:hover .project-card-assignee.is-empty .assignee-chip {
+    visibility: hidden;
+}
+
+.project-card-assignee:hover .project-card-claude,
+.project-card:hover .project-card-assignee.is-empty .project-card-claude,
+.project-card-claude:focus-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.project-card-claude:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-claude-soft);
+}
+
+/* Phones have no hover: a tap on the face opens the window straight away. */
+
+/* Hovering the face turns the card - or the row in the list view - to
+   Claude: tinted orange, the content blurred behind "Chat with Claude", only
+   the Claude button sharp. */
+#projectsView .project-card::after,
+#projectsView .project-row::after {
+    content: "Chat with Claude";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: inherit;
+    color: var(--c-claude-2);
+    font-size: var(--t-md);
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
+#projectsView .project-card > *,
+#projectsView .project-card-title-wrap,
+#projectsView .project-row > * {
+    transition: filter var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease);
+}
+
+#projectsView :is(.project-card, .project-row):has(.project-card-assignee:hover, .project-card-claude:focus-visible) {
+    background: color-mix(in srgb, var(--c-claude) 12%, var(--c-surface));
+}
+
+#projectsView :is(.project-card, .project-row):has(.project-card-assignee:hover, .project-card-claude:focus-visible)::after {
+    opacity: 1;
+}
+
+#projectsView .project-card:has(.project-card-assignee:hover, .project-card-claude:focus-visible) > :not(.project-card-head),
+#projectsView .project-card:has(.project-card-assignee:hover, .project-card-claude:focus-visible) .project-card-title-wrap,
+#projectsView .project-row:has(.project-card-assignee:hover, .project-card-claude:focus-visible) > :not(.project-row-assignee) {
+    filter: blur(3px);
+    opacity: 0.45;
+}
+
+/* In a row the face sits on the right: the words keep clear of it. */
+#projectsView .project-row::after {
+    padding-right: 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #projectsView .project-card::after,
+    #projectsView .project-row::after,
+    #projectsView .project-card > *,
+    #projectsView .project-card-title-wrap,
+    #projectsView .project-row > * {
+        transition: none;
+    }
+}
+
+/* ---- The window -------------------------------------------------------- */
+
+#meetingAskModal .meeting-ask-content {
+    display: flex;
+    flex-direction: column;
+    width: min(520px, 100%);
+    max-width: none;
+    max-height: min(680px, calc(100dvh - 48px));
+    padding: 0;
+    overflow: hidden;
+}
+
+.meeting-ask-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px 14px;
+}
+
+.meeting-ask-mark {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-full);
+    background: var(--c-claude-soft);
+}
+
+.meeting-ask-mark .meeting-claude-mark {
+    width: 16px;
+    height: 16px;
+}
+
+.meeting-ask-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.meeting-ask-name {
+    margin: 0;
+    overflow: hidden;
+    color: var(--c-ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.meeting-ask-company {
+    margin: 1px 0 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+.meeting-ask-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    padding: 0 20px;
+    overflow-y: auto;
+}
+
+.meeting-ask-text {
+    width: 100%;
+    resize: vertical;
+    line-height: 1.55;
+}
+
+.meeting-ask-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px 18px;
+}
+
+.meeting-ask-foot .meeting-hint {
+    flex: 1;
+}
+
+/* Send: in Claude's colour, with its mark. */
+.btn.meeting-ask-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-color: var(--c-claude);
+    background: var(--c-claude);
+    color: #fff;
+}
+
+.btn.meeting-ask-send:hover:not(:disabled) {
+    border-color: var(--c-claude-2);
+    background: var(--c-claude-2);
+    color: #fff;
+}
+
+.btn.meeting-ask-send .meeting-claude-mark {
+    color: inherit;
+}
+
+/* Claude's answer to a question, under what was asked. */
+.meeting-job-answer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: var(--r-md);
+    background: var(--c-claude-softer);
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.meeting-job-answer .meeting-claude-mark {
+    flex-shrink: 0;
+    margin-top: 3px;
 }

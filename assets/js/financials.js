@@ -128,10 +128,6 @@
         plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
-        bank: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18L12 4 3 10z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3.5 20.5h17"/></svg>',
-        in: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6.5 10.5 12 16l5.5-5.5"/><path d="M4.5 20h15"/></svg>',
-        out: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5"/><path d="M4.5 20h15"/></svg>',
-        low: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3.5 7 6 6 4-4 7 7"/><path d="M20.5 11v5h-5"/></svg>',
         trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
     };
 
@@ -306,7 +302,6 @@
 
         els.finKpis.innerHTML = `
             <article class="fin-kpi fin-kpi--balance${b ? '' : ' is-empty'}">
-                <span class="fin-kpi-icon" aria-hidden="true">${ICON.bank}</span>
                 <span class="fin-kpi-label">Bank balance today</span>
                 <span class="fin-kpi-value">${b ? esc(euro(b.amount)) : '—'}</span>
                 <span class="fin-kpi-sub">${esc(balanceSub)}</span>
@@ -314,19 +309,16 @@
                 ${state.balanceOpen ? balanceForm() : ''}
             </article>
             <article class="fin-kpi fin-kpi--in">
-                <span class="fin-kpi-icon" aria-hidden="true">${ICON.in}</span>
                 <span class="fin-kpi-label">Coming in · next 3 months</span>
                 <span class="fin-kpi-value">${esc(euro(k.incomeNext3))}</span>
                 <span class="fin-kpi-sub">${esc(euro(k.incomeTotal))} in ${p.months} months · net${k.overdue.count ? ` · ${euro(k.overdue.amount)} overdue` : ''}</span>
             </article>
             <article class="fin-kpi fin-kpi--out">
-                <span class="fin-kpi-icon" aria-hidden="true">${ICON.out}</span>
                 <span class="fin-kpi-label">Fixed costs · per month</span>
                 <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}</span>
                 <span class="fin-kpi-sub">${esc(plural(p.costs.filter(c => c.kind !== 'once').length, 'position'))}${costsAhead ? ` · ${esc(plural(costsAhead, 'planned cost'))} ahead` : ''} · ${esc(euro(k.outTotal))} out in ${p.months} months</span>
             </article>
             <article class="fin-kpi fin-kpi--low ${lowTone}">
-                <span class="fin-kpi-icon" aria-hidden="true">${ICON.low}</span>
                 <span class="fin-kpi-label">Lowest balance</span>
                 <span class="fin-kpi-value">${k.lowest ? esc((k.lowest.amount < 0 ? MINUS : '') + euro(Math.abs(k.lowest.amount))) : '—'}</span>
                 <span class="fin-kpi-sub">${k.lowest ? `<strong>${esc(k.lowest.label)}</strong> · ` : ''}${esc(lowSub)}</span>
@@ -388,11 +380,8 @@
         const p = state.plan;
         const k = p.kpis;
         const alerts = [];
-        if (k.belowZero) {
-            alerts.push({ tone: 'danger', html: `<strong>The account goes below zero in ${esc(k.belowZero.label)}</strong> (${esc(signed(k.belowZero.closing))}) in this scenario.` });
-        } else if (k.belowBuffer) {
-            alerts.push({ tone: 'warn', html: `<strong>Below your cash buffer from ${esc(k.belowBuffer.label)}</strong> - ${esc(euro(k.belowBuffer.closing))} against ${esc(euro(p.settings.buffer))}.` });
-        }
+        // Below zero or below the buffer is on the "Lowest balance" card
+        // already, in its colour; a banner repeating it was one too many.
         if (k.overdue.count) {
             const oldest = p.income.filter(x => x.counted && x.overdue).sort((a, b) => a.due - b.due)[0];
             alerts.push({ tone: 'warn', html: `<strong>${esc(plural(k.overdue.count, 'payment'))} overdue, ${esc(euro(k.overdue.amount))}</strong> - counted in this month. Oldest: ${esc(oldest.name)}, due ${esc(RF.monthName(oldest.due, RF.monthOf(new Date())))}.` });

@@ -771,10 +771,10 @@
         }
 
         return `
-            <button type="button" class="btn btn-secondary ov-delete-btn" data-review-act="reject"${off}>${ICON_X}Reject</button>
+            <button type="button" class="btn review-decide review-decide--reject" data-review-act="reject"${off}>${ICON_X}Reject</button>
             ${open}
             ${canEdit(item) ? `<button type="button" class="btn btn-secondary" data-review-act="edit"${off}>${ICON_EDIT}Edit</button>` : ''}
-            <button type="button" class="btn btn-primary" data-review-act="accept"${off}>${ICON_CHECK}Accept</button>`;
+            <button type="button" class="btn review-decide review-decide--accept" data-review-act="accept"${off}>${ICON_CHECK}Accept</button>`;
     }
 
     function renderSheet() {

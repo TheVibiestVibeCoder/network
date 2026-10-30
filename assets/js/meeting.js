@@ -752,7 +752,9 @@
             case 'working':
                 return '<span class="meeting-spinner" aria-hidden="true"></span><span>Claude is working on this…</span>';
             case 'done':
-                return `${ICON_DONE}<span>${job.result.created.length ? `${plural(job.result.created.length, 'proposal')} under From Claude` : 'Nothing to change'}</span>`;
+                return `${ICON_DONE}<span>${job.result.created.length
+                    ? `${plural(job.result.created.length, 'proposal')} under From Claude`
+                    : (job.result.answer ? 'Answered' : 'Nothing to change')}</span>`;
             case 'interrupted':
                 return `<span>The page closed while Claude worked on this. Check From Claude before sending it again.</span>
                         <button type="button" class="btn btn-secondary btn-small" data-meeting-retry="${job.id}">Send again</button>`;
@@ -769,6 +771,7 @@
             <div class="meeting-job meeting-job--${job.status}">
                 <div class="meeting-job-head">${jobHead(job)}</div>
                 <p class="meeting-job-text">${escapeHtml(job.text)}</p>
+                ${job.status === 'done' && job.result.answer ? `<p class="meeting-job-answer">${ICON_CLAUDE}<span>${escapeHtml(job.result.answer)}</span></p>` : ''}
                 ${job.status === 'done' && job.result.created.length ? `<ul class="meeting-job-items">${job.result.created.map(item => `
                     <li><span class="meeting-kind">${escapeHtml(KIND_LABELS[item.type] || item.type)}</span>${escapeHtml(item.label)}</li>`).join('')}</ul>` : ''}
                 ${job.status === 'done' && job.result.failed.length ? `<p class="meeting-job-failed">${escapeHtml(job.result.failed.join(' '))}</p>` : ''}
@@ -990,6 +993,166 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // One project, from its card
+    // ------------------------------------------------------------------
+    // Hovering the assignee on a project card turns it into a Claude button
+    // (app.js draws it while this file is loaded). It opens a small window
+    // with the meeting's field for that one project: what is typed goes to
+    // Claude at once, and what Claude makes of it waits under From Claude,
+    // as in a meeting. Not part of a meeting, and not kept across reloads.
+
+    const ask = { el: null, project: null, jobs: [], drafts: {} };
+
+    function askHtml() {
+        const project = ask.project;
+        const jobs = ask.jobs.filter(job => job.projectId === project.id);
+        const busy = jobs.some(job => job.status === 'working');
+        return `
+            <header class="meeting-ask-head">
+                <span class="meeting-ask-mark" aria-hidden="true">${ICON_CLAUDE}</span>
+                <div class="meeting-ask-title">
+                    <h2 class="meeting-ask-name">${escapeHtml(project.name)}</h2>
+                    ${project.company ? `<p class="meeting-ask-company">${escapeHtml(project.company)}</p>` : ''}
+                </div>
+                <button type="button" class="meeting-icon-btn" data-ask-close aria-label="Close">${ICON_CLOSE}</button>
+            </header>
+            <div class="meeting-ask-body">
+                <textarea class="form-input meeting-ask-text" maxlength="8000" rows="5" aria-label="For Claude"
+                          placeholder="Ask about this project, or say what should change.&#10;&#10;e.g. How much is still open? Chance up to 80 %, Anna drafts the offer by Friday.">${escapeHtml(ask.drafts[project.id] || '')}</textarea>
+                ${jobsHtml(jobs).replace(/data-meeting-retry/g, 'data-ask-retry')}
+            </div>
+            <footer class="meeting-ask-foot">
+                <p class="meeting-hint"><span>Changes wait under <strong>From Claude</strong>; answers show here.</span></p>
+                <button type="button" class="btn meeting-ask-send" data-ask-send ${busy ? 'disabled' : ''}
+                        title="${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter">${ICON_CLAUDE}<span>Send to Claude</span></button>
+            </footer>`;
+    }
+
+    function renderAsk() {
+        if (!ask.el || !ask.project) return;
+        const field = ask.el.querySelector('.meeting-ask-text');
+        if (field) ask.drafts[ask.project.id] = field.value;
+        const focused = field && document.activeElement === field;
+        ask.el.querySelector('.meeting-ask-content').innerHTML = askHtml();
+        const next = ask.el.querySelector('.meeting-ask-text');
+        if (focused && next) {
+            next.focus();
+            next.setSelectionRange(next.value.length, next.value.length);
+        }
+    }
+
+    function buildAsk() {
+        if (ask.el) return;
+        ask.el = document.createElement('div');
+        ask.el.className = 'modal meeting-ask';
+        ask.el.id = 'meetingAskModal';
+        ask.el.setAttribute('role', 'dialog');
+        ask.el.setAttribute('aria-modal', 'true');
+        ask.el.setAttribute('aria-label', 'Ask Claude about this project');
+        ask.el.innerHTML = '<div class="modal-backdrop" data-ask-close></div><div class="modal-content meeting-ask-content"></div>';
+        document.body.appendChild(ask.el);
+
+        ask.el.addEventListener('click', event => {
+            const target = event.target;
+            if (target.closest('[data-ask-close]')) closeAsk();
+            else if (target.closest('[data-ask-send]')) sendAsk();
+            else if (target.closest('[data-ask-retry]')) {
+                const job = ask.jobs.find(j => j.id === Number(target.closest('[data-ask-retry]').dataset.askRetry));
+                if (job) runAskJob(job);
+            }
+        });
+        ask.el.addEventListener('input', event => {
+            if (event.target.classList.contains('meeting-ask-text')) ask.drafts[ask.project.id] = event.target.value;
+        });
+        ask.el.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                sendAsk();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                closeAsk();
+            }
+        });
+    }
+
+    function askAbout(project) {
+        buildAsk();
+        ask.project = project;
+        ask.el.classList.add('active');
+        renderAsk();
+        const field = ask.el.querySelector('.meeting-ask-text');
+        if (field) field.focus();
+    }
+
+    function closeAsk() {
+        if (!ask.el) return;
+        const field = ask.el.querySelector('.meeting-ask-text');
+        if (field && ask.project) ask.drafts[ask.project.id] = field.value;
+        ask.el.classList.remove('active');
+    }
+
+    function sendAsk() {
+        const project = ask.project;
+        const field = ask.el && ask.el.querySelector('.meeting-ask-text');
+        const text = field ? field.value.trim() : '';
+        if (!project || !text) return;
+        ask.drafts[project.id] = '';
+        field.value = '';
+        runAskJob({ id: ++jobSeq, projectId: project.id, projectName: project.name, text, status: 'working' });
+    }
+
+    async function runAskJob(job) {
+        if (!ask.jobs.includes(job)) ask.jobs.push(job);
+        job.status = 'working';
+        job.error = '';
+        renderAsk();
+        try {
+            const result = await request(`${API}?action=submit`, { method: 'POST', json: { project_id: job.projectId, text: job.text, source: 'card' } });
+            job.result = result.data;
+            job.status = 'done';
+        } catch (error) {
+            job.error = error.message;
+            job.status = 'failed';
+        }
+        renderAsk();
+        if (job.status === 'done') {
+            if (window.CRMReview && window.CRMReview.refreshBadge) window.CRMReview.refreshBadge();
+            document.dispatchEvent(new CustomEvent('crm:review-changed', { detail: { action: 'meeting' } }));
+        }
+    }
+
+    // The button sits inside the card, which opens the project sheet on a
+    // click or Enter: caught on the way down, so the card never sees it.
+    function bindCardButtons() {
+        document.addEventListener('click', event => {
+            const button = event.target.closest('[data-claude-project]');
+            if (!button) return;
+            event.preventDefault();
+            event.stopPropagation();
+            askAbout({
+                id: Number(button.dataset.claudeProject),
+                name: button.dataset.name || '',
+                company: button.dataset.company || ''
+            });
+        }, true);
+        document.addEventListener('keydown', event => {
+            if ((event.key === 'Enter' || event.key === ' ') && event.target.closest && event.target.closest('[data-claude-project]')) {
+                event.stopPropagation();
+            }
+        }, true);
+    }
+
+    /** The button for a project card, laid over its assignee (app.js). */
+    function cardButton(project) {
+        return `<button type="button" class="project-card-claude" data-claude-project="${Number(project.id)}"
+                        data-name="${escapeHtml(project.name || '')}" data-company="${escapeHtml(project.company || '')}"
+                        title="Ask Claude to change this project" aria-label="Ask Claude to change ${escapeHtml(project.name || 'this project')}">${ICON_CLAUDE}</button>`;
+    }
+
+    window.CRMMeeting = { askAbout, cardButton };
+
     function bindElements() {
         [modal, mini].forEach(el => {
             el.addEventListener('click', handleClick);
@@ -1028,6 +1191,7 @@
     function bind() {
         const button = document.getElementById('startMeetingBtn');
         if (button) button.addEventListener('click', start);
+        bindCardButtons();
 
         // A decision made (or undone) - here or anywhere - shows in the summary.
         document.addEventListener('crm:review-changed', event => {

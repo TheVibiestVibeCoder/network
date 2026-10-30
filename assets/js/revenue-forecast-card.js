@@ -223,7 +223,7 @@
                 return `<span class="rf-key${on ? ' is-on' : ''}" data-tone="${st.tone}">
                     <span class="rf-stage-dot" aria-hidden="true"></span>${esc(st.label)}${on ? '' : '<span class="rf-sr"> (not counted)</span>'}
                 </span>`;
-            }).join('')}<span class="rf-legend-hint">Click a bar to see its projects</span></div>`;
+            }).join('')}</div>`;
         }
 
         function summary(ctx) {
@@ -238,8 +238,7 @@
                 <div class="rf-summary">
                     <span class="rf-summary-label">${esc(preset)} · ${f.counted} of ${ctx.items.length} ${ctx.items.length === 1 ? 'project' : 'projects'}</span>
                     <span class="rf-hero" aria-label="${esc(RF.moneyFull(f.current.total))}">${esc(RF.money(f.current.total))}</span>
-                    <span class="rf-hero-sub">expected ${esc(RF.monthName(0, now))} – ${esc(RF.monthName(f.months - 1, now))}${
-                        f.current.undated > 0 ? ` · ${esc(RF.money(f.current.undated))} without end date` : ''}</span>
+                    <span class="rf-hero-sub">expected ${esc(RF.monthName(0, now))} – ${esc(RF.monthName(f.months - 1, now))}</span>
                     <span class="rf-compare">${compare}</span>
                 </div>`;
         }
@@ -333,8 +332,9 @@
                 const busiest = f.current.totals[f.busiest] > 0
                     ? `<span>Busiest month: ${esc(RF.monthName(f.busiest, ctx.now))} · </span><strong>${esc(RF.money(f.current.totals[f.busiest]))}</strong>`
                     : `<span>${esc(UNDATED_LABEL)} · </span><strong>${esc(RF.money(f.current.undated))}</strong>`;
-                return busiest
-                    + '<span> · <span class="rf-key-ghost" aria-hidden="true"></span>grey = everything won at the top of its budget</span>';
+                // What the grey part of a bar means is in each bar's
+                // tooltip, not a line of its own here.
+                return busiest;
             }
             const col = columnOf(f, f.current, month);
             const parts = RF.STACK.filter(k => col.stage(k) > 0)
@@ -375,7 +375,7 @@
                 const selected = state.selected === i;
                 cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
                     data-rf-focus="month-${undated ? 'undated' : i}" aria-expanded="${selected}" aria-controls="${uid}-tip"
-                    title="${esc(columnName(ctx, i))}: click for its projects"
+                    title="${esc(columnName(ctx, i))}: click for its projects${ghost > 0 ? ' · grey: everything won at the top of its budget' : ''}"
                     aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
                     ${ghost > 0 ? `<span class="rf-ghost" style="height:${ghost}px"></span>` : ''}
                     <span class="rf-stack">${segs}</span>

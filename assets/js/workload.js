@@ -225,7 +225,7 @@
 
         return `
             <span class="home-donut" aria-hidden="true">
-                <svg viewBox="0 0 92 92" width="84" height="84" focusable="false">
+                <svg viewBox="0 0 92 92" width="68" height="68" focusable="false">
                     <circle class="home-donut-track" cx="46" cy="46" r="${r}"></circle>${arcs}
                 </svg>
                 <span class="home-donut-center">
@@ -313,6 +313,10 @@
             ? ` <span class="home-week-overdue">· ${summary.overdue} overdue</span>`
             : '';
 
+        // A week with nothing due is only empty dots: left out then, unless
+        // one of its days is the filter in use.
+        const weekShown = summary.due > 0 || filters.day !== null;
+
         // The list: open to-dos plus the ones just ticked off here.
         const listed = todos.filter(t => HD.isOpen(t) || state.lingering.has(Number(t.id)));
         const filtered = HD.filterTodos(listed, filters, today);
@@ -339,13 +343,13 @@
                             ${donut(segments, priorities.map(p => p.key), summary.open, 'open')}
                             <div class="home-legend">${legend}</div>
                         </div>
-                        <div class="home-week">
+                        ${weekShown ? `<div class="home-week">
                             <div class="home-week-head">
                                 <span class="home-week-title">Next 7 days</span>
                                 <span class="home-week-due"><strong>${summary.due}</strong> due${overdue}</span>
                             </div>
                             <div class="home-week-days">${days}</div>
-                        </div>
+                        </div>` : ''}
                     </div>
                 </div>
                 ${filterBar(HD.todoListLabel(filters, filtered.length, today), 'todos', filtering)}
@@ -429,7 +433,7 @@
         const filtered = HD.filterProjects(projects, ui.stage);
         const shown = ui.allProjects ? filtered : filtered.slice(0, LIST_LIMIT);
         const stage = HD.STAGES.find(s => s.key === ui.stage);
-        const label = stage ? `${stage.label} · ${filtered.length}`.toUpperCase() : 'ALL PROJECTS';
+        const label = stage ? `${stage.label} · ${filtered.length}` : 'All projects';
 
         const list = filtered.length
             ? `<ul class="home-list">${shown.map(p => projectRow(p, todos)).join('')}</ul>`
@@ -1115,7 +1119,8 @@
      *
      * The same people the "Showing" switch offers, surfaced where they are
      * always visible - so "what is Anna working on?" is one click, not a
-     * dropdown hunt. Hidden entirely until there is somebody besides you.
+     * dropdown hunt. Only people who can sign in now: invited and disabled
+     * accounts stay out. Hidden entirely until there is somebody besides you.
      */
     function renderTeam() {
         const wrap = $('sidebarTeamWrap');
@@ -1126,7 +1131,7 @@
         const meKey = window.CRMPeople.meKey();
         const others = people.filter(person => {
             const key = person.id === null ? 'owner' : String(person.id);
-            return key !== meKey;
+            return key !== meKey && person.active !== false;
         });
 
         if (!others.length) {

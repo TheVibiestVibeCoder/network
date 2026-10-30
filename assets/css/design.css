@@ -28,6 +28,9 @@
      - One accent. Blue marks what is selected or active, nothing else.
      - Show what you need to recognise and decide; the rest is one click in.
      - Quiet chrome, so the content is the loudest thing on screen.
+     - One label style for small captions over lists and figures: sentence
+       case, --t-xs, weight 600, ink-3, no letter-spacing. No uppercase
+       captions (the brand's TEST tag aside).
 
    Contrast rules the tokens are built around (checked against WCAG AA):
      - ink-3 passes on page and card backgrounds, NOT on mist - secondary text
@@ -935,7 +938,25 @@ h1, h2, h3, h4 {
     color: var(--c-ink-3);
 }
 
-/* ---- Toolbar: search on the left, actions on the right ------------------ */
+/* ---- Toolbar: title, search, actions - one row ------------------------- */
+/* Contacts, To-dos and Projects carry their title in the toolbar, so the
+   page starts with one row instead of two, and the title stays in view
+   while the list scrolls. */
+
+.list-head-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-right: 14px;
+}
+
+.view-count {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
 
 .view-panel .list-header {
     position: sticky;
@@ -1384,16 +1405,27 @@ input[type="checkbox"] {
 /* --------------------------------------------------------------------------
    9. Grouped lists - one pattern for contacts, to-dos and home
    --------------------------------------------------------------------------
-   A group is a single card; its rows are separated by hairlines rather than
-   each wearing a border of its own. Boxes inside boxes are what made the old
-   lists feel busy.
+   The whole list is one white surface without a border; a group is a
+   heading inside it, its rows separated by hairlines. A card per group was
+   one box too many.
    -------------------------------------------------------------------------- */
 
-.group-card,
-#listView .company-group,
-#listView .pinned-section,
-#listView .tag-group,
-#todoView .todo-group {
+.view-panel .contacts-list,
+.view-panel .todos-list {
+    gap: 0;
+    background: var(--c-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+/* Nothing to list: no empty white box. */
+.view-panel .contacts-list:empty,
+.view-panel .todos-list:empty {
+    box-shadow: none;
+}
+
+.group-card {
     margin: 0 0 16px;
     padding: 0;
     background: var(--c-surface);
@@ -1403,23 +1435,42 @@ input[type="checkbox"] {
     overflow: hidden;
 }
 
-/* Group headings: a sentence-case label and a count, not a shouted caption. */
+#listView .company-group,
+#listView .pinned-section,
+#listView .tag-group,
+#todoView .todo-group {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--c-line);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#listView .company-group:first-child,
+#listView .pinned-section:first-child,
+#listView .tag-group:first-child,
+#todoView .todo-group:first-child {
+    border-top: 0;
+}
+
+/* Group headings: a quiet sentence-case label and a count, a little air
+   above, no rule under - the rows' hairlines start right below. */
 #listView .company-header,
 #listView .pinned-header,
 #listView .tag-group-header,
-#todoView .todo-group-header,
-#todoView .todo-group-title {
+#todoView .todo-group-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 44px;
+    min-height: 40px;
     margin: 0;
-    padding: 0 16px;
+    padding: 10px 16px 2px;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid var(--c-line-2);
     border-radius: 0;
-    color: var(--c-ink);
+    color: var(--c-ink-2);
     font: 600 var(--t-sm)/1.3 var(--font);
     letter-spacing: 0;
     text-transform: none;
@@ -1592,7 +1643,7 @@ input[type="checkbox"] {
 #listView.is-map .list-controls,
 #listView.is-map #listFilterToggle,
 #listView.is-map #importExportBtn {
-    visibility: hidden;
+    display: none;
 }
 
 #listView.is-map .list-header {
@@ -1604,7 +1655,7 @@ input[type="checkbox"] {
     flex: 1;
     min-height: 360px;
     position: relative;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
     box-shadow: var(--e-1);
@@ -1640,7 +1691,7 @@ input[type="checkbox"] {
 .rf-card {
     margin: 0 0 16px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-1);
     color: var(--c-ink);
@@ -1863,12 +1914,6 @@ input[type="checkbox"] {
     margin-left: 48px;
 }
 
-.rf-legend-hint {
-    margin-left: auto;
-    font-size: var(--t-xs);
-    color: var(--c-ink-4);
-}
-
 .rf-key {
     display: inline-flex;
     align-items: center;
@@ -1993,16 +2038,6 @@ input[type="checkbox"] {
     color: var(--c-ink);
 }
 
-.rf-key-ghost {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin: 0 5px 0 1px;
-    border-radius: 2px;
-    background: var(--c-tint);
-    vertical-align: 0;
-}
-
 .rf-plot-wrap {
     position: relative;
 }
@@ -2077,7 +2112,7 @@ input[type="checkbox"] {
     max-width: calc(100% - 24px);
     padding: 10px 12px 8px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-3, var(--e-2));
     font-size: var(--t-sm);
@@ -2305,15 +2340,13 @@ input[type="checkbox"] {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 22px;
+    padding: 10px 22px 4px;
     border-top: 1px solid var(--c-line-2);
-    border-bottom: 1px solid var(--c-line-2);
-    background: var(--c-tint-3);
     font-size: var(--t-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--c-ink-2);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-ink-3);
 }
 
 .rf-detail-actions {
@@ -2689,7 +2722,7 @@ input[type="checkbox"] {
     gap: 8px;
     height: 32px;
     padding: 0 5px 0 14px;
-    border: 1px solid color-mix(in srgb, var(--stage-tone) 45%, transparent);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
     background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
     color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
@@ -2729,6 +2762,8 @@ input[type="checkbox"] {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 14px;
+    /* Cards in a row share one height; the spare room goes above the
+       dates and figures, so those line up at the bottom of the row. */
     align-items: stretch;
 }
 
@@ -2743,8 +2778,9 @@ input[type="checkbox"] {
     margin: 0;
     padding: 18px 18px 16px;
     background: var(--c-surface);
-    /* The stage, as the colour of the border: softened at rest, full on hover. */
-    border: 1px solid color-mix(in srgb, var(--stage-tone) 55%, var(--c-line));
+    /* No border: white on the grey page is edge enough, and the stage is
+       already the group's heading. Transparent, so focus can still colour it. */
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     cursor: pointer;
@@ -2758,7 +2794,6 @@ input[type="checkbox"] {
 #projectsView .project-card.stage-complete { --stage-tone: var(--stage-complete); }
 
 #projectsView .project-card:hover {
-    border-color: var(--stage-tone);
     box-shadow: var(--e-2);
     transform: translateY(-2px);
 }
@@ -2828,34 +2863,9 @@ input[type="checkbox"] {
     box-shadow: 0 0 0 2px var(--c-surface);
 }
 
-#projectsView .project-card-description {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    min-height: 0;
-    margin: 10px 0 0;
-    font-size: var(--t-sm);
-    line-height: 1.55;
-    color: var(--c-ink-2);
-}
-
-/* Timeline and figures sit at the bottom, so cards in a row line up even
-   when their descriptions differ in length. */
 #projectsView .project-card-bottom {
     margin-top: auto;
-    padding-top: 16px;
-}
-
-/* Small uppercase labels: Start, End, Budget, Chance. */
-.project-meta-label {
-    display: block;
-    margin-bottom: 3px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--c-ink-3);
+    padding-top: 12px;
 }
 
 /* ---- When it runs: one quiet line, lighter than the budget ---- */
@@ -2914,11 +2924,9 @@ input[type="checkbox"] {
 
 #projectsView .project-card-foot {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 16px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--c-line-2);
+    margin-top: 8px;
 }
 
 .project-stat {
@@ -2967,6 +2975,182 @@ input[type="checkbox"] {
     background: conic-gradient(var(--c-accent) calc(var(--chance, 0) * 1%), var(--c-tint-2) 0);
     -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 62%);
     mask: radial-gradient(closest-side, transparent 58%, #000 62%);
+}
+
+
+/* ---- List view: one row per project ------------------------------------- */
+/* The same facts as a card, side by side, in one white surface per stage.
+   Chosen with the cards / list switch in the toolbar (kept per account). */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.project-view-switch .segmented-btn {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.project-rows {
+    background: var(--c-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.project-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.7fr) minmax(110px, 0.9fr) minmax(0, 1.3fr) 60px 28px;
+    align-items: center;
+    gap: 16px;
+    min-height: 56px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--c-line-2);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.project-row:last-child {
+    border-bottom: 0;
+}
+
+.project-row:hover {
+    background: var(--c-tint-3);
+}
+
+.project-row:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+}
+
+.project-row-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    min-width: 0;
+}
+
+.project-row-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.project-row-company {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.project-row-main .review-badge,
+.project-row-main .review-change-badge {
+    align-self: center;
+}
+
+/* When it ends and how long is left; the start is in the sheet. */
+.project-row .project-when-part:first-child,
+.project-row .project-when-arrow {
+    display: none;
+}
+
+.project-row .project-when {
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+.project-row-budget {
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-row-budget.is-empty {
+    color: var(--c-ink-3);
+    font-weight: 500;
+}
+
+.project-row .ppay-card {
+    margin: 0;
+}
+
+.project-row-chance {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-row-assignee {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.project-row .assignee-chip {
+    width: 28px;
+    height: 28px;
+}
+
+/* Narrow screens: name, budget, chance and face; the rest is in the sheet. */
+@media (max-width: 900px) {
+    .project-row {
+        grid-template-columns: minmax(0, 1fr) auto 52px 28px;
+        gap: 12px;
+    }
+
+    .project-row-when,
+    .project-row-pay {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .project-row-main {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Stacked, name and company are cut short at the column's edge. */
+    .project-row-title,
+    .project-row-company {
+        max-width: 100%;
+    }
+
+    .project-row-main .review-badge,
+    .project-row-main .review-change-badge {
+        align-self: flex-start;
+    }
+
+    /* The name needs the room more than the chance does. */
+    .project-row {
+        grid-template-columns: minmax(0, 1fr) auto 28px;
+    }
+
+    .project-row-chance {
+        display: none;
+    }
 }
 
 
@@ -3195,9 +3379,9 @@ input[type="checkbox"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-sm);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -3207,7 +3391,7 @@ input[type="checkbox"] {
 #workloadView .workload-list {
     display: block;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -3392,25 +3576,12 @@ input[type="checkbox"] {
 }
 
 /* ---- To-do groups ------------------------------------------------------- */
-/* Header, "Open" action and count on one line; the rows below. The action
-   div is a sibling of the header in the markup, so a grid places it there. */
-
-#todoView .todo-group {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-}
+/* Name (it opens the project or contact) and count on one line, the rows
+   below. */
 
 #todoView .todo-group-header {
-    grid-column: 1;
-    grid-row: 1;
-    display: flex;
-    align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 52px;
-    padding: 8px 8px 8px 16px;
-    border: 0;
-    background: transparent;
 }
 
 #todoView .todo-group-title-wrap {
@@ -3425,7 +3596,7 @@ input[type="checkbox"] {
     padding: 0;
     border: 0;
     min-height: 0;
-    font-size: var(--t-base);
+    font-size: var(--t-sm);
     font-weight: 600;
     color: var(--c-ink);
     white-space: nowrap;
@@ -3445,16 +3616,21 @@ input[type="checkbox"] {
     white-space: nowrap;
 }
 
-#todoView .todo-group-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+/* The names open their project or contact: plain text until hovered. */
+#todoView .todo-group-link {
+    background: none;
+    font-family: inherit;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
 }
 
-/* The type label repeats the subtitle word for word. */
-#todoView .todo-group-type {
-    display: none;
+#todoView .todo-group-link:hover,
+#todoView .todo-group-link:focus-visible {
+    outline: none;
+    color: var(--c-accent-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 #todoView .todo-group-count {
@@ -3472,36 +3648,12 @@ input[type="checkbox"] {
     font-weight: 600;
 }
 
-#todoView .todo-group-actions {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-    display: flex;
-    gap: 4px;
-    margin: 0;
-    padding: 0 12px 0 0;
-    border: 0;
-}
-
-/* "Open contact / project" as a quiet text action, not a boxed button. */
-#todoView .todo-group-actions .btn {
-    height: 30px;
-    padding: 0 10px;
-    border-color: transparent;
-    background: transparent;
-    color: var(--c-accent-2);
-    font-weight: 500;
-}
-
-#todoView .todo-group-actions .btn:hover {
-    background: var(--c-accent-softer);
-    border-color: transparent;
-    color: var(--c-accent-2);
-}
-
 #todoView .todo-group-items {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--c-line-2);
+    /* style.css makes this a grid; one column no wider than the list, or a
+       long title pushes the row past the edge instead of being cut short. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border-top: 0;
 }
 
 /* ---- Round checkboxes --------------------------------------------------- */
@@ -3990,11 +4142,35 @@ input[type="checkbox"] {
         font-size: 22px;
     }
 
-    /* Toolbar: search fills the row, actions become icons. */
+    /* Toolbar: the title on its own line, then search filling the row and
+       actions as icons. */
     .view-panel .list-header {
         top: -18px;
         margin-bottom: 12px;
         padding: 10px 0;
+    }
+
+    .view-panel .list-header-top {
+        flex-wrap: wrap;
+    }
+
+    .list-head-title {
+        flex-basis: 100%;
+        margin: 0 0 4px;
+    }
+
+    .list-head-title .view-title {
+        font-size: 22px;
+    }
+
+    /* Search and actions share the second line: the search gives way. */
+    .view-panel .list-header-top .search-box {
+        flex: 1 1 0;
+        min-width: 110px;
+    }
+
+    .view-panel .list-header-actions .segmented-btn span {
+        display: none;
     }
 
     .view-panel .search-box {
@@ -4158,12 +4334,8 @@ input[type="checkbox"] {
    into a quiet, cool winter map in either theme - no second tile set needed.
    -------------------------------------------------------------------------- */
 
-/* The toolbar's search and filters do not act on the map, so in map mode the
-   whole bar steps aside; the List/Map switch above is the way back. */
-#listView.is-map .list-header,
-#listView.is-map > .list-header {
-    display: none;
-}
+/* The toolbar's search and filters do not act on the map, so in map mode
+   they step aside (section 9); title, List/Map switch and Add stay. */
 
 .contacts-map .leaflet-container {
     background: var(--c-sunken);
@@ -4279,7 +4451,7 @@ input[type="checkbox"] {
 .modal-content {
     max-height: calc(100dvh - 48px);
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-4);
     animation: dsDialogIn var(--dur-3) var(--ease) both;
@@ -4483,17 +4655,21 @@ input[type="checkbox"] {
     display: none;
 }
 
-/* ---- Facts: a quiet two-column grid, no box around each one ---- */
+/* ---- Facts: a quiet two-column grid, no box around it or each one ----
+   Pulled out by the items' own padding, so labels line up with the section
+   headings above them. */
 
 .detail-grid,
 .overview-details {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2px 8px;
-    padding: 8px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     overflow: hidden;
 }
 
@@ -4585,10 +4761,10 @@ a.detail-value:hover,
 
 .assignee-bar {
     margin: 0 0 22px;
-    padding: 10px 12px 10px 10px;
-    background: var(--c-tint-3);
-    border: 1px solid var(--c-line-2);
-    border-radius: var(--r-lg);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .assignee-bar-face {
@@ -4627,9 +4803,9 @@ a.detail-value:hover,
     gap: 6px;
     height: 28px;
     padding: 0 6px 0 10px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -4735,8 +4911,8 @@ a.detail-value:hover,
 
 .project-mini-card {
     padding: 12px 14px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
     box-shadow: none;
     cursor: pointer;
@@ -4744,7 +4920,7 @@ a.detail-value:hover,
 }
 
 .project-mini-card:hover {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     background: var(--c-tint-3);
 }
 
@@ -4944,10 +5120,49 @@ textarea.form-input:focus {
    The month is one card with hairline gridlines, not forty-two boxes.
    -------------------------------------------------------------------------- */
 
+/* Month view: an entry is its dot and its name. The coloured bar down its
+   left edge said the same thing a second time. */
+#calendarView .cal-month-note-dot {
+    border-left: 0;
+    padding-left: 2px;
+}
+
+.cal-kind-dot { background: var(--c-ink-4); }
+.cal-month-note-dot--project-note .cal-kind-dot { background: var(--c-warning); }
+.cal-month-note-dot--todo .cal-kind-dot { background: var(--c-success); }
+.cal-month-note-dot--contact-activity .cal-kind-dot { background: var(--c-primary); }
+.cal-month-note-dot--project-activity .cal-kind-dot { background: var(--c-ink-3); }
+
+
 #calendarView .calendar-toolbar {
     padding: 0 0 14px;
     border: 0;
     background: transparent;
+}
+
+/* The page title starts the toolbar row, as on the other pages. */
+#calendarView .calendar-page-title {
+    margin: 0 14px 0 0;
+}
+
+/* Narrow screens stack the toolbar: the title on top, then the way through
+   the months, then Month / Week / Day. */
+@media (max-width: 768px) {
+    #calendarView .calendar-toolbar-left {
+        order: 1;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    #calendarView .calendar-toolbar-right {
+        order: 2;
+    }
+
+    #calendarView .calendar-page-title {
+        flex-basis: 100%;
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
 }
 
 #calendarView .calendar-title {
@@ -5028,7 +5243,7 @@ textarea.form-input:focus {
 #calendarView .cal-month-body {
     gap: 0;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -5113,9 +5328,14 @@ textarea.form-input:focus {
     --bk-control-height: 36px;
 }
 
-/* The page title already says Bookkeeping; the bar keeps only its count. */
+/* The page title starts the toolbar, as on Contacts, To-dos and Projects. */
 #bookkeepingView .bk-bar-title {
-    display: none;
+    margin: 0 6px 0 0;
+    font-size: var(--t-2xl);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--c-ink);
 }
 
 #bookkeepingView .bk-bar {
@@ -5145,7 +5365,7 @@ textarea.form-input:focus {
 
 #bookkeepingView .bk-table-wrap,
 #bookkeepingView .bk-dropzone {
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     background: var(--c-surface);
@@ -5208,10 +5428,31 @@ textarea.form-input:focus {
 .profile-pop {
     padding: 16px;
     background: var(--c-raised);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-3);
     animation: dsDialogIn var(--dur-2) var(--ease) both;
+}
+
+/* Users and the theme switch, under the photo: rows like the sidebar's,
+   set apart by a hairline. */
+.profile-pop-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px -8px -8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.sidebar .profile-pop .profile-pop-item {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+/* In the narrow rail the sidebar hides its labels; here they always show. */
+.sidebar .profile-pop .profile-pop-item .nav-label {
+    display: inline;
 }
 
 /* Desktop: sized to the sidebar, so the sidebar's own overflow clipping
@@ -5591,8 +5832,8 @@ textarea.form-input:focus {
 details.import-instructions {
     margin: 0 0 14px;
     padding: 0;
-    background: transparent;
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
 }
 
@@ -5852,8 +6093,8 @@ details.import-instructions p {
 }
 
 .pdoc-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
 }
@@ -6114,9 +6355,9 @@ details.import-instructions p {
     gap: 7px;
     height: 30px;
     padding: 0 12px 0 10px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink);
     font: 500 var(--t-sm)/1 var(--font);
     cursor: pointer;
@@ -6129,7 +6370,7 @@ details.import-instructions p {
 }
 
 .pdoc-chip:hover:not(:disabled) {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     box-shadow: var(--e-1);
 }
 
@@ -6357,9 +6598,9 @@ details.import-instructions p {
     max-width: 100%;
     height: 28px;
     padding: 0 4px 0 2px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     font-size: var(--t-sm);
     font-weight: 500;
     color: var(--c-ink);
@@ -6385,7 +6626,7 @@ details.import-instructions p {
 }
 
 .pcontact-chip:hover {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     background: var(--c-tint-3);
 }
 
@@ -6409,7 +6650,8 @@ details.import-instructions p {
 }
 
 /* Completed to-dos, when shown, read as done. */
-#projectOverviewModal .ptodo.todo-completed .ptodo-title {
+#projectOverviewModal .ptodo.todo-completed .ptodo-title,
+#todoView .ptodo.todo-completed .ptodo-title {
     color: var(--c-ink-3);
     text-decoration: line-through;
     text-decoration-color: var(--c-ink-4);
@@ -6443,13 +6685,14 @@ details.import-instructions p {
 /* ---- To-dos: one line each, open in place ---- */
 
 .ptodo-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
 }
 
-#projectOverviewModal .ptodo {
+#projectOverviewModal .ptodo,
+#todoView .ptodo {
     margin: 0;
     padding: 0;
     background: transparent;
@@ -6458,8 +6701,20 @@ details.import-instructions p {
     border-radius: 0;
 }
 
-#projectOverviewModal .ptodo:last-child {
+#projectOverviewModal .ptodo:last-child,
+#todoView .ptodo:last-child {
     border-bottom: 0;
+}
+
+/* On the To-dos page a row opens the to-do's sheet; it lines up with the
+   group names above it. */
+#todoView .ptodo-row {
+    min-height: 44px;
+    padding: 6px 14px 6px 16px;
+}
+
+#todoView .ptodo-title {
+    cursor: pointer;
 }
 
 .ptodo-row {
@@ -6474,6 +6729,11 @@ details.import-instructions p {
 
 .ptodo-row:hover {
     background: var(--c-tint-3);
+}
+
+/* In the sheet the list itself is tinted; a hovered row one step more. */
+.ptodo-card .ptodo-row:hover {
+    background: var(--c-tint-2);
 }
 
 .ptodo-row .todo-check {
@@ -6572,6 +6832,12 @@ details.import-instructions p {
     .ptodo-meta .todo-priority {
         font-size: 0;
         gap: 0;
+    }
+
+    /* "Awaiting review" shrinks to its mark, so the title keeps the room;
+       the orange frame round the row already says it. */
+    .ptodo-row .review-badge > span {
+        display: none;
     }
 }
 
@@ -7337,56 +7603,71 @@ details.import-instructions p {
     font-variant-numeric: tabular-nums;
 }
 
-/* On a project card, under the budget: what is still open, hard to miss,
-   over the same budget bar as in the project sheet. */
+/* On a project card, under the budget: one dash per payment, then a line
+   saying where they stand (project-payments.js, cardSummary). */
 .ppay-card {
     display: flex;
-    flex-direction: column;
-    gap: 7px;
-    margin-top: 12px;
-    padding: 9px 12px 11px;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    min-width: 0;
 }
 
-.ppay-card-head {
+/* Up to 120px wide: a dash is 18px, and shares the room once there are
+   more payments than fit. */
+.ppay-dashes {
     display: flex;
+    gap: 3px;
+    flex: 0 1 auto;
+    max-width: 120px;
+}
+
+.ppay-dash {
+    width: 18px;
+    flex: 0 1 auto;
+    min-width: 4px;
+    height: 5px;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+}
+
+.ppay-dash.is-paid { background: var(--c-success); }
+.ppay-dash.is-late { background: var(--c-danger); }
+.ppay-dash.is-due { background: color-mix(in srgb, var(--c-ink) 20%, transparent); }
+
+/* Budget no payment covers yet: hatched, so it reads as "not decided". */
+.ppay-dash.is-unplanned {
+    background: repeating-linear-gradient(-45deg, var(--c-line-strong) 0 2px, transparent 2px 4px);
+    opacity: 0.5;
+}
+
+.ppay-card-text {
+    display: flex;
+    align-items: center;
     flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 2px 12px;
-}
-
-.ppay-card .ppay-bar {
-    height: 6px;
-}
-
-.ppay-card-open {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 5px;
-    font-size: var(--t-sm);
+    gap: 0 5px;
+    min-width: 0;
+    font-size: var(--t-xs);
     font-weight: 500;
-    color: var(--c-success-ink);
-}
-
-.ppay-card-open strong {
-    font-size: var(--t-base);
-    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
-.ppay-card-open svg {
-    align-self: center;
+.ppay-card-text > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
-.ppay-card.is-done .ppay-card-open {
-    font-weight: 600;
-}
+.ppay-card-text .is-paid { color: var(--c-success-ink); }
+.ppay-card-text .is-late { color: var(--c-danger-ink); font-weight: 600; }
+.ppay-card-text .is-due { color: var(--c-ink-3); }
+.ppay-card-text .is-warn { color: var(--c-warning-ink); }
+.ppay-card-text .ppay-sep { color: var(--c-ink-4); }
 
-.ppay-card-count {
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
+.ppay-card-text svg {
+    width: 12px;
+    height: 12px;
 }
 
 @media (max-width: 560px) {
@@ -7484,8 +7765,8 @@ details.import-instructions p {
     margin: 0 0 6px;
     font-size: var(--t-xs);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--c-ink-3);
 }
 
@@ -7660,9 +7941,9 @@ details.import-instructions p {
     max-width: 200px;
     height: 26px;
     padding: 0 10px 0 8px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink-2);
     font: 500 var(--t-xs)/1 var(--font);
     text-decoration: none;
@@ -7670,7 +7951,7 @@ details.import-instructions p {
 }
 
 .tlink-pill:hover {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     box-shadow: var(--e-1);
     color: var(--c-ink);
 }
@@ -7857,8 +8138,8 @@ details.import-instructions p {
 }
 
 .tlink-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
 }
@@ -8030,9 +8311,9 @@ details.import-instructions p {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-sm);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -8046,7 +8327,7 @@ details.import-instructions p {
 
 .deleted-projects-list {
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
 }
@@ -8200,8 +8481,8 @@ details.import-instructions p {
     margin: 0 0 6px;
     font-size: var(--t-xs);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--c-ink-3);
 }
 
@@ -8330,7 +8611,7 @@ details.import-instructions p {
 #workloadView .home-news {
     margin: 0 0 24px;
     background: var(--c-surface);
-    border: 1px solid color-mix(in srgb, var(--c-accent) 45%, var(--c-line));
+    border: 0;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -8340,9 +8621,7 @@ details.import-instructions p {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px 10px 16px;
-    background: color-mix(in srgb, var(--c-accent) 6%, var(--c-surface));
-    border-bottom: 1px solid var(--c-line-2);
+    padding: 10px 12px 4px 16px;
 }
 
 .home-news-icon {
@@ -8410,16 +8689,25 @@ details.import-instructions p {
     background: var(--c-tint-3);
 }
 
-/* The kind, in the colour it has everywhere on the home page. */
+/* The kind: a dot in the colour it has everywhere on the home page, and
+   the word - no pill. */
 .home-news-type {
     --wl-type: var(--type-todo);
     justify-self: start;
-    padding: 3px 8px;
-    border-radius: var(--r-full);
-    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
-    color: var(--wl-type);
-    font: 600 11px/1.2 var(--font);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--c-ink-3);
+    font: 500 var(--t-xs)/1.2 var(--font);
     white-space: nowrap;
+}
+
+.home-news-type::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-full);
+    background: var(--wl-type);
 }
 
 .home-news-type[data-type="project"] { --wl-type: var(--type-project); }
@@ -8527,7 +8815,7 @@ details.import-instructions p {
 
 #workloadView .home-card {
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 0;
     border-radius: var(--r-xl);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -8615,13 +8903,17 @@ details.import-instructions p {
 
 .home-donut {
     position: relative;
-    width: 84px;
-    height: 84px;
+    width: 68px;
+    height: 68px;
     flex-shrink: 0;
 }
 
 .home-donut svg {
     display: block;
+    /* As big as the ring, whatever size a screen gives it: the count in
+       the middle is centred on the ring's box. */
+    width: 100%;
+    height: 100%;
     transform: rotate(-90deg);
 }
 
@@ -8654,7 +8946,7 @@ details.import-instructions p {
 }
 
 .home-donut-value {
-    font-size: var(--t-2xl);
+    font-size: var(--t-xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
@@ -8671,9 +8963,11 @@ details.import-instructions p {
    priority): the summaries of both cards are then the same height, so the
    filter bars under them line up whether there are three entries or four. */
 .home-legend {
-    --legend-row: 32px;
+    --legend-row: 26px;
     flex: 1;
     min-width: 0;
+    /* Counts close to their names, also when the week is left out. */
+    max-width: 280px;
     display: grid;
     grid-auto-rows: var(--legend-row);
     align-content: center;
@@ -8686,7 +8980,7 @@ details.import-instructions p {
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 6px 8px;
+    padding: 3px 8px;
     border: 0;
     border-radius: var(--r-sm);
     background: transparent;
@@ -8871,16 +9165,15 @@ details.import-instructions p {
 
 /* ---- Filter bar ---- */
 
+/* What the list below shows, as a quiet label over it - no band. */
 .home-filterbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 38px;
-    padding: 8px 22px;
-    background: var(--c-tint-3);
+    min-height: 34px;
+    padding: 10px 22px 2px;
     border-top: 1px solid var(--c-line-2);
-    border-bottom: 1px solid var(--c-line-2);
 }
 
 .home-filterbar-label {
@@ -8890,8 +9183,7 @@ details.import-instructions p {
     white-space: nowrap;
     font-size: var(--t-xs);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    color: var(--c-ink-2);
+    color: var(--c-ink-3);
 }
 
 .home-clear {
@@ -9268,7 +9560,7 @@ details.import-instructions p {
     --wl-type: var(--type-bookkeeping);
     margin: 0 0 20px;
     background: var(--c-surface);
-    border: 1px solid color-mix(in srgb, var(--wl-type) 50%, var(--c-line));
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -9566,20 +9858,9 @@ details.import-instructions p {
     min-width: 0;
     padding: 16px 18px 18px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-1);
-}
-
-.fin-kpi-icon {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    margin-bottom: 8px;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
-    color: var(--c-ink-2);
 }
 
 .fin-kpi-label {
@@ -9611,26 +9892,9 @@ details.import-instructions p {
     font-weight: 600;
 }
 
-.fin-kpi--in .fin-kpi-icon {
-    background: var(--c-success-soft);
-    color: var(--c-success-ink);
-}
-
-.fin-kpi--out .fin-kpi-icon {
-    background: var(--c-danger-soft);
-    color: var(--c-danger-ink);
-}
-
-.fin-kpi--low .fin-kpi-icon {
-    background: var(--c-accent-soft);
-    color: var(--c-accent-2);
-}
-
 .fin-kpi--low.is-ok .fin-kpi-value { color: var(--c-success-ink); }
 .fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning-ink); }
 .fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger-ink); }
-.fin-kpi--low.is-warn .fin-kpi-icon { background: var(--c-warning-soft); color: var(--c-warning-ink); }
-.fin-kpi--low.is-danger .fin-kpi-icon { background: var(--c-danger-soft); color: var(--c-danger-ink); }
 
 /* The bank balance carries the page: navy, with a soft glow. */
 .fin-kpi--balance {
@@ -9640,11 +9904,6 @@ details.import-instructions p {
         linear-gradient(140deg, var(--c-primary) 0%, var(--c-primary-2) 100%);
     color: var(--c-on-primary);
     box-shadow: var(--e-2);
-}
-
-.fin-kpi--balance .fin-kpi-icon {
-    background: color-mix(in srgb, var(--c-on-primary) 14%, transparent);
-    color: var(--c-on-primary);
 }
 
 .fin-kpi--balance :is(.fin-kpi-label, .fin-kpi-sub) {
@@ -9754,7 +10013,7 @@ details.import-instructions p {
     min-width: 0;
     padding: 18px 20px 20px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-1);
 }
@@ -10132,8 +10391,8 @@ details.import-instructions p {
     border-bottom: 1px solid var(--c-line-2);
     font-size: var(--t-xs);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--c-ink-3);
 }
 
@@ -10592,7 +10851,7 @@ details.import-instructions p {
     max-width: 980px;
     padding: 22px 24px 24px;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
 }
 
@@ -10604,7 +10863,7 @@ details.import-instructions p {
     height: 30px;
     margin-right: 6px;
     padding: 0 10px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -10612,10 +10871,11 @@ details.import-instructions p {
     cursor: pointer;
     user-select: none;
     transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+    background: var(--c-tint-2);
 }
 
 .user-permission:hover {
-    border-color: var(--c-line-strong, var(--c-line));
+    background: var(--c-tint);
 }
 
 .user-permission input {

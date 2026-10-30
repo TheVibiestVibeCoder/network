@@ -252,7 +252,7 @@
         return { open: openTodos.length, priorities, days, due, overdue };
     }
 
-    /** "HIGH PRIORITY · FRIDAY · 3", or "ALL OPEN · BY DUE DATE · 12". */
+    /** "High priority · Friday · 3", or "All open · by due date · 12". */
     function todoListLabel(filters, count, today) {
         const parts = [];
         if (filters.prio) {
@@ -261,9 +261,10 @@
         if (filters.day !== null && filters.day !== undefined) {
             parts.push(dayName(filters.day, today));
         }
-        if (!parts.length) parts.push('All open', 'By due date');
+        if (!parts.length) parts.push('All open', 'by due date');
         parts.push(String(count));
-        return parts.join(' · ').toUpperCase();
+        const label = parts.join(' · ');
+        return label.charAt(0).toUpperCase() + label.slice(1);
     }
 
     // ------------------------------------------------------------------

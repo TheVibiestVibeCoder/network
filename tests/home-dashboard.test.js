@@ -146,10 +146,10 @@
     });
 
     test('the filter bar names the filters and the count', () => {
-        eq(HD.todoListLabel({ prio: null, day: null }, 10, TODAY), 'ALL OPEN · BY DUE DATE · 10');
-        eq(HD.todoListLabel({ prio: 'high', day: 2 }, 1, TODAY), 'HIGH PRIORITY · FRIDAY · 1');
-        eq(HD.todoListLabel({ prio: null, day: 0 }, 2, TODAY), 'TODAY · 2');
-        eq(HD.todoListLabel({ prio: 'none', day: null }, 1, TODAY), 'NO PRIORITY · 1');
+        eq(HD.todoListLabel({ prio: null, day: null }, 10, TODAY), 'All open · by due date · 10');
+        eq(HD.todoListLabel({ prio: 'high', day: 2 }, 1, TODAY), 'High priority · Friday · 1');
+        eq(HD.todoListLabel({ prio: null, day: 0 }, 2, TODAY), 'Today · 2');
+        eq(HD.todoListLabel({ prio: 'none', day: null }, 1, TODAY), 'No priority · 1');
     });
 
     // ------------------------------------------------------------------

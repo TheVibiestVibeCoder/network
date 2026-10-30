@@ -6,6 +6,7 @@
  *   GET  ?action=context&id=..               one project: fields, contacts, open to-dos, notes, team
  *   GET  ?action=contexts                    all of them at once, keyed by project id
  *   POST ?action=submit {project_id, text}   Claude turns the text into proposals under "From Claude"
+ *                                            (source: "card" when typed on a project card, not in a meeting)
  */
 
 define('APP_ROOT', dirname(__DIR__));
@@ -100,7 +101,8 @@ try {
         }
 
         try {
-            echo json_encode(['success' => true, 'data' => MeetingAssistant::propose($db, $context, $text)]);
+            $fromCard = is_array($input) && ($input['source'] ?? '') === 'card';
+            echo json_encode(['success' => true, 'data' => MeetingAssistant::propose($db, $context, $text, $fromCard)]);
         } catch (RuntimeException $e) {
             http_response_code(502);
             echo json_encode(['error' => $e->getMessage()]);

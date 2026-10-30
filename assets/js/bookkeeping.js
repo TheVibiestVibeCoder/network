@@ -105,6 +105,34 @@
         }
     }
 
+    // The drop zone can be folded into a narrow rail, so the table gets the
+    // width; remembered per browser, like the column widths.
+    const DROPZONE_FOLDED_KEY = 'crm-bk-dropzone-folded';
+
+    function setDropzoneFolded(folded) {
+        els.dropzone.classList.toggle('is-folded', folded);
+        els.dropzoneCollapse.setAttribute('aria-expanded', String(!folded));
+        els.dropzoneExpand.setAttribute('aria-expanded', String(!folded));
+        try {
+            localStorage.setItem(DROPZONE_FOLDED_KEY, folded ? '1' : '0');
+        } catch (e) {
+            // Ignore storage errors; it stays folded until the page reloads
+        }
+    }
+
+    function bindDropzoneFold() {
+        if (!els.dropzoneCollapse || !els.dropzoneExpand) return;
+        let folded = false;
+        try {
+            folded = localStorage.getItem(DROPZONE_FOLDED_KEY) === '1';
+        } catch (e) {
+            folded = false;
+        }
+        setDropzoneFolded(folded);
+        els.dropzoneCollapse.addEventListener('click', () => setDropzoneFolded(true));
+        els.dropzoneExpand.addEventListener('click', () => setDropzoneFolded(false));
+    }
+
     function colWidth(key) {
         return colWidths.stored[key] || colWidths.measured[key] || null;
     }
@@ -1176,6 +1204,7 @@
     function renderPool() {
         const count = state.pool.length;
         els.poolCount.textContent = count === 1 ? '1 file' : `${count} files`;
+        if (els.poolRailCount) els.poolRailCount.textContent = count ? String(count) : '';
 
         if (count === 0) {
             els.poolList.innerHTML = '<p class="bk-pool-empty">No unassigned PDFs.<br>Drop files here to store them until the matching bank entry is imported.</p>';
@@ -3043,6 +3072,9 @@
             poolCount: $('bkPoolCount'),
             poolInput: $('bkPoolInput'),
             poolBrowseBtn: $('bkPoolBrowseBtn'),
+            poolRailCount: $('bkPoolRailCount'),
+            dropzoneCollapse: $('bkDropzoneCollapse'),
+            dropzoneExpand: $('bkDropzoneExpand'),
             selectToolsBtn: $('bkSelectToolsBtn'),
             selectTools: $('bkSelectTools'),
             selectMonth: $('bkSelectMonth'),
@@ -3344,6 +3376,7 @@
         bindFileDrops();
 
         els.poolBrowseBtn.addEventListener('click', () => els.poolInput.click());
+        bindDropzoneFold();
 
         // Select-by-date tools, now inside a popover
         els.selectMonthBtn.addEventListener('click', () => { selectRowsByMonth(); closeSelectTools(); });

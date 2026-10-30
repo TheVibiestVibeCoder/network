@@ -19,8 +19,7 @@
     --bk-control-height: 30px;
     /* Status tints. Deliberately faint: a row's state should be scannable in
        peripheral vision without the table turning into a traffic light. */
-    --bk-tint-missing: color-mix(in srgb, var(--color-danger) 5%, transparent);
-    --bk-edge-missing: color-mix(in srgb, var(--color-danger) 55%, transparent);
+    --bk-edge-missing: var(--color-danger);
     --bk-tint-excluded: color-mix(in srgb, var(--color-warning) 8%, transparent);
 }
 
@@ -393,8 +392,8 @@ body.bk-col-resizing * {
 .bk-menu-title {
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
     margin: 0 0 var(--spacing-3);
 }
@@ -555,8 +554,8 @@ body.bk-col-resizing * {
     color: var(--color-text-muted);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -599,19 +598,11 @@ body.bk-col-resizing * {
     background: var(--color-surface-hover);
 }
 
-/* Only the actionable state is tinted, and barely. A row that is finished
-   needs no colour; a row still missing its invoice gets a faint wash and a
-   hairline down its leading edge, which is enough to find while scrolling. */
-.bk-row-missing td {
-    background: var(--bk-tint-missing);
-}
-
+/* A row still missing its invoice gets a red bar down its leading edge -
+   no wash over the row, so the table stays calm and the bar is what the
+   eye finds while scrolling. A finished row needs no colour at all. */
 .bk-row-missing td:first-child {
-    box-shadow: inset 2px 0 0 var(--bk-edge-missing);
-}
-
-.bk-row-missing:hover td {
-    background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+    box-shadow: inset 3px 0 0 var(--bk-edge-missing);
 }
 
 /* Excluded rows: still listed, visibly not counted. Struck-through amounts and
@@ -748,8 +739,8 @@ body.bk-col-resizing * {
     font-size: var(--font-size-xs);
     font-weight: 500;
     color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 /* The month's one figure, and the button that opens its workings. */
@@ -829,8 +820,8 @@ body.bk-col-resizing * {
     margin: 0 0 var(--spacing-3);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
 }
 
@@ -1196,8 +1187,8 @@ body.bk-col-resizing * {
     padding: var(--spacing-2) var(--spacing-2) 6px;
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
 }
 
@@ -1498,11 +1489,60 @@ body.bk-col-resizing * {
     font-variant-numeric: tabular-nums;
 }
 
-.bk-dropzone-hint {
-    margin: 0 0 var(--spacing-3);
-    font-size: var(--font-size-xs);
-    line-height: 1.5;
+/* Upload first, the fold button at the very end. */
+.bk-dropzone-header .bk-btn-small {
+    margin-left: auto;
+}
+
+/* ---- Folded: a narrow rail with the file count ---- */
+
+.bk-dropzone-rail {
+    display: none;
+}
+
+#bookkeepingView .bk-dropzone.is-folded {
+    width: 48px;
+    flex-basis: 48px;
+    padding: var(--spacing-2) 0;
+    align-items: center;
+}
+
+.bk-dropzone.is-folded > :not(.bk-dropzone-rail):not(input) {
+    display: none;
+}
+
+.bk-dropzone.is-folded .bk-dropzone-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 36px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
     color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.bk-dropzone.is-folded .bk-dropzone-rail:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+.bk-dropzone-rail-count {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.bk-dropzone-rail-count:empty {
+    display: none;
+}
+
+/* Too narrow for the words while something is dragged over it. */
+#bookkeepingView .bk-dropzone.is-folded.bk-dropzone-hover::after {
+    content: "";
 }
 
 .bk-pool-list {
@@ -1755,8 +1795,8 @@ body.bk-col-resizing * {
 .bk-row-card-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .bk-row-card-value {

@@ -54,6 +54,9 @@
         projects: [],
         allProjects: [],
         projectSortField: 'stage',
+        // 'cards' or 'list', as this person last chose it (index.php reads
+        // it from includes/UserPrefs.php into data-project-view).
+        projectView: (document.getElementById('projectsView') || { dataset: {} }).dataset.projectView === 'list' ? 'list' : 'cards',
         projectSortOrder: 'ASC',
         projectSearchQuery: '',
         hideCompletedProjects: true,
@@ -1029,8 +1032,8 @@
                     <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
-                    <h3>Keine Kontakte gefunden</h3>
-                    <p>${state.searchQuery ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
+                    <h3>No contacts found</h3>
+                    <p>${state.searchQuery ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
             `;
             return;
@@ -1132,8 +1135,8 @@
                     <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
-                    <h3>Keine Kontakte gefunden</h3>
-                    <p>${query ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
+                    <h3>No contacts found</h3>
+                    <p>${query ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
             `;
             return;
@@ -1907,35 +1910,29 @@
 
         const groups = Array.from(groupMap.values());
 
+        // A group's name opens its project or contact; with both, the
+        // contact's name beside it opens the contact.
         const html = groups.map(group => {
             const { meta, items } = group;
 
-            const typeLabel = meta.kind === 'project-contact'
-                ? 'Project + Contact'
-                : (meta.kind === 'project' ? 'Project' : 'Contact');
-
-            const headerActions = `
-                <div class="todo-group-actions">
-                    ${meta.projectId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-project="${meta.projectId}">Open Project</button>` : ''}
-                    ${meta.contactId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-contact="${meta.contactId}">Open Contact</button>` : ''}
-                </div>
-            `;
+            const opens = meta.projectId
+                ? `data-todo-open-project="${meta.projectId}" title="Open project"`
+                : `data-todo-open-contact="${meta.contactId}" title="Open contact"`;
+            const subtitle = meta.kind === 'project-contact'
+                ? `<button type="button" class="todo-group-subtitle todo-group-link" data-todo-open-contact="${meta.contactId}" title="Open contact">${escapeHtml(meta.subtitle)}</button>`
+                : `<span class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</span>`;
 
             return `
                 <div class="todo-group">
                     <div class="todo-group-header">
                         <div class="todo-group-title-wrap">
-                            <h3 class="todo-group-title">${escapeHtml(meta.title)}</h3>
-                            <p class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</p>
+                            <button type="button" class="todo-group-title todo-group-link" ${opens}>${escapeHtml(meta.title)}</button>
+                            ${subtitle}
                         </div>
-                        <div class="todo-group-meta">
-                            <span class="todo-group-type">${escapeHtml(typeLabel)}</span>
-                            <span class="todo-group-count">${items.length}</span>
-                        </div>
+                        <span class="todo-group-count">${items.length}</span>
                     </div>
-                    ${headerActions}
                     <div class="todo-group-items">
-                        ${items.map(todo => createTodoItemMarkup(todo, { showContext: false })).join('')}
+                        ${items.map(todo => createProjectTodoMarkup(todo, { opensSheet: true })).join('')}
                     </div>
                 </div>
             `;
@@ -2034,7 +2031,7 @@
                     </div>
                     <div class="todo-actions">
                         <button type="button" class="btn btn-secondary btn-small todo-edit-btn" data-todo-edit="${todo.id}">
-                            Bearbeiten
+                            Edit
                         </button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -2050,7 +2047,8 @@
     /**
      * The to-dos in a project's detail sheet: open ones only, one line each
      * (title, priority, due date, assignee). A row opens in place to show the
-     * description and the edit and delete buttons.
+     * description and the edit and delete buttons. The To-dos page uses the
+     * same line (opensSheet), but a click there opens the to-do's sheet.
      */
     function renderProjectTodos(todos) {
         const container = elements.projectTodosList;
@@ -2082,7 +2080,7 @@
         `;
     }
 
-    function createProjectTodoMarkup(todo) {
+    function createProjectTodoMarkup(todo, { opensSheet = false } = {}) {
         const isCompleted = Number(todo.is_completed) === 1;
         const dueDate = parseTodoDueDate(todo.due_date);
         const priorityMeta = getTodoPriorityMeta(todo.priority);
@@ -2099,8 +2097,29 @@
 
         const isProposed = todo.review_status === 'pending';
         const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
-        const expanded = state.expandedProjectTodos.has(Number(todo.id));
+        const expanded = !opensSheet && state.expandedProjectTodos.has(Number(todo.id));
         const priorityWord = priorityMeta ? priorityMeta.label.replace(/ Priority$/, '') : '';
+
+        if (opensSheet) {
+            return `
+            <div class="todo-item ptodo${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
+                <div class="ptodo-row">
+                    <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
+                        <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
+                        <span class="todo-check-indicator"></span>
+                    </label>
+                    <span class="ptodo-title" title="${escapeHtml(todo.title || '')}">${escapeHtml(todo.title || '')}</span>
+                    ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : reviewChangeBadge(todo)}
+                    <span class="ptodo-meta">
+                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
+                        ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
+                        ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
+                    </span>
+                </div>
+            </div>
+        `;
+        }
 
         return `
             <div class="todo-item ptodo${expanded ? ' is-expanded' : ''}${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
@@ -2123,7 +2142,7 @@
                     ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
                     <div class="ptodo-actions">
                         ${isProposed ? reviewInline('todo', proposalId) : ''}
-                        <button type="button" class="btn btn-secondary btn-small" data-todo-edit="${todo.id}">Bearbeiten</button>
+                        <button type="button" class="btn btn-secondary btn-small" data-todo-edit="${todo.id}">Edit</button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -3047,7 +3066,7 @@
 
         if (contact.location) {
             const hasCoords = contact.latitude && contact.longitude;
-            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
+            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item">
                     <span class="detail-icon">
@@ -3113,7 +3132,7 @@
 
         if (contact.address) {
             const hasCoords = contact.latitude && contact.longitude;
-            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
+            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item detail-item-full">
                     <span class="detail-icon">
@@ -3379,7 +3398,7 @@
 
     function renderContactTags(tags) {
         if (!tags || tags.length === 0) {
-            elements.contactTags.innerHTML = '<span class="no-tags">Keine Tags</span>';
+            elements.contactTags.innerHTML = '<span class="no-tags">No tags</span>';
             return;
         }
 
@@ -3388,7 +3407,7 @@
             html += `
                 <span class="tag" style="--tag-color: ${escapeHtml(tag.color)}">
                     ${escapeHtml(tag.name)}
-                    <button class="tag-remove" data-tag-id="${tag.id}" title="Tag entfernen">
+                    <button class="tag-remove" data-tag-id="${tag.id}" title="Remove tag">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                         </svg>
@@ -3446,7 +3465,7 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                     </svg>
-                    Neuer Tag: "${escapeHtml(query)}"
+                    New tag: "${escapeHtml(query)}"
                 </div>
             `;
         }
@@ -3516,12 +3535,12 @@
 
         headerEl.innerHTML = `
             <form class="tag-edit-form" data-tag-id="${tagId}">
-                <input type="color" class="tag-edit-color" value="${tagColor}" title="Farbe">
-                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag-Name">
-                <button type="submit" class="tag-edit-save" title="Speichern">
+                <input type="color" class="tag-edit-color" value="${tagColor}" title="Colour">
+                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag name">
+                <button type="submit" class="tag-edit-save" title="Save">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                 </button>
-                <button type="button" class="tag-edit-cancel" title="Abbrechen">
+                <button type="button" class="tag-edit-cancel" title="Cancel">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                 </button>
             </form>
@@ -3558,7 +3577,7 @@
     }
 
     async function confirmDeleteTag(tagId, tagName) {
-        if (!confirm(`Tag "${tagName}" wirklich l\u00f6schen?\n\nDer Tag wird von allen Kontakten entfernt.`)) {
+        if (!confirm(`Delete the tag "${tagName}"?\n\nIt is removed from every contact.`)) {
             return;
         }
 
@@ -4078,9 +4097,9 @@
 
     function updateCalendarTitle() {
         const d = state.calendarDate;
-        const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-                        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-        const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+        const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
         if (state.calendarMode === 'month') {
             elements.calTitle.textContent = `${months[d.getMonth()]} ${d.getFullYear()}`;
@@ -4088,11 +4107,11 @@
             const range = getCalendarDateRange();
             const s = range.startDate;
             const e = range.endDate;
-            const sStr = `${s.getDate()}. ${months[s.getMonth()].substring(0, 3)}`;
-            const eStr = `${e.getDate()}. ${months[e.getMonth()].substring(0, 3)} ${e.getFullYear()}`;
+            const sStr = `${months[s.getMonth()].substring(0, 3)} ${s.getDate()}`;
+            const eStr = `${months[e.getMonth()].substring(0, 3)} ${e.getDate()}, ${e.getFullYear()}`;
             elements.calTitle.textContent = `${sStr} – ${eStr}`;
         } else {
-            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`;
+            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
         }
     }
 
@@ -4139,12 +4158,12 @@
 
     function getCalendarEntryTypeLabel(entry) {
         const type = getCalendarEntryType(entry);
-        if (type === 'project_note') return 'Projekt-Notiz';
+        if (type === 'project_note') return 'Project note';
         if (type === 'todo') return 'To-do';
-        if (type === 'contact_activity') return 'Kontakt-Update';
-        if (type === 'project_activity') return 'Projekt-Update';
-        if (type === 'account_activity') return 'Konto';
-        return 'Kontakt-Notiz';
+        if (type === 'contact_activity') return 'Contact update';
+        if (type === 'project_activity') return 'Project update';
+        if (type === 'account_activity') return 'Account';
+        return 'Contact note';
     }
 
     function getCalendarEntryTags(entry) {
@@ -4158,14 +4177,14 @@
         // team itself, so the actor is the whole context.
         if (type === 'account_activity') {
             return {
-                primary: entry.actor_name || 'Konto',
-                secondary: 'Benutzerverwaltung'
+                primary: entry.actor_name || 'Account',
+                secondary: 'User management'
             };
         }
 
         if (type === 'project_note' || type === 'project_activity') {
             return {
-                primary: entry.project_name || 'Projekt',
+                primary: entry.project_name || 'Project',
                 secondary: entry.project_company || ''
             };
         }
@@ -4182,13 +4201,13 @@
             }
 
             return {
-                primary: entry.contact_name || 'Kontakt',
+                primary: entry.contact_name || 'Contact',
                 secondary: entry.contact_company || ''
             };
         }
 
         return {
-            primary: entry.contact_name || 'Kontakt',
+            primary: entry.contact_name || 'Contact',
             secondary: entry.contact_company || ''
         };
     }
@@ -4214,9 +4233,9 @@
             if (type === 'todo') {
                 text = 'To-do';
             } else if (type === 'contact_activity' || type === 'project_activity') {
-                text = 'Aktivität';
+                text = 'Activity';
             } else {
-                text = 'Notiz';
+                text = 'Note';
             }
         }
 
@@ -4288,7 +4307,7 @@
         const range = getCalendarDateRange();
         const notesByDate = groupNotesByDate(state.calendarNotes);
 
-        const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         let html = '<div class="cal-month-grid">';
 
         // Header row
@@ -4319,16 +4338,18 @@
                     const typeClass = getCalendarEntryTypeClass(entry);
                     const navAttrs = getCalendarEntryNavigationAttrs(entry);
                     const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                    // One dot per entry: its first tag's colour, or without
+                    // tags the colour of its kind (design.css, Calendar).
                     const tagDot = tags.length > 0
                         ? `<span class="cal-tag-dot-sm" style="background:${tags[0].color}"></span>`
-                        : '';
+                        : '<span class="cal-tag-dot-sm cal-kind-dot"></span>';
 
                     html += `<div class="cal-month-note-dot cal-month-note-dot--${typeClass}${completedClass}" ${navAttrs} title="${preview}">
                         ${tagDot}<span class="cal-month-note-label">${label}</span>
                     </div>`;
                 });
                 if (dayNotes.length > maxShow) {
-                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} weitere</div>`;
+                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} more</div>`;
                 }
                 html += '</div>';
             }
@@ -4345,8 +4366,8 @@
         const range = getCalendarDateRange();
         const today = new Date();
         const notesByDate = groupNotesByDate(state.calendarNotes);
-        const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-        const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
         let html = '<div class="cal-week-grid">';
 
@@ -4359,7 +4380,7 @@
             html += `<div class="cal-week-day${isToday ? ' cal-today' : ''}" data-date="${dateKey}">`;
             html += `<div class="cal-week-day-header">
                 <span class="cal-week-day-name">${dayNames[i]}</span>
-                <span class="cal-week-day-date">${cursor.getDate()}. ${months[cursor.getMonth()]}</span>
+                <span class="cal-week-day-date">${months[cursor.getMonth()]} ${cursor.getDate()}</span>
                 ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
             </div>`;
             html += '<div class="cal-week-day-body">';
@@ -4367,7 +4388,7 @@
                 html += renderNoteChip(entry);
             });
             if (dayNotes.length === 0) {
-                html += '<div class="cal-week-empty">Keine Aktivitaeten</div>';
+                html += '<div class="cal-week-empty">Nothing this day</div>';
             }
             html += '</div></div>';
             cursor.setDate(cursor.getDate() + 1);
@@ -4391,7 +4412,7 @@
                 <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
                     <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
                 </svg>
-                <p>Keine Aktivitaeten an diesem Tag</p>
+                <p>Nothing on this day</p>
             </div>`;
         } else {
             dayNotes.forEach(entry => {
@@ -4670,10 +4691,10 @@
 
         elements.projectsList.innerHTML = state.projectSortField === 'stage'
             ? renderProjectsByStage(visible)
-            : `<div class="project-grid">${visible.map(createProjectCard).join('')}</div>`;
+            : projectCollection(visible);
 
-        // Cards open on click, and on Enter / Space for keyboard users.
-        elements.projectsList.querySelectorAll('.project-card').forEach(card => {
+        // Cards and rows open on click, and on Enter / Space for keyboard users.
+        elements.projectsList.querySelectorAll('.project-card, .project-row').forEach(card => {
             const open = () => openProjectOverview(parseInt(card.dataset.id, 10));
             card.addEventListener('click', open);
             card.addEventListener('keydown', (event) => {
@@ -4685,58 +4706,6 @@
         });
 
         triggerProjectDeckAnimation();
-        fitProjectDescriptions();
-    }
-
-    /**
-     * Cards in a grid row stretch to the tallest one, so a card without
-     * expected payments next to one with them has room to spare above its
-     * timeline. Its description uses that room: as many more lines than the
-     * usual two as fit there, never more, so no card grows because of it.
-     *
-     * Runs after every render and whenever the list changes size (a resize, the
-     * tab being shown, fonts arriving) - see bindProjectDescriptionFit.
-     */
-    function fitProjectDescriptions() {
-        const list = elements.projectsList;
-        if (!list) {
-            return;
-        }
-
-        const descriptions = [...list.querySelectorAll('.project-card-description')];
-
-        // Back to the stylesheet's two lines first, so every row settles at the
-        // height its cards need without any of the extra lines.
-        descriptions.forEach(desc => desc.style.removeProperty('-webkit-line-clamp'));
-
-        // All reads, then all writes: one layout, not one per card.
-        const fits = descriptions.map(desc => {
-            const bottom = desc.parentElement.querySelector('.project-card-bottom');
-            if (!bottom || desc.offsetHeight === 0) {
-                return 0;
-            }
-            const spare = bottom.offsetTop - (desc.offsetTop + desc.offsetHeight);
-            const lineHeight = parseFloat(getComputedStyle(desc).lineHeight) || 0;
-            return lineHeight > 0 ? Math.floor((spare + 1) / lineHeight) : 0;
-        });
-
-        descriptions.forEach((desc, i) => {
-            if (fits[i] > 0) {
-                desc.style.setProperty('-webkit-line-clamp', String(2 + fits[i]));
-            }
-        });
-    }
-
-    function bindProjectDescriptionFit() {
-        if (!elements.projectsList || typeof ResizeObserver === 'undefined') {
-            return;
-        }
-
-        let frame = 0;
-        new ResizeObserver(() => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(fitProjectDescriptions);
-        }).observe(elements.projectsList);
     }
 
     /**
@@ -4768,10 +4737,41 @@
                             <span class="project-group-count" title="${group.items.length === 1 ? '1 project' : group.items.length + ' projects'}">${group.items.length}</span>
                         </div>
                     </header>
-                    <div class="project-grid">${group.items.map(createProjectCard).join('')}</div>
+                    ${projectCollection(group.items)}
                 </section>
             `;
         }).join('');
+    }
+
+    /** Projects as cards in a grid, or as rows of one list - per state.projectView. */
+    function projectCollection(projects) {
+        return state.projectView === 'list'
+            ? `<div class="project-rows">${projects.map(createProjectRow).join('')}</div>`
+            : `<div class="project-grid">${projects.map(createProjectCard).join('')}</div>`;
+    }
+
+    /** Switch between cards and the list, and keep the choice for this account. */
+    function setProjectView(view) {
+        const next = view === 'list' ? 'list' : 'cards';
+        if (next === state.projectView) {
+            return;
+        }
+        state.projectView = next;
+        document.querySelectorAll('[data-project-view-btn]').forEach(btn => {
+            const on = btn.dataset.projectViewBtn === next;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', String(on));
+        });
+        if (elements.projectsView) {
+            elements.projectsView.dataset.projectView = next;
+        }
+        renderProjects(state.projects);
+
+        fetch('api/profile.php?action=pref', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ name: 'project_view', value: next })
+        }).catch(error => console.error('Could not save the project view:', error));
     }
 
     function triggerProjectDeckAnimation() {
@@ -4878,9 +4878,9 @@
 
     /**
      * One project, as a card: what it is, for whom and who has it on top;
-     * when it runs in the timeline panel; budget and chance at the foot,
-     * and with expected payments, what is still open under them.
-     * Notes, contacts and the rest live in the detail view.
+     * when it runs; budget and chance at the foot, and with expected
+     * payments, a thin bar of what is paid under them. The description,
+     * notes, contacts and the rest live in the detail view.
      */
     function createProjectCard(project) {
         const stageLabel = project.stage || 'Lead';
@@ -4894,22 +4894,16 @@
             : null;
         const chance = Number.isFinite(chanceRaw) ? Math.round(Math.max(0, Math.min(100, chanceRaw))) : null;
 
-        // The full text is escaped and handed to CSS, which clamps it to two
-        // lines. Truncating in JS after escaping could cut an entity in half.
-        const description = (project.description || '').trim();
-
         const isProposed = project.review_status === 'pending';
 
         const budgetStat = `
             <div class="project-stat project-stat--budget">
-                <span class="project-meta-label">Budget</span>
-                <span class="project-stat-value${value ? '' : ' is-empty'}" title="${escapeHtml(value || 'No budget set')}">${escapeHtml(value || 'Not set')}</span>
+                <span class="project-stat-value${value ? '' : ' is-empty'}" title="${escapeHtml(value ? 'Budget ' + value : 'No budget set')}">${escapeHtml(value || 'No budget')}</span>
             </div>`;
         // A finished project has no chance left to estimate.
         const chanceStat = chance !== null && !isComplete ? `
             <div class="project-stat project-stat--chance">
-                <span class="project-meta-label">Chance</span>
-                <span class="project-stat-value"><span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%</span>
+                <span class="project-stat-value" title="${chance}% chance"><span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%</span>
             </div>` : '';
 
         return `
@@ -4922,9 +4916,8 @@
                         ${isProposed ? `<div class="project-card-review">${reviewBadge(project)}</div>` : ''}
                         ${!isProposed && reviewChangeBadge(project, 'project') ? `<div class="project-card-review">${reviewChangeBadge(project, 'project')}</div>` : ''}
                     </div>
-                    ${assigneeChip(project)}
+                    ${claudeSlot(project)}
                 </div>
-                ${description ? `<p class="project-card-description">${escapeHtml(description)}</p>` : ''}
                 <div class="project-card-bottom">
                     ${projectTimelineMarkup(project, isComplete)}
                     <div class="project-card-foot">
@@ -4936,6 +4929,53 @@
                 </div>
             </article>
         `;
+    }
+
+    /**
+     * One project as a row of the list view: name and company, when it
+     * ends, budget, what is still open, chance, and who has it - the same
+     * facts as the card, side by side. The row opens the project sheet.
+     */
+    function createProjectRow(project) {
+        const stageClass = (project.stage || 'Lead').toLowerCase().replace(/ /g, '-');
+        const isComplete = stageClass === 'complete';
+        const value = formatProjectValue(project);
+        const chanceRaw = project.success_chance !== null && project.success_chance !== ''
+            ? parseFloat(project.success_chance)
+            : null;
+        const chance = Number.isFinite(chanceRaw) ? Math.round(Math.max(0, Math.min(100, chanceRaw))) : null;
+        const isProposed = project.review_status === 'pending';
+        const badge = isProposed ? reviewBadge(project) : reviewChangeBadge(project, 'project');
+
+        return `
+            <article class="project-row${isProposed ? ' is-proposed' : ''}" data-id="${project.id}" tabindex="0" role="button"
+                     aria-label="${escapeHtml(project.name)}">
+                <div class="project-row-main">
+                    <span class="project-row-title">${escapeHtml(project.name)}</span>
+                    ${project.company ? `<span class="project-row-company">${escapeHtml(project.company)}</span>` : ''}
+                    ${badge}
+                </div>
+                <div class="project-row-when">${projectTimelineMarkup(project, isComplete)}</div>
+                <span class="project-row-budget${value ? '' : ' is-empty'}">${escapeHtml(value || 'No budget')}</span>
+                <div class="project-row-pay">${window.ProjectPayments ? window.ProjectPayments.cardSummary(project) : ''}</div>
+                <span class="project-row-chance">${chance !== null && !isComplete
+                    ? `<span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%`
+                    : ''}</span>
+                <span class="project-row-assignee">${claudeSlot(project)}</span>
+            </article>
+        `;
+    }
+
+    /**
+     * The assignee in a card's corner. With the meeting assistant on, a
+     * Claude button lies over it and shows on hover (meeting.js), to tell
+     * Claude what to change on just this project.
+     */
+    function claudeSlot(project) {
+        const chip = assigneeChip(project);
+        const button = window.CRMMeeting ? window.CRMMeeting.cardButton(project) : '';
+        if (!button) return chip;
+        return `<span class="project-card-assignee${chip ? '' : ' is-empty'}">${chip}${button}</span>`;
     }
 
     function closeDeleteProjectModal() {
@@ -6659,6 +6699,11 @@
             elements.addProjectBtn.addEventListener('click', openNewProject);
         }
 
+        // Cards or list
+        document.querySelectorAll('[data-project-view-btn]').forEach(btn => {
+            btn.addEventListener('click', () => setProjectView(btn.dataset.projectViewBtn));
+        });
+
         // Payments marked paid elsewhere (after a bookkeeping import): the
         // project cards, the forecast and an open sheet catch up.
         document.addEventListener('crm:projects-changed', () => {
@@ -7077,7 +7122,6 @@
         bindAssignmentControls();
         bindReviewRefresh();
         bindShell();
-        bindProjectDescriptionFit();
         initEventListeners();
         initImportExportEvents();
         initCalendarEvents();
