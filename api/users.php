@@ -15,7 +15,7 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Mailer.php';
-// Meeting assistant (test): for the "Meeting" permission on the Users page.
+// Meeting assistant (test): for the "Claude" permission on the Users page.
 if (is_file(APP_ROOT . '/includes/MeetingAssistant.php')) {
     require_once APP_ROOT . '/includes/MeetingAssistant.php';
 }
@@ -199,7 +199,7 @@ function handleUpdate(User $model, ?int $id, string $action): void
         $allowed = (bool) $input['can_meeting'];
         $model->setMeetingAccess($id, $allowed);
         $updated = $model->getById($id);
-        logAccountEvent('updated', $updated, ($allowed ? 'Meeting-Funktion freigegeben: ' : 'Meeting-Funktion entzogen: ') . $updated['name']);
+        logAccountEvent('updated', $updated, ($allowed ? 'Claude-Integration freigegeben: ' : 'Claude-Integration entzogen: ') . $updated['name']);
 
         echo json_encode(['success' => true, 'data' => $updated]);
         return;

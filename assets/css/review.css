@@ -973,10 +973,15 @@
 }
 
 /* Badge and accept / reject follow the title, as the link pill does. */
-#workloadView .is-proposed .review-badge,
-#workloadView .is-proposed .review-inline {
+#workloadView .is-proposed .review-pill,
+#workloadView .is-proposed > .review-badge,
+#workloadView .is-proposed :not(.review-pill) > .review-badge {
     margin-left: 6px;
     vertical-align: middle;
+}
+
+#workloadView .is-proposed .review-pill .review-badge {
+    margin-left: 0;
 }
 
 /* An accepted record Claude proposes to change: a soft orange pill and
@@ -1010,56 +1015,80 @@
 }
 
 /* ---- "Awaiting review" and its decision as one pill ----
-   Where the badge is followed straight away by the reject / accept buttons
-   (to-do rows, home, contact rows), the two join into a single orange pill:
-   the label on the left, the two buttons inside it on the right. */
-.review-badge:has(+ .review-inline) {
-    height: 24px;
-    margin-right: 0;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    padding-right: 6px;
-}
-
-.review-badge + .review-inline {
+   review.js pill(): the badge and the reject / accept buttons inside one
+   .review-pill (to-do rows, notes, home), so nothing can come between them.
+   30px high with a 3px inset all round: Claude's mark sits in a 24px circle
+   on the left, the buttons are 24px circles on the right, so both ends of
+   the pill run concentric with them (15px radius = 12px + 3px). A soft
+   Claude tint with the words in Claude's darker orange - strong enough to
+   find, quiet enough to sit in a list. */
+.review-pill {
+    --pill-inset: 3px;
+    --pill-dot: 24px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
     gap: 3px;
-    height: 24px;
-    margin-left: 0 !important;
-    padding: 0 2px 0 0;
-    border-radius: 0 var(--r-full) var(--r-full) 0;
-    background: var(--c-claude-soft);
+    height: calc(var(--pill-dot) + 2 * var(--pill-inset));
+    padding: var(--pill-inset);
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--c-claude) 20%, transparent);
     vertical-align: middle;
 }
 
-.is-proposed .review-badge + .review-inline {
-    background: var(--c-claude);
+/* On a proposed row the tint underneath adds up: a touch less here. */
+.is-proposed .review-pill {
+    background: color-mix(in srgb, var(--c-claude) 17%, transparent);
 }
 
-.review-badge + .review-inline .review-inline-btn {
-    width: 20px;
-    height: 20px;
-    background: color-mix(in srgb, #FFFFFF 28%, transparent);
+.is-proposed .review-pill .review-badge,
+.review-pill .review-badge {
+    gap: 6px;
+    height: var(--pill-dot);
+    margin: 0;
+    padding: 0 6px 0 0;
+    background: transparent;
+    color: var(--c-claude-2);
+    font-size: 12px;
+}
+
+/* Claude's mark takes a button's place, so the left end curves round it
+   as the right end does round the accept button. */
+.review-pill .review-badge svg {
+    box-sizing: border-box;
+    width: var(--pill-dot);
+    height: var(--pill-dot);
+    padding: 6px;
+    color: var(--c-claude);
+}
+
+.review-pill .review-inline {
+    gap: 3px;
+    height: var(--pill-dot);
+    margin: 0 !important;
+    padding: 0;
+}
+
+.review-pill .review-inline-btn {
+    width: var(--pill-dot);
+    height: var(--pill-dot);
+    background: color-mix(in srgb, var(--c-surface) 75%, transparent);
+    color: var(--c-claude-2);
+}
+
+.review-pill .review-inline-btn svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* Hover: solid, as everywhere, with a thin white ring to sit on the orange. */
+.review-pill .review-inline-btn:hover {
     color: #FFFFFF;
-}
-
-.review-badge + .review-inline .review-inline-btn svg {
-    width: 11px;
-    height: 11px;
 }
 
 /* A hovered proposed row stays orange, a shade deeper - not grey. */
 .ptodo.is-proposed .ptodo-row:hover {
     background: color-mix(in srgb, var(--c-claude) 7%, transparent);
-}
-
-/* In a flex row the row's own gap would split the pill in two. */
-.ptodo-row .review-badge + .review-inline {
-    margin-left: -10px !important;
-}
-
-/* Hover: solid, as everywhere, with a thin white ring to sit on the orange. */
-.review-badge + .review-inline .review-inline-btn:hover {
-    box-shadow: 0 0 0 1px #FFFFFF;
 }
 
 .review-inline {

@@ -155,11 +155,12 @@
 
         const resendTitle = isPending ? 'Resend invite link' : 'Send a password reset link';
 
-        // Meeting assistant (test): who may run a project meeting with Claude.
+        // Meeting assistant (test): who may use Claude in the CRM - the
+        // project meeting and the Claude button on the project cards.
         const meetingControl = state.meetingAvailable
-            ? `<label class="user-permission" title="${user.can_meeting ? 'Can run project meetings with Claude - click to take it away' : 'Let them run project meetings with Claude'}">
+            ? `<label class="user-permission" title="${user.can_meeting ? 'Can use Claude: project meetings and Claude on project cards - click to take it away' : 'Let them use Claude: project meetings and Claude on project cards'}">
                    <input type="checkbox" data-user-action="meeting" data-user-id="${user.id}" ${user.can_meeting ? 'checked' : ''}>
-                   <span>Meeting</span>
+                   <span>Claude</span>
                </label>`
             : '';
 
@@ -327,14 +328,14 @@
         }
     }
 
-    /** Meeting assistant (test): give or take away the meeting permission. */
+    /** Meeting assistant (test): give or take away the Claude permission. */
     async function setMeetingAccess(userId, allowed) {
         try {
             await api('?id=' + encodeURIComponent(userId), {
                 method: 'PATCH',
                 body: JSON.stringify({ can_meeting: allowed })
             });
-            showToast(allowed ? 'Can now run project meetings.' : 'Meeting permission removed.');
+            showToast(allowed ? 'Can now use Claude.' : 'Claude permission removed.');
             await load();
         } catch (e) {
             showToast(e.message, true);

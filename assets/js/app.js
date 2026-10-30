@@ -2017,7 +2017,7 @@
                     <div class="todo-content">
                         <div class="todo-title-row">
                             <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
-                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : reviewChangeBadge(todo)}
+                            ${isProposed ? reviewPill(todo, 'todo', proposalId) : reviewChangeBadge(todo)}
                             ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
@@ -2109,7 +2109,7 @@
                         <span class="todo-check-indicator"></span>
                     </label>
                     <span class="ptodo-title" title="${escapeHtml(todo.title || '')}">${escapeHtml(todo.title || '')}</span>
-                    ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : reviewChangeBadge(todo)}
+                    ${isProposed ? reviewPill(todo, 'todo', proposalId) : reviewChangeBadge(todo)}
                     <span class="ptodo-meta">
                         ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
                         ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
@@ -3215,7 +3215,7 @@
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
-                        ${isProposed ? reviewBadge(note) + reviewInline('contact_note', note.id) : ''}
+                        ${isProposed ? reviewPill(note, 'contact_note', note.id) : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -4827,10 +4827,12 @@
     }
 
     /**
-     * When a project runs, as one quiet line: "Start Aug 17, 2026 → End
-     * Sep 26, 2026 · 5 days overdue". Either half reads "Not set" when
-     * missing, so a lone date is never ambiguous. Kept below the budget in
-     * weight - it is reference, not the headline. The status only takes a
+     * When a project runs, as one quiet line: the span on the left, how it
+     * stands on the right - "Aug 17 – Sep 26, 2026     5 days overdue".
+     * The year is written once when both dates share it, the month once when
+     * they share that too ("Nov 13 – 27, 2026"); a lone date says which it
+     * is ("From Nov 13, 2026", "Until Nov 27, 2026"). Kept below the budget
+     * in weight - it is reference, not the headline. The status only takes a
      * colour when it needs attention: overdue, or a week or less to go.
      */
     function projectTimelineMarkup(project, isComplete) {
@@ -4839,7 +4841,8 @@
             const date = new Date(value + 'T00:00:00');
             return isNaN(date.getTime()) ? null : date;
         };
-        const label = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const fmt = (date, parts) => date.toLocaleDateString('en-US', parts);
+        const full = (date) => fmt(date, { month: 'short', day: 'numeric', year: 'numeric' });
         const DAY = 86400000;
         const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -4849,6 +4852,25 @@
         today.setHours(0, 0, 0, 0);
 
         const late = !isComplete && end && end < today;
+
+        let span;
+        if (start && end) {
+            if (start.getFullYear() !== end.getFullYear()) {
+                span = `${full(start)} – ${full(end)}`;
+            } else if (start.getMonth() !== end.getMonth()) {
+                span = `${fmt(start, { month: 'short', day: 'numeric' })} – ${full(end)}`;
+            } else if (start.getDate() !== end.getDate()) {
+                span = `${fmt(start, { month: 'short', day: 'numeric' })} – ${end.getDate()}, ${end.getFullYear()}`;
+            } else {
+                span = full(end);
+            }
+        } else if (start) {
+            span = `From ${full(start)}`;
+        } else if (end) {
+            span = `Until ${full(end)}`;
+        } else {
+            span = 'No dates yet';
+        }
 
         let status = '';
         if (isComplete) {
@@ -4864,15 +4886,10 @@
                 : `<span class="project-when-status${left <= 7 ? ' is-soon' : ''}">${plural(left, 'day')} left</span>`;
         }
 
-        const part = (name, date, extra = '') =>
-            `<span class="project-when-part${extra}"><span class="project-when-label">${name}</span> ${date ? escapeHtml(label(date)) : '<span class="project-when-empty">Not set</span>'}</span>`;
-
         return `
             <p class="project-when">
-                ${part('Start', start)}
-                <span class="project-when-arrow" aria-hidden="true">→</span>
-                ${part('End', end, late ? ' is-late' : '')}
-                ${status ? `<span class="project-when-sep" aria-hidden="true">·</span>${status}` : ''}
+                <span class="project-when-span${start || end ? '' : ' is-empty'}">${escapeHtml(span)}</span>
+                ${status}
             </p>`;
     }
 
@@ -5210,7 +5227,7 @@
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
-                        ${isProposed ? reviewBadge(note) + reviewInline('project_note', note.id) : ''}
+                        ${isProposed ? reviewPill(note, 'project_note', note.id) : ''}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -5997,6 +6014,11 @@
     /** Accept / reject buttons on a proposed note or to-do (review.js). */
     function reviewInline(entityType, id) {
         return window.CRMReview ? window.CRMReview.inlineActions(entityType, id) : '';
+    }
+
+    /** "Awaiting review" with its reject / accept buttons, as one pill (review.js). */
+    function reviewPill(record, entityType, id) {
+        return window.CRMReview ? window.CRMReview.pill(record, entityType, id) : '';
     }
 
     /**

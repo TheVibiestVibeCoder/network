@@ -372,7 +372,7 @@
     function reviewMarks(type, record) {
         const review = window.CRMReview;
         if (!review || !isProposed(record)) return '';
-        return review.badge(record) + (type === 'todo' ? review.inlineActions('todo', Number(record.id)) : '');
+        return type === 'todo' ? review.pill(record, 'todo', Number(record.id)) : review.badge(record);
     }
 
     function todoRow(entry) {

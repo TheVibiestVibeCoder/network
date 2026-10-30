@@ -1275,6 +1275,16 @@
         entry.timer = setTimeout(() => commitHeld(entry), UNDO_MS);
         held = entry;
         toast(message, { undo: true });
+        notifyHeld();
+    }
+
+    /**
+     * A decision was made and waits out its Undo seconds: lists that count
+     * what is still open (the meeting's summary) can count it as gone now,
+     * rather than when it is sent. crm:review-changed follows once it is.
+     */
+    function notifyHeld() {
+        document.dispatchEvent(new CustomEvent('crm:review-held'));
     }
 
     /** Send the decision that is waiting now, without waiting any longer. */
@@ -1708,6 +1718,16 @@
             </span>`;
     }
 
+    /**
+     * "Awaiting review" and its reject / accept buttons as one pill. One
+     * element around both, so no gap the surrounding row puts between its
+     * items can split it (review.css).
+     */
+    function pill(record, entityType, id) {
+        if (!record || record.review_status !== 'pending') return '';
+        return `<span class="review-pill">${badge(record)}${inlineActions(entityType, id).trim()}</span>`;
+    }
+
     const panelItems = new Map();
 
     /**
@@ -1906,6 +1926,7 @@
         entry.timer = setTimeout(() => commitHeld(entry), UNDO_MS);
         held = entry;
         toast(action === 'reject' ? 'Rejected' : 'Accepted', { undo: true });
+        notifyHeld();
     }
 
     /** Mark the record as decided (action) or put it back as it was (null). */
@@ -1985,6 +2006,7 @@
         badge,
         changeBadge,
         inlineActions,
+        pill,
         decideItems,
         isHeld,
         renderItems

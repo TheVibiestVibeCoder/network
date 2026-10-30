@@ -38,7 +38,7 @@ if (!MeetingAssistant::enabled()) {
 
 if (!MeetingAssistant::allowed()) {
     http_response_code(403);
-    echo json_encode(['error' => 'You do not have the meeting permission. An admin can give it to you on the Users page.']);
+    echo json_encode(['error' => 'You do not have the Claude permission. An admin can give it to you on the Users page.']);
     exit;
 }
 

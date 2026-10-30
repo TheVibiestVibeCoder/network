@@ -4,7 +4,7 @@
    what Claude should do on the right, the way through at the foot.
    ========================================================================== */
 
-#meetingModal .meeting-content {
+:is(#meetingModal, #meetingAskModal) .meeting-content {
     display: flex;
     flex-direction: column;
     width: min(1120px, 100%);
@@ -118,19 +118,19 @@
 /* The details read like the project's own sheet: the same sections, fact
    grid, to-do rows and notes (design.css). What that sheet scopes to
    #projectOverviewModal is repeated here for this window. */
-#meetingModal .overview-section {
+:is(#meetingModal, #meetingAskModal) .overview-section {
     margin-bottom: 22px;
 }
 
-#meetingModal .overview-section:last-child {
+:is(#meetingModal, #meetingAskModal) .overview-section:last-child {
     margin-bottom: 0;
 }
 
-#meetingModal .overview-details {
+:is(#meetingModal, #meetingAskModal) .overview-details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-#meetingModal .ptodo {
+:is(#meetingModal, #meetingAskModal) .ptodo {
     margin: 0;
     padding: 0;
     background: transparent;
@@ -139,29 +139,29 @@
     border-radius: 0;
 }
 
-#meetingModal .ptodo:last-child {
+:is(#meetingModal, #meetingAskModal) .ptodo:last-child {
     border-bottom: 0;
 }
 
 /* A to-do's title opens its sheet, to edit or reassign it. */
-#meetingModal .ptodo-title {
+:is(#meetingModal, #meetingAskModal) .ptodo-title {
     cursor: pointer;
 }
 
-#meetingModal .ptodo.todo-completed .ptodo-title {
+:is(#meetingModal, #meetingAskModal) .ptodo.todo-completed .ptodo-title {
     color: var(--c-ink-3);
     text-decoration: line-through;
     text-decoration-color: var(--c-ink-4);
 }
 
 /* Contacts as chips side by side, as in the project sheet. */
-#meetingModal .project-contacts-list {
+:is(#meetingModal, #meetingAskModal) .project-contacts-list {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-#meetingModal .pcontact-chip {
+:is(#meetingModal, #meetingAskModal) .pcontact-chip {
     cursor: default;
 }
 
@@ -171,19 +171,19 @@
     gap: 8px;
 }
 
-#meetingModal .note-item {
+:is(#meetingModal, #meetingAskModal) .note-item {
     padding: 8px 12px;
 }
 
-#meetingModal .note-header {
+:is(#meetingModal, #meetingAskModal) .note-header {
     margin-bottom: 2px;
 }
 
-#meetingModal .note-item {
+:is(#meetingModal, #meetingAskModal) .note-item {
     cursor: pointer;
 }
 
-#meetingModal .note-content {
+:is(#meetingModal, #meetingAskModal) .note-content {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
@@ -194,14 +194,14 @@
 }
 
 /* Clicked open: the whole note. */
-#meetingModal .note-item.is-open .note-content {
+:is(#meetingModal, #meetingAskModal) .note-item.is-open .note-content {
     display: block;
     -webkit-line-clamp: unset;
     overflow: visible;
 }
 
 /* A project or to-do sheet opened from the meeting goes over it. */
-#meetingModal.is-under {
+:is(#meetingModal, #meetingAskModal).is-under {
     z-index: 990;
 }
 
@@ -425,7 +425,7 @@
 /* ---- Narrow screens: one column, details above ---------------------------- */
 
 @media (max-width: 820px) {
-    #meetingModal .meeting-content {
+    :is(#meetingModal, #meetingAskModal) .meeting-content {
         height: calc(100dvh - 24px);
     }
 
@@ -576,7 +576,7 @@
    clusters, buttons and detail sheet. This only arranges them - one group
    per project, on the app's background like the From Claude screen. */
 
-#meetingModal .meeting-summary {
+:is(#meetingModal, #meetingAskModal) .meeting-summary {
     background: var(--c-bg);
 }
 
@@ -735,10 +735,12 @@
     transition: opacity var(--dur-2) var(--ease);
 }
 
+/* The blur comes at once; only the fading is animated, so the blur never
+   seems to change on its way in. */
 #projectsView .project-card > *,
 #projectsView .project-card-title-wrap,
 #projectsView .project-row > * {
-    transition: filter var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease);
+    transition: opacity var(--dur-2) var(--ease);
 }
 
 #projectsView :is(.project-card, .project-row):has(.project-card-assignee:hover, .project-card-claude:focus-visible) {
@@ -771,89 +773,33 @@
     }
 }
 
-/* ---- The window -------------------------------------------------------- */
+/* ---- The window: the meeting's, for one project ----
+   Same layout as the meeting (details | field for Claude); what differs is
+   in meeting.js - no way between projects, and no foot. */
 
-#meetingAskModal .meeting-ask-content {
-    display: flex;
-    flex-direction: column;
-    width: min(520px, 100%);
-    max-width: none;
-    max-height: min(680px, calc(100dvh - 48px));
-    padding: 0;
-    overflow: hidden;
-}
-
-.meeting-ask-head {
+/* Under the field: the hint, and the button that sends now. */
+.meeting-send-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 18px 20px 14px;
 }
 
-.meeting-ask-mark {
-    display: grid;
-    place-items: center;
+.meeting-send-row .meeting-hint {
+    flex: 1;
+}
+
+.meeting-send-row .btn {
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--r-full);
-    background: var(--c-claude-soft);
 }
 
-.meeting-ask-mark .meeting-claude-mark {
-    width: 16px;
-    height: 16px;
+/* The card window has no foot: the field takes the room down to the edge. */
+#meetingAskModal .meeting-input {
+    padding-bottom: 24px;
 }
 
-.meeting-ask-title {
-    flex: 1;
-    min-width: 0;
-}
-
-.meeting-ask-name {
-    margin: 0;
-    overflow: hidden;
-    color: var(--c-ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-
-.meeting-ask-company {
-    margin: 1px 0 0;
-    color: var(--c-ink-3);
-    font-size: var(--t-sm);
-}
-
-.meeting-ask-body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-height: 0;
-    padding: 0 20px;
-    overflow-y: auto;
-}
-
-.meeting-ask-text {
-    width: 100%;
-    resize: vertical;
-    line-height: 1.55;
-}
-
-.meeting-ask-foot {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 20px 18px;
-}
-
-.meeting-ask-foot .meeting-hint {
-    flex: 1;
-}
-
-/* Send: in Claude's colour, with its mark. */
-.btn.meeting-ask-send {
+/* Send and "Start meeting": in Claude's colour, with its mark. */
+.btn.meeting-ask-send,
+.btn.meeting-start-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -862,7 +808,8 @@
     color: #fff;
 }
 
-.btn.meeting-ask-send:hover:not(:disabled) {
+.btn.meeting-ask-send:hover:not(:disabled),
+.btn.meeting-start-btn:hover:not(:disabled) {
     border-color: var(--c-claude-2);
     background: var(--c-claude-2);
     color: #fff;

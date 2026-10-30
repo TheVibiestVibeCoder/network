@@ -361,20 +361,40 @@
     }
 
     /**
-     * Open one of the CRM's own sheets over the meeting: the meeting steps
-     * behind it, and comes back - showing the changes - once it is closed.
+     * The window the project details are shown in - the meeting, or the
+     * Claude window of one project card - as the details' actions need it:
+     * its element, the project on screen, and how to bring it up to date.
      */
-    function overSheet(openSheet) {
+    function meetingHost() {
+        return {
+            el: modal,
+            project: currentProject(),
+            refresh: refreshContext,
+            focus: focusText,
+            keep: () => { saveDraft(); persist(); }
+        };
+    }
+
+    // The window a sheet was opened over, until that sheet closes.
+    let sheetHost = null;
+
+    /**
+     * Open one of the CRM's own sheets over the window: it steps behind,
+     * and comes back - showing the changes - once the sheet is closed.
+     */
+    function overSheet(openSheet, host) {
         if (!window.CRM) return;
-        saveDraft();
-        persist();
-        modal.classList.add('is-under');
+        host.keep();
+        host.el.classList.add('is-under');
+        sheetHost = host;
         if (!sheetWatch) {
             sheetWatch = new MutationObserver(() => {
-                if (modal.classList.contains('is-under') && !sheetOpen()) {
-                    modal.classList.remove('is-under');
-                    refreshContext();
-                    focusText();
+                if (sheetHost && sheetHost.el.classList.contains('is-under') && !sheetOpen()) {
+                    const back = sheetHost;
+                    sheetHost = null;
+                    back.el.classList.remove('is-under');
+                    back.refresh();
+                    back.focus();
                 }
             });
             SHEETS.forEach(id => {
@@ -385,7 +405,42 @@
         openSheet(window.CRM);
     }
 
-    async function completeTodo(todoId, checkbox) {
+    /**
+     * What the project details do when clicked - edit the project, open a
+     * to-do, take a contact off, open a note - in whichever window they are.
+     * True when the click was one of these.
+     */
+    function handleDetailClick(target, host) {
+        const project = host.project;
+        if (target.closest('[data-meeting-open-project]')) {
+            if (!project) return true;
+            // "Add" (contacts) opens the sheet to pick someone; "Edit" goes
+            // straight to editing and comes back here once saved.
+            const editing = target.closest('[data-meeting-open-project]').dataset.mode === 'edit';
+            overSheet(crm => crm.openProjectOverview(project.id, editing ? { edit: true, closeAfterEdit: true } : {}), host);
+        } else if (target.closest('[data-meeting-open-todo]')) {
+            const id = Number(target.closest('[data-meeting-open-todo]').dataset.meetingOpenTodo);
+            overSheet(crm => crm.openTodoDetail(id), host);
+        } else if (target.closest('[data-meeting-remove-contact]')) {
+            const button = target.closest('[data-meeting-remove-contact]');
+            removeContact(host, Number(button.dataset.meetingRemoveContact), button.dataset.name || 'this contact');
+        } else if (target.closest('[data-meeting-note]')) {
+            target.closest('[data-meeting-note]').classList.toggle('is-open');
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /** Ticking a to-do off in the details, in whichever window they are. */
+    function bindTodoTicks(el, host) {
+        el.addEventListener('change', event => {
+            const checkbox = event.target.closest('[data-meeting-toggle-todo]');
+            if (checkbox && checkbox.checked) completeTodo(Number(checkbox.dataset.meetingToggleTodo), checkbox, host().refresh);
+        });
+    }
+
+    async function completeTodo(todoId, checkbox, refresh) {
         const row = checkbox.closest('.ptodo');
         if (row) row.classList.add('todo-completed');
         try {
@@ -397,11 +452,11 @@
             return;
         }
         // A moment to see it ticked before it leaves the open list.
-        setTimeout(refreshContext, 600);
+        setTimeout(refresh, 600);
     }
 
-    async function removeContact(contactId, name) {
-        const project = currentProject();
+    async function removeContact(host, contactId, name) {
+        const project = host.project;
         if (!project || !confirm(`Remove ${name} from ${project.name}?`)) return;
         try {
             await request('api/projects.php?action=unassign-contact', {
@@ -412,7 +467,7 @@
             alert(error.message);
             return;
         }
-        refreshContext();
+        host.refresh();
     }
 
     /** Hand what was typed for the project on screen to Claude, if anything. */
@@ -586,7 +641,7 @@
     function draftField(project, extraClass, rows) {
         return `<textarea class="form-input meeting-draft ${extraClass}" maxlength="8000" ${rows ? `rows="${rows}"` : ''}
                           data-project-id="${project.id}" aria-label="For Claude"
-                          placeholder="What is new, what is next, who does it?&#10;&#10;e.g. Kickoff went well. Anna does the moodboard by Friday, Livio sends the offer. Budget up to 24k.">${escapeHtml(state.drafts[project.id] || '')}</textarea>`;
+                          placeholder="What is new, what is next, who does it? Or ask about the project.&#10;&#10;e.g. Kickoff went well. Anna does the moodboard by Friday, Livio sends the offer. Budget up to 24k.">${escapeHtml(state.drafts[project.id] || '')}</textarea>`;
     }
 
     function projectHtml() {
@@ -621,7 +676,10 @@
                 <section class="meeting-input">
                     <span class="meeting-label">For Claude</span>
                     ${draftField(project, 'meeting-text')}
-                    <p class="meeting-hint">${ICON_CLAUDE}<span>When you move on, Claude turns this into to-dos, notes and changes under <strong>From Claude</strong>.</span></p>
+                    <div class="meeting-send-row">
+                        <p class="meeting-hint"><span>When you move on, Claude turns this into to-dos, notes and changes under <strong>From Claude</strong>. A question? Ask it now and the answer shows here.</span></p>
+                        <button type="button" class="btn meeting-ask-send" data-meeting-send title="Send to Claude now, without moving on">${ICON_CLAUDE}<span>Ask now</span></button>
+                    </div>
                     ${jobsHtml(jobsFor(project.id))}
                 </section>
             </div>
@@ -764,15 +822,21 @@
         }
     }
 
-    /** What was already handed to Claude for this project in this meeting. */
-    function jobsHtml(jobs) {
+    /**
+     * What was already handed to Claude for this project: each text, its
+     * state and Claude's answer to a question. The proposals it made are
+     * listed one by one only where asked for (the Claude window of a project
+     * card); in a meeting they are made in the background, and a line says
+     * how many wait under From Claude.
+     */
+    function jobsHtml(jobs, { items = false } = {}) {
         if (!jobs.length) return '';
         return `<div class="meeting-jobs">${jobs.map(job => `
             <div class="meeting-job meeting-job--${job.status}">
                 <div class="meeting-job-head">${jobHead(job)}</div>
                 <p class="meeting-job-text">${escapeHtml(job.text)}</p>
                 ${job.status === 'done' && job.result.answer ? `<p class="meeting-job-answer">${ICON_CLAUDE}<span>${escapeHtml(job.result.answer)}</span></p>` : ''}
-                ${job.status === 'done' && job.result.created.length ? `<ul class="meeting-job-items">${job.result.created.map(item => `
+                ${items && job.status === 'done' && job.result.created.length ? `<ul class="meeting-job-items">${job.result.created.map(item => `
                     <li><span class="meeting-kind">${escapeHtml(KIND_LABELS[item.type] || item.type)}</span>${escapeHtml(item.label)}</li>`).join('')}</ul>` : ''}
                 ${job.status === 'done' && job.result.failed.length ? `<p class="meeting-job-failed">${escapeHtml(job.result.failed.join(' '))}</p>` : ''}
             </div>`).join('')}</div>`;
@@ -913,13 +977,7 @@
                 <div class="meeting-head-main">
                     <div class="meeting-head-meta"><span class="meeting-test-tag">Test</span></div>
                     <h2 class="meeting-title">Meeting finished</h2>
-                    <p class="meeting-company">${busy
-                        ? `Claude is still working on ${plural(busy, 'project')} - its proposals appear here when it is done.`
-                        : items.length
-                            ? `Everything Claude proposed in this meeting, project by project: ${open.length
-                                ? plural(open.length, 'proposal') + ' waiting' + (decidedCount ? `, ${decidedCount} decided` : '')
-                                : `all ${decidedCount} decided`}.`
-                            : 'Claude proposed no changes in this meeting.'}</p>
+                    <p class="meeting-company" data-meeting-summary-line>${summaryLine(busy, items.length, open.length, decidedCount)}</p>
                 </div>
                 <div class="meeting-head-actions">
                     <button type="button" class="meeting-icon-btn" data-meeting-close title="Close - you can come back to this" aria-label="Close">${ICON_CLOSE}</button>
@@ -934,16 +992,61 @@
                 ${unsent.length ? `<p class="meeting-hint mrev-unsent">Text not sent yet: ${unsent.map(p => escapeHtml(p.name)).join(', ')}. <button type="button" class="btn btn-secondary btn-small" data-meeting-resume>Back to the meeting</button></p>` : ''}
                 ${failedJobs.length ? '<p class="meeting-hint">Projects that did not go through keep their text here until you finish the meeting.</p>' : ''}
             </div>
+            ${summaryFoot(busy, open.length)}`;
+    }
+
+    /** The line under "Meeting finished": what Claude proposed, and how much is still open. */
+    function summaryLine(busy, total, open, decided) {
+        if (busy) return `Claude is still working on ${plural(busy, 'project')} - its proposals appear here when it is done.`;
+        if (!total) return 'Claude proposed no changes in this meeting.';
+        if (!open) return `All ${plural(decided, 'proposal')} from this meeting decided - nothing left open.`;
+        return `Everything Claude proposed in this meeting, project by project: ${plural(open, 'proposal')} waiting${decided ? `, ${decided} decided` : ''}.`;
+    }
+
+    /**
+     * The way out of the meeting, matching what is left: with proposals
+     * still open, From Claude, finishing with them kept open, or accepting
+     * them all; with nothing open, only finishing.
+     */
+    function summaryFoot(busy, open) {
+        const off = busy ? 'disabled' : '';
+        if (!open) {
+            return `
             <footer class="meeting-foot">
-                <button type="button" class="btn btn-primary meeting-claude-btn" data-meeting-review ${busy ? 'disabled' : ''}>${ICON_CLAUDE}<span>Go to From Claude</span></button>
                 <span class="meeting-status"></span>
                 <div class="meeting-nav">
-                    <button type="button" class="btn btn-secondary" data-meeting-finish ${busy ? 'disabled' : ''}
-                            title="${open.length ? 'Finish; the proposals stay open under From Claude' : 'Finish the meeting'}">${open.length ? `${ICON_KEEP}<span>Finish, keep open</span>` : `${ICON_DONE}<span>Finish meeting</span>`}</button>
-                    ${open.length ? `<button type="button" class="btn btn-primary meeting-accept-btn" data-meeting-finish-accept ${busy ? 'disabled' : ''}
-                            title="Accept all ${open.length} waiting proposals from this meeting, then finish">${ICON_DONE}<span>Finish & accept all ${open.length}</span></button>` : ''}
+                    <button type="button" class="btn btn-primary" data-meeting-finish ${off} title="Finish the meeting">${ICON_DONE}<span>Finish meeting</span></button>
                 </div>
             </footer>`;
+        }
+        return `
+            <footer class="meeting-foot">
+                <button type="button" class="btn btn-primary meeting-claude-btn" data-meeting-review ${off}>${ICON_CLAUDE}<span>Go to From Claude</span></button>
+                <span class="meeting-status"></span>
+                <div class="meeting-nav">
+                    <button type="button" class="btn btn-secondary" data-meeting-finish ${off}
+                            title="Finish; the proposals stay open under From Claude">${ICON_KEEP}<span>Finish, keep open</span></button>
+                    <button type="button" class="btn btn-primary meeting-accept-btn" data-meeting-finish-accept ${off}
+                            title="Accept all ${open} waiting proposals from this meeting, then finish">${ICON_DONE}<span>Finish & accept all ${open}</span></button>
+                </div>
+            </footer>`;
+    }
+
+    /**
+     * A proposal decided in the summary: the line and the buttons follow at
+     * once. The list itself is left alone - its row is on its way out - and
+     * is drawn again once the decision is sent (crm:review-changed).
+     */
+    function refreshSummaryChrome() {
+        if (!modal || !state.ended || !modal.classList.contains('active')) return;
+        const review = window.CRMReview;
+        const items = state.review.items.filter(item => !(item.status === 'pending' && review && review.isHeld(item.id)));
+        const open = openProposals(state.review.items).length;
+        const busy = working();
+        const line = modal.querySelector('[data-meeting-summary-line]');
+        if (line) line.innerHTML = summaryLine(busy, items.length, open, items.length - open);
+        const foot = modal.querySelector('.meeting-foot');
+        if (foot) foot.outerHTML = summaryFoot(busy, open);
     }
 
     // ------------------------------------------------------------------
@@ -959,22 +1062,8 @@
         else if (target.closest('[data-meeting-next]')) go(1);
         else if (target.closest('[data-meeting-end]')) end();
         else if (target.closest('[data-meeting-finish]')) finish();
-        else if (target.closest('[data-meeting-open-project]')) {
-            const project = currentProject();
-            if (!project) return;
-            // "Add" (contacts) opens the sheet to pick someone; "Edit" goes
-            // straight to editing and comes back here once saved.
-            const editing = target.closest('[data-meeting-open-project]').dataset.mode === 'edit';
-            overSheet(crm => crm.openProjectOverview(project.id, editing ? { edit: true, closeAfterEdit: true } : {}));
-        } else if (target.closest('[data-meeting-open-todo]')) {
-            const id = Number(target.closest('[data-meeting-open-todo]').dataset.meetingOpenTodo);
-            overSheet(crm => crm.openTodoDetail(id));
-        } else if (target.closest('[data-meeting-remove-contact]')) {
-            const button = target.closest('[data-meeting-remove-contact]');
-            removeContact(Number(button.dataset.meetingRemoveContact), button.dataset.name || 'this contact');
-        } else if (target.closest('[data-meeting-note]')) {
-            target.closest('[data-meeting-note]').classList.toggle('is-open');
-        }
+        else if (target.closest('[data-meeting-send]')) submitCurrent();
+        else if (handleDetailClick(target, meetingHost())) return;
         else if (target.closest('[data-meeting-resume]')) {
             state.ended = false;
             open();
@@ -997,79 +1086,136 @@
     // One project, from its card
     // ------------------------------------------------------------------
     // Hovering the assignee on a project card turns it into a Claude button
-    // (app.js draws it while this file is loaded). It opens a small window
-    // with the meeting's field for that one project: what is typed goes to
-    // Claude at once, and what Claude makes of it waits under From Claude,
-    // as in a meeting. Not part of a meeting, and not kept across reloads.
+    // (app.js draws it while this file is loaded). It opens the meeting's
+    // window for that one project: its details on the left, the field for
+    // Claude on the right - but nothing to move between projects and no
+    // meeting to end. What is sent goes to Claude at once; its answer and the
+    // proposals it made show under the field. Not kept across reloads.
 
-    const ask = { el: null, project: null, jobs: [], drafts: {} };
+    const ask = { el: null, project: null, context: null, jobs: [], drafts: {} };
+
+    function askHost() {
+        return {
+            el: ask.el,
+            project: ask.project,
+            refresh: refreshAskContext,
+            focus: () => {
+                const field = ask.el && ask.el.querySelector('.meeting-ask-text');
+                if (field) field.focus();
+            },
+            keep: saveAskDraft
+        };
+    }
 
     function askHtml() {
         const project = ask.project;
+        const ctx = ask.context;
+        const stage = ctx && !ctx.error ? ctx.project.stage : project.stage;
         const jobs = ask.jobs.filter(job => job.projectId === project.id);
         const busy = jobs.some(job => job.status === 'working');
         return `
-            <header class="meeting-ask-head">
-                <span class="meeting-ask-mark" aria-hidden="true">${ICON_CLAUDE}</span>
-                <div class="meeting-ask-title">
-                    <h2 class="meeting-ask-name">${escapeHtml(project.name)}</h2>
-                    ${project.company ? `<p class="meeting-ask-company">${escapeHtml(project.company)}</p>` : ''}
+            <header class="meeting-head">
+                <div class="meeting-head-main">
+                    <div class="meeting-head-meta">
+                        ${stage ? `<span class="meeting-stage stage-${stageClass(stage)}">${escapeHtml(stage)}</span>` : ''}
+                        <span class="meeting-position">${ICON_CLAUDE} Chat with Claude</span>
+                    </div>
+                    <h2 class="meeting-title">${escapeHtml(project.name)}</h2>
+                    ${project.company ? `<p class="meeting-company">${escapeHtml(project.company)}</p>` : ''}
                 </div>
-                <button type="button" class="meeting-icon-btn" data-ask-close aria-label="Close">${ICON_CLOSE}</button>
+                <div class="meeting-head-actions">
+                    <button type="button" class="meeting-icon-btn" data-ask-close title="Close" aria-label="Close">${ICON_CLOSE}</button>
+                </div>
             </header>
-            <div class="meeting-ask-body">
-                <textarea class="form-input meeting-ask-text" maxlength="8000" rows="5" aria-label="For Claude"
-                          placeholder="Ask about this project, or say what should change.&#10;&#10;e.g. How much is still open? Chance up to 80 %, Anna drafts the offer by Friday.">${escapeHtml(ask.drafts[project.id] || '')}</textarea>
-                ${jobsHtml(jobs).replace(/data-meeting-retry/g, 'data-ask-retry')}
-            </div>
-            <footer class="meeting-ask-foot">
-                <p class="meeting-hint"><span>Changes wait under <strong>From Claude</strong>; answers show here.</span></p>
-                <button type="button" class="btn meeting-ask-send" data-ask-send ${busy ? 'disabled' : ''}
-                        title="${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter">${ICON_CLAUDE}<span>Send to Claude</span></button>
-            </footer>`;
+
+            <div class="meeting-body">
+                <section class="meeting-details" aria-label="Project details">
+                    ${ctx ? (ctx.error ? `<p class="meeting-error">${escapeHtml(ctx.error)}</p>` : detailsHtml(ctx)) : '<p class="empty-hint">Loading…</p>'}
+                </section>
+
+                <section class="meeting-input">
+                    <span class="meeting-label">For Claude</span>
+                    <textarea class="form-input meeting-text meeting-ask-text" maxlength="8000" aria-label="For Claude"
+                              placeholder="Ask about this project, or say what should change.&#10;&#10;e.g. How much is still open? Chance up to 80 %, Anna drafts the offer by Friday.">${escapeHtml(ask.drafts[project.id] || '')}</textarea>
+                    <div class="meeting-send-row">
+                        <p class="meeting-hint"><span>Changes wait under <strong>From Claude</strong>; answers show here.</span></p>
+                        <button type="button" class="btn meeting-ask-send" data-ask-send ${busy ? 'disabled' : ''}
+                                title="${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter">${ICON_CLAUDE}<span>Send to Claude</span></button>
+                    </div>
+                    ${jobsHtml(jobs, { items: true }).replace(/data-meeting-retry/g, 'data-ask-retry')}
+                </section>
+            </div>`;
+    }
+
+    function saveAskDraft() {
+        const field = ask.el && ask.el.querySelector('.meeting-ask-text');
+        if (field && ask.project) ask.drafts[ask.project.id] = field.value;
     }
 
     function renderAsk() {
         if (!ask.el || !ask.project) return;
+        saveAskDraft();
         const field = ask.el.querySelector('.meeting-ask-text');
-        if (field) ask.drafts[ask.project.id] = field.value;
-        const focused = field && document.activeElement === field;
-        ask.el.querySelector('.meeting-ask-content').innerHTML = askHtml();
+        const typing = field && document.activeElement === field
+            ? { start: field.selectionStart, end: field.selectionEnd }
+            : null;
+        const pane = ask.el.querySelector('.meeting-details');
+        const scrolled = pane ? pane.scrollTop : 0;
+
+        ask.el.querySelector('.meeting-content').innerHTML = askHtml();
+
+        const nextPane = ask.el.querySelector('.meeting-details');
+        if (nextPane) nextPane.scrollTop = scrolled;
         const next = ask.el.querySelector('.meeting-ask-text');
-        if (focused && next) {
+        if (typing && next) {
             next.focus();
-            next.setSelectionRange(next.value.length, next.value.length);
+            next.setSelectionRange(typing.start, typing.end);
         }
+    }
+
+    async function refreshAskContext() {
+        const project = ask.project;
+        if (!project) return;
+        try {
+            const result = await request(`${API}?action=context&id=${encodeURIComponent(project.id)}`);
+            contexts.set(project.id, result.data);
+            if (ask.project === project) ask.context = result.data;
+        } catch (error) {
+            if (ask.project === project && !ask.context) ask.context = { error: error.message };
+        }
+        if (ask.project === project) renderAsk();
     }
 
     function buildAsk() {
         if (ask.el) return;
         ask.el = document.createElement('div');
-        ask.el.className = 'modal meeting-ask';
+        ask.el.className = 'modal meeting-modal';
         ask.el.id = 'meetingAskModal';
         ask.el.setAttribute('role', 'dialog');
         ask.el.setAttribute('aria-modal', 'true');
-        ask.el.setAttribute('aria-label', 'Ask Claude about this project');
-        ask.el.innerHTML = '<div class="modal-backdrop" data-ask-close></div><div class="modal-content meeting-ask-content"></div>';
+        ask.el.setAttribute('aria-label', 'Chat with Claude about this project');
+        ask.el.innerHTML = '<div class="modal-backdrop" data-ask-close></div><div class="modal-content meeting-content"></div>';
         document.body.appendChild(ask.el);
 
         ask.el.addEventListener('click', event => {
             const target = event.target;
             if (target.closest('[data-ask-close]')) closeAsk();
             else if (target.closest('[data-ask-send]')) sendAsk();
+            else if (handleDetailClick(target, askHost())) return;
             else if (target.closest('[data-ask-retry]')) {
                 const job = ask.jobs.find(j => j.id === Number(target.closest('[data-ask-retry]').dataset.askRetry));
                 if (job) runAskJob(job);
             }
         });
         ask.el.addEventListener('input', event => {
-            if (event.target.classList.contains('meeting-ask-text')) ask.drafts[ask.project.id] = event.target.value;
+            if (event.target.classList.contains('meeting-ask-text')) saveAskDraft();
         });
+        bindTodoTicks(ask.el, askHost);
         ask.el.addEventListener('keydown', event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
                 sendAsk();
-            } else if (event.key === 'Escape') {
+            } else if (event.key === 'Escape' && !ask.el.classList.contains('is-under')) {
                 event.preventDefault();
                 event.stopPropagation();
                 closeAsk();
@@ -1080,16 +1226,17 @@
     function askAbout(project) {
         buildAsk();
         ask.project = project;
+        // What a meeting loaded ahead shows at once, and is brought up to date.
+        ask.context = contexts.get(project.id) || null;
         ask.el.classList.add('active');
         renderAsk();
-        const field = ask.el.querySelector('.meeting-ask-text');
-        if (field) field.focus();
+        askHost().focus();
+        refreshAskContext();
     }
 
     function closeAsk() {
         if (!ask.el) return;
-        const field = ask.el.querySelector('.meeting-ask-text');
-        if (field && ask.project) ask.drafts[ask.project.id] = field.value;
+        saveAskDraft();
         ask.el.classList.remove('active');
     }
 
@@ -1165,10 +1312,7 @@
             });
         });
 
-        modal.addEventListener('change', event => {
-            const checkbox = event.target.closest('[data-meeting-toggle-todo]');
-            if (checkbox && checkbox.checked) completeTodo(Number(checkbox.dataset.meetingToggleTodo), checkbox);
-        });
+        bindTodoTicks(modal, meetingHost);
 
         modal.addEventListener('keydown', event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !state.ended) {
@@ -1192,6 +1336,10 @@
         const button = document.getElementById('startMeetingBtn');
         if (button) button.addEventListener('click', start);
         bindCardButtons();
+
+        // A decision just made, still undoable: the summary's line and buttons
+        // count it as decided straight away.
+        document.addEventListener('crm:review-held', refreshSummaryChrome);
 
         // A decision made (or undone) - here or anywhere - shows in the summary.
         document.addEventListener('crm:review-changed', event => {

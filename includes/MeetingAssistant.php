@@ -12,7 +12,8 @@
  *
  * Switched on by ANTHROPIC_API_KEY in .env (MEETING_ASSISTANT=false turns it
  * off again with the key in place). The key never leaves the server. Only
- * people an admin has given the "Meeting" permission (Users page) see it.
+ * people an admin has given the "Claude" permission (Users page) see it -
+ * the meeting, and the Claude button on the project cards (meeting.js).
  *
  * To remove the test entirely: this file, api/meeting.php,
  * assets/js/meeting.js, assets/css/meeting.css, and the lines marked

@@ -2793,6 +2793,20 @@ input[type="checkbox"] {
 #projectsView .project-card.stage-negotiation { --stage-tone: var(--stage-negotiation); }
 #projectsView .project-card.stage-complete { --stage-tone: var(--stage-complete); }
 
+/* style.css prepared the cards for its old 3D entrance: a layer of their own
+   (will-change, hidden backface) in a 3D space. The entrance is a plain fade
+   now, and that layer made Chrome draw a card's text soft while it moved -
+   with the Claude blur on top, the blur seemed to change after a moment. */
+#projectsView .projects-list {
+    perspective: none;
+    transform-style: flat;
+}
+
+#projectsView .project-card {
+    backface-visibility: visible;
+    will-change: auto;
+}
+
 #projectsView .project-card:hover {
     box-shadow: var(--e-2);
     transform: translateY(-2px);
@@ -2868,13 +2882,16 @@ input[type="checkbox"] {
     padding-top: 12px;
 }
 
-/* ---- When it runs: one quiet line, lighter than the budget ---- */
+/* ---- When it runs: one quiet line, lighter than the budget ----
+   The span on the left, the status on the right; on a narrow card the
+   status wraps under the span, and nothing is left dangling. */
 
 .project-when {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 6px;
+    justify-content: space-between;
+    gap: 2px 12px;
     margin: 0;
     font-size: var(--t-xs);
     line-height: 1.5;
@@ -2882,34 +2899,22 @@ input[type="checkbox"] {
     font-variant-numeric: tabular-nums;
 }
 
-.project-when-part {
+.project-when-span {
     white-space: nowrap;
     color: var(--c-ink-2);
 }
 
-.project-when-label {
-    font-weight: 500;
+.project-when-span.is-empty {
     color: var(--c-ink-3);
-}
-
-.project-when-empty {
-    color: var(--c-ink-3);
-}
-
-.project-when-arrow,
-.project-when-sep {
-    color: var(--c-ink-3);
-    opacity: 0.7;
-}
-
-.project-when-part.is-late,
-.project-when-part.is-late .project-when-label,
-.project-when-status.is-late {
-    color: var(--c-danger-ink);
 }
 
 .project-when-status {
     white-space: nowrap;
+}
+
+.project-when-status.is-late {
+    color: var(--c-danger-ink);
+    font-weight: 600;
 }
 
 .project-when-status.is-soon {
@@ -3064,14 +3069,10 @@ input[type="checkbox"] {
     align-self: center;
 }
 
-/* When it ends and how long is left; the start is in the sheet. */
-.project-row .project-when-part:first-child,
-.project-row .project-when-arrow {
-    display: none;
-}
-
+/* In a row the status follows the span, rather than sitting far right. */
 .project-row .project-when {
     flex-wrap: nowrap;
+    justify-content: flex-start;
     overflow: hidden;
 }
 
