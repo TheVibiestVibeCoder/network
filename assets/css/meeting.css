@@ -738,8 +738,8 @@
     margin-top: 0;
 }
 
-/* Over the face, hidden until the face is hovered; on a card without an
-   assignee, until the card is. */
+/* Over the face, hidden until the face - or on a card without an assignee,
+   the empty spot where it would be - is hovered. */
 /* The face inside the chip is 24px within a 2px white ring; the button
    covers exactly the face, not the ring. */
 .project-card-claude {
@@ -766,13 +766,11 @@
 
 /* While the button shows, the face and its white ring step aside. */
 .project-card-assignee:hover .assignee-chip,
-.project-card-assignee:has(.project-card-claude:focus-visible) .assignee-chip,
-.project-card:hover .project-card-assignee.is-empty .assignee-chip {
+.project-card-assignee:has(.project-card-claude:focus-visible) .assignee-chip {
     visibility: hidden;
 }
 
 .project-card-assignee:hover .project-card-claude,
-.project-card:hover .project-card-assignee.is-empty .project-card-claude,
 .project-card-claude:focus-visible {
     opacity: 1;
     transform: scale(1);

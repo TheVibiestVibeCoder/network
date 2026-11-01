@@ -133,6 +133,28 @@ class ProjectSummary
         ];
     }
 
+    /**
+     * Projects that have never had a summary written, though there is
+     * something to summarise - for the first round through all of them
+     * (project-summary.js). Proposed projects nobody has accepted yet wait.
+     *
+     * @return int[]
+     */
+    public static function missing(PDO $db): array
+    {
+        $stmt = $db->query("
+            SELECT p.id
+            FROM projects p
+            WHERE (p.claude_summary IS NULL OR p.claude_summary = '')
+              AND p.review_status IS NULL
+              AND (TRIM(COALESCE(p.description, '')) <> ''
+                   OR EXISTS (SELECT 1 FROM project_notes n WHERE n.project_id = p.id AND n.review_status IS NULL))
+            ORDER BY p.updated_at DESC, p.id DESC
+        ");
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     // -------------------------------------------------------------------------
     // Writing
     // -------------------------------------------------------------------------

@@ -105,6 +105,18 @@ function handleGet(Project $model, string $action, ?int $id): void
         return;
     }
 
+    // Projects that have never had a Claude summary written (admins only:
+    // their browser writes the first ones, see project-summary.js)
+    if ($action === 'summary-missing') {
+        if (!ProjectSummary::enabled() || !Auth::isAdmin()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Not available']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => ProjectSummary::missing(Database::getInstance())]);
+        return;
+    }
+
     // Claude's summary of the project, and whether it is behind the notes
     if ($action === 'summary' && $id !== null) {
         if (!ProjectSummary::enabled()) {

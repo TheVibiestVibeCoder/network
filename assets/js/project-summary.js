@@ -224,6 +224,68 @@
         check(id);
     }
 
+    // ------------------------------------------------------------------
+    // The first round: every project without a summary gets one
+    // ------------------------------------------------------------------
+    // Shortly after an admin opens the CRM, the projects that never had a
+    // summary are written one after the other in the background, so the
+    // first look at any project finds one. Once all have one there is
+    // nothing left to do; a project added later gets its first the same way.
+    // One tab at a time: the tab doing it holds a lease in localStorage and
+    // renews it per project, so a closed tab's round is taken up again later.
+
+    const BACKFILL_KEY = 'crm-summary-backfill';
+    const BACKFILL_LEASE_MS = 3 * 60 * 1000;
+    const BACKFILL_DELAY_MS = 4000;
+    let backfilling = false;
+
+    function claimBackfill() {
+        try {
+            const held = Number(localStorage.getItem(BACKFILL_KEY) || 0);
+            if (held && Date.now() - held < BACKFILL_LEASE_MS) return false;
+            localStorage.setItem(BACKFILL_KEY, String(Date.now()));
+        } catch (e) {
+            // No storage: this tab just goes ahead.
+        }
+        return true;
+    }
+
+    function renewBackfill() {
+        try { localStorage.setItem(BACKFILL_KEY, String(Date.now())); } catch (e) { /* see claimBackfill */ }
+    }
+
+    function releaseBackfill() {
+        backfilling = false;
+        try { localStorage.removeItem(BACKFILL_KEY); } catch (e) { /* see claimBackfill */ }
+    }
+
+    async function backfill() {
+        const role = document.querySelector('meta[name="current-user-role"]');
+        if (!role || role.getAttribute('content') !== 'admin' || !claimBackfill()) return;
+        backfilling = true;
+        try {
+            const ids = await request(`${API}?action=summary-missing`);
+            for (const id of ids) {
+                if (!backfilling) break;
+                renewBackfill();
+                // Through refresh(), so a project on screen shows it being
+                // written. A failure is left for the next round.
+                await refresh(Number(id));
+            }
+        } catch (error) {
+            // Not now; the next time the CRM is opened.
+        } finally {
+            if (backfilling) releaseBackfill();
+        }
+    }
+
+    // Leaving mid-round frees it for the next tab at once.
+    window.addEventListener('pagehide', () => {
+        if (backfilling) releaseBackfill();
+    });
+
+    setTimeout(backfill, BACKFILL_DELAY_MS);
+
     // Still behind after a failed attempt, so checking again tries again.
     document.addEventListener('click', event => {
         const retry = event.target.closest('[data-summary-retry]');
