@@ -835,22 +835,6 @@ h1, h2, h3, h4 {
     line-height: 1.2;
 }
 
-.user-chip-logout {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    color: var(--c-ink-3);
-    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-
-.user-chip-logout:hover {
-    background: var(--c-tint-3);
-    color: var(--c-ink);
-}
-
 /* The profile popover opens upward from the chip at the bottom of the rail. */
 .sidebar .profile-pop {
     top: auto;
@@ -3807,8 +3791,8 @@ input[type="checkbox"] {
         width: 100%;
     }
 
-    .sidebar .nav-item,
-    .sidebar .nav-item.toggle-btn {
+    .sidebar .nav-item:not(.profile-pop-item),
+    .sidebar .nav-item.toggle-btn:not(.profile-pop-item) {
         width: 48px;
         min-width: 0;
         height: 44px;
@@ -3917,8 +3901,8 @@ input[type="checkbox"] {
         width: 100%;
     }
 
-    .sidebar-collapsed .sidebar .nav-item,
-    .sidebar-collapsed .sidebar .nav-item.toggle-btn {
+    .sidebar-collapsed .sidebar .nav-item:not(.profile-pop-item),
+    .sidebar-collapsed .sidebar .nav-item.toggle-btn:not(.profile-pop-item) {
         width: 48px;
         min-width: 0;
         height: 44px;
@@ -5404,10 +5388,37 @@ textarea.form-input:focus {
     letter-spacing: 0;
 }
 
+/* Accounts are rows divided by hairlines inside the page's card, not cards
+   of their own. */
+.users-list {
+    gap: 0;
+}
+
 .user-row {
-    padding: 12px 14px;
-    border-color: var(--c-line);
-    border-radius: var(--r-lg);
+    padding: 12px 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+}
+
+.user-row:first-child {
+    border-top: 0;
+}
+
+.user-row:hover {
+    border-color: var(--c-line-2);
+}
+
+/* The fresh invite link: a quiet tinted strip, not a box in the box. */
+.users-link-box {
+    margin: 14px 0 8px;
+    background: var(--c-tint-3);
+    border: 0;
+}
+
+.users-invite {
+    margin-bottom: 8px;
 }
 
 .user-row-role-select {
@@ -5451,7 +5462,209 @@ textarea.form-input:focus {
     justify-content: flex-start;
 }
 
-/* In the narrow rail the sidebar hides its labels; here they always show. */
+/* Sign out is a link among the buttons. */
+.sidebar .profile-pop a.profile-pop-item {
+    text-decoration: none;
+}
+
+/* The face is the way to the picture. A picture shows a camera over it on
+   hover; without one, a small camera badge says it can be clicked. */
+.profile-pop-head {
+    position: relative;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.profile-pop-face {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    cursor: pointer;
+}
+
+.profile-pop-face .profile-pop-avatar {
+    width: 100%;
+    height: 100%;
+    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.profile-pop-face:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.profile-pop-face-cue {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: rgba(28, 50, 88, 0.6);
+    color: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-1) var(--ease);
+}
+
+.profile-pop-face:hover .profile-pop-face-cue,
+.profile-pop-face:focus-visible .profile-pop-face-cue,
+.profile-pop-face[aria-expanded="true"] .profile-pop-face-cue {
+    opacity: 1;
+}
+
+.profile-pop-face.is-empty .profile-pop-face-cue {
+    inset: auto -3px -3px auto;
+    width: 20px;
+    height: 20px;
+    background: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-raised);
+    opacity: 1;
+}
+
+.profile-pop-face.is-empty .profile-pop-face-cue svg {
+    width: 11px;
+    height: 11px;
+}
+
+.profile-pop-face.is-empty:hover .profile-pop-avatar,
+.profile-pop-face.is-empty[aria-expanded="true"] .profile-pop-avatar {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.profile-pop-face.is-busy {
+    cursor: progress;
+}
+
+.profile-pop-face.is-busy .profile-pop-avatar {
+    opacity: 0.5;
+}
+
+.profile-pop-name-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.profile-pop-edit {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--c-ink-3);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.profile-pop-edit:hover {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+/* Upload / remove, dropping down under the face. */
+.profile-photo-menu {
+    position: absolute;
+    top: 50px;
+    left: -6px;
+    right: -6px;
+    z-index: 2;
+    padding: 6px;
+    background: var(--c-raised);
+    border: 1px solid var(--c-line-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--e-3);
+    animation: dsDialogIn var(--dur-2) var(--ease) both;
+}
+
+.profile-photo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+
+.profile-photo-item[hidden] {
+    display: none;
+}
+
+.profile-photo-item svg {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+}
+
+.profile-photo-item:hover {
+    background: var(--c-tint-3);
+}
+
+.profile-photo-item.is-danger,
+.profile-photo-item.is-danger svg {
+    color: var(--c-danger);
+}
+
+.profile-photo-item.is-danger:hover {
+    background: var(--c-danger-soft);
+}
+
+.profile-photo-hint span {
+    white-space: nowrap;
+}
+
+.profile-photo-hint {
+    margin: 6px 4px 2px;
+    padding: 8px 6px 0;
+    border-top: 1px solid var(--c-line-2);
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    line-height: 1.4;
+}
+
+/* Your name, being changed: under the head, the full width of the popover. */
+.profile-name-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.profile-name-form[hidden] {
+    display: none;
+}
+
+.profile-name-form .form-input {
+    height: 36px;
+}
+
+.profile-name-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* In the narrow rail the sidebar hides its labels and squeezes its rows to
+   icon buttons (those rules skip .profile-pop-item); here they always show. */
 .sidebar .profile-pop .profile-pop-item .nav-label {
     display: inline;
 }

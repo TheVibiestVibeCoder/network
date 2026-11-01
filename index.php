@@ -848,31 +848,61 @@ function assetUrl(string $path): string
                                 <span class="user-chip-role"><?= $isAdmin ? 'Admin' : 'Member' ?></span>
                             </span>
                         </button>
-                        <a href="index.php?action=logout" class="user-chip-logout header-logout-btn" title="Sign out" aria-label="Sign out">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M14.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3.5"/><path d="m10 16.5-4.5-4.5L10 7.5"/><path d="M5.5 12H15"/>
-                            </svg>
-                        </a>
-
-                        <!-- Profile picture popover -->
+                        <!-- Profile popover: your picture, your name, settings, sign out -->
                         <div class="profile-pop" id="profilePop" hidden role="dialog" aria-label="Your profile">
                             <div class="profile-pop-head">
-                                <div class="profile-pop-avatar" id="profilePopAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></div>
+                                <!-- The face is the way to the picture: click it for upload / remove. -->
+                                <button type="button" class="profile-pop-face" id="profilePhotoToggle"
+                                        aria-haspopup="menu" aria-expanded="false" aria-controls="profilePhotoMenu"
+                                        title="Change profile picture" aria-label="Change profile picture">
+                                    <span class="profile-pop-avatar" id="profilePopAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></span>
+                                    <span class="profile-pop-face-cue" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.2"/>
+                                        </svg>
+                                    </span>
+                                </button>
                                 <div class="profile-pop-info">
-                                    <div class="profile-pop-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></div>
+                                    <div class="profile-pop-name-row">
+                                        <span class="profile-pop-name" id="profilePopName"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
+                                        <?php if (empty($currentUser['is_owner'])): ?>
+                                        <button type="button" class="profile-pop-edit" id="profileNameEdit" title="Change your name" aria-label="Change your name">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/>
+                                            </svg>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="profile-pop-sub"><?= htmlspecialchars($currentUser['email'] ?? 'Owner login') ?></div>
                                 </div>
+
+                                <!-- What can be done with the picture -->
+                                <div class="profile-photo-menu" id="profilePhotoMenu" role="menu" hidden>
+                                    <button type="button" class="profile-photo-item" id="profilePhotoBtn" role="menuitem">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>
+                                        </svg>
+                                        <span id="profilePhotoBtnLabel">Upload photo</span>
+                                    </button>
+                                    <button type="button" class="profile-photo-item is-danger" id="profileRemoveBtn" role="menuitem" hidden>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/>
+                                        </svg>
+                                        <span>Remove photo</span>
+                                    </button>
+                                    <p class="profile-photo-hint"><span>JPEG, PNG, GIF or WebP</span> &middot; <span>up to 5 MB</span></p>
+                                </div>
                             </div>
-                            <div class="profile-pop-actions">
-                                <button type="button" class="btn btn-secondary btn-small btn-block" id="profilePhotoBtn">
-                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.2"/>
-                                    </svg>
-                                    <span id="profilePhotoBtnLabel">Upload photo</span>
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-small btn-block profile-pop-remove" id="profileRemoveBtn" hidden>Remove photo</button>
-                            </div>
-                            <p class="profile-pop-hint">JPEG, PNG, GIF or WebP &middot; up to 5 MB</p>
+
+                            <?php if (empty($currentUser['is_owner'])): ?>
+                            <form class="profile-name-form" id="profileNameForm" autocomplete="off" hidden>
+                                <input type="text" class="form-input" id="profileNameInput" maxlength="120" aria-label="Your name" required>
+                                <div class="profile-name-actions">
+                                    <button type="button" class="btn btn-secondary btn-small" id="profileNameCancel">Cancel</button>
+                                    <button type="submit" class="btn btn-primary btn-small" id="profileNameSave">Save</button>
+                                </div>
+                            </form>
+                            <?php endif; ?>
                             <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
 
                             <!-- Settings that are rarely touched, out of the sidebar. -->
@@ -880,7 +910,7 @@ function assetUrl(string $path): string
                                 <?php if ($isAdmin): ?>
                                 <button type="button" class="toggle-btn nav-item nav-item--quiet profile-pop-item" data-view="users" id="manageUsersBtn" title="Manage users">
                                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.2 0 2.3.3 3.2.8"/><circle cx="17.5" cy="17" r="2.5"/><path d="M17.5 13v1.5M17.5 19.5V21M21.5 17H20M15 17h-1.5"/>
+                                        <rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10.5" r="2.2"/><path d="M5.8 16c.5-1.5 1.7-2.4 3.2-2.4s2.7.9 3.2 2.4"/><path d="M15 10h3M15 13.5h3"/>
                                     </svg>
                                     <span class="nav-label">Users</span>
                                 </button>
@@ -888,6 +918,12 @@ function assetUrl(string $path): string
                                 <button type="button" class="nav-item nav-item--quiet theme-toggle-btn profile-pop-item" id="themeToggleBtn" aria-label="Switch to dark mode" title="Switch to dark mode">
                                     <span class="nav-label theme-toggle-label">Dark mode</span>
                                 </button>
+                                <a href="index.php?action=logout" class="nav-item nav-item--quiet profile-pop-item" title="Sign out">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M14.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3.5"/><path d="m10 16.5-4.5-4.5L10 7.5"/><path d="M5.5 12H15"/>
+                                    </svg>
+                                    <span class="nav-label">Sign out</span>
+                                </a>
                             </div>
                         </div>
                     </div>

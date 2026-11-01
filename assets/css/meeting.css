@@ -40,17 +40,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-.meeting-test-tag {
-    padding: 1px 7px;
-    border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
 .meeting-title {
     margin: 0;
     color: var(--c-ink);

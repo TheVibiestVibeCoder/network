@@ -379,17 +379,6 @@ textarea.form-input {
     white-space: nowrap;
 }
 
-.header-logout-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-2);
-}
-
-.header-logout-btn svg {
-    flex-shrink: 0;
-}
-
 /* ============================================
    View Toggle
    ============================================ */
@@ -3013,15 +3002,6 @@ textarea.form-input {
     }
 
     .theme-toggle-label {
-        display: none;
-    }
-
-    .header-logout-btn {
-        min-width: 38px;
-        padding: 8px 10px;
-    }
-
-    .header-logout-btn span {
         display: none;
     }
 
@@ -5841,28 +5821,6 @@ button.user-chip:focus-visible {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.profile-pop-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-2);
-}
-
-.profile-pop-remove {
-    color: var(--color-danger);
-}
-
-.profile-pop-remove:hover:not(:disabled) {
-    background-color: var(--color-danger-subtle);
-    border-color: color-mix(in srgb, var(--c-danger) 30%, transparent);
-}
-
-.profile-pop-hint {
-    margin-top: var(--spacing-3);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    text-align: center;
 }
 
 /* --- "Last edited by" --------------------------------------------------- */

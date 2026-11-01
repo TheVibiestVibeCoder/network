@@ -718,7 +718,6 @@
                     <div class="meeting-head-meta">
                         <span class="meeting-stage stage-${stageClass(project.stage)}">${escapeHtml(project.stage)}</span>
                         <span class="meeting-position">Project ${state.index + 1} of ${count}</span>
-                        <span class="meeting-test-tag">Test</span>
                     </div>
                     <h2 class="meeting-title">${escapeHtml(project.name)}</h2>
                     ${project.company ? `<p class="meeting-company">${escapeHtml(project.company)}</p>` : ''}
@@ -1077,7 +1076,6 @@
         return `
             <header class="meeting-head">
                 <div class="meeting-head-main">
-                    <div class="meeting-head-meta"><span class="meeting-test-tag">Test</span></div>
                     <h2 class="meeting-title">Meeting finished</h2>
                     <p class="meeting-company" data-meeting-summary-line>${summaryLine(busy, items.length, open.length, decidedCount)}</p>
                 </div>

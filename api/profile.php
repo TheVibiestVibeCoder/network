@@ -61,6 +61,8 @@ try {
         uploadAvatar();
     } elseif ($method === 'DELETE' && $action === 'avatar') {
         deleteAvatar();
+    } elseif ($method === 'POST' && $action === 'name') {
+        renameSelf();
     } elseif ($method === 'POST' && $action === 'pref') {
         savePref();
     } else {
@@ -491,6 +493,33 @@ function currentAvatarUrl(): ?string
     $stored = $stmt->fetchColumn() ?: null;
 
     return $stored ? avatarUrl((string) $me['id'], (string) $stored) : null;
+}
+
+/**
+ * Change the caller's own display name - like the picture, only ever their own.
+ *
+ * The owner login has no users row; its name is OWNER_NAME in .env. Records
+ * keep the name they were written under, as when an admin renames someone.
+ */
+function renameSelf(): void
+{
+    $me = Auth::currentUser();
+    if ($me['is_owner']) {
+        profileJson(['error' => 'The owner login\'s name is set in .env (OWNER_NAME).'], 422);
+    }
+
+    $input = Auth::getJsonInput();
+    $raw = is_array($input) && is_string($input['name'] ?? null) ? $input['name'] : null;
+    $name = Auth::sanitizeString($raw, 120);
+    if ($name === null || $name === '') {
+        profileJson(['error' => 'Please enter a name.'], 422);
+    }
+
+    $stmt = Database::getInstance()->prepare("UPDATE users SET name = :name, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+    $stmt->execute(['name' => $name, 'id' => (int) $me['id']]);
+    $_SESSION['user_name'] = $name;
+
+    profileJson(['success' => true, 'name' => $name]);
 }
 
 /**
