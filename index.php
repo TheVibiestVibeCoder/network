@@ -282,7 +282,7 @@ $isAdmin = Auth::isAdmin();
 $meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
 // Quick add (test, assets/js/compose.js): hidden for now. true brings the
 // tab and its page back.
-$quickAddEnabled = false;
+$quickAddEnabled = true;
 
 // Get contact count for dashboard
 $contactCount = 0;

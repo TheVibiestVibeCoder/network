@@ -79,19 +79,15 @@
     color: transparent;
 }
 
+/* Everything recognised is marked alike, in the positive green: the keyword,
+   the date, the priority, the person, the project. */
 .compose-hl {
-    color: inherit;
-    background: var(--c-tint);
+    color: var(--c-success-ink);
+    background: var(--c-success-soft);
     border-radius: 4px;
     /* An outline drawn with a shadow takes no room, so the mirror stays
        letter for letter under the input. */
-    box-shadow: 0 0 0 2px var(--c-tint);
-}
-
-.compose-hl--intent {
-    color: var(--c-accent);
-    background: var(--c-accent-soft);
-    box-shadow: 0 0 0 1.5px var(--c-accent);
+    box-shadow: 0 0 0 1.5px var(--c-success);
 }
 
 .compose-card.is-stepping .compose-field,

@@ -480,26 +480,23 @@
      * Bank entries still missing their invoice, above the to-dos and projects
      * and across the full width: each one is money that cannot be booked
      * until somebody finds the PDF, and in the side column they went unseen.
+     * Built like the other small cards (listCard), its rows side by side.
      * Every entry is a drop target for its PDF (bindPdfDrops).
      */
     function bookkeepingBand(entries) {
         if (!entries.length) return '';
 
-        const count = entries.length;
         return `
-            <section class="home-bk" aria-labelledby="homeBkHeading">
-                <div class="home-bk-head">
-                    <span class="home-bk-icon" aria-hidden="true">${ICON_RECEIPT}</span>
-                    <div class="home-bk-titles">
-                        <h2 class="home-bk-heading" id="homeBkHeading">
-                            Bookkeeping
-                            <span class="home-bk-count">${count}</span>
-                        </h2>
-                        <p class="home-bk-sub">${count === 1 ? 'A bank entry is' : 'Bank entries are'} waiting for ${count === 1 ? 'its' : 'their'} invoice. Drop the PDF onto an entry, or click it to open it.</p>
-                    </div>
+            <section class="home-card home-mini is-bookkeeping home-bk" aria-labelledby="homeBkHeading">
+                <div class="home-card-head">
+                    <h2 class="home-card-title" id="homeBkHeading">
+                        <span class="home-mini-icon" aria-hidden="true">${ICON_RECEIPT}</span>
+                        Bookkeeping
+                        <span class="home-mini-count">${entries.length}</span>
+                    </h2>
                     <button type="button" class="home-link" data-home-go="bookkeeping">Open Bookkeeping</button>
                 </div>
-                <div class="home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
+                <div class="workload-list home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
             </section>`;
     }
 

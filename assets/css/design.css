@@ -9553,153 +9553,63 @@ details.import-instructions p {
 }
 
 /* ---- Bookkeeping: entries waiting on an invoice (workload.js) ----
-   Above the to-dos and projects, across the full width, in the bookkeeping
-   colour - the same language as "New for you" above it. Each entry is a tile
-   a PDF can be dropped onto. */
+   Above the to-dos and projects, across the full width. A small card like
+   Contacts (.home-mini), but its rows run side by side; each is a row a
+   PDF can be dropped onto. */
 
 #workloadView .home-bk {
-    --wl-type: var(--type-bookkeeping);
     margin: 0 0 20px;
-    background: var(--c-surface);
-    border: 1px solid transparent;
-    border-radius: var(--r-xl);
-    box-shadow: var(--e-1);
-    overflow: hidden;
 }
 
-.home-bk-head {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 22px;
-    background: color-mix(in srgb, var(--wl-type) 7%, var(--c-surface));
-    border-bottom: 1px solid color-mix(in srgb, var(--wl-type) 20%, var(--c-line-2));
-}
-
-.home-bk-icon {
-    width: 38px;
-    height: 38px;
-    flex-shrink: 0;
+/* Rows in columns. The line goes above each row rather than under it, so
+   every row of the grid has one, however many columns there are. */
+#workloadView .home-bk .home-bk-list {
     display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    background: color-mix(in srgb, var(--wl-type) 16%, var(--c-surface));
-    color: var(--wl-type);
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    /* style.css spaces the stacked lists apart; here the lines meet. */
+    gap: 0;
+    border-top: 0;
 }
 
-.home-bk-icon svg {
-    width: 19px;
-    height: 19px;
+/* Across the full width, beside "My to-dos": its title size, not the
+   side column's. */
+#workloadView .home-bk .home-card-head {
+    padding: 18px 22px 14px;
 }
 
-.home-bk-titles {
-    flex: 1;
-    min-width: 0;
-}
-
-.home-bk-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    font-size: var(--t-md);
-    font-weight: 600;
-    color: var(--c-ink);
-}
-
-.home-bk-count {
-    min-width: 22px;
-    height: 22px;
-    padding: 0 7px;
-    display: inline-grid;
-    place-items: center;
-    border-radius: var(--r-full);
-    background: var(--wl-type);
-    color: var(--c-bg);
-    font: 600 12px/1 var(--font);
-}
-
-.home-bk-sub {
-    margin: 2px 0 0;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.home-bk-head .home-link {
-    flex-shrink: 0;
-}
-
-.home-bk-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 10px;
-    padding: 14px 16px 16px;
+#workloadView .home-bk .home-card-title {
+    font-size: var(--t-lg);
 }
 
 #workloadView .home-bk .workload-row,
 #workloadView .home-bk .workload-row:last-child {
     min-height: 0;
-    padding: 10px 14px;
-    gap: 12px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-top: 1px solid var(--c-line-2);
+    border-bottom: 0;
 }
 
-#workloadView .home-bk .workload-row:hover {
-    background: color-mix(in srgb, var(--wl-type) 5%, var(--c-surface));
-    border-color: color-mix(in srgb, var(--wl-type) 45%, var(--c-line));
+#workloadView .home-bk .home-link {
+    flex-shrink: 0;
 }
 
-/* The dashed-blue drop language of the Bookkeeping tab; the tile's own
-   border takes the colour, so there is one frame, not two. */
+/* The drop frame sits a little inside the row: drawn on the row itself, the
+   card's rounded corners would cut into it on the rows along the card's
+   edge, giving it two different radii. */
 #workloadView .home-bk .workload-row.is-drop-target {
-    background: var(--c-accent-soft);
-    border-color: var(--c-accent);
-    box-shadow: inset 0 0 0 1px var(--c-accent);
+    isolation: isolate;
+    background: transparent;
+    box-shadow: none;
 }
 
-#workloadView .home-bk .workload-row-mark.is-icon {
-    width: 32px;
-    height: 32px;
-    border: 0;
+#workloadView .home-bk .workload-row.is-drop-target::before {
+    content: "";
+    position: absolute;
+    inset: 4px 8px;
+    z-index: -1;
     border-radius: var(--r-md);
-    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
-    color: var(--wl-type);
-}
-
-#workloadView .home-bk .workload-row-body {
-    min-width: 0;
-}
-
-#workloadView .home-bk .workload-row-title,
-#workloadView .home-bk .workload-row-context {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-    .home-bk-head {
-        flex-wrap: wrap;
-        gap: 10px 12px;
-        padding: 14px 16px;
-    }
-
-    /* The text takes the row beside the icon; the link moves under it. */
-    .home-bk-titles {
-        flex-basis: calc(100% - 50px);
-    }
-
-    .home-bk-head .home-link {
-        margin-left: 50px;
-    }
-
-    .home-bk-list {
-        grid-template-columns: minmax(0, 1fr);
-        padding: 12px;
-    }
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
+    pointer-events: none;
 }
 
 /* ---- Loading: the cards' shape in placeholders ---- */

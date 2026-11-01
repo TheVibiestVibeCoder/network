@@ -22,16 +22,33 @@
     // ------------------------------------------------------------------
     // Recognising the sentence
     // ------------------------------------------------------------------
+    // English and German. JavaScript's \b only counts ASCII letters as part
+    // of a word, so "übermorgen" would have no word start and "morgen" would
+    // be found inside it. Words are fenced with these instead.
+
+    const LETTER = 'A-Za-zÄÖÜäöüß0-9_';
+    const B = `(?<![${LETTER}])`;
+    const E = `(?![${LETTER}])`;
+
+    function words(source) {
+        return new RegExp(`${B}(?:${source})${E}`, 'i');
+    }
 
     // "todo", "to-do", "task", "Aufgabe" anywhere; "to do" with a space only
     // where it is clearly a noun ("a to do", "new to do", at the start), so
     // "I need to do the slides" is not taken for one.
-    const INTENT_WORD = /\b(to-?dos?|tasks?|aufgaben?)\b/i;
+    const INTENT_WORD = words('to-?dos?|tasks?|aufgaben?');
     const INTENT_SPACED = /(?:^|\b(?:a|an|new|create|add|neue?[nrs]?|ein(?:e|en)?)\s+)(to do)\b/i;
 
     // What may stand in front of the keyword and still count as the command
-    // rather than part of the title: "please create a new", "Erstelle ein".
-    const INTENT_LEAD = /^\s*(?:(?:please|bitte)\s+)?(?:(?:create|add|make|new|erstell\w*|leg\w*|mach\w*|neue?\w*)\s+)?(?:(?:a|an|the|ein\w*)\s+)?(?:(?:new|neue?\w*)\s+)?$/i;
+    // rather than part of the title: "please create a new", "Kannst du mir
+    // bitte eine neue", "Ich brauche ein", "Guten Morgen, neue".
+    const LEAD_WORDS = [
+        'hi', 'hey', 'hallo', 'moin', 'guten\\s+(?:morgen|tag)', 'please', 'can', 'could', 'you', 'i', 'need', 'want', 'create', 'add', 'make', 'new', 'a', 'an', 'the',
+        'bitte', 'kannst', 'könntest', 'du', 'mir', 'uns', 'mal', 'noch', 'ich', 'brauche', 'möchte', 'hätte', 'gerne?',
+        'erstell\\w*', 'leg\\w*', 'mach\\w*', 'notier\\w*', 'füg\\w*', 'trag\\w*', 'neue?[nrs]?', 'ein(?:e[nrs]?)?'
+    ];
+    const INTENT_LEAD = new RegExp(`^(?:[\\s,]*(?:${LEAD_WORDS.join('|')})${E})*[\\s,]*$`, 'i');
 
     const WEEKDAYS = [
         ['sunday', 'sonntag', 'sun', 'so'],
@@ -44,19 +61,40 @@
     ];
     // Only the full names are matched in running text: "do" and "so" are
     // ordinary words.
-    const WEEKDAY_NAMES = WEEKDAYS.map(names => names.slice(0, 2));
+    const WEEKDAY = `(${WEEKDAYS.map(names => names.slice(0, 2).join('|')).join('|')})`;
 
     const MONTHS = ['jan', 'feb', 'mar|mär', 'apr', 'may|mai', 'jun', 'jul', 'aug', 'sep', 'oct|okt', 'nov', 'dec|dez'];
+    const MONTH = `(${MONTHS.join('|')})[a-zä]*\\.?`;
 
-    const DATE_PREFIX = '(?:(?:due|by|on|until|before|bis|am|zum|fällig)\\s+)?';
+    const NUMBER_WORDS = {
+        a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+        ein: 1, eine: 1, einem: 1, einer: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10
+    };
+    const COUNT = `(\\d{1,2}|${Object.keys(NUMBER_WORDS).sort((a, b) => b.length - a.length).join('|')})`;
 
+    // "by", "due", "bis zum", "bis spätestens am" in front of a date go with
+    // it, so they leave the title along with the date.
+    const DATE_PREFIX = `${B}(?:(?:due|by|on|until|before|bis|zum|am|vor|spätestens|fällig|deadline:?)\\s+){0,3}`;
+
+    // Negations first, or "nicht dringend" would be read as urgent. A "mit"
+    // or "with" in front goes with the priority: "mit hoher Priorität".
+    const PRIO = 'prio(?:rity|rität)?';
     const PRIORITY_PATTERNS = [
-        { re: /\b(?:high|hohe?r?)\s+prio(?:rity|rität)?\b|\bprio(?:rity|rität)?\s*:?\s*high\b|\burgent\b|\basap\b|\bdringend\b|\bwichtig\b/i, value: 'high' },
-        { re: /\b(?:medium|normal|mittlere?r?)\s+prio(?:rity|rität)?\b|\bprio(?:rity|rität)?\s*:?\s*medium\b/i, value: 'medium' },
-        { re: /\b(?:low|niedrige?r?)\s+prio(?:rity|rität)?\b|\bprio(?:rity|rität)?\s*:?\s*low\b|\bno rush\b/i, value: 'low' }
-    ];
+        { value: 'low', re: 'not (?:urgent|important)|no rush|nicht (?:so )?(?:dringend|eilig|wichtig)|keine eile|hat zeit|unwichtig' },
+        { value: 'high', re: `(?:high|highest|hohe[rnms]?|höchste[rnms]?)\\s+${PRIO}|${PRIO}\\s*:?\\s*(?:high|hoch|1)|p1|urgent|asap|dringend|eilig|wichtig|sofort` },
+        { value: 'medium', re: `(?:medium|normal|mittlere[rnms]?)\\s+${PRIO}|${PRIO}\\s*:?\\s*(?:medium|mittel|normal|2)|p2` },
+        { value: 'low', re: `(?:low|niedrige[rnms]?|geringe[rnms]?)\\s+${PRIO}|${PRIO}\\s*:?\\s*(?:low|niedrig|gering|3)|p3` }
+    ].map(({ value, re }) => ({ value, re: words(`(?:mit|with)\\s+(?:${re})|${re}`) }));
 
     const PRIORITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' };
+
+    // Who a to-do is for: "for Anna", "für Anna", "zuständig: Anna",
+    // "@Anna" - and "für mich", "for me" for the person typing. "an Anna"
+    // only right after the keyword or before a colon ("Aufgabe an Anna",
+    // "an Anna: ..."): elsewhere it is "Angebot an Anna schicken".
+    const PERSON_PREFIX = `(?:${B}(?:for|für|assign(?:ed)?\\s+to|zuständig(?:\\s+ist)?:?|verantwortlich:?)\\s+|@|(?<=${B}(?:to-?dos?|tasks?|aufgaben?)\\s+)an\\s+)`;
+    const PERSON_PREFIX_COLON = `${B}an\\s+`;
+    const ME = '(?:me|myself|mich(?:\\s+selbst)?|mir)';
 
     function escapeRegExp(text) {
         return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -96,6 +134,34 @@
         return addDays(today, toMonday + ((day + 6) % 7));
     }
 
+    /** The last day of this month. */
+    function endOfMonth() {
+        const today = startOfToday();
+        return new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+
+    /** The Friday of a calendar week ("KW 46"): this year's, or next year's if past. */
+    function calendarWeekFriday(week) {
+        if (week < 1 || week > 53) return null;
+        const today = startOfToday();
+        for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+            // Week 1 is the week with 4 January in it.
+            const jan4 = new Date(year, 0, 4);
+            const monday = addDays(jan4, -((jan4.getDay() + 6) % 7));
+            const friday = addDays(monday, (week - 1) * 7 + 4);
+            if (friday >= today) return friday;
+        }
+        return null;
+    }
+
+    /** "in 2 weeks", "in einer Woche", "in drei Tagen". */
+    function inCount(amount, unit) {
+        const n = /^\d+$/.test(amount) ? Number(amount) : NUMBER_WORDS[amount.toLowerCase()];
+        const today = startOfToday();
+        if (/^mon/i.test(unit)) return new Date(today.getFullYear(), today.getMonth() + n, today.getDate());
+        return addDays(today, n * (/^w/i.test(unit) ? 7 : 1));
+    }
+
     /** A day and month without a year: this year, or next if it is past. */
     function dayMonth(day, month, year) {
         if (month < 0 || month > 11 || day < 1 || day > 31) return null;
@@ -111,36 +177,50 @@
         return date.getMonth() === month ? date : null;
     }
 
+    /** Just a day ("14"): this month, or next if it is past. */
+    function dayOnly(day) {
+        const today = startOfToday();
+        const month = day < today.getDate() ? today.getMonth() + 1 : today.getMonth();
+        return dayMonth(day, month % 12, today.getFullYear() + (month > 11 ? 1 : 0));
+    }
+
+    const NEXT_WEEK = '(?:next|nächste[rn]?|kommende[rn]?) week|(?:nächste[rn]?|kommende[rn]?) woche';
+
     /**
-     * Every way of naming a day the parser knows, tried in order. Each
-     * returns a Date from its match, or null when the match is no real date.
+     * Every way of naming a day the parser knows, tried in order, longer
+     * phrases first. Each returns a Date from its match, or null when the
+     * match is no real date. `loose` rules only apply to the due date field,
+     * where a bare "14.11" or "14" can only mean a day.
      */
     const DATE_RULES = [
-        { re: /\b(?:day after tomorrow|übermorgen)\b/i, date: () => addDays(startOfToday(), 2) },
-        { re: /\b(?:today|heute)\b/i, date: () => startOfToday() },
-        { re: /\b(?:tomorrow|morgen)\b/i, date: () => addDays(startOfToday(), 1) },
-        { re: /\b(?:next week|nächste woche)\b/i, date: () => weekdayNextWeek(1) },
-        { re: /\b(?:end of (?:the )?week|ende der woche)\b/i, date: () => upcomingWeekday(5) },
-        { re: /\bin\s+(\d{1,2})\s+(days?|tagen?|weeks?|wochen?)\b/i, date: m => addDays(startOfToday(), Number(m[1]) * (/^(w)/i.test(m[2]) ? 7 : 1)) },
-        { re: /\b(\d{4})-(\d{2})-(\d{2})\b/, date: m => dayMonth(Number(m[3]), Number(m[2]) - 1, Number(m[1])) },
-        { re: /\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2,4})\b)?/, date: m => dayMonth(Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3]) : undefined) },
-        {
-            re: new RegExp(`\\b(\\d{1,2})\\.?\\s+(${MONTHS.join('|')})[a-zä]*\\.?\\b`, 'i'),
-            date: m => dayMonth(Number(m[1]), monthIndex(m[2]))
-        },
-        {
-            re: new RegExp(`\\b(${MONTHS.join('|')})[a-zä]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'i'),
-            date: m => dayMonth(Number(m[2]), monthIndex(m[1]))
-        },
-        {
-            re: new RegExp(`\\b(next|nächste[nr]?)\\s+(${WEEKDAY_NAMES.flat().join('|')})\\b`, 'i'),
-            date: m => weekdayNextWeek(weekdayIndex(m[2]))
-        },
-        {
-            re: new RegExp(`\\b(${WEEKDAY_NAMES.flat().join('|')})\\b`, 'i'),
-            date: m => upcomingWeekday(weekdayIndex(m[1]))
-        }
-    ];
+        { re: 'day after tomorrow|übermorgen', date: () => addDays(startOfToday(), 2) },
+        { re: 'today|heute', date: () => startOfToday() },
+        // Not the "Morgen" of "Guten Morgen".
+        { re: 'tomorrow|(?<!guten\\s)morgen', date: () => addDays(startOfToday(), 1) },
+        { re: 'end of (?:the |this )?month|ende (?:des|dieses) monats|monatsende', date: endOfMonth },
+        { re: `(?:end of|ende) (?:${NEXT_WEEK})`, date: () => weekdayNextWeek(5) },
+        { re: `(?:middle of|mid|mitte) (?:${NEXT_WEEK})`, date: () => weekdayNextWeek(3) },
+        { re: `(?:start of|beginning of|anfang) (?:${NEXT_WEEK})`, date: () => weekdayNextWeek(1) },
+        { re: 'the week after next|übernächste[rn]? woche', date: () => addDays(weekdayNextWeek(1), 7) },
+        { re: NEXT_WEEK, date: () => weekdayNextWeek(1) },
+        { re: 'end of (?:the |this )?week|ende (?:der|dieser) woche', date: () => upcomingWeekday(5) },
+        { re: '(?:kw|kalenderwoche|cw|calendar week)\\s*(\\d{1,2})', date: m => calendarWeekFriday(Number(m[1])) },
+        { re: `in\\s+${COUNT}\\s+(days?|tage?n?|weeks?|wochen?|months?|monate?n?)`, date: m => inCount(m[1], m[2]) },
+        { re: '(\\d{4})-(\\d{2})-(\\d{2})', date: m => dayMonth(Number(m[3]), Number(m[2]) - 1, Number(m[1])) },
+        // "14.11." and "14.11.2026" anywhere; "14.11" only after "bis",
+        // "am", "by" - on its own it may be "3.5 hours".
+        { re: '(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4}|\\d{2})?', date: m => dayMonth(Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3]) : undefined) },
+        { re: '(?:bis|zum|am|vor|spätestens|by|due|on|until|before)\\s+(\\d{1,2})\\.(\\d{1,2})', date: m => dayMonth(Number(m[1]), Number(m[2]) - 1) },
+        { re: '(\\d{1,2})\\.(\\d{1,2})', loose: true, date: m => dayMonth(Number(m[1]), Number(m[2]) - 1) },
+        { re: `(\\d{1,2})\\.?\\s*${MONTH}`, date: m => dayMonth(Number(m[1]), monthIndex(m[2])) },
+        { re: `${MONTH}\\s+(\\d{1,2})(?:st|nd|rd|th)?`, date: m => dayMonth(Number(m[2]), monthIndex(m[1])) },
+        // "next Friday" is the Friday of next week; "nächsten Freitag",
+        // "kommenden Freitag" the next one to come.
+        { re: `next\\s+${WEEKDAY}`, date: m => weekdayNextWeek(weekdayIndex(m[1])) },
+        { re: `(?:nächste[nr]?|kommende[nr]?)\\s+${WEEKDAY}`, date: m => addDays(upcomingWeekday(weekdayIndex(m[1])), upcomingWeekday(weekdayIndex(m[1])) <= startOfToday() ? 7 : 0) },
+        { re: `(?:(?:this|coming|diese[nrm]?)\\s+)?${WEEKDAY}`, date: m => upcomingWeekday(weekdayIndex(m[1])) },
+        { re: '^\\s*(\\d{1,2})\\.?\\s*$', loose: true, date: m => dayOnly(Number(m[1])) }
+    ].map(rule => ({ ...rule, re: new RegExp(`${DATE_PREFIX}(?:${rule.re})${E}`, 'i') }));
 
     function monthIndex(word) {
         const lower = word.toLowerCase();
@@ -154,12 +234,13 @@
 
     /**
      * Find a date in the text. The range covers a leading "by", "due",
-     * "bis" so it is taken out of the title along with the date.
+     * "bis zum" so it is taken out of the title along with the date. With
+     * `loose`, also a bare "14.11" or "14" (the due date field).
      */
-    function findDate(text) {
+    function findDate(text, loose = false) {
         for (const rule of DATE_RULES) {
-            const re = new RegExp(DATE_PREFIX + rule.re.source, rule.re.flags);
-            const match = re.exec(text);
+            if (rule.loose && !loose) continue;
+            const match = rule.re.exec(text);
             if (!match) continue;
             // The prefix captures nothing, so the rule's groups keep their numbers.
             const date = rule.date(match);
@@ -179,10 +260,18 @@
     }
 
     /**
-     * A teammate named after "for", "für", "an", "assign(ed) to" or "@".
-     * A bare name is left alone: "call Anna" is about Anna, not for her.
+     * A teammate named after "for", "für", "an", "zuständig" or "@", or the
+     * person typing ("für mich", "for me"). A bare name is left alone: "call
+     * Anna" is about Anna, not for her.
      */
     function findPerson(text, people) {
+        const meKey = window.CRMPeople && window.CRMPeople.meKey ? window.CRMPeople.meKey() : null;
+        const me = people.find(person => personKey(person) === meKey);
+        if (me) {
+            const match = new RegExp(`${PERSON_PREFIX}${ME}${E}|${PERSON_PREFIX_COLON}${ME}(?=\\s*:)`, 'i').exec(text);
+            if (match) return { start: match.index, end: match.index + match[0].length, person: me };
+        }
+
         const candidates = [];
         people.forEach(person => {
             const full = person.name.trim();
@@ -195,8 +284,8 @@
         candidates.sort((a, b) => b.name.length - a.name.length);
 
         for (const { person, name } of candidates) {
-            const re = new RegExp(`(?:\\b(?:for|für|an|assign(?:ed)?\\s+to)\\s+|@)${escapeRegExp(name)}(?![\\wäöüß])`, 'i');
-            const match = re.exec(text);
+            const named = escapeRegExp(name);
+            const match = new RegExp(`${PERSON_PREFIX}${named}${E}|${PERSON_PREFIX_COLON}${named}(?=\\s*:)`, 'i').exec(text);
             if (match) {
                 return { start: match.index, end: match.index + match[0].length, person };
             }
@@ -214,8 +303,7 @@
             .sort((a, b) => b.name.length - a.name.length);
 
         for (const project of named) {
-            const re = new RegExp(`(?<![\\wäöüß])${escapeRegExp(project.name.trim())}(?![\\wäöüß])`, 'i');
-            const match = re.exec(text);
+            const match = new RegExp(`${B}${escapeRegExp(project.name.trim())}${E}`, 'i').exec(text);
             if (match) return { start: match.index, end: match.index + match[0].length, project };
         }
         return null;
@@ -258,13 +346,15 @@
         // The title is what is left: the command in front of the keyword,
         // the date, priority and person phrases taken out. A project name
         // stays in - "Send the Müller offer" would lose its meaning.
-        const cut = [];
-        if (INTENT_LEAD.test(text.slice(0, intent.start))) {
-            cut.push([0, intent.end]);
-        } else {
-            cut.push([intent.start, intent.end]);
-        }
-        [due, priority, person].forEach(range => { if (range) cut.push([range.start, range.end]); });
+        const cut = [due, priority, person].filter(Boolean).map(range => [range.start, range.end]);
+
+        // Whether what stands before the keyword is only the command is
+        // judged without the parts found in it: "Erstelle für Anna ein To-do".
+        let lead = text.slice(0, intent.start);
+        cut.forEach(([s, e]) => {
+            if (e <= intent.start) lead = lead.slice(0, s) + ' '.repeat(e - s) + lead.slice(e);
+        });
+        cut.push(INTENT_LEAD.test(lead) ? [0, intent.end] : [intent.start, intent.end]);
         cut.sort((a, b) => a[0] - b[0]);
 
         let title = '';
@@ -288,9 +378,16 @@
 
     function cleanTitle(raw) {
         let title = raw.replace(/\s+/g, ' ').trim();
+        // Punctuation left behind where a part was taken out:
+        // "Müller anrufen , , wegen des Angebots".
+        title = title.replace(/\s+([,;:.!?])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1');
         // Joining words left at the edges once the parts are gone.
         title = title.replace(/^(?:[:,;.\-–—]\s*)+/, '');
-        title = title.replace(/^(?:to|that|about|for|zum|zur|um|dass|über|:)\s+/i, '');
+        // The rest of the command after the keyword: "Leg ein To-do an: ...",
+        // "Aufgabe anlegen - ...".
+        title = title.replace(/^(?:an|anlegen|erstellen|hinzufügen|eintragen|notieren|create|add)\s*[:,;\-–—]\s*/i, '');
+        title = title.replace(/^(?:to|that|about|for|zum|zur|um|dass|über|wegen|bitte|please)\s+/i, '');
+        title = title.replace(/[\s,;]+(?:bitte|please|danke|thanks)[.!]?$/i, '');
         title = title.replace(/\s+(?:and|und|with|mit|,)$/i, '');
         title = title.replace(/[\s,;:\-–—]+$/, '');
         return title ? title.charAt(0).toUpperCase() + title.slice(1) : '';
@@ -432,9 +529,9 @@
     function renderHint() {
         if (state.phase !== 'typing') return;
         if (!state.text.trim()) {
-            els.hint.innerHTML = 'Start with <kbd>to-do</kbd> - for example <em>"New to-do: send the offer to Müller by Friday, high priority"</em>';
+            els.hint.innerHTML = 'Start with <kbd>to-do</kbd> or <kbd>Aufgabe</kbd> - for example <em>"New to-do: send the offer to Müller by Friday, high priority"</em> or <em>"Aufgabe für Anna: Moodboard bis nächsten Montag"</em>';
         } else if (!state.parsed.intent) {
-            els.hint.textContent = 'Only to-dos can be created here so far. Mention "to-do" or "task" somewhere.';
+            els.hint.textContent = 'Only to-dos can be created here so far. Mention "to-do", "task" or "Aufgabe" somewhere.';
         } else {
             els.hint.innerHTML = '<kbd>Enter</kbd> to continue';
         }
@@ -575,7 +672,7 @@
         ].map(p => ({ value: toIso(p.date), label: p.label, meta: plainDate(toIso(p.date)) }));
 
         const q = query.trim();
-        const typed = q ? findDate(q) : null;
+        const typed = q ? findDate(q, true) : null;
         const options = [];
         if (typed) {
             options.push({ value: typed.value, label: formatDue(typed.value), meta: 'From what you typed' });
@@ -604,7 +701,7 @@
         title: 'What needs doing?',
         link: 'Search projects or contacts…',
         assignee: 'Who should do it?',
-        due: 'Pick below, or type "next Tuesday", "14.11.", "in 3 days"…',
+        due: 'Pick below, or type "next Tuesday", "Freitag", "14.11", "in 3 Tagen"…',
         priority: 'How urgent?'
     };
 
