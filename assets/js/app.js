@@ -1442,6 +1442,8 @@
             elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
         }
         if (elements.financialsView) {
+            // "Financials (new)" is the same page in its new layout, side by
+            // side with the current one until it replaces it.
             elements.financialsView.classList.toggle('active', view === 'financials');
         }
         if (elements.reviewView) {

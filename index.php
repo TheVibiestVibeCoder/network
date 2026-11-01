@@ -1026,7 +1026,6 @@ function assetUrl(string $path): string
                     <div class="view-head">
                         <div class="view-head-text">
                             <h1 class="view-title">Users</h1>
-                            <p class="view-sub">Invite people and manage what they can do.</p>
                         </div>
                     </div>
                     <div class="users-page">
@@ -1108,19 +1107,36 @@ function assetUrl(string $path): string
                         <div class="view-head-text">
                             <h1 class="view-title">Financials</h1>
                         </div>
-                        <div class="fin-head-tools" id="finHeadTools"></div>
+                        <!-- Bank balance and months ahead (financials.js), and between
+                             them the scenario the whole page plans with
+                             (revenue-forecast-card.js). -->
+                        <div class="fin-head-tools">
+                            <div class="fin-head-own" id="finHeadTools"></div>
+                            <div class="fin-tool fin-scenario" id="finScenario"></div>
+                        </div>
                     </div>
+                    <!-- What "Adjust" in the header opens: under it, pushing the page down. -->
+                    <div class="fin-adjust" id="finAdjust"></div>
                     <div class="fin-page" id="finPage" aria-busy="true">
-                        <!-- The revenue forecast (revenue-forecast-card.js); its
-                             scenario is the one the whole page plans with. -->
+                        <!-- The revenue forecast (revenue-forecast-card.js). -->
                         <section class="rf-card" id="finForecast" aria-label="Revenue forecast" aria-busy="true"></section>
                         <div class="fin-kpis" id="finKpis"></div>
                         <div id="finAlerts"></div>
                         <section class="fin-card fin-chart-card" id="finChart" aria-label="Cashflow"></section>
                         <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
-                        <div class="fin-columns">
-                            <section class="fin-card" id="finIncome" aria-label="Expected income"></section>
-                            <section class="fin-card" id="finCosts" aria-label="Costs"></section>
+                    </div>
+                    <!-- The costs, opened from the "Fixed costs" figure: a sheet like
+                         a project's, where they are added and edited (financials.js). -->
+                    <div class="modal fin-costs-modal" id="finCostsModal">
+                        <div class="modal-backdrop" data-fin-costs-close></div>
+                        <div class="modal-content modal-large" role="dialog" aria-modal="true" aria-labelledby="finCostsTitle">
+                            <div class="modal-header">
+                                <div class="overview-title-info">
+                                    <h2 id="finCostsTitle">Costs</h2>
+                                </div>
+                                <button type="button" class="modal-close" data-fin-costs-close aria-label="Close">&times;</button>
+                            </div>
+                            <div class="modal-body fin-costs-body" id="finCosts"></div>
                         </div>
                     </div>
                 </div>
@@ -1288,6 +1304,9 @@ function assetUrl(string $path): string
                                         <span>Map</span>
                                     </button>
                                 </div>
+                                <button type="button" class="btn btn-icon list-filter-toggle" id="listFilterToggle" title="Filters">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+                                </button>
                                 <button type="button" class="btn btn-secondary" id="importExportBtn" title="Import/Export Contacts">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
                                     <span>Import/Export</span>
@@ -1295,9 +1314,6 @@ function assetUrl(string $path): string
                                 <button type="button" class="btn btn-primary" id="addContactBtn" title="Add Contact">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                                     <span>Add Contact</span>
-                                </button>
-                                <button type="button" class="btn btn-icon list-filter-toggle" id="listFilterToggle" title="Filters">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1349,12 +1365,12 @@ function assetUrl(string $path): string
                                 <input type="text" id="searchTodosInput" placeholder="Search to-dos..." class="search-input">
                             </div>
                             <div class="list-header-actions">
+                                <button type="button" class="btn btn-icon list-filter-toggle" id="todoFilterToggle" title="Filters">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+                                </button>
                                 <button type="button" class="btn btn-primary" id="addTodoBtn" title="New To-Do">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                                     <span>New To-Do</span>
-                                </button>
-                                <button type="button" class="btn btn-icon list-filter-toggle" id="todoFilterToggle" title="Filters">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1412,6 +1428,10 @@ function assetUrl(string $path): string
                                         <span class="sr-only">List</span>
                                     </button>
                                 </div>
+                                <!-- Filters beside the view switch: both change what the list shows. -->
+                                <button type="button" class="btn btn-icon list-filter-toggle" id="projectFilterToggle" title="Filters">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+                                </button>
                                 <?php if ($meetingEnabled): ?>
                                 <!-- Meeting assistant (test): assets/js/meeting.js. A secondary
                                      button with Claude's mark in its colour; "Add Project" stays
@@ -1426,9 +1446,6 @@ function assetUrl(string $path): string
                                 <button type="button" class="btn btn-primary" id="addProjectBtn" title="Add Project">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                                     <span>Add Project</span>
-                                </button>
-                                <button type="button" class="btn btn-icon list-filter-toggle" id="projectFilterToggle" title="Filters">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
                                 </button>
                             </div>
                         </div>

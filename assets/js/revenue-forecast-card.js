@@ -4,7 +4,7 @@
  *
  * The card is drawn whole from state on every change - settings, expanded or
  * not, the projects - and keeps the keyboard where it was. Hovering a month
- * only touches the readout line, so moving the mouse never redraws the card.
+ * only marks its column, so moving the mouse never redraws the card.
  * Clicking a month opens a panel beside it with the projects, payments and
  * budget shares it is made of; it stays until closed.
  *
@@ -12,7 +12,10 @@
  * Realistic / Best) in the header sets every assumption at once; the
  * assumptions - chance, budget and stages behind "Adjust", single projects
  * in the table - fine-tune it, and any change there
- * turns the scenario into a custom one.
+ * turns the scenario into a custom one. A page whose other parts plan with
+ * the scenario too can have the switch drawn in its own header instead
+ * (init's `controls`), and what "Adjust" opens in a place of its own
+ * (`adjust`), e.g. under that header.
  */
 (function (root) {
     'use strict';
@@ -112,11 +115,15 @@
     // One copy of the card
     // ------------------------------------------------------------------
 
-    function createCard(el, name) {
+    function createCard(el, name, controlsEl, adjustEl) {
         // Per copy: where it is and how it is opened. Projects, settings and
         // loading read through to `shared`.
         const state = {
             el,
+            // Where the scenario switch is drawn, if not in the card's header.
+            controlsEl: controlsEl || null,
+            // Where "Adjust" opens, if not under the card's header.
+            adjustEl: adjustEl || null,
             expanded: storedExpanded(name),
             adjustOpen: false,
             focusMonth: 0,
@@ -168,8 +175,8 @@
         }
 
         /**
-         * What "Adjust" opens: one slim row under the header that pushes the
-         * chart down rather than covering it.
+         * What "Adjust" opens: one slim row that pushes what is below it down
+         * rather than covering it, and stays until "Adjust" closes it.
          */
         function adjustPanel(ctx) {
             if (!state.adjustOpen) return '';
@@ -188,7 +195,11 @@
                         <span class="rf-adj-label">Stages</span>
                         ${stageToggles(ctx)}
                     </div>
-                    ${ctx.f.active ? '' : `<button type="button" class="rf-link rf-adj-reset" data-rf-preset="${RF.DEFAULT_PRESET}" data-rf-focus="reset" title="Back to the Realistic scenario">Reset</button>`}
+                    ${ctx.f.active
+                        // Always there, only invisible while a scenario is set, so the
+                        // row keeps its width and nothing shifts when it appears.
+                        ? '<button type="button" class="rf-link rf-adj-reset" disabled aria-hidden="true" tabindex="-1">Reset</button>'
+                        : `<button type="button" class="rf-link rf-adj-reset" data-rf-preset="${RF.DEFAULT_PRESET}" data-rf-focus="reset" title="Back to the Realistic scenario">Reset</button>`}
                 </div>`;
         }
 
@@ -228,17 +239,14 @@
 
         function summary(ctx) {
             const f = ctx.f;
-            const now = ctx.now;
-            const preset = f.active ? RF.presetByKey(f.active).label + ' case' : 'Custom scenario';
+            // All three scenarios, the one in use marked.
             const compare = RF.PRESETS.map(p => `
                 <span class="rf-compare-item${f.active === p.key ? ' is-active' : ''}">${esc(p.label)}
                     <strong>${esc(RF.money(f.presets[p.key].total))}</strong></span>`).join('');
 
             return `
                 <div class="rf-summary">
-                    <span class="rf-summary-label">${esc(preset)} · ${f.counted} of ${ctx.items.length} ${ctx.items.length === 1 ? 'project' : 'projects'}</span>
                     <span class="rf-hero" aria-label="${esc(RF.moneyFull(f.current.total))}">${esc(RF.money(f.current.total))}</span>
-                    <span class="rf-hero-sub">expected ${esc(RF.monthName(0, now))} – ${esc(RF.monthName(f.months - 1, now))}</span>
                     <span class="rf-compare">${compare}</span>
                 </div>`;
         }
@@ -322,25 +330,9 @@
                 <ul class="rf-tip-list">${rows}${more}</ul>`;
         }
 
-        /** The line above the chart: the busiest month, or the column in focus. */
-        function readout(ctx, month) {
-            const f = ctx.f;
-            if (month === null || month === undefined) {
-                if (f.current.total <= 0) {
-                    return '<span>Nothing counted in this scenario</span>';
-                }
-                const busiest = f.current.totals[f.busiest] > 0
-                    ? `<span>Busiest month: ${esc(RF.monthName(f.busiest, ctx.now))} · </span><strong>${esc(RF.money(f.current.totals[f.busiest]))}</strong>`
-                    : `<span>${esc(UNDATED_LABEL)} · </span><strong>${esc(RF.money(f.current.undated))}</strong>`;
-                // What the grey part of a bar means is in each bar's
-                // tooltip, not a line of its own here.
-                return busiest;
-            }
-            const col = columnOf(f, f.current, month);
-            const parts = RF.STACK.filter(k => col.stage(k) > 0)
-                .map(k => `${labelOf(k)} ${RF.money(col.stage(k))}`);
-            return `<span>${esc(columnName(ctx, month))} · </span><strong>${esc(RF.money(col.total))}</strong>`
-                + `<span>${parts.length ? esc(' (' + parts.join(' · ') + ')') : ''} · up to ${esc(RF.money(columnOf(f, f.ceiling, month).total))}</span>`;
+        /** Above the chart only when there is nothing on it. */
+        function emptyNote(ctx) {
+            return ctx.f.current.total > 0 ? '' : '<p class="rf-readout">Nothing counted in this scenario</p>';
         }
 
         function chart(ctx) {
@@ -380,7 +372,7 @@
                     + columnProjects(ctx, i).map(g => `; ${g.p.name} ${RF.moneyFull(g.amount)}`).join('');
 
                 const selected = state.selected === i;
-                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}${ghost > 0 && stackH ? ' has-best' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
+                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
                     data-rf-focus="month-${undated ? 'undated' : i}" aria-expanded="${selected}" aria-controls="${uid}-tip"
                     title="${esc(columnName(ctx, i))}: click for its projects${ghost > 0 ? ' · hatched: the best case, every project won at the top of its budget' : ''}"
                     aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
@@ -406,7 +398,7 @@
 
             return `
                 <div class="rf-chart">
-                    <div class="rf-readout" data-rf-readout>${readout(ctx, null)}</div>
+                    ${emptyNote(ctx)}
                     <div class="rf-plot-wrap" style="height:${H}px">
                         ${ticks.join('')}
                         <div class="rf-plot" role="group" aria-label="Revenue per month">${cols.join('')}</div>
@@ -599,14 +591,19 @@
             const el = state.el;
             if (!el) return;
 
+            const outside = state.controlsEl;
+            const adjustAt = state.adjustEl;
+            const clearOutside = () => [outside, adjustAt].forEach(node => { if (node) node.innerHTML = ''; });
             el.setAttribute('aria-busy', String(state.loading));
             if (state.loading) {
                 el.innerHTML = skeleton();
+                clearOutside();
                 return;
             }
 
             const active = document.activeElement;
-            const focusKey = active && el.contains(active) ? active.getAttribute('data-rf-focus') : null;
+            const own = node => node && [el, outside, adjustAt].some(root => root && root.contains(node));
+            const focusKey = own(active) ? active.getAttribute('data-rf-focus') : null;
 
             const ctx = context();
             current = ctx;
@@ -619,6 +616,7 @@
                 aria-expanded="${state.expanded}" aria-controls="${uid}-detail">${state.expanded ? 'Collapse' : 'Expand'}${CHEVRON}</button>`;
 
             if (!ctx.items.length) {
+                clearOutside();
                 el.innerHTML = `
                     <div class="rf-top">
                         <div class="rf-head"><h2 class="rf-title">Revenue forecast</h2></div>
@@ -632,20 +630,24 @@
                 <div class="rf-top">
                     <div class="rf-head">
                         <h2 class="rf-title">Revenue forecast</h2>
-                        ${controls(ctx)}
+                        ${outside ? '' : controls(ctx)}
                         ${expandBtn}
                     </div>
-                    ${adjustPanel(ctx)}
+                    ${outside || adjustAt ? '' : adjustPanel(ctx)}
                     <div class="rf-body${state.expanded ? ' is-expanded' : ''}">
                         ${summary(ctx)}
                         ${chart(ctx)}
                     </div>
                 </div>
                 ${state.expanded ? table(ctx) : ''}`;
+            if (outside) outside.innerHTML = controls(ctx) + (adjustAt ? '' : adjustPanel(ctx));
+            if (adjustAt) adjustAt.innerHTML = adjustPanel(ctx);
 
             if (focusKey) {
                 // "Reset" disappears once it has done its job; the keyboard goes back to Adjust.
-                const again = el.querySelector(`[data-rf-focus="${focusKey}"]`) || el.querySelector('[data-rf-adjust]');
+                const scope = [el, outside, adjustAt].filter(Boolean);
+                const find = sel => scope.map(root => root.querySelector(sel)).find(Boolean);
+                const again = find(`[data-rf-focus="${focusKey}"]`) || find('[data-rf-adjust]');
                 if (again) again.focus();
             }
             if (state.selected !== null) placeTip(state.selected);
@@ -654,8 +656,6 @@
         function showMonth(month) {
             if (!current || !state.el) return;
             state.hover = month;
-            const line = state.el.querySelector('[data-rf-readout]');
-            if (line) line.innerHTML = readout(current, month === null ? state.selected : month);
             state.el.querySelectorAll('[data-rf-month]').forEach(col => {
                 col.classList.toggle('is-hover', Number(col.getAttribute('data-rf-month')) === month);
             });
@@ -727,9 +727,9 @@
         // ------------------------------------------------------------------
 
         function bind(el) {
-            el.addEventListener('click', e => {
+            const onClick = e => {
                 const t = e.target.closest('button');
-                if (!t || !el.contains(t)) return;
+                if (!t || !e.currentTarget.contains(t)) return;
                 const s = state.settings;
 
                 if (t.hasAttribute('data-rf-month')) {
@@ -782,6 +782,12 @@
                         current.items.forEach(p => { s.excluded[p.id] = true; });
                     });
                 }
+            };
+            el.addEventListener('click', onClick);
+
+            // The switch and the "Adjust" panel elsewhere on the page: the same buttons.
+            [state.controlsEl, state.adjustEl].forEach(node => {
+                if (node) node.addEventListener('click', onClick);
             });
 
             // An open panel closes on Escape and on a click anywhere but the
@@ -849,11 +855,15 @@
     // Public
     // ------------------------------------------------------------------
 
-    /** Draws the card into `el`; `name` keeps each copy's expanded state apart. */
+    /**
+     * Draws the card into `el`; `name` keeps each copy's expanded state apart.
+     * `controls`, an element elsewhere on the page, takes the scenario switch,
+     * `adjust` what "Adjust" opens.
+     */
     function init(el, options) {
         if (!el || shared.cards.some(card => card.el === el)) return;
         const name = (options && options.name) || 'projects';
-        const card = createCard(el, name);
+        const card = createCard(el, name, options && options.controls, options && options.adjust);
         shared.cards.push(card);
         card.render();
     }

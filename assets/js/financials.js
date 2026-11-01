@@ -6,9 +6,9 @@
  * bank movements in Bookkeeping. The numbers all come from cashflow.js; this
  * file only turns them into HTML and saves what is edited here.
  *
- * The scenario is the revenue forecast's (revenue-forecast-card.js), whose
- * card opens the page: Worst / Realistic / Best and its adjustments there
- * are what the whole page plans with.
+ * The scenario is the revenue forecast's (revenue-forecast-card.js): its
+ * switch - Worst / Realistic / Best, with the adjustments behind "Adjust" -
+ * sits in this page's header, since the whole page plans with it.
  *
  * app.js calls window.Financials.load() when the tab opens.
  */
@@ -128,7 +128,8 @@
         plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
-        trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>'
+        trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>',
+        bank: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7"/><path d="M3.5 19.5h17"/></svg>'
     };
 
     // ------------------------------------------------------------------
@@ -139,14 +140,14 @@
         if (state.inited) return;
         state.inited = true;
         ['financialsView', 'finHeadTools', 'finPage', 'finKpis', 'finAlerts', 'finChart', 'finMonths',
-            'finIncome', 'finCosts', 'finForecast'].forEach(id => { els[id] = document.getElementById(id); });
+            'finCosts', 'finCostsModal', 'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
             const stored = Number(localStorage.getItem(HORIZON_KEY));
             if (CF.HORIZONS.indexOf(stored) >= 0) state.months = stored;
         } catch (e) { /* no storage: a year */ }
 
-        Card.init(els.finForecast, { name: 'financials' });
+        Card.init(els.finForecast, { name: 'financials', controls: els.finScenario, adjust: els.finAdjust });
         // The forecast looks as far ahead as the rest of the page.
         Card.setMonths(state.months);
         Card.onChange(() => {
@@ -222,7 +223,7 @@
 
     function renderSkeleton() {
         els.finPage.setAttribute('aria-busy', 'true');
-        els.finKpis.innerHTML = [0, 1, 2].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
+        els.finKpis.innerHTML = [0, 1].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
         els.finChart.innerHTML = '<div class="fin-skel is-chart"></div>';
     }
 
@@ -242,7 +243,6 @@
         renderAlerts();
         renderChart();
         renderMonths();
-        renderIncome();
         renderCosts();
 
         if (focusKey) {
@@ -259,43 +259,44 @@
         }).join('')}</div>`;
     }
 
-    /** The scenario in words, as the forecast card above names it. */
-    function scenarioName() {
-        const active = RF.activePreset(Card.getSettings());
-        return active ? RF.presetByKey(active).label + ' scenario' : 'Custom scenario';
-    }
-
     /**
      * The header: today's bank balance - where the page starts from, not its
-     * headline - and how many months ahead it plans.
+     * headline - and how many months ahead it plans. The scenario between
+     * them is drawn by the forecast card (#finScenario).
      */
     function renderHead() {
         els.finHeadTools.innerHTML = `
             ${state.plan ? balanceTool() : ''}
-            <div class="fin-tool">
-                <span class="fin-tool-label">Months ahead</span>
-                ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: String(n) })), state.months)}
+            <div class="fin-tool fin-months">
+                ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: n + 'M', hint: n + ' months ahead' })), state.months)}
             </div>`;
+    }
+
+    /** Where today's balance comes from, in a line. */
+    function balanceNote() {
+        const b = state.plan.balance;
+        let note;
+        if (!b) {
+            note = 'Enter today’s balance to plan from it';
+        } else if (b.rows > 0) {
+            note = `${euro(b.anchor.amount)} on ${dayName(b.anchor.asOf)} · ${signed(b.movement)} from ${plural(b.rows, 'bookkeeping row')} since`;
+        } else {
+            note = `Entered for ${dayName(b.anchor.asOf)}`;
+        }
+        if (state.tx.error) note += ' · Bookkeeping could not be read';
+        return note;
     }
 
     function balanceTool() {
         const b = state.plan.balance;
-
-        let balanceSub;
-        if (!b) {
-            balanceSub = 'Enter today’s balance to plan from it';
-        } else if (b.rows > 0) {
-            balanceSub = `${euro(b.anchor.amount)} on ${dayName(b.anchor.asOf)} · ${signed(b.movement)} from ${plural(b.rows, 'bookkeeping row')} since`;
-        } else {
-            balanceSub = `Entered for ${dayName(b.anchor.asOf)}`;
-        }
-        if (state.tx.error) balanceSub += ' · Bookkeeping could not be read';
+        const balanceSub = balanceNote();
 
         return `
             <div class="fin-tool fin-balance${b ? '' : ' is-empty'}">
-                <span class="fin-tool-label">Bank balance</span>
-                <span class="fin-balance-value" title="${esc(balanceSub)}">${b ? esc(euro(b.amount)) : '—'}</span>
-                <button type="button" class="fin-link" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}">${b ? 'Update' : 'Enter balance'}</button>
+                <button type="button" class="fin-balance-btn" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
+                    title="Bank balance · ${esc(balanceSub)} · click to update">
+                    ${ICON.bank}<span class="fin-balance-value">${b ? esc(euro(b.amount)) : 'Enter balance'}</span>
+                </button>
                 ${state.balanceOpen ? `<div class="fin-balance-pop">
                     <p class="fin-balance-note">${esc(balanceSub)}</p>
                     ${balanceForm()}
@@ -303,7 +304,13 @@
             </div>`;
     }
 
-    // ---- The three figures on top ----
+    /** How the lowest balance stands, as the colour of its figure. */
+    function lowestTone() {
+        const k = state.plan.kpis;
+        return !k.lowest ? '' : k.lowest.amount < 0 ? 'is-danger' : (k.belowBuffer ? 'is-warn' : 'is-ok');
+    }
+
+    // ---- The two figures on top ----
 
     function renderKpis() {
         const p = state.plan;
@@ -312,30 +319,19 @@
         // The balance lives in the header; its form is redrawn from here too.
         renderHead();
 
-        const lowTone = !k.lowest ? '' : k.lowest.amount < 0 ? 'is-danger' : (k.belowBuffer ? 'is-warn' : 'is-ok');
-        let lowSub = '';
-        if (k.belowZero) lowSub = `Below zero from ${k.belowZero.label}`;
-        else if (k.belowBuffer) lowSub = `Below your buffer of ${euro(p.settings.buffer)} from ${k.belowBuffer.label}`;
-        else if (k.lowest && p.hasBalance) lowSub = `Stays above ${p.settings.buffer > 0 ? 'your buffer' : 'zero'} · ${p.rows[p.rows.length - 1].label} ends at ${euro(k.end)}`;
-        else if (k.lowest) lowSub = 'Counted from zero until a balance is entered';
+        const lowTone = lowestTone();
 
-        const costsAhead = p.costs.filter(c => c.kind === 'once' && c.occurrences.length).length;
-
+        // Fixed costs open the costs sheet (renderCosts), where they are edited.
         els.finKpis.innerHTML = `
-            <article class="fin-kpi fin-kpi--in">
-                <span class="fin-kpi-label">Coming in · next 3 months</span>
-                <span class="fin-kpi-value">${esc(euro(k.incomeNext3))}</span>
-                <span class="fin-kpi-sub">${esc(euro(k.incomeTotal))} in ${p.months} months · net${k.overdue.count ? ` · ${euro(k.overdue.amount)} overdue` : ''}</span>
-            </article>
-            <article class="fin-kpi fin-kpi--out">
-                <span class="fin-kpi-label">Fixed costs · per month</span>
-                <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}</span>
-                <span class="fin-kpi-sub">${esc(plural(p.costs.filter(c => c.kind !== 'once').length, 'position'))}${costsAhead ? ` · ${esc(plural(costsAhead, 'planned cost'))} ahead` : ''} · ${esc(euro(k.outTotal))} out in ${p.months} months</span>
-            </article>
+            <button type="button" class="fin-kpi fin-kpi--out is-link" data-fin-costs data-fin-focus="costs" aria-haspopup="dialog"
+                title="See and edit the costs">
+                <span class="fin-kpi-label">Fixed costs</span>
+                <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}<span class="fin-kpi-unit">/month</span></span>
+            </button>
             <article class="fin-kpi fin-kpi--low ${lowTone}">
                 <span class="fin-kpi-label">Lowest balance</span>
                 <span class="fin-kpi-value">${k.lowest ? esc((k.lowest.amount < 0 ? MINUS : '') + euro(Math.abs(k.lowest.amount))) : '—'}</span>
-                <span class="fin-kpi-sub">${k.lowest ? `<strong>${esc(k.lowest.label)}</strong> · ` : ''}${esc(lowSub)}</span>
+                ${k.lowest ? `<span class="fin-kpi-sub"><strong>${esc(k.lowest.label)}</strong></span>` : ''}
                 <button type="button" class="fin-link fin-kpi-action" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
                     title="The least that should always be in the account; the chart and this figure warn below it">${p.settings.buffer > 0 ? 'Buffer ' + esc(euro(p.settings.buffer)) : 'Set buffer'}</button>
                 ${state.bufferOpen ? bufferForm() : ''}
@@ -398,7 +394,7 @@
         // already, in its colour; a banner repeating it was one too many.
         if (k.overdue.count) {
             const oldest = p.income.filter(x => x.counted && x.overdue).sort((a, b) => a.due - b.due)[0];
-            alerts.push({ tone: 'warn', html: `<strong>${esc(plural(k.overdue.count, 'payment'))} overdue, ${esc(euro(k.overdue.amount))}</strong> - counted in this month. Oldest: ${esc(oldest.name)}, due ${esc(RF.monthName(oldest.due, RF.monthOf(new Date())))}.` });
+            alerts.push({ tone: 'warn', html: `<strong>${esc(euro(k.overdue.amount))} overdue</strong> · ${esc(oldest.name)}${k.overdue.count > 1 ? ` and ${k.overdue.count - 1} more` : ''}` });
         }
         if (!p.hasBalance) {
             alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one above.' });
@@ -418,37 +414,27 @@
     }
 
     function renderChart() {
-        const p = state.plan;
+        // No key: the line is the balance, red is below zero, and the
+        // buffer line carries its own label.
         els.finChart.innerHTML = `
             <div class="fin-card-head">
-                <div>
-                    <h2 class="fin-card-title">Cashflow</h2>
-                    <p class="fin-card-sub">${p.past.length ? `${esc(plural(p.past.length, 'month'))} from Bookkeeping, then` : 'The'} next ${p.months} months as planned · <strong>${esc(scenarioName())}</strong> from the forecast above</p>
-                </div>
-                <ul class="fin-legend" aria-label="Legend">
-                    <li><span class="fin-key is-in"></span>In</li>
-                    <li><span class="fin-key is-out"></span>Out</li>
-                    <li><span class="fin-key is-line"></span>Balance</li>
-                    ${p.settings.buffer > 0 ? '<li><span class="fin-key is-buffer"></span>Buffer</li>' : ''}
-                </ul>
+                <h2 class="fin-card-title">Cashflow</h2>
             </div>
-            <div class="fin-readout" data-fin-readout aria-live="polite">${readout(null)}</div>
-            <div class="fin-plot" data-fin-plot></div>`;
+            <div class="fin-plot-wrap">
+                <div class="fin-plot" data-fin-plot></div>
+                <div class="fin-hover-tip" data-fin-readout aria-live="polite" hidden></div>
+            </div>`;
         drawPlot();
     }
 
-    function readout(i) {
-        const p = state.plan;
-        const cols = chartColumns();
-        if (i === null || i === undefined || !cols[i]) {
-            const last = p.rows[p.rows.length - 1];
-            return p.hasBalance
-                ? `<span>Today</span> <strong>${esc(euro(p.balance.amount))}</strong> <span>→ end of ${esc(last.label)}</span> <strong class="${last.closing < 0 ? 'is-neg' : ''}">${esc((last.closing < 0 ? MINUS : '') + euro(Math.abs(last.closing)))}</strong>`
-                : `<span>In ${esc(euro(p.kpis.incomeTotal))} · out ${esc(euro(p.kpis.outTotal))} over ${p.months} months</span>`;
-        }
-        const c = cols[i];
-        const bal = c.closing === null ? '' : ` · <span>${c.past ? 'closed at' : 'balance'}</span> <strong class="${c.closing < 0 ? 'is-neg' : ''}">${esc((c.closing < 0 ? MINUS : '') + euro(Math.abs(c.closing)))}</strong>`;
-        return `<strong>${esc(c.label)}</strong>${c.past ? ' <span class="fin-tag">actual</span>' : ''} · <span>in</span> <strong class="is-pos">${esc(signed(c.in))}</strong> · <span>out</span> <strong>${esc(signed(-c.out))}</strong>${bal}`;
+    /** What a hovered month is made of, in the box above its point. */
+    function readout(c) {
+        const money = v => esc((v < 0 ? MINUS : '') + euro(Math.abs(v)));
+        return `
+            <strong class="fin-hover-month">${esc(c.label)}${c.past ? ' <span class="fin-tag">actual</span>' : ''}</strong>
+            <span><span>In</span><strong class="is-pos">${esc(signed(c.in))}</strong></span>
+            <span><span>Out</span><strong>${esc(signed(-c.out))}</strong></span>
+            ${c.closing === null ? '' : `<span><span>Balance</span><strong class="${c.closing < 0 ? 'is-neg' : ''}">${money(c.closing)}</strong></span>`}`;
     }
 
     /** A clean step for about four gridlines across `span`. */
@@ -460,6 +446,40 @@
         return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * pow;
     }
 
+    /**
+     * A smooth path through the points that never bulges past them: a
+     * monotone cubic, so the line shows no high or low the plan does not have.
+     */
+    function smoothPath(pts) {
+        const n = pts.length;
+        if (n < 2) return n ? `M${pts[0][0]},${pts[0][1]}` : '';
+        const d = [];
+        for (let i = 0; i < n - 1; i++) {
+            const dx = pts[i + 1][0] - pts[i][0];
+            d.push(dx ? (pts[i + 1][1] - pts[i][1]) / dx : 0);
+        }
+        const m = [d[0]];
+        for (let i = 1; i < n - 1; i++) m.push(d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+        m.push(d[n - 2]);
+        for (let i = 0; i < n - 1; i++) {
+            if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+            const a = m[i] / d[i], b = m[i + 1] / d[i], sq = a * a + b * b;
+            if (sq > 9) { const t = 3 / Math.sqrt(sq); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+        }
+        const f = v => Math.round(v * 10) / 10;
+        let path = `M${f(pts[0][0])},${f(pts[0][1])}`;
+        for (let i = 0; i < n - 1; i++) {
+            const h = (pts[i + 1][0] - pts[i][0]) / 3;
+            path += ` C${f(pts[i][0] + h)},${f(pts[i][1] + m[i] * h)} ${f(pts[i + 1][0] - h)},${f(pts[i + 1][1] - m[i + 1] * h)} ${f(pts[i + 1][0])},${f(pts[i + 1][1])}`;
+        }
+        return path;
+    }
+
+    /**
+     * The cashflow: the balance as one smooth line - blue above zero, red
+     * below - with "Today" marked above its point and the last month's
+     * balance at the end. Hovering a month reads its in and out above the chart.
+     */
     function drawPlot() {
         const plot = els.finChart && els.finChart.querySelector('[data-fin-plot]');
         if (!plot || !state.plan) return;
@@ -470,14 +490,13 @@
         const cols = chartColumns();
         const n = cols.length;
         const narrow = W < 560;
-        const padL = 52, padR = 6;
-        const H1 = narrow ? 150 : 190, gap = 18, H2 = narrow ? 80 : 100, axisH = 22;
-        const top1 = 8, top2 = top1 + H1 + gap, H = top2 + H2 + axisH;
+        const padL = 48, padR = 12;
+        const top = 16, H1 = narrow ? 190 : 250, axisH = 30;
+        const H = top + H1 + axisH;
         const cw = (W - padL - padR) / n;
         const cx = i => padL + cw * (i + 0.5);
         const todayX = padL + cw * p.past.length;
 
-        // Balance panel scale
         const values = cols.filter(c => c.closing !== null).map(c => c.closing);
         if (p.hasBalance) values.push(p.balance.amount);
         if (p.settings.buffer > 0) values.push(p.settings.buffer);
@@ -487,90 +506,79 @@
         const step = niceStep(hi - lo);
         lo = Math.floor(lo / step) * step;
         hi = Math.ceil(hi / step) * step;
-        const y1 = v => top1 + (hi - v) / (hi - lo) * H1;
-
-        // Flow panel scale: in up, out down from the middle
-        const peak = Math.max(1, ...cols.map(c => Math.max(c.in, c.out)));
-        const half = H2 / 2;
-        const mid = top2 + half;
-        const fh = v => (v / peak) * (half - 2);
-        const bw = Math.max(3, Math.min(20, cw * 0.5));
+        const y1 = v => top + (hi - v) / (hi - lo) * H1;
+        const y0 = y1(0);
+        const right = W - padR;
 
         const parts = [];
-        // gridlines + labels
+        parts.push(`<defs>
+            <linearGradient id="finArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="fin-area-top"/><stop offset="1" class="fin-area-bottom"/></linearGradient>
+            <clipPath id="finAbove"><rect x="0" y="0" width="${W}" height="${y0}"/></clipPath>
+            <clipPath id="finBelow"><rect x="0" y="${y0}" width="${W}" height="${H - y0}"/></clipPath>
+        </defs>`);
+        if (lo < 0) parts.push(`<rect class="fin-below-zero" x="${padL}" y="${y0}" width="${right - padL}" height="${y1(lo) - y0}"/>`);
         for (let v = lo; v <= hi + 0.001; v += step) {
             const y = y1(v);
-            parts.push(`<line class="fin-grid${Math.abs(v) < 0.001 ? ' is-zero' : ''}" x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}"/>`);
-            parts.push(`<text class="fin-axis-y" x="${padL - 8}" y="${y + 4}" text-anchor="end">${esc(short(v))}</text>`);
-        }
-        if (lo < 0) {
-            parts.push(`<rect class="fin-below-zero" x="${padL}" y="${y1(0)}" width="${W - padL - padR}" height="${y1(lo) - y1(0)}"/>`);
+            const zero = Math.abs(v) < 0.001;
+            parts.push(`<line class="fin-grid${zero ? ' is-zero' : ' is-dashed'}" x1="${padL}" x2="${right}" y1="${y}" y2="${y}"/>`);
+            parts.push(`<text class="fin-axis-y${zero ? ' is-zero' : v < 0 ? ' is-neg' : ''}" x="${padL - 10}" y="${y + 4}" text-anchor="end">${esc(zero ? '0' : short(v))}</text>`);
         }
         if (p.settings.buffer > 0) {
             const y = y1(p.settings.buffer);
-            parts.push(`<line class="fin-buffer" x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}"/>`);
-            parts.push(`<text class="fin-buffer-label" x="${W - padR - 4}" y="${y - 5}" text-anchor="end">Buffer ${esc(short(p.settings.buffer))}</text>`);
+            parts.push(`<line class="fin-buffer" x1="${padL}" x2="${right}" y1="${y}" y2="${y}"/>`);
+            parts.push(`<text class="fin-buffer-label" x="${right - 4}" y="${y - 5}" text-anchor="end">Buffer ${esc(short(p.settings.buffer))}</text>`);
         }
+        parts.push(`<rect class="fin-hover-band" data-fin-band x="0" y="${top - 6}" width="${cw}" height="${H1 + 12}" rx="8" visibility="hidden"/>`);
 
-        // hover band (moved on hover)
-        parts.push(`<rect class="fin-hover-band" data-fin-band x="0" y="${top1}" width="${cw}" height="${H - top1 - axisH + 4}" rx="6" visibility="hidden"/>`);
-
-        // balance: past (actual) dashed, plan solid with a soft area
-        const pastPts = cols.map((c, i) => (c.past && c.closing !== null ? [cx(i), y1(c.closing)] : null)).filter(Boolean);
         if (p.hasBalance) {
-            const futurePts = [[todayX, y1(p.balance.amount)]].concat(cols.map((c, i) => (!c.past ? [cx(i), y1(c.closing)] : null)).filter(Boolean));
-            if (pastPts.length) {
-                parts.push(`<polyline class="fin-line is-past" points="${pastPts.concat([[todayX, y1(p.balance.amount)]]).map(pt => pt.join(',')).join(' ')}"/>`);
+            const pastPts = cols.map((c, i) => (c.past && c.closing !== null ? [cx(i), y1(c.closing)] : null)).filter(Boolean);
+            const todayPt = [todayX, y1(p.balance.amount)];
+            const futurePts = [todayPt].concat(cols.map((c, i) => (!c.past ? [cx(i), y1(c.closing)] : null)).filter(Boolean));
+            const line = smoothPath(futurePts);
+            const last = futurePts[futurePts.length - 1];
+
+            if (pastPts.length) parts.push(`<path class="fin-line is-past" d="${smoothPath(pastPts.concat([todayPt]))}"/>`);
+            const area = `${line} L${last[0]},${y0} L${todayPt[0]},${y0} Z`;
+            parts.push(`<path class="fin-area" d="${area}" fill="url(#finArea)" clip-path="url(#finAbove)"/>`);
+            parts.push(`<path class="fin-area is-neg" d="${area}" clip-path="url(#finBelow)"/>`);
+            parts.push(`<path class="fin-line" d="${line}" clip-path="url(#finAbove)"/>`);
+            parts.push(`<path class="fin-line is-neg" d="${line}" clip-path="url(#finBelow)"/>`);
+
+            // Today: a dotted line down from its point.
+            parts.push(`<line class="fin-today" x1="${todayX}" x2="${todayX}" y1="${todayPt[1]}" y2="${top + H1}"/>`);
+            parts.push(`<circle class="fin-dot-mark" cx="${todayPt[0]}" cy="${todayPt[1]}" r="6"/>`);
+
+            // Where it crosses below zero, and where the last month ends.
+            const k = p.kpis;
+            if (k.belowZero) {
+                const i = p.past.length + k.belowZero.offset;
+                const prev = i > p.past.length ? [cx(i - 1), y1(cols[i - 1].closing)] : todayPt;
+                const cur = [cx(i), y1(cols[i].closing)];
+                const t = (y0 - prev[1]) / ((cur[1] - prev[1]) || 1);
+                parts.push(`<circle class="fin-dot-mark is-neg" cx="${prev[0] + (cur[0] - prev[0]) * Math.max(0, Math.min(1, t))}" cy="${y0}" r="5"/>`);
             }
-            const area = `M${futurePts[0][0]},${top1 + H1} ` + futurePts.map(pt => `L${pt[0]},${pt[1]}`).join(' ') + ` L${futurePts[futurePts.length - 1][0]},${top1 + H1} Z`;
-            parts.push(`<defs><linearGradient id="finArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="fin-area-top"/><stop offset="1" class="fin-area-bottom"/></linearGradient></defs>`);
-            parts.push(`<path class="fin-area" d="${area}" fill="url(#finArea)"/>`);
-            parts.push(`<polyline class="fin-line" points="${futurePts.map(pt => pt.join(',')).join(' ')}"/>`);
-            parts.push(`<circle class="fin-dot is-today" cx="${todayX}" cy="${y1(p.balance.amount)}" r="4.5"/>`);
-            // the lowest point
-            const low = p.kpis.lowest;
-            if (low) {
-                const i = p.past.length + low.offset;
-                parts.push(`<circle class="fin-dot is-low${low.amount < 0 ? ' is-neg' : ''}" cx="${cx(i)}" cy="${y1(low.amount)}" r="4"/>`);
-            }
+            const endValue = cols[cols.length - 1].closing;
+            parts.push(`<circle class="fin-dot-mark${endValue < 0 ? ' is-neg' : ''}" cx="${last[0]}" cy="${last[1]}" r="6"/>`);
         }
         parts.push(`<circle class="fin-dot is-hover" data-fin-dot cx="0" cy="0" r="5" visibility="hidden"/>`);
 
-        // flows
-        parts.push(`<line class="fin-grid is-mid" x1="${padL}" x2="${W - padR}" y1="${mid}" y2="${mid}"/>`);
-        parts.push(`<text class="fin-axis-y" x="${padL - 8}" y="${top2 + 10}" text-anchor="end">in</text>`);
-        parts.push(`<text class="fin-axis-y" x="${padL - 8}" y="${top2 + H2 - 2}" text-anchor="end">out</text>`);
-        cols.forEach((c, i) => {
-            const x = cx(i) - bw / 2;
-            const hIn = fh(c.in), hOut = fh(c.out);
-            if (hIn > 0.5) parts.push(`<rect class="fin-bar is-in${c.past ? ' is-past' : ''}" x="${x}" y="${mid - hIn - 1}" width="${bw}" height="${hIn}" rx="${Math.min(3, bw / 3)}"/>`);
-            if (hOut > 0.5) parts.push(`<rect class="fin-bar is-out${c.past ? ' is-past' : ''}" x="${x}" y="${mid + 1}" width="${bw}" height="${hOut}" rx="${Math.min(3, bw / 3)}"/>`);
-        });
-
-        // today divider
-        parts.push(`<line class="fin-today" x1="${todayX}" x2="${todayX}" y1="${top1 - 4}" y2="${top2 + H2}"/>`);
-        if (p.past.length) parts.push(`<text class="fin-today-label" x="${todayX + 5}" y="${top1 + 8}">Today</text>`);
-
-        // month axis
         cols.forEach((c, i) => {
             const cal = RF.calendarMonth(c.offset, RF.monthOf(new Date()));
             const name = RF.MONTHS_SHORT[cal.month];
             const label = cw < 24 ? name.charAt(0) : name;
-            parts.push(`<text class="fin-axis-x${c.offset === 0 ? ' is-now' : ''}${c.past ? ' is-past' : ''}" x="${cx(i)}" y="${top2 + H2 + 15}" text-anchor="middle">${esc(label)}</text>`);
+            const y = top + H1 + 20;
+            parts.push(`<text class="fin-axis-x${c.offset === 0 ? ' is-now' : ''}${c.past ? ' is-past' : ''}" x="${cx(i)}" y="${y}" text-anchor="middle">${esc(label)}</text>`);
             if ((cal.month === 0 || i === 0) && cw >= 24) {
-                parts.push(`<text class="fin-axis-year" x="${cx(i)}" y="${top2 + H2 + 27}" text-anchor="middle">${cal.year}</text>`);
+                parts.push(`<text class="fin-axis-year" x="${cx(i)}" y="${y + 12}" text-anchor="middle">${cal.year}</text>`);
             }
         });
-
-        // hit areas
         cols.forEach((c, i) => {
             parts.push(`<rect class="fin-hit" data-fin-col="${i}" x="${padL + cw * i}" y="0" width="${cw}" height="${H}"><title>${esc(c.label)}</title></rect>`);
         });
 
-        plot.innerHTML = `<svg class="fin-svg" width="${W}" height="${H + 8}" viewBox="0 0 ${W} ${H + 8}" role="img"
+        plot.innerHTML = `<svg class="fin-svg" width="${W}" height="${H + 6}" viewBox="0 0 ${W} ${H + 6}" role="img"
             aria-label="${esc(`Cashflow: balance today ${p.hasBalance ? euro(p.balance.amount) : 'not entered'}, lowest ${p.kpis.lowest ? euro(p.kpis.lowest.amount) + ' in ' + p.kpis.lowest.label : ''}`)}">${parts.join('')}</svg>`;
-
-        plot._geom = { cx, y1, cw, cols, padL };
+        plot._geom = { cx, y1, cw, cols, padL, top };
     }
 
     function hoverColumn(i) {
@@ -581,11 +589,11 @@
         const g = plot._geom;
         const band = plot.querySelector('[data-fin-band]');
         const dot = plot.querySelector('[data-fin-dot]');
-        const line = els.finChart.querySelector('[data-fin-readout]');
-        if (line) line.innerHTML = readout(i);
+        const tip = els.finChart.querySelector('[data-fin-readout]');
         if (i === null) {
             band.setAttribute('visibility', 'hidden');
             dot.setAttribute('visibility', 'hidden');
+            tip.hidden = true;
             return;
         }
         band.setAttribute('x', g.padL + g.cw * i);
@@ -598,6 +606,16 @@
         } else {
             dot.setAttribute('visibility', 'hidden');
         }
+        tip.innerHTML = readout(c);
+        tip.hidden = false;
+        // Above the point - below it when there is no room - and inside the
+        // chart at both ends.
+        const w = tip.offsetWidth;
+        const h = tip.offsetHeight;
+        const x = Math.max(0, Math.min(plot.clientWidth - w, g.cx(i) - w / 2));
+        const y = c.closing === null ? g.top : g.y1(c.closing);
+        tip.style.left = Math.round(x) + 'px';
+        tip.style.top = Math.round(y - h - 14 >= 0 ? y - h - 14 : y + 14) + 'px';
     }
 
     // ---- Month by month ----
@@ -626,10 +644,7 @@
 
         els.finMonths.innerHTML = `
             <div class="fin-card-head">
-                <div>
-                    <h2 class="fin-card-title">Month by month</h2>
-                    <p class="fin-card-sub">Open a month to see what makes it up · all amounts net</p>
-                </div>
+                <h2 class="fin-card-title">Month by month</h2>
             </div>
             <div class="fin-table-scroll">
                 <table class="fin-table">
@@ -639,11 +654,7 @@
                     </tr></thead>
                     <tbody>${body}</tbody>
                 </table>
-            </div>
-            <details class="fin-how">
-                <summary>How this is worked out</summary>
-                <p>Income follows the scenario of the revenue forecast at the top. An expected payment counts in its month, the part of a budget the payments leave open at the project’s end; anything overdue counts in this month. Complete projects still bring their unpaid payments. A fixed cost whose day this month has passed is taken to be in the balance already. VAT is left out: project amounts are net, so enter costs net too - over a VAT period that is what stays in the account; only when the VAT is paid is not shown.${state.tx.amountColumn ? ` Bank movements come from the Bookkeeping column “${esc(state.tx.amountColumn)}”; rows left out of the month totals do not move the balance.` : ''}</p>
-            </details>`;
+            </div>`;
     }
 
     function monthDetail(r) {
@@ -660,62 +671,9 @@
         return all.length ? `<ul class="fin-detail">${all.join('')}</ul>` : '<p class="fin-muted fin-detail-empty">Nothing planned this month.</p>';
     }
 
-    // ---- Expected income ----
-
     function incomeKind(x) {
         if (x.kind === 'payment') return 'Expected payment';
         return x.partial ? 'Rest of budget' : 'Final invoice';
-    }
-
-    function renderIncome() {
-        const p = state.plan;
-        const now = RF.monthOf(new Date());
-        const inRange = p.income.filter(x => x.offset !== null && x.offset < p.months);
-        const later = p.income.filter(x => x.offset !== null && x.offset >= p.months);
-        const undated = p.income.filter(x => x.offset === null);
-
-        const row = x => `
-            <li class="fin-income${x.counted ? '' : ' is-off'}${x.overdue ? ' is-overdue' : ''}">
-                <span class="fin-income-main">
-                    <a href="#" class="fin-income-name" data-crm-action="open-project-overview" data-project-id="${esc(x.projectId)}">${esc(x.name)}</a>
-                    <span class="fin-income-meta">
-                        <span class="fin-stage" data-stage="${esc(String(x.stage).toLowerCase().replace(/ /g, '-'))}">${esc(x.stage)}</span>
-                        <span>${esc(incomeKind(x))}</span>
-                        ${x.overdue ? `<span class="fin-tag is-warn">overdue since ${esc(RF.monthName(x.due, now))}</span>` : ''}
-                        ${x.counted ? '' : '<span class="fin-tag">not in this scenario</span>'}
-                    </span>
-                </span>
-                <span class="fin-income-amount">
-                    <strong>${esc(euro(x.expected))}</strong>
-                    <span>${x.factor < 1 ? `${Math.round(x.factor * 100)}% of ${esc(euro(x.net))} net` : `${esc(euro(x.net))} net`}</span>
-                </span>
-            </li>`;
-
-        const groups = [];
-        const byMonth = new Map();
-        inRange.forEach(x => { if (!byMonth.has(x.offset)) byMonth.set(x.offset, []); byMonth.get(x.offset).push(x); });
-        byMonth.forEach((items, offset) => groups.push({ title: RF.monthName(offset, now), items }));
-        if (later.length) groups.push({ title: `Later than ${p.months} months`, items: later });
-        if (undated.length) groups.push({ title: 'No end date', items: undated, note: 'Projects without an end date: when this comes in is open.' });
-
-        const total = p.kpis.incomeTotal;
-        els.finIncome.innerHTML = `
-            <div class="fin-card-head">
-                <div>
-                    <h2 class="fin-card-title">Expected income</h2>
-                    <p class="fin-card-sub">${esc(euro(total))} in ${p.months} months · payments in their month, the rest of a budget at the project’s end</p>
-                </div>
-            </div>
-            ${groups.length ? groups.map(g => {
-                const counted = g.items.filter(x => x.counted);
-                return `
-                <section class="fin-group">
-                    <h3 class="fin-group-title"><span>${esc(g.title)}</span><strong>${esc(euro(counted.reduce((s, x) => s + x.expected, 0)))}</strong></h3>
-                    ${g.note ? `<p class="fin-hint">${esc(g.note)}</p>` : ''}
-                    <ul class="fin-income-list">${g.items.map(row).join('')}</ul>
-                </section>`;
-            }).join('') : '<p class="fin-empty">No income expected from projects yet. Budgets, end dates and expected payments on projects show up here.</p>'}
-            ${p.missing.length ? `<p class="fin-hint">${esc(plural(p.missing.length, 'open project'))} without a budget or chance ${p.missing.length === 1 ? 'is' : 'are'} not included.</p>` : ''}`;
     }
 
     // ---- Costs ----
@@ -762,24 +720,18 @@
 
         const editing = state.draft;
         els.finCosts.innerHTML = `
-            <div class="fin-card-head">
-                <div>
-                    <h2 class="fin-card-title">Costs</h2>
-                    <p class="fin-card-sub">Net, without VAT · ≈ ${esc(euro(p.kpis.fixedPerMonth))} fixed per month</p>
-                </div>
-            </div>
             ${editing ? costForm(editing) : ''}
             <section class="fin-group">
-                <h3 class="fin-group-title"><span>Fixed costs</span>
+                <h3 class="fin-group-title"><span>Fixed costs <span class="fin-muted">· ${esc(euro(p.kpis.fixedPerMonth))}/month</span></span>
                     <button type="button" class="ov-add-btn" data-fin-add="recurring" data-fin-focus="add-recurring">${ICON.plus}Add</button></h3>
                 ${fixed.length ? `<ul class="fin-cost-list">${fixed.map(fixedRow).join('')}</ul>`
-                    : '<p class="fin-empty">Rent, salaries, software, insurance - whatever goes out every month, quarter or year.</p>'}
+                    : ''}
             </section>
             <section class="fin-group">
                 <h3 class="fin-group-title"><span>Planned costs</span>
                     <button type="button" class="ov-add-btn" data-fin-add="once" data-fin-focus="add-once">${ICON.plus}Add</button></h3>
                 ${upcoming.length ? `<ul class="fin-cost-list">${upcoming.map(onceRow).join('')}</ul>`
-                    : '<p class="fin-empty">One-off costs in a future month: a laptop, a tax payment, an event.</p>'}
+                    : ''}
                 ${past.length ? `<button type="button" class="fin-link" data-fin-past>${state.showPastPlanned ? 'Hide' : 'Show'} ${esc(plural(past.length, 'past planned cost'))}</button>
                     ${state.showPastPlanned ? `<ul class="fin-cost-list is-past">${past.map(onceRow).join('')}</ul>` : ''}` : ''}
             </section>`;
@@ -906,7 +858,7 @@
         if (amount === null || Number.isNaN(amount)) {
             state.balanceError = 'Enter the balance, e.g. 48.500,00';
             renderKpis();
-            const field = els.finHeadTools.querySelector('[data-fin-focus="balance-amount"]');
+            const field = els.financialsView.querySelector('[data-fin-focus="balance-amount"]');
             if (field) field.focus();
             return;
         }
@@ -966,11 +918,17 @@
         const view = els.financialsView;
 
         view.addEventListener('click', e => {
+            if (e.target.closest('[data-fin-costs-close]')) {
+                closeCosts();
+                return;
+            }
             const t = e.target.closest('button');
             if (!t || !view.contains(t) || els.finForecast.contains(t)) return;
 
             if (t.hasAttribute('data-fin-retry')) {
                 load();
+            } else if (t.hasAttribute('data-fin-costs')) {
+                openCosts();
             } else if (t.hasAttribute('data-fin-months')) {
                 state.months = Number(t.getAttribute('data-fin-months'));
                 try { localStorage.setItem(HORIZON_KEY, String(state.months)); } catch (err) { /* fine */ }
@@ -981,12 +939,12 @@
                 state.balanceOpen = !state.balanceOpen;
                 state.balanceError = '';
                 renderKpis();
-                const field = els.finHeadTools.querySelector('[data-fin-focus="balance-amount"]');
+                const field = els.financialsView.querySelector('[data-fin-focus="balance-amount"]');
                 if (field) { field.focus(); field.select(); }
             } else if (t.hasAttribute('data-fin-balance-cancel')) {
                 state.balanceOpen = false;
                 renderKpis();
-                const btn = els.finHeadTools.querySelector('[data-fin-balance]');
+                const btn = els.financialsView.querySelector('[data-fin-balance]');
                 if (btn) btn.focus();
             } else if (t.hasAttribute('data-fin-buffer')) {
                 state.bufferOpen = !state.bufferOpen;
@@ -1019,7 +977,7 @@
                 state.draft = Object.assign({}, cost, { end_month: cost.end_month || '', amount: showAmount(cost.amount) });
                 state.draftError = '';
                 renderCosts();
-                els.finCosts.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                els.finCosts.scrollTop = 0;
                 const name = els.finCosts.querySelector('[data-fin-focus="draft-name"]');
                 if (name) name.focus();
             } else if (t.hasAttribute('data-fin-cancel')) {
@@ -1061,6 +1019,8 @@
             if (state.draft && e.target.closest('[data-fin-cost-form]')) {
                 state.draft = null;
                 renderCosts();
+            } else if (els.finCostsModal.classList.contains('active')) {
+                closeCosts();
             } else if (state.bufferOpen && e.target.closest('[data-fin-buffer-form]')) {
                 state.bufferOpen = false;
                 renderKpis();
@@ -1069,7 +1029,7 @@
             } else if (state.balanceOpen && e.target.closest('[data-fin-balance-form]')) {
                 state.balanceOpen = false;
                 renderKpis();
-                const btn = els.finHeadTools.querySelector('[data-fin-balance]');
+                const btn = els.financialsView.querySelector('[data-fin-balance]');
                 if (btn) btn.focus();
             }
         });
@@ -1084,6 +1044,22 @@
             const hit = e.target.closest('[data-fin-col]');
             if (hit) hoverColumn(Number(hit.getAttribute('data-fin-col')));
         }, { passive: true });
+    }
+
+    /** The costs sheet, opened from the "Fixed costs" figure. */
+    function openCosts() {
+        renderCosts();
+        els.finCostsModal.classList.add('active');
+        const close = els.finCostsModal.querySelector('.modal-close');
+        if (close) close.focus();
+    }
+
+    function closeCosts() {
+        els.finCostsModal.classList.remove('active');
+        state.draft = null;
+        state.draftError = '';
+        const card = els.finKpis.querySelector('[data-fin-costs]');
+        if (card) card.focus();
     }
 
     window.Financials = { load };

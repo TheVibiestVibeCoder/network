@@ -19,10 +19,6 @@
 
 /* ---- The screen ---------------------------------------------------------- */
 
-#reviewView .view-head {
-    align-items: flex-end;
-}
-
 .review-list {
     display: flex;
     flex-direction: column;

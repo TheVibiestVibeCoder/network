@@ -890,13 +890,19 @@ h1, h2, h3, h4 {
 
 /* ---- View head: the same top on every page ------------------------------ */
 
+/* Every page's title in the same place: 12px below the panel's padding,
+   centred in a row 42px high - where the sticky toolbars of Contacts,
+   To-dos and Projects put it (Bookkeeping and Calendar match it below). */
 .view-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
+    box-sizing: border-box;
+    min-height: 54px;
     margin-bottom: 20px;
+    padding-top: 12px;
 }
 
 .view-head-text {
@@ -1697,12 +1703,11 @@ input[type="checkbox"] {
     color: var(--c-ink);
 }
 
-/* One width for "Expand" and "Collapse", so nothing beside it moves. */
+/* A plain small button like any other; one width for "Expand" and
+   "Collapse", so nothing beside it moves. */
 .rf-expand.btn {
-    width: 108px;
-    border-radius: var(--r-full);
+    min-width: 104px;
     gap: 6px;
-    padding: 0 12px 0 14px;
 }
 
 .rf-expand svg {
@@ -1814,6 +1819,10 @@ input[type="checkbox"] {
     margin-left: auto;
 }
 
+.rf-adj-reset:disabled {
+    visibility: hidden;
+}
+
 /* ---- Stages: switches in the Adjust panel, a plain key under the chart ---- */
 
 .rf-adj-stages {
@@ -1903,10 +1912,10 @@ input[type="checkbox"] {
 /* ---- Stage colours ---- */
 
 :is(.rf-stage.is-on .rf-stage-dot, .rf-key.is-on .rf-stage-dot, .rf-seg, .rf-row-bar) { background: var(--rf-tone, var(--stage-lead)); }
-.rf-card [data-tone="progress"]    { --rf-tone: var(--stage-progress); }
-.rf-card [data-tone="proposal"]    { --rf-tone: var(--stage-proposal); }
-.rf-card [data-tone="negotiation"] { --rf-tone: var(--stage-negotiation); }
-.rf-card [data-tone="lead"]        { --rf-tone: var(--stage-lead); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="progress"]    { --rf-tone: var(--stage-progress); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="proposal"]    { --rf-tone: var(--stage-proposal); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="negotiation"] { --rf-tone: var(--stage-negotiation); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="lead"]        { --rf-tone: var(--stage-lead); }
 
 /* ---- Body: the total, and the months ---- */
 
@@ -1917,19 +1926,14 @@ input[type="checkbox"] {
     gap: 20px 40px;
 }
 
+/* Top-aligned, so the total sits right under the card's title. */
 .rf-summary {
     flex: 0 1 260px;
     min-width: 200px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 6px;
-}
-
-.rf-summary-label {
-    font-size: var(--t-sm);
-    font-weight: 600;
-    color: var(--c-ink-3);
 }
 
 .rf-hero {
@@ -1939,11 +1943,6 @@ input[type="checkbox"] {
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
     color: var(--c-ink);
-}
-
-.rf-hero-sub {
-    font-size: var(--t-base);
-    color: var(--c-ink-3);
 }
 
 /* The three scenarios stacked, label left and amount right, so the
@@ -1998,16 +1997,10 @@ input[type="checkbox"] {
 }
 
 .rf-readout {
-    min-height: 20px;
+    margin: 0;
     font-size: var(--t-sm);
     line-height: 20px;
     color: var(--c-ink-3);
-    font-variant-numeric: tabular-nums;
-}
-
-.rf-readout strong {
-    font-weight: 700;
-    color: var(--c-ink);
 }
 
 .rf-plot-wrap {
@@ -2269,10 +2262,6 @@ input[type="checkbox"] {
     background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1px, transparent 1px 2.5px) content-box;
 }
 
-.rf-col.has-best .rf-seg:last-child {
-    border-radius: 0;
-}
-
 .rf-stack {
     display: flex;
     flex-direction: column-reverse;
@@ -2356,22 +2345,6 @@ input[type="checkbox"] {
 .rf-detail-actions {
     display: flex;
     gap: 16px;
-}
-
-.rf-link {
-    padding: 0;
-    border: 0;
-    background: none;
-    font: 600 var(--t-xs)/1.4 var(--font);
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--c-accent-2);
-    cursor: pointer;
-}
-
-.rf-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
 }
 
 .rf-table-scroll {
@@ -4519,7 +4492,8 @@ input[type="checkbox"] {
 @media (min-width: 769px) {
     #overviewModal,
     #projectOverviewModal,
-    #companyNotesModal {
+    #companyNotesModal,
+    #finCostsModal {
         justify-content: flex-end;
         align-items: stretch;
         padding: 12px;
@@ -4527,7 +4501,8 @@ input[type="checkbox"] {
 
     #overviewModal .modal-content,
     #projectOverviewModal .modal-content,
-    #companyNotesModal .modal-content {
+    #companyNotesModal .modal-content,
+    #finCostsModal .modal-content {
         width: min(600px, 100%);
         max-width: 600px;
         height: 100%;
@@ -5075,7 +5050,8 @@ a.detail-value:hover,
 @media (min-width: 769px) {
     #overviewModal .modal-backdrop,
     #projectOverviewModal .modal-backdrop,
-    #companyNotesModal .modal-backdrop {
+    #companyNotesModal .modal-backdrop,
+    #finCostsModal .modal-backdrop {
         background: rgba(28, 50, 88, 0.18);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -5083,7 +5059,8 @@ a.detail-value:hover,
 
     :root[data-theme="dark"] #overviewModal .modal-backdrop,
     :root[data-theme="dark"] #projectOverviewModal .modal-backdrop,
-    :root[data-theme="dark"] #companyNotesModal .modal-backdrop {
+    :root[data-theme="dark"] #companyNotesModal .modal-backdrop,
+    :root[data-theme="dark"] #finCostsModal .modal-backdrop {
         background: rgba(3, 8, 16, 0.45);
     }
 }
@@ -5127,9 +5104,13 @@ textarea.form-input:focus {
 
 
 #calendarView .calendar-toolbar {
-    padding: 0 0 14px;
+    padding: 12px 0 14px;
     border: 0;
     background: transparent;
+}
+
+#calendarView .calendar-toolbar-left {
+    min-height: 42px;
 }
 
 /* The page title starts the toolbar row, as on the other pages. */
@@ -5331,10 +5312,11 @@ textarea.form-input:focus {
 }
 
 #bookkeepingView .bk-bar {
+    box-sizing: border-box;
     height: auto;
-    min-height: 0;
+    min-height: 54px;
     margin: 0 0 16px;
-    padding: 0;
+    padding: 12px 0 0;
     background: transparent;
     border: 0;
 }
@@ -6718,29 +6700,71 @@ details.import-instructions p {
     margin: 0;
 }
 
-.ov-add-btn {
+/* ---- Text buttons: one look everywhere ----
+   Every button that is only words - "+ New", "+ Add", "Update", "Reset",
+   "Show 3 more" - is accent text with a soft pill behind it on hover; what
+   adds something starts with a +. The negative margin keeps the words where
+   a plain link would sit and lets the pill grow around them. */
+.ov-add-btn,
+.ov-link-btn,
+.home-link,
+.home-clear,
+.home-more,
+.home-foot-link,
+.fin-link,
+.rf-link {
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
     gap: 4px;
     height: 28px;
-    padding: 0 10px 0 7px;
+    margin: 0 -10px;
+    padding: 0 10px;
     border: 0;
     border-radius: var(--r-full);
     background: transparent;
     color: var(--c-accent-2);
     font: 500 var(--t-sm)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease);
 }
 
-.ov-add-btn:hover,
-.ov-add-btn[aria-expanded="true"] {
+/* With a +, the icon sits a little closer to the edge. */
+.ov-add-btn,
+.home-link {
+    padding-left: 7px;
+    margin-left: -7px;
+}
+
+:is(.ov-add-btn, .ov-link-btn, .home-link, .home-clear, .home-more, .home-foot-link, .fin-link, .rf-link):hover,
+.ov-add-btn[aria-expanded="true"],
+.fin-link[aria-expanded="true"] {
     background: var(--c-accent-soft);
 }
 
-.ov-add-btn:focus-visible {
+:is(.ov-add-btn, .ov-link-btn, .home-link, .home-clear, .home-more, .home-foot-link, .fin-link, .rf-link):focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+:is(.ov-add-btn, .home-link) svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* In the foot of a Home card, the same room as before around them. */
+.home-more,
+.home-foot-link {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.home-foot-link {
+    margin-left: auto;
 }
 
 /* The search field an "Add" button opens. */
@@ -6758,20 +6782,6 @@ details.import-instructions p {
 }
 
 /* A link-sized button: "Show more", "Show older notes". */
-.ov-link-btn {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--c-accent-2);
-    font: 500 var(--t-sm)/1.4 var(--font);
-    cursor: pointer;
-}
-
-.ov-link-btn:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
 .ov-link-btn[hidden] {
     display: none;
 }
@@ -9054,31 +9064,6 @@ details.import-instructions p {
     color: var(--c-ink);
 }
 
-.home-link,
-.home-clear,
-.home-more,
-.home-foot-link {
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    cursor: pointer;
-}
-
-.home-link {
-    font-size: var(--t-base);
-    font-weight: 500;
-    color: var(--c-accent-2);
-}
-
-.home-link:hover,
-.home-clear:hover,
-.home-more:hover,
-.home-foot-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
 /* Every control on the dashboard shows where the keyboard is. */
 #workloadView .home-dash :is(button, a):focus-visible,
 #workloadView .home-news :is(button, a):focus-visible {
@@ -9086,139 +9071,148 @@ details.import-instructions p {
     outline-offset: 2px;
 }
 
-/* ---- Summary: ring + legend, and the week ---- */
+/* ---- The band: one colour block per priority or stage ----
+   A bar of its own at the top of the card, inside its padding and rounded
+   at both ends: each block as wide as its share, its count in it and its
+   name below in the block's colour - and each the filter for it. Blocks sit
+   2px apart, like the stages in a forecast bar. */
 
-.home-summary {
+.home-meter {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 20px 28px;
+    gap: 2px;
+    margin: 20px 22px 0;
 }
 
-.home-breakdown {
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 18px;
+.home-meter-seg:first-child .home-meter-fill {
+    border-top-left-radius: var(--r-md);
+    border-bottom-left-radius: var(--r-md);
 }
 
-/* Beside the week on the To-dos card. On Projects the breakdown stands
-   alone in the card's column, where a flex basis would set its height. */
-.home-summary > .home-breakdown {
-    flex: 1 1 250px;
+.home-meter-seg:last-child .home-meter-fill {
+    border-top-right-radius: var(--r-md);
+    border-bottom-right-radius: var(--r-md);
 }
 
-/* The count beside the legend: a plain number, no chart. */
-.home-total {
+.home-meter-seg {
+    --meter-bg: var(--c-tint-2);
+    --meter-fg: var(--c-ink);
+    --meter-ink: var(--c-ink-2);
+    /* As wide as its share, never narrower than its name. */
+    flex: 1 1 0;
+    min-width: auto;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    flex-shrink: 0;
-    min-width: 64px;
-    line-height: 1;
-}
-
-.home-total-value {
-    font-size: 40px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-    color: var(--c-ink);
-}
-
-.home-total-label {
-    margin-top: 6px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-/* Fixed-height rows, and always room for four (High, Medium, Low, No
-   priority): the summaries of both cards are then the same height, so the
-   filter bars under them line up whether there are three entries or four. */
-.home-legend {
-    --legend-row: 26px;
-    flex: 1;
-    min-width: 0;
-    /* Counts close to their names, also when the week is left out. */
-    max-width: 280px;
-    display: grid;
-    grid-auto-rows: var(--legend-row);
-    align-content: center;
-    gap: 2px;
-    min-height: calc(4 * var(--legend-row) + 3 * 2px);
-}
-
-.home-legend-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 3px 8px;
+    gap: 9px;
+    padding: 0;
     border: 0;
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: var(--c-ink);
+    border-radius: 0;
+    background: none;
     font: inherit;
-    font-size: var(--t-base);
     text-align: left;
     cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+    transition: opacity var(--dur-2) var(--ease);
 }
 
-.home-legend-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.home-meter-fill {
+    display: flex;
+    align-items: center;
+    height: 64px;
+    padding: 0 18px;
+    background: var(--meter-bg);
+    color: var(--meter-fg);
+    transition: filter var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.home-meter-seg:hover .home-meter-fill {
+    filter: brightness(0.95);
+}
+
+/* A filter in use: its block keeps a white line along its foot, the others
+   step back. */
+.home-meter-seg.is-dim {
+    opacity: 0.32;
+}
+
+.home-meter-seg.is-active .home-meter-fill {
+    box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--meter-fg) 80%, transparent);
+}
+
+.home-meter-count {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-meter-label {
+    padding: 0 18px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--meter-ink);
     white-space: nowrap;
 }
 
-.home-legend-count {
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+.home-meter-seg[data-tone="high"] { --meter-bg: var(--c-danger); --meter-fg: #FFFFFF; --meter-ink: var(--c-danger-ink); }
+.home-meter-seg[data-tone="medium"] { --meter-bg: var(--pri-medium); --meter-fg: #FFFFFF; --meter-ink: var(--pri-medium-ink); }
+.home-meter-seg[data-tone="low"] { --meter-bg: #AAB5C5; --meter-fg: #1C3258; --meter-ink: var(--c-ink-2); }
+.home-meter-seg[data-tone="none"] { --meter-ink: var(--c-ink-3); }
+.home-meter-seg[data-tone="progress"] { --meter-bg: var(--stage-progress); --meter-fg: #FFFFFF; --meter-ink: color-mix(in srgb, var(--stage-progress) 75%, var(--c-ink)); }
+.home-meter-seg[data-tone="proposal"] { --meter-bg: var(--stage-proposal); --meter-fg: #FFFFFF; --meter-ink: color-mix(in srgb, var(--stage-proposal) 75%, var(--c-ink)); }
+.home-meter-seg[data-tone="negotiation"] { --meter-bg: var(--stage-negotiation); --meter-fg: #1C3258; --meter-ink: color-mix(in srgb, var(--stage-negotiation) 55%, var(--c-ink)); }
+
+/* No priority: hatched, the same "not decided" as the forecast's best case. */
+.home-meter-seg[data-tone="none"] .home-meter-fill {
+    color: var(--c-ink);
+    background: repeating-linear-gradient(135deg, var(--meter-hatch, #DDE2EA) 0 2px, var(--meter-hatch-bg, #F3F5F8) 2px 7px);
 }
 
-/* Selected: a tinted chip with a hairline ring. The rest step back. */
-.home-legend-btn:hover,
+.home-meter.is-empty .home-meter-seg {
+    flex: 1;
+    cursor: default;
+    --meter-bg: var(--c-tint-3);
+    --meter-fg: var(--c-ink-3);
+    --meter-ink: var(--c-ink-3);
+}
+
+.home-meter.is-empty .home-meter-seg:hover .home-meter-fill {
+    filter: none;
+}
+
+/* Dark: the light stage fills keep dark text, the low block goes deeper. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .home-meter-seg[data-tone="low"] { --meter-bg: #5E6B80; --meter-fg: #FFFFFF; }
+    :root:not([data-theme="light"]) .home-meter-seg:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) { --meter-fg: #0E1626; --meter-ink: var(--meter-bg); }
+    :root:not([data-theme="light"]) .home-meter-seg[data-tone="none"] { --meter-hatch: #2A3754; --meter-hatch-bg: #1B2742; }
+}
+
+:root[data-theme="dark"] .home-meter-seg[data-tone="low"] { --meter-bg: #5E6B80; --meter-fg: #FFFFFF; }
+:root[data-theme="dark"] .home-meter-seg:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) { --meter-fg: #0E1626; --meter-ink: var(--meter-bg); }
+:root[data-theme="dark"] .home-meter-seg[data-tone="none"] { --meter-hatch: #2A3754; --meter-hatch-bg: #1B2742; }
+
+/* The labels under the band take the place of the card's top padding. */
+.home-meter + .home-card-top {
+    padding-top: 14px;
+}
+
+#workloadView .home-card-title .home-card-sub {
+    font-weight: 400;
+    color: var(--c-ink-3);
+}
+
+/* The week's days: hover, the day in use, and the others stepping back. */
 .home-day-btn:hover {
     background: var(--c-tint-3);
 }
 
-.home-legend-btn.is-active,
 .home-day-btn.is-active {
     background: var(--c-tint-2);
     box-shadow: inset 0 0 0 1px var(--c-line-strong);
 }
 
-.home-legend-btn.is-dim,
 .home-day-btn.is-dim {
     opacity: 0.45;
 }
-
-/* The filters beside the count: each value as its pill, as in every list. */
-.home-legend-pill {
-    --tone: var(--c-ink-4);
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 9px;
-    border-radius: var(--r-full);
-    background: var(--c-tint-2);
-    color: var(--c-ink-2);
-    font: 600 var(--t-xs)/1 var(--font);
-    white-space: nowrap;
-}
-
-.home-legend-pill[data-tone="high"] { background: var(--c-danger-soft); color: var(--c-danger-ink); }
-.home-legend-pill[data-tone="medium"] { background: var(--pri-medium-soft); color: var(--pri-medium-ink); }
-.home-legend-pill[data-tone="none"] { background: transparent; color: var(--c-ink-3); box-shadow: inset 0 0 0 1px var(--c-line); }
-.home-legend-pill:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) {
-    background: color-mix(in srgb, var(--tone) 14%, var(--c-surface));
-    color: color-mix(in srgb, var(--tone) 70%, var(--c-ink));
-}
-.home-legend-pill[data-tone="progress"] { --tone: var(--stage-progress); }
-.home-legend-pill[data-tone="proposal"] { --tone: var(--stage-proposal); }
-.home-legend-pill[data-tone="negotiation"] { --tone: var(--stage-negotiation); }
 
 /* One dot vocabulary for priorities and stages. */
 .home-dot {
@@ -9237,24 +9231,13 @@ details.import-instructions p {
 :is(.home-dot, .home-project-bar)[data-tone="proposal"] { background: var(--stage-proposal); }
 :is(.home-dot, .home-project-bar)[data-tone="negotiation"] { background: var(--stage-negotiation); }
 
-/* The week: today and the six days after it, each a filter. */
+/* The week: today and the six days after it, each a filter - under the
+   card's title, the full width of the card. */
 .home-week {
-    flex: 1.3 1 300px;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding-left: 28px;
-    border-left: 1px solid var(--c-line-2);
-}
-
-/* Once the week wraps under the ring, the divider has nothing to divide. */
-@container (max-width: 600px) {
-    .home-week {
-        flex-basis: 100%;
-        padding-left: 0;
-        border-left: 0;
-    }
 }
 
 .home-week-head {
@@ -9376,12 +9359,6 @@ details.import-instructions p {
     color: var(--c-ink-3);
 }
 
-.home-clear {
-    flex-shrink: 0;
-    font-size: var(--t-xs);
-    font-weight: 600;
-    color: var(--c-accent-2);
-}
 
 /* ---- Lists ---- */
 
@@ -9657,21 +9634,6 @@ details.import-instructions p {
     border-top: 1px solid var(--c-line-2);
 }
 
-.home-more,
-.home-foot-link {
-    padding: 12px 0;
-    font-size: var(--t-base);
-}
-
-.home-more {
-    font-weight: 600;
-    color: var(--c-accent-2);
-}
-
-.home-foot-link {
-    margin-left: auto;
-    color: var(--c-ink-3);
-}
 
 /* ---- Bookkeeping and contacts: small cards ---- */
 
@@ -9694,12 +9656,6 @@ details.import-instructions p {
     border-radius: var(--r-sm);
     background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
     color: var(--wl-type);
-}
-
-.home-mini-count {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
 }
 
 /* The rows sit straight in the card: no second outline inside it. */
@@ -9777,10 +9733,6 @@ details.import-instructions p {
     border-bottom: 0;
 }
 
-#workloadView .home-bk .home-link {
-    flex-shrink: 0;
-}
-
 /* The drop frame sits a little inside the row: drawn on the row itself, the
    card's rounded corners would cut into it on the rows along the card's
    edge, giving it two different radii. */
@@ -9817,10 +9769,11 @@ details.import-instructions p {
 .home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); }
 .home-skel.is-day { height: 52px; border-radius: var(--r-md); }
 
-.home-skel.is-total {
-    width: 64px;
-    height: 56px;
-    flex-shrink: 0;
+.home-skel.is-meter {
+    display: block;
+    height: 64px;
+    margin: 20px 22px 0;
+    border-radius: var(--r-md);
 }
 
 .home-skel-row {
@@ -9854,6 +9807,30 @@ details.import-instructions p {
 @media (max-width: 600px) {
     .home-card-top {
         padding: 16px 16px 14px;
+    }
+
+    .home-meter,
+    .home-skel.is-meter {
+        margin: 16px 16px 0;
+    }
+
+    .home-meter-fill,
+    .home-skel.is-meter {
+        height: 54px;
+    }
+
+    .home-meter-fill,
+    .home-meter-label {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .home-meter-count {
+        font-size: 26px;
+    }
+
+    .home-meter-label {
+        font-size: var(--t-xs);
     }
 
     .home-filterbar,
@@ -9902,10 +9879,40 @@ details.import-instructions p {
 
 /* "Months ahead" beside its switch, both no taller than the page title,
    so this header is as high as every other tab's. */
+/* Three groups, each one control, a hairline between them: the balance,
+   the scenario, how far ahead. The controls say what they are, so there
+   are no labels in front of them. */
 .fin-head-tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 20px;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.fin-head-tools :is(.fin-scenario, .fin-months) {
+    padding-left: 16px;
+    border-left: 1px solid var(--c-line);
+}
+
+.fin-balance-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    color: var(--c-ink-3);
+    font: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.fin-balance-btn:hover,
+.fin-balance-btn[aria-expanded="true"] {
+    background: var(--c-tint-3);
+    border-color: var(--c-line-strong);
 }
 
 .fin-tool {
@@ -9918,6 +9925,57 @@ details.import-instructions p {
     font-size: var(--t-sm);
     font-weight: 500;
     color: var(--c-ink-3);
+}
+
+/* Balance, scenario, months ahead - in that order. The balance and the
+   months are financials.js's, the scenario the forecast card's. */
+.fin-head-own {
+    display: contents;
+}
+
+.fin-head-tools .fin-balance { order: 1; }
+.fin-head-tools .fin-scenario { order: 2; }
+.fin-head-tools .fin-months { order: 3; }
+
+/* Empty while the forecast loads. A plain :empty, not :has(): Safari does
+   not redraw a :has(:empty) parent once its child is filled in. */
+.fin-scenario:empty {
+    display: none;
+}
+
+.fin-scenario .rf-presets {
+    padding: 2px;
+}
+
+.fin-scenario .rf-presets .segmented-btn {
+    height: 26px;
+    padding: 0 12px;
+}
+
+.fin-scenario .rf-adjust {
+    min-width: 98px;
+    justify-content: center;
+    height: 30px;
+    border-radius: var(--r-sm);
+}
+
+/* What "Adjust" opens: a row under the header, at its right edge below
+   the button, pushing the page down. It stays until "Adjust" closes it. */
+.fin-adjust {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.fin-adjust:empty {
+    display: none;
+}
+
+.fin-adjust .rf-adjust-panel {
+    margin: 0;
+    padding: 10px 16px;
+    background: var(--c-surface);
+    box-shadow: var(--e-1);
 }
 
 .fin-head .fin-seg {
@@ -9943,8 +10001,29 @@ details.import-instructions p {
 
 .fin-kpis {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+}
+
+/* "Fixed costs" opens the costs sheet: the whole figure is the button. */
+.fin-kpi.is-link {
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.fin-kpi.is-link:hover {
+    border-color: var(--c-line-strong);
+    box-shadow: var(--e-2);
+}
+
+.fin-kpi-unit {
+    margin-left: 4px;
+    font-size: var(--t-md);
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--c-ink-3);
 }
 
 .fin-kpi {
@@ -10000,7 +10079,7 @@ details.import-instructions p {
 }
 
 .fin-balance-value {
-    font-size: var(--t-md);
+    font-size: var(--t-base);
     font-weight: 600;
     color: var(--c-ink);
     font-variant-numeric: tabular-nums;
@@ -10040,7 +10119,7 @@ details.import-instructions p {
 /* "Set buffer" / "Buffer 15.000 €": top right, on the label's line. */
 .fin-kpi-action {
     position: absolute;
-    top: 16px;
+    top: 11px;
     right: 18px;
 }
 
@@ -10162,58 +10241,51 @@ details.import-instructions p {
     margin: 0;
 }
 
-.fin-columns {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
-}
-
 /* ---- The chart ---- */
 
-.fin-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 14px;
-    margin: 4px 0 0;
-    padding: 0;
-    list-style: none;
+/* A hovered month: its in, out and balance in a box above its point. */
+.fin-plot-wrap {
+    position: relative;
+}
+
+.fin-hover-tip {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    gap: 3px;
+    min-width: 150px;
+    padding: 9px 12px 10px;
+    border-radius: var(--r-md);
+    background: var(--c-raised);
+    box-shadow: var(--e-3);
     font-size: var(--t-xs);
     color: var(--c-ink-3);
-}
-
-.fin-legend li {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.fin-key {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-}
-
-.fin-key.is-in { background: var(--c-success); }
-.fin-key.is-out { background: var(--c-danger); opacity: 0.75; }
-.fin-key.is-line { height: 3px; border-radius: 2px; background: var(--c-accent); }
-.fin-key.is-buffer { height: 0; border-top: 2px dashed var(--c-warning); border-radius: 0; }
-
-.fin-readout {
-    min-height: 22px;
-    margin-bottom: 6px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
     font-variant-numeric: tabular-nums;
+    pointer-events: none;
 }
 
-.fin-readout strong {
+.fin-hover-tip[hidden] {
+    display: none;
+}
+
+.fin-hover-tip > span {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.fin-hover-tip strong {
     font-weight: 700;
     color: var(--c-ink);
 }
 
-.fin-readout .is-pos { color: var(--c-success-ink); }
-.fin-readout .is-neg { color: var(--c-danger-ink); }
+.fin-hover-tip .fin-hover-month {
+    margin-bottom: 2px;
+    font-size: var(--t-sm);
+}
+
+.fin-hover-tip .is-pos { color: var(--c-success-ink); }
+.fin-hover-tip .is-neg { color: var(--c-danger-ink); }
 
 .fin-plot {
     position: relative;
@@ -10230,8 +10302,7 @@ details.import-instructions p {
     stroke-width: 1;
 }
 
-.fin-grid.is-zero,
-.fin-grid.is-mid {
+.fin-grid.is-zero {
     stroke: var(--c-line-strong);
 }
 
@@ -10277,57 +10348,56 @@ details.import-instructions p {
     fill: var(--c-ink-4);
 }
 
+/* The balance as one smooth line: accent blue above zero, red below. */
 .fin-line {
     fill: none;
     stroke: var(--c-accent);
-    stroke-width: 2.5;
+    stroke-width: 3.5;
     stroke-linejoin: round;
     stroke-linecap: round;
 }
 
+.fin-line.is-neg { stroke: var(--c-danger); }
+
 .fin-line.is-past {
     stroke: var(--c-ink-4);
-    stroke-width: 2;
-    stroke-dasharray: 4 4;
+    stroke-width: 2.5;
+    stroke-dasharray: 2 7;
 }
 
 .fin-area-top { stop-color: var(--c-accent); stop-opacity: 0.22; }
 .fin-area-bottom { stop-color: var(--c-accent); stop-opacity: 0; }
 
+.fin-area.is-neg {
+    fill: var(--c-danger);
+    fill-opacity: 0.14;
+}
+
+.fin-grid.is-dashed { stroke-dasharray: 4 6; }
+.fin-axis-y.is-zero { font-weight: 700; fill: var(--c-ink); }
+.fin-axis-y.is-neg { fill: var(--c-danger-ink); }
+
+/* The hover dot. */
 .fin-dot {
     fill: var(--c-surface);
     stroke: var(--c-accent);
     stroke-width: 2.5;
 }
 
-.fin-dot.is-today {
-    fill: var(--c-accent);
-    stroke: var(--c-surface);
-    stroke-width: 2;
+/* Today, where it crosses zero and where the last month ends. */
+.fin-dot-mark {
+    fill: var(--c-surface);
+    stroke: var(--c-accent);
+    stroke-width: 3.5;
 }
 
-.fin-dot.is-low {
-    stroke: var(--c-success);
-}
+.fin-dot-mark.is-neg { stroke: var(--c-danger); }
 
-.fin-dot.is-low.is-neg {
-    stroke: var(--c-danger);
-}
-
-.fin-bar.is-in { fill: var(--c-success); }
-.fin-bar.is-out { fill: var(--c-danger); opacity: 0.72; }
-.fin-bar.is-past { opacity: 0.35; }
 
 .fin-today {
     stroke: var(--c-ink-4);
     stroke-width: 1;
     stroke-dasharray: 2 3;
-}
-
-.fin-today-label {
-    font-size: 10.5px;
-    font-weight: 600;
-    fill: var(--c-ink-3);
 }
 
 .fin-hover-band {
@@ -10336,7 +10406,6 @@ details.import-instructions p {
 
 .fin-hit {
     fill: transparent;
-    cursor: crosshair;
 }
 
 /* ---- Month by month ---- */
@@ -10515,105 +10584,12 @@ details.import-instructions p {
     font-variant-numeric: tabular-nums;
 }
 
-.fin-income-list,
 .fin-cost-list {
     display: flex;
     flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
-}
-
-.fin-income {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 0;
-}
-
-.fin-income + .fin-income {
-    border-top: 1px dashed var(--c-line-2);
-}
-
-.fin-income.is-off {
-    opacity: 0.5;
-}
-
-.fin-income-main {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-}
-
-.fin-income-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-    color: var(--c-ink);
-    text-decoration: none;
-}
-
-.fin-income-name:hover {
-    color: var(--c-accent-2);
-    text-decoration: underline;
-}
-
-.fin-income-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 8px;
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-}
-
-/* The stage as the same pill as on the project cards. */
-.fin-stage {
-    --stage-tone: var(--stage-lead);
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 9px;
-    border: 0;
-    border-radius: var(--r-full);
-    font: 600 var(--t-xs)/1 var(--font);
-    letter-spacing: 0;
-    text-transform: none;
-    white-space: nowrap;
-    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
-    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
-}
-
-.fin-stage[data-stage="in-progress"] { --stage-tone: var(--stage-progress); }
-.fin-stage[data-stage="proposal"] { --stage-tone: var(--stage-proposal); }
-.fin-stage[data-stage="negotiation"] { --stage-tone: var(--stage-negotiation); }
-.fin-stage[data-stage="complete"] { --stage-tone: var(--stage-complete); }
-
-.fin-income-amount {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
-    flex-shrink: 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.fin-income-amount strong {
-    font-weight: 700;
-    color: var(--c-success-ink);
-}
-
-.fin-income.is-off .fin-income-amount strong {
-    color: var(--c-ink-3);
-}
-
-.fin-income-amount span {
-    font-size: var(--t-xs);
-    color: var(--c-ink-4);
 }
 
 .fin-tag {
@@ -10830,20 +10806,6 @@ details.import-instructions p {
     color: var(--c-ink-4);
 }
 
-.fin-link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--c-accent-2);
-    font: 500 var(--t-sm)/1.4 var(--font);
-    cursor: pointer;
-}
-
-.fin-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
 .fin-icon-btn {
     width: 26px;
     height: 26px;
@@ -10865,30 +10827,6 @@ details.import-instructions p {
 :is(.fin-link, .fin-icon-btn, .fin-month-toggle):focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 2px;
-}
-
-/* ---- How it is worked out: folded under the months ---- */
-
-.fin-how {
-    margin: 20px -20px -20px;
-    padding: 12px 20px 14px;
-    border-top: 1px solid var(--c-line-2);
-    font-size: var(--t-xs);
-    line-height: 1.6;
-    color: var(--c-ink-3);
-}
-
-.fin-how summary {
-    width: fit-content;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-accent-2);
-    cursor: pointer;
-}
-
-.fin-how p {
-    margin: 8px 0 0;
-    max-width: 80ch;
 }
 
 /* ---- Loading ---- */
@@ -10915,12 +10853,6 @@ details.import-instructions p {
 
 /* ---- Narrower screens ---- */
 
-@media (max-width: 1100px) {
-    .fin-columns {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
 @media (max-width: 760px) {
     .fin-kpis {
         grid-template-columns: minmax(0, 1fr);
@@ -10940,11 +10872,6 @@ details.import-instructions p {
         margin: 0 -14px;
     }
 
-    .fin-how {
-        margin: 16px -14px -16px;
-        padding: 12px 14px 14px;
-    }
-
     .fin-table :is(th, td):first-child { padding-left: 14px; }
     .fin-table :is(th, td):last-child { padding-right: 14px; }
 
@@ -10955,6 +10882,12 @@ details.import-instructions p {
 
     .fin-head-tools {
         width: 100%;
+    }
+
+    /* Stacked, the groups need no line between them. */
+    .fin-head-tools :is(.fin-scenario, .fin-months) {
+        padding-left: 0;
+        border-left: 0;
     }
 }
 

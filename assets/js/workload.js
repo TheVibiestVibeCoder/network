@@ -105,14 +105,6 @@
         return payload;
     }
 
-    /**
-     * A plain date, for things that have one without having a deadline.
-     */
-    function formatDate(value) {
-        if (!value) return '';
-        return window.CRMFormat.date(value) || String(value);
-    }
-
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
@@ -156,7 +148,7 @@
         // The narrow column: projects, then the contacts to look after.
         let side = projectsCard(projects, todos);
         if (contacts.length) {
-            side += listCard('contact', 'Contacts', contacts.map(contactRow).join(''), contacts.length);
+            side += listCard('contact', 'Contacts', contacts.map(contactRow).join(''));
         }
 
         els.body.innerHTML = newsBox()
@@ -198,37 +190,40 @@
     }
 
     /** A card's title, with "Create new" opening the same sheet as everywhere else. */
-    function cardHead(title, create) {
+    function cardHead(title, create, sub) {
         return `
             <div class="home-card-head">
-                <h2 class="home-card-title">${escapeHtml(title)}</h2>
-                ${create ? `<button type="button" class="home-link" data-home-create="${create}">Create new</button>` : ''}
+                <h2 class="home-card-title">${escapeHtml(title)}${sub ? ` <span class="home-card-sub">· ${escapeHtml(sub)}</span>` : ''}</h2>
+                ${create ? `<button type="button" class="home-link" data-home-create="${create}">${ICON_PLUS}New</button>` : ''}
             </div>`;
     }
 
     /**
-     * The count beside a legend, as a plain number. Hidden from screen
-     * readers: the legend buttons beside it carry the same numbers in words.
+     * The band across the top of a card: one colour block per priority or
+     * stage, as wide as its share, with its count in it and its name below -
+     * and each block the filter for it. Empty values are left out; when nothing is open,
+     * one quiet block says so.
      */
-    function total(value, label) {
-        return `
-            <span class="home-total" aria-hidden="true">
-                <span class="home-total-value">${value}</span>
-                <span class="home-total-label">${escapeHtml(label)}</span>
-            </span>`;
-    }
+    function meter(kind, items, selected, emptyLabel, groupLabel) {
+        const shown = items.filter(item => item.count > 0 || item.key === selected);
+        if (!shown.length) {
+            return `<div class="home-meter is-empty"><span class="home-meter-seg" data-tone="empty">
+                <span class="home-meter-fill"><span class="home-meter-count">0</span></span>
+                <span class="home-meter-label">${escapeHtml(emptyLabel)}</span>
+            </span></div>`;
+        }
 
-    /** One filter entry: its value as the same coloured pill as in the lists, and the count. */
-    function legendButton(kind, key, label, tone, count, selected) {
-        const pressed = selected === key;
-        const dim = (selected && !pressed) || count === 0;
-
-        return `
-            <button type="button" class="home-legend-btn${pressed ? ' is-active' : ''}${dim ? ' is-dim' : ''}"
-                    data-home-${kind}="${escapeHtml(key)}" data-fk="${kind}-${escapeHtml(key)}" aria-pressed="${pressed}">
-                <span class="home-legend-name"><span class="home-legend-pill" data-tone="${tone}">${escapeHtml(label)}</span></span>
-                <span class="home-legend-count">${count}</span>
-            </button>`;
+        return `<div class="home-meter" role="group" aria-label="${escapeHtml(groupLabel)}">${shown.map(item => {
+            const pressed = selected === item.key;
+            const dim = !!selected && !pressed;
+            return `
+                <button type="button" class="home-meter-seg${pressed ? ' is-active' : ''}${dim ? ' is-dim' : ''}"
+                        data-home-${kind}="${escapeHtml(item.key)}" data-fk="${kind}-${escapeHtml(item.key)}" data-tone="${item.tone}"
+                        aria-pressed="${pressed}" style="flex-grow: ${Math.max(item.count, 1)}">
+                    <span class="home-meter-fill"><span class="home-meter-count">${item.count}</span></span>
+                    <span class="home-meter-label">${escapeHtml(item.label)}</span>
+                </button>`;
+        }).join('')}</div>`;
     }
 
     function filterBar(label, clearKey, active) {
@@ -261,11 +256,10 @@
         const filters = { prio: ui.prio, day: dayFilter(today) };
         const summary = HD.todoSummary(openTodos, ui.prio, today);
 
-        // Count and legend. "No priority" only shows up when there is some.
-        const priorities = HD.PRIORITIES.filter(p => p.key !== 'none' || summary.priorities.none > 0 || ui.prio === 'none');
-        const legend = priorities.map(p =>
-            legendButton('prio', p.key, p.label, p.key, summary.priorities[p.key], ui.prio)
-        ).join('');
+        // The band: one block per priority that has open to-dos.
+        const band = meter('prio', HD.PRIORITIES.map(p => ({
+            key: p.key, label: p.label, tone: p.key, count: summary.priorities[p.key]
+        })), ui.prio, 'Nothing open', 'Filter by priority');
 
         // The week strip: each day a filter, its badge counting the to-dos
         // due that day at the selected priority.
@@ -314,23 +308,18 @@
 
         return `
             <article class="home-card home-todos" aria-label="${escapeHtml(cardTitle('to-dos'))}">
+                ${band}
                 <div class="home-card-top">
                     ${cardHead(cardTitle('to-dos'), 'todo')}
-                    <div class="home-summary">
-                        <div class="home-breakdown">
-                            ${total(summary.open, 'open')}
-                            <div class="home-legend">${legend}</div>
+                    ${weekShown ? `<div class="home-week">
+                        <div class="home-week-head">
+                            <span class="home-week-title">Next 7 days</span>
+                            <span class="home-week-due"><strong>${summary.due}</strong> due${overdue}</span>
                         </div>
-                        ${weekShown ? `<div class="home-week">
-                            <div class="home-week-head">
-                                <span class="home-week-title">Next 7 days</span>
-                                <span class="home-week-due"><strong>${summary.due}</strong> due${overdue}</span>
-                            </div>
-                            <div class="home-week-days">${days}</div>
-                        </div>` : ''}
-                    </div>
+                        <div class="home-week-days">${days}</div>
+                    </div>` : ''}
                 </div>
-                ${filterBar(HD.todoListLabel(filters, filtered.length, today), 'todos', filtering)}
+                ${filtering ? filterBar(HD.todoListLabel(filters, filtered.length, today), 'todos', true) : ''}
                 <div class="home-list-wrap">${list}</div>
                 <div class="home-card-foot">
                     ${filtered.length > LIST_LIMIT ? moreButton('todos', ui.allTodos, filtered.length - LIST_LIMIT) : ''}
@@ -399,15 +388,14 @@
     function projectsCard(projects, todos) {
         const ui = state.ui;
         const counts = HD.stageCounts(projects);
-        const active = HD.filterProjects(projects, null);
-        const legend = HD.STAGES.map(s =>
-            legendButton('stage', s.key, s.label, s.tone, counts[s.key], ui.stage)
-        ).join('');
+        const band = meter('stage', HD.STAGES.map(s => ({
+            key: s.key, label: s.label, tone: s.tone, count: counts[s.key]
+        })), ui.stage, 'No active projects', 'Filter by stage');
 
         const filtered = HD.filterProjects(projects, ui.stage);
         const shown = ui.allProjects ? filtered : filtered.slice(0, LIST_LIMIT);
         const stage = HD.STAGES.find(s => s.key === ui.stage);
-        const label = stage ? `${stage.label} · ${filtered.length}` : 'All projects';
+        const label = stage ? `${stage.label} · ${filtered.length}` : '';
 
         const list = filtered.length
             ? `<ul class="home-list">${shown.map(p => projectRow(p, todos)).join('')}</ul>`
@@ -415,14 +403,11 @@
 
         return `
             <article class="home-card home-projects" aria-label="${escapeHtml(cardTitle('projects'))}">
+                ${band}
                 <div class="home-card-top">
                     ${cardHead(cardTitle('projects'), 'project')}
-                    <div class="home-breakdown">
-                        ${total(active.length, 'active')}
-                        <div class="home-legend">${legend}</div>
-                    </div>
                 </div>
-                ${filterBar(label, 'projects', !!stage)}
+                ${stage ? filterBar(label, 'projects', true) : ''}
                 <div class="home-list-wrap">${list}</div>
                 ${filtered.length > LIST_LIMIT
                     ? `<div class="home-card-foot">${moreButton('projects', ui.allProjects, filtered.length - LIST_LIMIT)}</div>`
@@ -433,17 +418,18 @@
     function projectRow(project, todos) {
         const stage = HD.stageOf(project);
         const open = HD.projectOpenTodos(project, todos);
-        const context = [project.company || '', stage.label].filter(Boolean).map(escapeHtml).join(' · ');
+        // The stage is the bar's colour; in words only for screen readers.
+        const context = escapeHtml(project.company || '');
 
         return `
             <li>
                 <button type="button" class="home-project${isProposed(project) ? ' is-proposed' : ''}" data-workload-open="project" data-id="${project.id}">
-                    <span class="home-project-bar" data-tone="${stage.tone}"></span>
+                    <span class="home-project-bar" data-tone="${stage.tone}" title="${escapeHtml(stage.label)}"></span>
                     <span class="home-row-body">
                         <span class="home-row-title">${escapeHtml(project.name || '')}${newTag('project', project.id)}${reviewMarks('project', project)}</span>
-                        <span class="home-row-context">${context}</span>
+                        ${context ? `<span class="home-row-context">${context}</span>` : ''}<span class="sr-only"> · ${escapeHtml(stage.label)}</span>
                     </span>
-                    <span class="home-pill${open ? ' has-todos' : ''}">${open ? open + (open === 1 ? ' to-do' : ' to-dos') : 'No to-dos'}</span>
+                    ${open ? `<span class="home-pill has-todos">${open + (open === 1 ? ' to-do' : ' to-dos')}</span>` : ''}
                 </button>
             </li>`;
     }
@@ -459,16 +445,15 @@
      */
     function bookkeepingBand(entries) {
         if (!entries.length) return '';
+        const missing = entries.filter(e => !e.no_pdf_needed).length;
 
         return `
             <section class="home-card home-mini is-bookkeeping home-bk" aria-labelledby="homeBkHeading">
                 <div class="home-card-head">
                     <h2 class="home-card-title" id="homeBkHeading">
                         <span class="home-mini-icon" aria-hidden="true">${ICON_RECEIPT}</span>
-                        Bookkeeping
-                        <span class="home-mini-count">${entries.length}</span>
+                        Bookkeeping${missing ? ` <span class="home-card-sub">· ${missing} ${missing === 1 ? 'PDF' : 'PDFs'} missing</span>` : ''}
                     </h2>
-                    <button type="button" class="home-link" data-home-go="bookkeeping">Open Bookkeeping</button>
                 </div>
                 <div class="workload-list home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
             </section>`;
@@ -478,14 +463,13 @@
      * A compact card for the other things a person can be handed. Each kind
      * keeps its colour and icon (--wl-type in design.css).
      */
-    function listCard(type, title, rows, count) {
+    function listCard(type, title, rows) {
         return `
             <article class="home-card home-mini is-${type}" aria-label="${escapeHtml(title)}">
                 <div class="home-card-head">
                     <h2 class="home-card-title">
                         <span class="home-mini-icon" aria-hidden="true">${TYPE_ICONS[type] || ''}</span>
                         ${escapeHtml(title)}
-                        <span class="home-mini-count">${count}</span>
                     </h2>
                 </div>
                 <div class="workload-list">${rows}</div>
@@ -646,19 +630,14 @@
      * (bindPdfDrops), or click through to the Bookkeeping tab.
      */
     function bookkeepingRow(entry) {
-        // A bank entry's date is when the money moved, not a deadline, so it
-        // is printed plainly rather than as "3 days overdue".
-        const date = formatDate(entry.row_date);
-
+        // The date leads the summary ("Sep 19 · Partner · 120,00 €"), and that
+        // the PDF is missing the card's heading says once for all of them.
         return `
             <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}"
                     data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
                 <span class="workload-row-body">
                     <span class="workload-row-title">${escapeHtml(entry.summary || '')}${newTag('bookkeeping', entry.id)}</span>
-                    <span class="workload-row-context">${entry.no_pdf_needed ? 'Marked as needing no PDF' : 'PDF missing'}</span>
-                </span>
-                <span class="workload-row-meta">
-                    ${date ? `<span class="workload-due">${escapeHtml(date)}</span>` : ''}
+                    ${entry.no_pdf_needed ? '<span class="workload-row-context">Marked as needing no PDF</span>' : ''}
                 </span>
             </button>
         `;
@@ -684,29 +663,22 @@
      */
     function skeleton() {
         const bar = (width, extra) => `<span class="home-skel${extra ? ' ' + extra : ''}" style="width:${width}"></span>`;
-        const legend = n => Array.from({ length: n }, () => bar('100%', 'is-line')).join('');
         const rows = n => Array.from({ length: n }, (_, i) => `
             <div class="home-skel-row">
                 ${bar('22px', 'is-round')}
                 <span class="home-skel-lines">${bar(['70%', '55%', '62%', '48%', '66%'][i % 5])}${bar('38%', 'is-small')}</span>
             </div>`).join('');
-        const breakdown = `
-            <div class="home-breakdown">
-                <span class="home-skel is-total"></span>
-                <div class="home-legend">${legend(3)}</div>
-            </div>`;
+        const band = '<span class="home-skel is-meter"></span>';
 
         return `
             <section class="home-dash is-loading" aria-label="Loading" aria-busy="true">
                 <div class="home-card home-todos">
+                    ${band}
                     <div class="home-card-top">
-                        <div class="home-card-head">${bar('72px', 'is-title')}</div>
-                        <div class="home-summary">
-                            ${breakdown}
-                            <div class="home-week">
-                                <div class="home-week-head">${bar('80px', 'is-small')}</div>
-                                <div class="home-week-days">${Array.from({ length: 7 }, () => bar('100%', 'is-day')).join('')}</div>
-                            </div>
+                        <div class="home-card-head">${bar('120px', 'is-title')}</div>
+                        <div class="home-week">
+                            <div class="home-week-head">${bar('80px', 'is-small')}</div>
+                            <div class="home-week-days">${Array.from({ length: 7 }, () => bar('100%', 'is-day')).join('')}</div>
                         </div>
                     </div>
                     <div class="home-filterbar">${bar('160px', 'is-small')}</div>
@@ -714,9 +686,9 @@
                 </div>
                 <div class="home-side">
                     <div class="home-card home-projects">
+                        ${band}
                         <div class="home-card-top">
-                            <div class="home-card-head">${bar('80px', 'is-title')}</div>
-                            ${breakdown}
+                            <div class="home-card-head">${bar('120px', 'is-title')}</div>
                         </div>
                         <div class="home-filterbar">${bar('100px', 'is-small')}</div>
                         <div class="home-list-wrap">${rows(4)}</div>
@@ -841,6 +813,7 @@
         bookkeeping: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>'
     };
 
+    const ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
     const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>';
     // The empty list: a check in a circle.

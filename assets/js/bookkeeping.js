@@ -3482,6 +3482,7 @@
         const dateColumn = settings && settings.date_column;
         const amountColumn = detectAmountColumn(columns, rows, name => name === dateColumn || looksLikeDateColumn(name));
         if (!amountColumn) return { amountColumn: null, rows: [] };
+
         return {
             amountColumn,
             rows: rows

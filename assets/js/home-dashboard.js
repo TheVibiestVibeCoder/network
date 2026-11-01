@@ -214,7 +214,8 @@
                 dueNote = 'due ' + shortDate(todo.due_date);
             } else if (key === 'overdue') {
                 const late = -dayOffset(todo.due_date, today);
-                dueNote = late === 1 ? 'due yesterday' : `${late} days overdue`;
+                // Under the "Overdue" heading, how late is enough: "33 days".
+                dueNote = late === 1 ? '1 day' : `${late} days`;
             }
             group.items.push({ todo, dueNote });
         });

@@ -114,7 +114,7 @@
         const today = groups.find(g => g.key === 'd0');
 
         eq(later.items[0].dueNote, 'due Wed, Oct 14');
-        eq(overdue.items[0].dueNote, '2 days overdue');
+        eq(overdue.items[0].dueNote, '2 days');
         eq(today.items[0].dueNote, '');
     });
 
