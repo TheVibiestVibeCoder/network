@@ -1,16 +1,17 @@
 /* ==========================================================================
    Claude summary under a project's description - assets/js/project-summary.js
+   In the project sheet, the meeting window and a project card's Claude window.
 
    Claude's mark beside the label says who wrote it. The panel itself stays
    neutral: an orange tint is what proposals waiting for a decision look
    like, and this is something to read, not to act on.
    ========================================================================== */
 
-#projectOverviewModal .ov-claude-summary[hidden] {
+.overview-detail-item.ov-claude-summary[hidden] {
     display: none;
 }
 
-#projectOverviewModal .ov-claude-summary {
+.overview-detail-item.ov-claude-summary {
     margin-top: 4px;
     padding: 12px 14px 13px;
     border-radius: var(--r-md);
@@ -53,7 +54,7 @@
     text-underline-offset: 2px;
 }
 
-#projectOverviewModal .ov-claude-summary-text {
+.ov-claude-summary .ov-claude-summary-text {
     display: block;
     margin-top: 4px;
     color: var(--c-ink);
@@ -87,7 +88,7 @@
 }
 
 /* The old summary stays readable while the new one is written. */
-#projectOverviewModal .ov-claude-summary.is-updating .ov-claude-summary-text {
+.ov-claude-summary.is-updating .ov-claude-summary-text {
     opacity: 0.55;
     transition: opacity var(--dur-2) var(--ease);
 }

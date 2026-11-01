@@ -361,6 +361,8 @@
     async function refreshContext() {
         const project = currentProject();
         if (!project) return;
+        // Claude's summary under the description follows the notes too.
+        if (window.CRMProjectSummary) window.CRMProjectSummary.check(project.id);
         try {
             const result = await request(`${API}?action=context&id=${encodeURIComponent(project.id)}`);
             contexts.set(project.id, result.data);
@@ -852,6 +854,7 @@
                         <span class="detail-label">Description</span>
                         <span class="detail-value meeting-description">${escapeHtml(p.description || 'No description')}</span>
                     </div>
+                    ${window.CRMProjectSummary ? window.CRMProjectSummary.block(p.id) : ''}
                 </div>
             </div>
 
@@ -1276,6 +1279,7 @@
     async function refreshAskContext() {
         const project = ask.project;
         if (!project) return;
+        if (window.CRMProjectSummary) window.CRMProjectSummary.check(project.id);
         try {
             const result = await request(`${API}?action=context&id=${encodeURIComponent(project.id)}`);
             contexts.set(project.id, result.data);

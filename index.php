@@ -283,7 +283,7 @@ $isAdmin = Auth::isAdmin();
 $meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
 // Quick add (test, assets/js/compose.js): hidden for now. true brings the
 // tab and its page back.
-$quickAddEnabled = true;
+$quickAddEnabled = false;
 // Claude's summary under a project's description: on while the API key is set.
 $summaryEnabled = ProjectSummary::enabled();
 
@@ -2040,10 +2040,7 @@ function assetUrl(string $path): string
                             <?php if ($summaryEnabled): ?>
                             <!-- Claude's summary of the description and all notes,
                                  kept up to date by assets/js/project-summary.js -->
-                            <div class="overview-detail-item full-width ov-claude-summary" id="projectSummaryItem" data-ov="view" hidden>
-                                <span class="detail-label ov-claude-summary-label" id="projectSummaryLabel"></span>
-                                <div class="detail-value ov-claude-summary-text" id="projectSummaryText" aria-live="polite"></div>
-                            </div>
+                            <div class="overview-detail-item full-width ov-claude-summary" id="projectSummaryItem" data-ov="view" hidden></div>
                             <?php endif; ?>
                         </div>
                     </div>
