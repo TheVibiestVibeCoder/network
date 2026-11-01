@@ -60,20 +60,17 @@
     margin-top: 14px;
 }
 
+/* Second level: a quiet grey label, no count - well below the record type
+   above it. */
 .review-subgroup-title {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 0 0 6px;
-    color: var(--c-ink-2);
-    font: 600 var(--t-xs)/1.3 var(--font);
+    margin: 0 0 6px 2px;
+    color: var(--c-ink-3);
+    font: 500 var(--t-xs)/1.3 var(--font);
     letter-spacing: 0;
     text-transform: none;
-}
-
-.review-subgroup-count {
-    color: var(--c-ink-3);
-    font-weight: 500;
 }
 
 .review-list-card {
@@ -540,16 +537,18 @@
 }
 
 /* ---- Accept and reject, everywhere Claude's proposals are decided ----
-   Quiet at rest - a pale round button like any secondary action - and on
-   hover filled solid in green or red with a white mark, so the decision
-   about to be made is unmistakable. Round buttons in rows (.review-act,
-   .review-inline-btn) and the worded ones in the sheet and above the list
-   (.review-decide). */
+   The round buttons in rows: reject a pale grey circle, accept a step
+   stronger in green - the action expected more often reads first. On hover
+   both fill solid, green or red with a white mark, so the decision about to
+   be made is unmistakable. Worded buttons (sheet, "Accept all") are the
+   ordinary primary and secondary buttons; reject still turns red on hover. */
 :is(.review-act, .review-inline-btn, .btn.review-decide) {
     border-color: transparent;
     background: color-mix(in srgb, var(--c-ink) 7%, transparent);
     color: var(--c-ink-2);
 }
+
+
 
 :is(.review-act--accept, .review-inline-btn--accept, .btn.review-decide--accept):hover:not(:disabled) {
     border-color: transparent;
@@ -881,26 +880,45 @@
 }
 
 
-/* ---- The mark on a proposed record, wherever it is listed ---------------- */
+/* ---- Claude's mark on a record, wherever it is listed ----------------------
+   One mark for everything Claude proposed: its asterisk in Claude's orange.
+   On a record that is itself new - its row tinted below - the mark stands
+   alone; on an accepted record with changes waiting, it says what, in the
+   same orange and without a pill around it. */
 
-.review-badge {
+.review-mark {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    height: 20px;
-    padding: 0 8px 0 6px;
-    border-radius: var(--r-full);
-    background: var(--c-claude-soft);
-    color: var(--c-claude-2);
-    font: 600 11px/1 var(--font);
-    white-space: nowrap;
     flex-shrink: 0;
+    color: var(--c-claude);
+    white-space: nowrap;
     vertical-align: middle;
 }
 
-.review-badge svg {
-    width: 11px;
-    height: 11px;
+.review-mark svg {
+    width: 14px;
+    height: 14px;
+}
+
+.review-mark.has-text {
+    color: var(--c-claude-2);
+    font: 600 var(--t-xs)/1 var(--font);
+}
+
+.review-mark.has-text svg {
+    width: 12px;
+    height: 12px;
+    color: var(--c-claude);
+}
+
+/* The mark followed by reject / accept, as one piece. */
+.review-decide-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    vertical-align: middle;
 }
 
 /* A proposed record: a tint in Claude's colour - no frame - so it stands
@@ -972,118 +990,11 @@
     box-shadow: none;
 }
 
-/* Badge and accept / reject follow the title, as the link pill does. */
-#workloadView .is-proposed .review-pill,
-#workloadView .is-proposed > .review-badge,
-#workloadView .is-proposed :not(.review-pill) > .review-badge {
+/* Mark and accept / reject follow the title, as the link pill does. */
+#workloadView .is-proposed .review-decide-inline,
+#workloadView .is-proposed :not(.review-decide-inline) > .review-mark,
+#workloadView .review-mark.has-text {
     margin-left: 6px;
-    vertical-align: middle;
-}
-
-#workloadView .is-proposed .review-pill .review-badge {
-    margin-left: 0;
-}
-
-/* An accepted record Claude proposes to change: a soft orange pill and
-   nothing else - no tint on the row - so it reads as a note on the record,
-   well below a record that is itself new. */
-.review-change-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 18px;
-    padding: 0 7px 0 5px;
-    border-radius: var(--r-full);
-    background: var(--c-claude-soft);
-    color: var(--c-claude-2);
-    font: 500 11px/1 var(--font);
-    white-space: nowrap;
-    flex-shrink: 0;
-    vertical-align: middle;
-}
-
-.review-change-badge svg {
-    width: 10px;
-    height: 10px;
-    opacity: 0.8;
-}
-
-/* The badge on a proposed record is the second half of the signal. */
-.is-proposed .review-badge {
-    background: var(--c-claude);
-    color: var(--c-on-claude);
-}
-
-/* ---- "Awaiting review" and its decision as one pill ----
-   review.js pill(): the badge and the reject / accept buttons inside one
-   .review-pill (to-do rows, notes, home), so nothing can come between them.
-   30px high with a 3px inset all round: Claude's mark sits in a 24px circle
-   on the left, the buttons are 24px circles on the right, so both ends of
-   the pill run concentric with them (15px radius = 12px + 3px). A soft
-   Claude tint with the words in Claude's darker orange - strong enough to
-   find, quiet enough to sit in a list. */
-.review-pill {
-    --pill-inset: 3px;
-    --pill-dot: 24px;
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    gap: 3px;
-    height: calc(var(--pill-dot) + 2 * var(--pill-inset));
-    padding: var(--pill-inset);
-    border-radius: var(--r-full);
-    background: color-mix(in srgb, var(--c-claude) 20%, transparent);
-    vertical-align: middle;
-}
-
-/* On a proposed row the tint underneath adds up: a touch less here. */
-.is-proposed .review-pill {
-    background: color-mix(in srgb, var(--c-claude) 17%, transparent);
-}
-
-.is-proposed .review-pill .review-badge,
-.review-pill .review-badge {
-    gap: 6px;
-    height: var(--pill-dot);
-    margin: 0;
-    padding: 0 6px 0 0;
-    background: transparent;
-    color: var(--c-claude-2);
-    font-size: 12px;
-}
-
-/* Claude's mark takes a button's place, so the left end curves round it
-   as the right end does round the accept button. */
-.review-pill .review-badge svg {
-    box-sizing: border-box;
-    width: var(--pill-dot);
-    height: var(--pill-dot);
-    padding: 6px;
-    color: var(--c-claude);
-}
-
-.review-pill .review-inline {
-    gap: 3px;
-    height: var(--pill-dot);
-    margin: 0 !important;
-    padding: 0;
-}
-
-.review-pill .review-inline-btn {
-    width: var(--pill-dot);
-    height: var(--pill-dot);
-    background: color-mix(in srgb, var(--c-surface) 75%, transparent);
-    color: var(--c-claude-2);
-}
-
-.review-pill .review-inline-btn svg {
-    width: 13px;
-    height: 13px;
-}
-
-/* Hover: solid, as everywhere, with a thin white ring to sit on the orange. */
-.review-pill .review-inline-btn:hover {
-    color: #FFFFFF;
 }
 
 /* A hovered proposed row stays orange, a shade deeper - not grey. */
@@ -1120,6 +1031,19 @@
 .review-inline-btn svg {
     width: 14px;
     height: 14px;
+}
+
+/* Accept a step stronger than reject, at rest (after both base rules). */
+.review-act.review-act--accept,
+.review-inline-btn.review-inline-btn--accept {
+    background: color-mix(in srgb, var(--c-success) 22%, var(--c-surface));
+    color: var(--c-success-ink);
+}
+
+.review-act.review-act--accept:hover:not(:disabled),
+.review-inline-btn.review-inline-btn--accept:hover:not(:disabled) {
+    background: var(--c-success);
+    color: #FFFFFF;
 }
 
 
@@ -1287,12 +1211,6 @@
     #reviewDetailModal .ov-footer .btn-primary {
         flex-basis: 100%;
         order: 1;
-    }
-
-    .review-pill {
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
     .review-toast {

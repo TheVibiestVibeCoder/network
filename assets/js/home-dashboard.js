@@ -96,10 +96,10 @@
         };
     }
 
-    /** "Fri 9 Oct" */
+    /** "Fri, Oct 9" - month before day, as dates read everywhere (format.js). */
     function shortDate(value) {
         const p = dateParts(value);
-        return `${p.weekdayShort} ${p.day} ${p.monthShort}`;
+        return `${p.weekdayShort}, ${p.monthShort} ${p.day}`;
     }
 
     /** "Today", "Tomorrow", then the weekday: "Friday". */

@@ -6,7 +6,7 @@
  *   - in a browser: open tests/revenue-forecast.test.html straight from disk (file://)
  *   - in a terminal on macOS, with the JavaScriptCore shell:
  *       /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc \
- *           assets/js/project-payments.js assets/js/revenue-forecast.js tests/revenue-forecast.test.js
+ *           assets/js/format.js assets/js/project-payments.js assets/js/revenue-forecast.js tests/revenue-forecast.test.js
  *
  * The current month is fixed at October 2026.
  */
@@ -134,21 +134,21 @@
         near(f.presets.worst.total, 75500, 'worst');
         near(f.presets.realistic.total, 164100, 'realistic');
         near(f.presets.best.total, 311500, 'best');
-        eq(RF.money(f.presets.realistic.total), '€164k', 'realistic label');
+        eq(RF.money(f.presets.realistic.total), '164.100 €', 'realistic label');
     });
 
     test('busiest month and hover readout numbers', () => {
         const f = run(busy());
         // Each budget in its end month: A's 48k in Mar 2027 is the biggest.
         eq(RF.monthName(f.busiest, NOW), 'Mar 2027', 'busiest');
-        eq(RF.money(f.current.totals[f.busiest]), '€48k', 'busiest value');
+        eq(RF.money(f.current.totals[f.busiest]), '48.000 €', 'busiest value');
         // Dec 2027 = offset 14: a 75k proposal x 0.5 and a 25k lead x 0.1.
-        eq(RF.money(f.current.totals[14]), '€40k', 'Dec 2027 total');
-        eq(RF.money(f.current.byStage.Proposal[14]), '€37.5k', 'Dec 2027 proposal');
-        eq(RF.money(f.current.byStage.Lead[14]), '€2.5k', 'Dec 2027 lead');
-        eq(RF.money(f.current.totals[4]), '€0', 'Feb 2027: nothing ends then');
+        eq(RF.money(f.current.totals[14]), '40.000 €', 'Dec 2027 total');
+        eq(RF.money(f.current.byStage.Proposal[14]), '37.500 €', 'Dec 2027 proposal');
+        eq(RF.money(f.current.byStage.Lead[14]), '2.500 €', 'Dec 2027 lead');
+        eq(RF.money(f.current.totals[4]), '0 €', 'Feb 2027: nothing ends then');
         // Best: both at the high end, every project won.
-        eq(RF.money(f.ceiling.totals[14]), '€120k', 'Dec 2027 ceiling');
+        eq(RF.money(f.ceiling.totals[14]), '120.000 €', 'Dec 2027 ceiling');
     });
 
     test('picking a preset gives exactly its controls and clears switches', () => {
@@ -383,20 +383,24 @@
     // Number formats
     // ------------------------------------------------------------------
 
-    test('money: one decimal below €100k, none for whole thousands', () => {
-        eq(RF.money(18900), '€18.9k');
-        eq(RF.money(48000), '€48k');
-        eq(RF.money(141200), '€141k');
-        eq(RF.money(950), '€950');
-        eq(RF.money(99960), '€100k');
-        eq(RF.money(1250000), '€1.3M');
-        eq(RF.moneyFull(48000), '€48,000');
+    test('money: whole euros, German grouping, euro sign after', () => {
+        eq(RF.money(18900), '18.900 €');
+        eq(RF.money(48000), '48.000 €');
+        eq(RF.money(141200), '141.200 €');
+        eq(RF.money(950), '950 €');
+        eq(RF.money(99960.4), '99.960 €');
+        eq(RF.money(1250000), '1.250.000 €');
+        eq(RF.moneyFull(48000), '48.000 €');
+        eq(RF.moneyShort(57500), '57,5k €');
+        eq(RF.moneyShort(60000), '60k €');
+        eq(RF.moneyShort(-20000), '\u221220k €');
+        eq(RF.moneyShort(1250000), '1,3M €');
     });
 
     test('budget and period labels', () => {
-        eq(RF.budgetLabel(24000, 30000), '€24–30k');
-        eq(RF.budgetLabel(48000, 48000), '€48k');
-        eq(RF.budgetLabel(500, 2000), '€500–2k');
+        eq(RF.budgetLabel(24000, 30000), '24.000 – 30.000 €');
+        eq(RF.budgetLabel(48000, 48000), '48.000 €');
+        eq(RF.budgetLabel(500, 2000), '500 – 2.000 €');
         eq(RF.periodLabel(2, 7, NOW), 'Dec ’26 – May ’27');
         eq(RF.periodLabel(1, 1, NOW), 'Nov ’26');
         eq(RF.periodLabel(2, null, NOW), 'From Dec ’26');

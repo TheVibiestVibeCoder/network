@@ -341,27 +341,36 @@
     // Numbers
     // ------------------------------------------------------------------
 
-    /** "€18.9k", "€48k", "€141k", "€1.2M", "€950". */
+    // Amounts read as everywhere in the CRM (assets/js/format.js): German
+    // grouping, the euro sign after, whole euros here - "48.000 €". Written
+    // out by hand rather than with Intl, so the tests run without a locale.
+    const MINUS = '\u2212';
+    const group = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    /** "18.900 €", "48.000 €", "950 €". */
     function money(v) {
-        const n = Math.max(0, v || 0);
-        if (n >= 999500) return '€' + (Math.round(n / 100000) / 10).toString().replace(/\.0$/, '') + 'M';
-        if (n >= 99950) return '€' + Math.round(n / 1000) + 'k';
-        if (n >= 1000) return '€' + (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k';
-        return '€' + Math.round(n);
+        return group(Math.round(Math.max(0, v || 0))) + ' €';
     }
 
-    /** "€48,000" - for screen readers. */
+    /** The same, for screen readers. */
     function moneyFull(v) {
-        return '€' + Math.round(Math.max(0, v || 0)).toLocaleString('en-US');
+        return money(v);
     }
 
-    /** A budget as typed: "€48k" or "€24–30k". */
+    /** For the chart's axis, where room is short: "60k €", "1,2M €", "950 €". */
+    function moneyShort(v) {
+        const n = Math.abs(v || 0);
+        const sign = v < 0 ? MINUS : '';
+        const one = x => String(Math.round(x * 10) / 10).replace('.', ',');
+        if (n >= 999500) return sign + one(n / 1e6) + 'M €';
+        if (n >= 1000) return sign + one(n / 1000) + 'k €';
+        return sign + Math.round(n) + ' €';
+    }
+
+    /** A budget as typed: "48.000 €" or "24.000 – 30.000 €". */
     function budgetLabel(min, max) {
-        if (min === max) return money(min);
-        const a = money(min);
-        const b = money(max);
-        const unit = b.slice(-1);
-        return (a.slice(-1) === unit && /[kM]/.test(unit) ? a.slice(0, -1) : a) + '–' + b.slice(1);
+        if (Math.round(min) === Math.round(max)) return money(min);
+        return group(Math.round(Math.max(0, min || 0))) + ' – ' + money(max);
     }
 
     /** "Dec ’26 – May ’27", one month, "From Dec ’26", "Ends Dec ’26" or "No dates". */
@@ -378,6 +387,6 @@
         prepare, horizon,
         presetByKey, settingsFor, normalizeSettings, excludedCount, activePreset,
         compute, scale, forecast,
-        money, moneyFull, budgetLabel, periodLabel
+        money, moneyFull, moneyShort, budgetLabel, periodLabel
     };
 })(typeof window !== 'undefined' ? window : globalThis);

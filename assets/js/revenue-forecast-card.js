@@ -223,7 +223,7 @@
                 return `<span class="rf-key${on ? ' is-on' : ''}" data-tone="${st.tone}">
                     <span class="rf-stage-dot" aria-hidden="true"></span>${esc(st.label)}${on ? '' : '<span class="rf-sr"> (not counted)</span>'}
                 </span>`;
-            }).join('')}</div>`;
+            }).join('')}<span class="rf-key is-on rf-key--best"><span class="rf-best-swatch" aria-hidden="true"></span>Best case</span></div>`;
         }
 
         function summary(ctx) {
@@ -353,7 +353,7 @@
             const ticks = [];
             if (state.expanded) {
                 for (let v = 0; v <= f.scale.max; v += f.scale.step) {
-                    ticks.push(`<span class="rf-tick${v === 0 ? ' is-base' : ''}" style="bottom:${px(v)}px"><span>${esc(RF.money(v))}</span></span>`);
+                    ticks.push(`<span class="rf-tick${v === 0 ? ' is-base' : ''}" style="bottom:${px(v)}px"><span>${esc(RF.moneyShort(v))}</span></span>`);
                 }
             }
 
@@ -362,22 +362,29 @@
             for (let i = 0; i < columnCount(f); i++) {
                 const undated = i >= f.months;
                 const col = columnOf(f, f.current, i);
-                const segs = RF.STACK
+                const stack = RF.STACK
                     .map(k => ({ k, h: px(col.stage(k)) }))
-                    .filter(x => x.h > 0)
+                    .filter(x => x.h > 0);
+                const segs = stack
                     .map(x => `<span class="rf-seg" data-tone="${toneOf(x.k)}" style="height:${x.h}px"></span>`)
                     .join('');
-                const ghost = px(columnOf(f, f.ceiling, i).total);
+                // The best case is drawn above the bar, not behind it, so the
+                // gaps between the stages show the background, not the hatching.
+                const GAP = 2;
+                const stackH = stack.reduce((sum, x) => sum + x.h, 0) + GAP * Math.max(0, stack.length - 1);
+                const ghostFrom = stackH ? stackH + GAP : 0;
+                const ghostTotal = px(columnOf(f, f.ceiling, i).total);
+                const ghost = Math.max(0, ghostTotal - ghostFrom);
                 const parts = RF.STACK.filter(k => col.stage(k) > 0)
                     .map(k => `, ${labelOf(k)} ${RF.moneyFull(col.stage(k))}`).join('')
                     + columnProjects(ctx, i).map(g => `; ${g.p.name} ${RF.moneyFull(g.amount)}`).join('');
 
                 const selected = state.selected === i;
-                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
+                cols.push(`<button type="button" class="rf-col${undated ? ' is-undated' : ''}${selected ? ' is-selected' : ''}${ghost > 0 && stackH ? ' has-best' : ''}" data-rf-month="${i}" tabindex="${i === focus ? 0 : -1}"
                     data-rf-focus="month-${undated ? 'undated' : i}" aria-expanded="${selected}" aria-controls="${uid}-tip"
-                    title="${esc(columnName(ctx, i))}: click for its projects${ghost > 0 ? ' · grey: everything won at the top of its budget' : ''}"
+                    title="${esc(columnName(ctx, i))}: click for its projects${ghost > 0 ? ' · hatched: the best case, every project won at the top of its budget' : ''}"
                     aria-label="${esc(columnName(ctx, i) + ': ' + RF.moneyFull(col.total) + parts)}">
-                    ${ghost > 0 ? `<span class="rf-ghost" style="height:${ghost}px"></span>` : ''}
+                    ${ghost > 0 ? `<span class="rf-ghost" style="bottom:${ghostFrom}px;height:${ghost}px"></span>` : ''}
                     <span class="rf-stack">${segs}</span>
                 </button>`);
 

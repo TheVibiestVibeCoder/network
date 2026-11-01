@@ -444,7 +444,7 @@ function fetchBookkeeping(PDO $db, ?int $assignee): array
         foreach ($columns as $column) {
             $value = trim((string) ($data[$column] ?? ''));
             if ($value !== '' && count($parts) < 3) {
-                $parts[] = $value;
+                $parts[] = assignDisplayValue($value);
             }
         }
 
@@ -638,3 +638,27 @@ function respond(array $payload, int $status = 200): void
     echo json_encode($payload);
     exit;
 }
+
+/**
+ * A bank statement's value the way the CRM writes it everywhere
+ * (assets/js/format.js): "19.09.2026" -> "Sep 19", "-1950,00" ->
+ * "−1.950,00 €". Anything else as imported.
+ */
+function assignDisplayValue(string $value): string
+{
+    if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/', $value, $m) || preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+        [$day, $month, $year] = strlen($m[1]) === 4 ? [(int) $m[3], (int) $m[2], (int) $m[1]] : [(int) $m[1], (int) $m[2], (int) $m[3]];
+        if (checkdate($month, $day, $year)) {
+            $label = date('M', mktime(0, 0, 0, $month, 1, $year)) . ' ' . $day;
+            return $year === (int) date('Y') ? $label : $label . ', ' . $year;
+        }
+    }
+
+    if (preg_match('/^([+-]?)(\d{1,3}(?:\.?\d{3})*),(\d{2})$/', $value, $m)) {
+        $amount = number_format((float) (str_replace('.', '', $m[2]) . '.' . $m[3]), 2, ',', '.');
+        return ($m[1] === '-' ? "\u{2212}" : '') . $amount . ' €';
+    }
+
+    return $value;
+}
+

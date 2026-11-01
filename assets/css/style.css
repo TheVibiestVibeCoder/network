@@ -6077,24 +6077,6 @@ button.user-chip:focus-visible {
     margin: 2px 0 0;
 }
 
-.workload-switch {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-2);
-}
-
-.workload-switch-label {
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--color-text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.workload-switch .form-select {
-    min-width: 150px;
-}
-
 /* --- Sections ----------------------------------------------------------- */
 
 .workload-section {
@@ -6428,15 +6410,6 @@ div.workload-row {
 
     .workload-head {
         align-items: flex-start;
-    }
-
-    .workload-switch {
-        width: 100%;
-    }
-
-    .workload-switch .form-select {
-        flex: 1;
-        min-width: 0;
     }
 
     .assignee-bar-body {

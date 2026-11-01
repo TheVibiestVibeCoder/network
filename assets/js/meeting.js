@@ -125,14 +125,7 @@
 
     function formatDate(value) {
         if (!value) return '';
-        const date = new Date(String(value).slice(0, 10) + 'T00:00:00');
-        if (Number.isNaN(date.getTime())) return value;
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-
-    function formatMoney(value) {
-        if (value === null || value === undefined || value === '') return '';
-        return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' €';
+        return window.CRMFormat.date(String(value).slice(0, 10)) || value;
     }
 
     function currentProject() {
@@ -738,7 +731,7 @@
                     ${draftField(project, 'meeting-text')}
                     <div class="meeting-send-row">
                         <p class="meeting-hint"><span>When you move on, Claude turns this into to-dos, notes and changes under <strong>From Claude</strong>. A question? Ask it now and the answer shows here.</span></p>
-                        <button type="button" class="btn meeting-ask-send" data-meeting-send title="Send to Claude now, without moving on">${ICON_CLAUDE}<span>Ask now</span></button>
+                        <button type="button" class="btn meeting-claude-btn" data-meeting-send title="Send to Claude now, without moving on">${ICON_CLAUDE}<span>Ask now</span></button>
                     </div>
                     ${jobsHtml(jobsFor(project.id))}
                 </section>
@@ -825,7 +818,7 @@
     function detailsHtml(ctx) {
         const p = ctx.project;
         const budget = p.budget_min || p.budget_max
-            ? [formatMoney(p.budget_min), formatMoney(p.budget_max)].filter(Boolean).join(' – ')
+            ? window.CRMFormat.amountRange(p.budget_min || null, p.budget_max || null)
             : '';
         const fact = (label, value) => `
             <div class="overview-detail-item">
@@ -864,10 +857,9 @@
                 </div>
                 ${ctx.contacts && ctx.contacts.length ? `<div class="project-contacts-list">${ctx.contacts.map(c => `
                     <span class="pcontact-chip" title="${escapeHtml(c.company ? `${c.name} · ${c.company}` : c.name)}">
-                        <span class="pcontact-avatar">${escapeHtml(initials(c.name))}</span>
                         <span class="pcontact-name">${escapeHtml(c.name)}</span>
                         <button type="button" class="pcontact-remove" data-meeting-remove-contact="${c.id}" data-name="${escapeHtml(c.name)}" title="Remove from the project" aria-label="Remove ${escapeHtml(c.name)}">&times;</button>
-                    </span>`).join('')}</div>` : '<p class="empty-hint">No contacts assigned</p>'}
+                    </span>`).join('')}</div>` : '<p class="empty-hint">No contacts yet</p>'}
             </div>
 
             <div class="overview-section">

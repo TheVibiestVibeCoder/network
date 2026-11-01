@@ -140,19 +140,14 @@
         return options.sort((a, b) => (a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
     }
 
-    /** "18.000 €" and "18.450,50 €", as the budget is shown everywhere in the sheet. */
-    function euroNumber(n) {
-        const v = Math.round(n * 100) / 100;
-        const cents = Math.round(Math.abs(v) * 100) % 100 !== 0;
-        return v.toLocaleString('de-DE', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
-    }
-    const euro = n => euroNumber(n) + ' €';
+    /** "18.000 €" and "18.450,50 €" (format.js), as amounts read everywhere. */
+    const euro = n => root.CRMFormat.amount(n);
 
     /** "4.000 – 10.000 €", or one amount when both ends agree. */
     function euroRange(r) {
         return Math.round(r.min * 100) === Math.round(r.max * 100)
             ? euro(r.min)
-            : euroNumber(r.min) + ' – ' + euro(r.max);
+            : root.CRMFormat.amountRange(r.min, r.max);
     }
 
     // ------------------------------------------------------------------
@@ -166,8 +161,8 @@
     }
 
     const ICON_CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
-    const ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>';
+    const ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     const ICON_WARN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 
     const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
@@ -551,10 +546,9 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
-    /** "2026-10-03" -> "3 Oct 2026"; anything else as it came. */
+    /** "2026-10-03" -> "Oct 3"; anything else as it came. */
     function dayName(iso) {
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
-        return m ? Number(m[3]) + ' ' + MONTHS_SHORT[Number(m[2]) - 1] + ' ' + m[1] : String(iso || '');
+        return root.CRMFormat.date(iso) || String(iso || '');
     }
 
     const sameAmount = (a, b) => Math.abs(a - b) < 0.005;

@@ -158,20 +158,15 @@
         return isNaN(date.getTime()) ? null : date;
     }
 
+    // Dates and amounts read the same as everywhere else (format.js).
     function timeAgo(value) {
         const date = parseUtc(value);
-        if (!date) return '';
-        const seconds = Math.max(0, (Date.now() - date.getTime()) / 1000);
-        if (seconds < 60) return 'just now';
-        if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
-        if (seconds < 86400) return Math.floor(seconds / 3600) + ' h ago';
-        if (seconds < 7 * 86400) return Math.floor(seconds / 86400) + ' d ago';
-        return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        return date ? window.CRMFormat.ago(date) : '';
     }
 
     function fullDate(value) {
         const date = parseUtc(value);
-        return date ? date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+        return date ? window.CRMFormat.dateTime(date) : '';
     }
 
     function formatBytes(bytes) {
@@ -185,12 +180,10 @@
         return value === null || value === undefined || String(value).trim() === '';
     }
 
-    /** "2026-10-15" as "Oct 15, 2026", the way the other sheets show dates. */
+    /** "2026-10-15" as "Oct 15", the way the other sheets show dates. */
     function formatDay(value) {
-        const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
-        if (!match) return String(value || '');
-        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value || ''));
+        return match ? window.CRMFormat.date(match[1]) : String(value || '');
     }
 
     function displayValue(field, value) {
@@ -200,7 +193,7 @@
         if (isEmpty(value)) return '—';
         if (field === 'priority') return String(value).charAt(0).toUpperCase() + String(value).slice(1);
         if (DATE_FIELDS.includes(field)) return formatDay(value);
-        if ((field === 'budget_min' || field === 'budget_max') && !isNaN(Number(value))) return Number(value).toLocaleString('de-AT') + ' €';
+        if ((field === 'budget_min' || field === 'budget_max') && !isNaN(Number(value))) return window.CRMFormat.amount(Number(value));
         if (field === 'success_chance' && !isNaN(Number(value))) return Number(value) + ' %';
         return String(value);
     }
@@ -225,7 +218,8 @@
     }
 
     function budgetText(r) {
-        return [r.budget_min, r.budget_max].filter(v => !isEmpty(v)).map(v => Number(v).toLocaleString('de-AT') + ' €').join(' – ');
+        const ends = [r.budget_min, r.budget_max].filter(v => !isEmpty(v)).map(Number);
+        return ends.length ? window.CRMFormat.amountRange(ends[0], ends[ends.length - 1]) : '';
     }
 
     // ------------------------------------------------------------------
@@ -771,10 +765,10 @@
         }
 
         return `
-            <button type="button" class="btn review-decide review-decide--reject" data-review-act="reject"${off}>${ICON_X}Reject</button>
+            <button type="button" class="btn btn-secondary review-decide--reject" data-review-act="reject"${off}>${ICON_X}Reject</button>
             ${open}
             ${canEdit(item) ? `<button type="button" class="btn btn-secondary" data-review-act="edit"${off}>${ICON_EDIT}Edit</button>` : ''}
-            <button type="button" class="btn review-decide review-decide--accept" data-review-act="accept"${off}>${ICON_CHECK}Accept</button>`;
+            <button type="button" class="btn btn-primary" data-review-act="accept"${off}>${ICON_CHECK}Accept</button>`;
     }
 
     function renderSheet() {
@@ -891,12 +885,11 @@
         return SUBGROUPS.map(sub => {
             const mine = records.filter(list => subgroupOf(list) === sub.key);
             if (!mine.length) return '';
-            const count = mine.reduce((n, list) => n + list.length, 0);
             // Deleting a project archives it.
             const title = sub.key === 'delete' && group.types[0] === 'project' ? 'Archiving' : sub.title;
             return `
                 <div class="review-subgroup review-subgroup--${sub.key}">
-                    <h3 class="review-subgroup-title">${escapeHtml(title)} <span class="review-subgroup-count" data-review-count>${count}</span></h3>
+                    <h3 class="review-subgroup-title">${escapeHtml(title)}</h3>
                     <div class="review-list-card">${mine.map(list => list.length > 1 ? renderCluster(list) : renderRow(list[0])).join('')}</div>
                 </div>`;
         }).join('');
@@ -1046,11 +1039,6 @@
             node.textContent = String(count);
             node.hidden = count === 0;
         });
-        if (els.subtitle) {
-            els.subtitle.textContent = count > 0
-                ? `${count} waiting for a decision. Nothing Claude proposes is permanent until someone accepts it.`
-                : 'Everything Claude adds or changes waits here until someone on the team accepts it.';
-        }
     }
 
     async function refreshBadge() {
@@ -1678,11 +1666,14 @@
     // Pieces other modules put on records
     // ------------------------------------------------------------------
 
-    /** The mark on a proposed record in a list. */
+    /**
+     * The mark on a proposed record in a list: Claude's asterisk, nothing
+     * more - the orange tint of the row and the mark say it is Claude's and
+     * not accepted yet; the tooltip says it in words.
+     */
     function badge(record) {
         if (!record || record.review_status !== 'pending') return '';
-        // Says what it means, not just who: the point is that nobody has accepted it yet.
-        return `<span class="review-badge" title="Proposed by Claude - not accepted yet">${ICON_SPARK}<span>Awaiting review</span></span>`;
+        return `<span class="review-mark" role="img" title="Proposed by Claude - not accepted yet" aria-label="Proposed by Claude, not accepted yet">${ICON_SPARK}</span>`;
     }
 
     /**
@@ -1701,7 +1692,7 @@
         const label = kinds.length === 1
             ? (words[kinds[0]] || 'Change') + ' proposed'
             : kinds.length + ' changes proposed';
-        return `<span class="review-change-badge" title="Claude proposes ${kinds.length === 1 ? 'a change' : kinds.length + ' changes'} here - open it to accept or reject">${ICON_SPARK}<span>${escapeHtml(label)}</span></span>`;
+        return `<span class="review-mark has-text" title="Claude proposes ${kinds.length === 1 ? 'a change' : kinds.length + ' changes'} here - open it to accept or reject">${ICON_SPARK}<span>${escapeHtml(label)}</span></span>`;
     }
 
     /**
@@ -1719,13 +1710,13 @@
     }
 
     /**
-     * "Awaiting review" and its reject / accept buttons as one pill. One
-     * element around both, so no gap the surrounding row puts between its
-     * items can split it (review.css).
+     * Claude's mark and its reject / accept buttons, kept together in one
+     * element so no gap the surrounding row puts between its items can
+     * split them (review.css).
      */
     function pill(record, entityType, id) {
         if (!record || record.review_status !== 'pending') return '';
-        return `<span class="review-pill">${badge(record)}${inlineActions(entityType, id).trim()}</span>`;
+        return `<span class="review-decide-inline">${badge(record)}${inlineActions(entityType, id).trim()}</span>`;
     }
 
     const panelItems = new Map();
@@ -1770,7 +1761,6 @@
 
     function bind() {
         els.list = document.getElementById('reviewList');
-        els.subtitle = document.getElementById('reviewSubtitle');
         els.bulk = document.getElementById('reviewBulk');
         els.bulkBar = document.getElementById('reviewBulkBar');
         els.bulkStatus = document.getElementById('reviewBulkStatus');

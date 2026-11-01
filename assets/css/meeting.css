@@ -491,6 +491,7 @@
 .meeting-mini-dot.stage-in-progress { --stage-tone: var(--stage-progress); }
 .meeting-mini-dot.stage-proposal { --stage-tone: var(--stage-proposal); }
 .meeting-mini-dot.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.meeting-mini-dot.stage-complete { --stage-tone: var(--stage-complete); }
 
 .meeting-mini-title {
     display: flex;
@@ -853,9 +854,11 @@
     padding-bottom: 24px;
 }
 
-/* Send and "Start meeting": in Claude's colour, with its mark. */
-.btn.meeting-ask-send,
-.btn.meeting-start-btn {
+/* Claude's buttons are orange, the way the rest are navy: solid when sending
+   to Claude is the window's one action (the card's Ask window), outlined
+   (.meeting-claude-btn) where another button leads - "Ask now" beside "Next
+   project" in the meeting. */
+.btn.meeting-ask-send {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -864,8 +867,19 @@
     color: #fff;
 }
 
-.btn.meeting-ask-send:hover:not(:disabled),
-.btn.meeting-start-btn:hover:not(:disabled) {
+/* "Start meeting": a secondary button like any other; only Claude's mark is
+   in its colour, so "Add Project" stays the page's one primary action. */
+.btn.meeting-start-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn.meeting-start-btn svg {
+    color: var(--c-claude);
+}
+
+.btn.meeting-ask-send:hover:not(:disabled) {
     border-color: var(--c-claude-2);
     background: var(--c-claude-2);
     color: #fff;

@@ -173,7 +173,6 @@
 
         // Overview modal
         overviewModal: document.getElementById('overviewModal'),
-        overviewAvatar: document.getElementById('overviewAvatar'),
         overviewName: document.getElementById('overviewName'),
         overviewCompany: document.getElementById('overviewCompany'),
         overviewEdited: document.getElementById('overviewEdited'),
@@ -186,7 +185,6 @@
         newNoteContent: document.getElementById('newNoteContent'),
         addNoteBtn: document.getElementById('addNoteBtn'),
         closeOverviewModal: document.getElementById('closeOverviewModal'),
-        closeOverviewBtn: document.getElementById('closeOverviewBtn'),
         editContactBtn: document.getElementById('editContactBtn'),
 
         // Company notes modal
@@ -1015,9 +1013,7 @@
     function renderPinnedSection(contacts) {
         let html = `<div class="pinned-section">`;
         html += `<div class="pinned-header">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-            </svg>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
             <span>Pinned</span>
             <span class="pinned-count">${contacts.length}</span>
         </div>`;
@@ -1030,9 +1026,7 @@
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
                     <h3>No contacts found</h3>
                     <p>${state.searchQuery ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
@@ -1057,9 +1051,7 @@
                 // Company group with header
                 html += `<div class="company-group">`;
                 html += `<div class="company-header" data-company="${escapeHtml(group.company)}" title="Klicken für Firmen-Notizen">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
                     <span>${escapeHtml(group.company)}</span>
                     <span class="company-count">${group.contacts.length}</span>
                 </div>`;
@@ -1069,9 +1061,7 @@
                 // Contacts without company get their own section for cleaner visual rhythm
                 html += `<div class="company-group company-group--ungrouped">`;
                 html += `<div class="company-header company-header--muted">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
                     <span>No Company</span>
                     <span class="company-count">${group.contacts.length}</span>
                 </div>`;
@@ -1133,9 +1123,7 @@
         if (totalContacts === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
                     <h3>No contacts found</h3>
                     <p>${query ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
@@ -1173,10 +1161,10 @@
                     <span class="tag-count">${unpinned.length}</span>
                     <span class="tag-actions">
                         <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
                         </button>
                         <button class="tag-action-btn tag-delete-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" title="Tag l&ouml;schen">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </span>
                 </div>`;
@@ -1190,9 +1178,7 @@
         if (unpinnedUntagged.length > 0) {
             html += `<div class="tag-group untagged-group">`;
             html += `<div class="tag-header tag-header-untagged">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
-                </svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.6 6.6a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8" cy="8" r="1.3"/></svg>
                 <span>Ohne Tag</span>
                 <span class="tag-count">${unpinnedUntagged.length}</span>
             </div>`;
@@ -1368,9 +1354,6 @@
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}${isProposed ? ' is-proposed' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
-                    <div class="contact-avatar">
-                        ${escapeHtml(getInitials(contact.name))}
-                    </div>
                     <div class="contact-card-content">
                         <h3 class="contact-card-name">${escapeHtml(contact.name)} ${reviewBadge(contact)}</h3>
                         <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
@@ -1378,15 +1361,8 @@
                 </div>
                 ${assigneeChip(contact)}
                 <button class="pin-btn${isPinned ? ' pin-btn--active' : ''}" data-id="${contact.id}" title="${isPinned ? 'Unpin contact' : 'Pin contact'}">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
                 </button>
-                <div class="contact-card-chevron" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
-                    </svg>
-                </div>
             </div>
         `;
     }
@@ -1733,12 +1709,12 @@
             if (result.success) {
                 renderTodoCollection(elements.contactTodosList, result.data || [], {
                     showContext: false,
-                    emptyMessage: 'No to-dos yet for this contact'
+                    emptyMessage: 'No to-dos yet'
                 });
             } else {
                 renderTodoCollection(elements.contactTodosList, [], {
                     showContext: false,
-                    emptyMessage: 'No to-dos yet for this contact'
+                    emptyMessage: 'No to-dos yet'
                 });
             }
         } catch (error) {
@@ -1837,14 +1813,7 @@
         const emptyMessage = options.emptyMessage || 'No to-dos yet';
 
         if (!todos || todos.length === 0) {
-            container.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-                    </svg>
-                    <p>${escapeHtml(emptyMessage)}</p>
-                </div>
-            `;
+            container.innerHTML = `<p class="empty-hint">${escapeHtml(emptyMessage)}</p>`;
             return;
         }
 
@@ -1987,11 +1956,7 @@
 
         let dueText = 'No due date';
         if (dueDate) {
-            dueText = `Due ${dueDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            })}`;
+            dueText = `Due ${window.CRMFormat.date(dueDate)}`;
         }
 
         let contextLabel = '';
@@ -2031,7 +1996,7 @@
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
                         <div class="todo-meta">
-                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label)}</span>` : ''}
+                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
                             ${assigneeChip(todo)}
                             ${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
@@ -2043,9 +2008,7 @@
                             Edit
                         </button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                 </div>
@@ -2096,13 +2059,7 @@
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
-        const dueText = dueDate
-            ? dueDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: dueDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-            })
-            : '';
+        const dueText = dueDate ? window.CRMFormat.date(dueDate) : '';
 
         const isProposed = todo.review_status === 'pending';
         const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
@@ -2145,7 +2102,7 @@
                         ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
                         ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
                     </span>
-                    <svg class="ptodo-chevron" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                    <svg class="ptodo-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
                 </div>
                 <div class="ptodo-detail">
                     ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
@@ -2153,9 +2110,7 @@
                         ${isProposed ? reviewInline('todo', proposalId) : ''}
                         <button type="button" class="btn btn-secondary btn-small" data-todo-edit="${todo.id}">Edit</button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                 </div>
@@ -2359,17 +2314,17 @@
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
         elements.todoDetailDue.innerHTML = dueDate
-            ? `<span class="${isOverdue ? 'todo-due-overdue' : ''}">${escapeHtml(dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}${isOverdue ? ' (overdue)' : ''}</span>`
-            : '<span class="tdetail-muted">No due date</span>';
+            ? `<span class="${isOverdue ? 'todo-due-overdue' : ''}">${escapeHtml(window.CRMFormat.date(dueDate))}${isOverdue ? ' (overdue)' : ''}</span>`
+            : '<span class="detail-empty">—</span>';
 
         const priorityMeta = getTodoPriorityMeta(todo.priority);
         elements.todoDetailPriority.innerHTML = priorityMeta
             ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>`
-            : '<span class="tdetail-muted">None</span>';
+            : '<span class="detail-empty">—</span>';
 
         elements.todoDetailDescription.innerHTML = todo.description
             ? escapeHtml(todo.description)
-            : '<span class="tdetail-muted">No description</span>';
+            : '<span class="detail-empty">—</span>';
 
         renderTodoDetailLinks(todo.links || []);
 
@@ -2728,6 +2683,7 @@
         elements.todoDetailModal.querySelector('.modal-backdrop').addEventListener('click', closeTodoDetail);
 
         elements.editTodoDetailBtn.addEventListener('click', enterTodoEdit);
+        bindClickToEdit(elements.todoDetailModal, elements.editTodoDetailBtn, isEditingTodo, enterTodoEdit);
         elements.cancelTodoEditBtn.addEventListener('click', cancelTodoEdit);
         elements.saveTodoEditBtn.addEventListener('click', saveTodoEdit);
         elements.todoEditAssignType.addEventListener('change', () => {
@@ -3034,7 +2990,6 @@
             state.viewingContact = contact;
 
             // Populate header
-            elements.overviewAvatar.textContent = getInitials(contact.name);
             elements.overviewName.textContent = contact.name;
             elements.overviewCompany.textContent = contact.company || '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
@@ -3078,11 +3033,6 @@
             const geoWarning = !hasCoords ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Location ${geoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.location)}</span>
@@ -3094,11 +3044,6 @@
         if (contact.email) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Email</span>
                         <a href="mailto:${escapeHtml(contact.email)}" class="detail-value detail-link">${escapeHtml(contact.email)}</a>
@@ -3110,11 +3055,6 @@
         if (contact.phone) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Phone</span>
                         <a href="tel:${escapeHtml(contact.phone)}" class="detail-value detail-link">${escapeHtml(contact.phone)}</a>
@@ -3126,11 +3066,6 @@
         if (contact.website) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Website</span>
                         <a href="${escapeHtml(normalizeUrl(contact.website))}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
@@ -3144,11 +3079,6 @@
             const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Address ${addressGeoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.address).replace(/\n/g, '<br>')}</span>
@@ -3160,11 +3090,6 @@
         if (contact.note) {
             html += `
                 <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Note</span>
                         <span class="detail-value">${escapeHtml(contact.note)}</span>
@@ -3177,7 +3102,7 @@
 
         // Show empty state if no details
         if (!contact.location && !contact.email && !contact.phone && !contact.website && !contact.address && !contact.note) {
-            html = '<p class="no-details">No contact details available</p>';
+            html = '<p class="empty-hint">No contact details yet</p>';
         }
 
         elements.overviewDetails.innerHTML = html;
@@ -3197,22 +3122,14 @@
 
     function renderNotesTimeline(notes) {
         if (!notes || notes.length === 0) {
-            elements.notesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet</p>
-                </div>
-            `;
+            elements.notesTimeline.innerHTML = '<p class="empty-hint">No notes yet</p>';
             return;
         }
 
         let html = '';
 
         notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
             const isCompanyNote = note.source === 'company';
             const contactName = note.contact_name || '';
 
@@ -3226,9 +3143,7 @@
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
                         ${isProposed ? reviewPill(note, 'contact_note', note.id) : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -3248,29 +3163,9 @@
         });
     }
 
+    /** "Just now", "5 minutes ago", "Yesterday", then the date (format.js). */
     function formatDate(date) {
-        const now = new Date();
-        const diff = now - date;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 7) {
-            return date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-            });
-        } else if (days > 0) {
-            return days === 1 ? 'Yesterday' : `${days} days ago`;
-        } else if (hours > 0) {
-            return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-        } else if (minutes > 0) {
-            return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
-        } else {
-            return 'Just now';
-        }
+        return window.CRMFormat.ago(date);
     }
 
     async function addNote() {
@@ -3302,9 +3197,7 @@
         } finally {
             elements.addNoteBtn.disabled = false;
             elements.addNoteBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                 Add Note
             `;
         }
@@ -3343,7 +3236,7 @@
 
     function renderContactProjects(projects) {
         if (!projects || projects.length === 0) {
-            elements.contactProjects.innerHTML = '<p class="empty-hint">No related projects</p>';
+            elements.contactProjects.innerHTML = '<p class="empty-hint">No projects yet</p>';
             return;
         }
 
@@ -3407,7 +3300,7 @@
 
     function renderContactTags(tags) {
         if (!tags || tags.length === 0) {
-            elements.contactTags.innerHTML = '<span class="no-tags">No tags</span>';
+            elements.contactTags.innerHTML = '<p class="empty-hint">No tags yet</p>';
             return;
         }
 
@@ -3417,9 +3310,7 @@
                 <span class="tag" style="--tag-color: ${escapeHtml(tag.color)}">
                     ${escapeHtml(tag.name)}
                     <button class="tag-remove" data-tag-id="${tag.id}" title="Remove tag">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
                     </button>
                 </span>
             `;
@@ -3471,9 +3362,7 @@
         if (query && !state.allTags.some(t => t.name.toLowerCase() === query.toLowerCase())) {
             html += `
                 <div class="tag-suggestion tag-create" data-create="true">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                     New tag: "${escapeHtml(query)}"
                 </div>
             `;
@@ -3547,10 +3436,10 @@
                 <input type="color" class="tag-edit-color" value="${tagColor}" title="Colour">
                 <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag name">
                 <button type="submit" class="tag-edit-save" title="Save">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
                 </button>
                 <button type="button" class="tag-edit-cancel" title="Cancel">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
                 </button>
             </form>
         `;
@@ -3611,11 +3500,7 @@
             elements.companyNotesTitle.textContent = company;
 
             // Show loading state
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <p>Loading notes...</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Loading notes...</p>';
 
             // Show modal
             elements.companyNotesModal.classList.add('active');
@@ -3626,40 +3511,24 @@
             if (result.success) {
                 renderCompanyNotesTimeline(result.data);
             } else {
-                elements.companyNotesTimeline.innerHTML = `
-                    <div class="notes-empty">
-                        <p>Error loading notes</p>
-                    </div>
-                `;
+                elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
             }
         } catch (error) {
             console.error('Error loading company notes:', error);
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <p>Error loading notes</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
         }
     }
 
     function renderCompanyNotesTimeline(notes) {
         if (!notes || notes.length === 0) {
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet for this company</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class="empty-hint">No notes yet for this company</p>';
             return;
         }
 
         let html = '';
 
         notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
             const contactName = note.contact_name || 'Unknown';
 
             html += `
@@ -3756,9 +3625,7 @@
             setTimeout(() => {
                 elements.exportBtn.disabled = false;
                 elements.exportBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
                     Export All Contacts
                 `;
             }, 1000);
@@ -4418,9 +4285,7 @@
 
         if (dayNotes.length === 0) {
             html += `<div class="cal-day-empty">
-                <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
-                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-                </svg>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
                 <p>Nothing on this day</p>
             </div>`;
         } else {
@@ -4439,7 +4304,7 @@
                     `<span class="cal-day-tag" style="--tag-color: ${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`
                 ).join('');
                 const todoMeta = getCalendarEntryType(entry) === 'todo'
-                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Erledigt' : 'Offen'}${entry.due_date ? ` - Faellig ${escapeHtml(entry.due_date)}` : ''}</span>`
+                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Done' : 'Open'}${entry.due_date ? ` · Due ${escapeHtml(window.CRMFormat.date(entry.due_date))}` : ''}</span>`
                     : '';
 
                 html += `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
@@ -4821,26 +4686,16 @@
         const min = toNumber(project.budget_min);
         const max = toNumber(project.budget_max);
 
-        // "18.000" and "18.450,50": dots for thousands (de-AT would use a thin
-        // space), and both decimals whenever there are cents at all.
-        const exact = (n) => {
-            const cents = Math.round(n * 100) % 100 !== 0;
-            return n.toLocaleString('de-DE', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
-        };
-
         if (min === null && max === null) return '';
         if ((min || 0) === 0 && (max || 0) === 0) return '';
-        if (min !== null && max !== null && min !== max) return `${exact(min)} – ${exact(max)} €`;
-
-        return `${exact(max !== null ? max : min)} €`;
+        return window.CRMFormat.amountRange(min, max);
     }
 
     /**
      * When a project runs, as one quiet line: the span on the left, how it
-     * stands on the right - "Aug 17 – Sep 26, 2026     5 days overdue".
-     * The year is written once when both dates share it, the month once when
-     * they share that too ("Nov 13 – 27, 2026"); a lone date says which it
-     * is ("From Nov 13, 2026", "Until Nov 27, 2026"). Kept below the budget
+     * stands on the right - "Aug 17 – Sep 26     5 days overdue". Dates as
+     * everywhere (format.js): the year only when it is not this one; a lone
+     * date says which it is ("From Nov 13", "Until Nov 27"). Kept below the budget
      * in weight - it is reference, not the headline. The status only takes a
      * colour when it needs attention: overdue, or a week or less to go.
      */
@@ -4850,8 +4705,6 @@
             const date = new Date(value + 'T00:00:00');
             return isNaN(date.getTime()) ? null : date;
         };
-        const fmt = (date, parts) => date.toLocaleDateString('en-US', parts);
-        const full = (date) => fmt(date, { month: 'short', day: 'numeric', year: 'numeric' });
         const DAY = 86400000;
         const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -4862,21 +4715,14 @@
 
         const late = !isComplete && end && end < today;
 
+        // "Sep 1 – Nov 13", "From Nov 13", "Until Nov 27" (format.js).
         let span;
         if (start && end) {
-            if (start.getFullYear() !== end.getFullYear()) {
-                span = `${full(start)} – ${full(end)}`;
-            } else if (start.getMonth() !== end.getMonth()) {
-                span = `${fmt(start, { month: 'short', day: 'numeric' })} – ${full(end)}`;
-            } else if (start.getDate() !== end.getDate()) {
-                span = `${fmt(start, { month: 'short', day: 'numeric' })} – ${end.getDate()}, ${end.getFullYear()}`;
-            } else {
-                span = full(end);
-            }
-        } else if (start) {
-            span = `From ${full(start)}`;
-        } else if (end) {
-            span = `Until ${full(end)}`;
+            span = start.getTime() === end.getTime()
+                ? window.CRMFormat.date(end)
+                : window.CRMFormat.dateRange(start, end);
+        } else if (start || end) {
+            span = window.CRMFormat.dateRange(start, end);
         } else {
             span = 'No dates yet';
         }
@@ -5077,26 +4923,26 @@
         setAssigneeControl(elements.projectOverviewAssignee, 'project', project);
 
         // Format dates as absolute dates
-        elements.projectOverviewStartDate.textContent = project.start_date
-            ? new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'N/A';
-        elements.projectOverviewStage.textContent = project.stage || 'N/A';
+        setDetailValue(elements.projectOverviewStartDate, project.start_date
+            ? window.CRMFormat.date(project.start_date)
+            : '');
+        setDetailValue(elements.projectOverviewStage, project.stage);
 
         // Same exact figures as the card. Both zero means "not decided yet".
         const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
         const ovBMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
-        elements.projectOverviewBudget.textContent = (ovBMin === null && ovBMax === null)
-            ? 'N/A'
-            : (formatProjectValue(project) || 'Undetermined');
+        setDetailValue(elements.projectOverviewBudget, (ovBMin === null && ovBMax === null)
+            ? ''
+            : (formatProjectValue(project) || 'Undetermined'));
         if (window.ProjectPayments) {
             window.ProjectPayments.renderView(project, elements.projectOverviewPayments, elements.projectOverviewPaymentsList);
         }
 
-        elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
-        elements.projectOverviewEstCompletion.textContent = project.estimated_completion
-            ? new Date(project.estimated_completion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'N/A';
-        elements.projectOverviewDescription.textContent = project.description || 'No description';
+        setDetailValue(elements.projectOverviewSuccessChance, project.success_chance ? `${project.success_chance}%` : '');
+        setDetailValue(elements.projectOverviewEstCompletion, project.estimated_completion
+            ? window.CRMFormat.date(project.estimated_completion)
+            : '');
+        setDetailValue(elements.projectOverviewDescription, project.description);
 
         // Claude's summary of the description and notes, written again when
         // either changed since (project-summary.js)
@@ -5132,7 +4978,7 @@
         state.viewingProjectTagIds = new Set((tags || []).map(tag => Number(tag.id)));
 
         if (!tags || tags.length === 0) {
-            elements.projectTags.innerHTML = '<p class="empty-hint">No tags</p>';
+            elements.projectTags.innerHTML = '<p class="empty-hint">No tags yet</p>';
             return;
         }
 
@@ -5150,14 +4996,13 @@
         state.viewingProjectContactIds = new Set((contacts || []).map(contact => Number(contact.id)));
 
         if (!contacts || contacts.length === 0) {
-            elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts assigned</p>';
+            elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts yet</p>';
             return;
         }
 
         // Small chips side by side; the company is in the tooltip.
         const html = contacts.map(contact => `
             <span class="pcontact-chip" data-open-contact="${contact.id}" title="${escapeHtml(contact.company ? `${contact.name} · ${contact.company}` : contact.name)}">
-                <span class="pcontact-avatar">${escapeHtml(getInitials(contact.name))}</span>
                 <button type="button" class="pcontact-name" data-open-contact="${contact.id}">${escapeHtml(contact.name)}</button>
                 <button type="button" class="pcontact-remove" data-remove-contact="${contact.id}" title="Remove contact" aria-label="Remove ${escapeHtml(contact.name)}">&times;</button>
             </span>
@@ -5227,8 +5072,7 @@
         let hiddenCount = 0;
         let html = '';
         notes.forEach((note, index) => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
 
             const isProposed = note.review_status === 'pending';
             const isHidden = !state.showAllProjectNotes && index >= PROJECT_NOTES_SHOWN && !isProposed;
@@ -5244,9 +5088,7 @@
                         ${byLine(note.author_name, note.author_id)}
                         ${isProposed ? reviewPill(note, 'project_note', note.id) : ''}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -5444,6 +5286,45 @@
 
     function isNewProject() {
         return elements.projectOverviewModal.classList.contains('is-new');
+    }
+
+    /**
+     * Click a value in a sheet to change it: the sheet turns to editing with
+     * that value's field in focus - no trip to the Edit button first. Links
+     * and buttons inside a value keep doing what they do, and selecting text
+     * to copy it does not count as a click.
+     */
+    function bindClickToEdit(modal, editButton, isEditing, enter) {
+        const content = modal && modal.querySelector('.modal-content');
+        if (!content || !editButton) return;
+
+        content.addEventListener('click', async (e) => {
+            if (isEditing() || modal.classList.contains('is-new')) return;
+            if (editButton.disabled || editButton.offsetParent === null) return;
+            if (e.target.closest('a, button, input, select, textarea, label')) return;
+            if (String(window.getSelection ? window.getSelection() : '').trim()) return;
+
+            const value = e.target.closest('[data-ov="view"]');
+            if (!value || !content.contains(value)) return;
+
+            // The value's field is the next sibling meant for editing.
+            let field = value.nextElementSibling;
+            while (field && field.getAttribute('data-ov') !== 'edit') {
+                field = field.nextElementSibling;
+            }
+            if (!field) return;
+            const input = field.matches('input, select, textarea')
+                ? field
+                : field.querySelector('input, select, textarea');
+            if (!input) return;
+
+            await enter();
+            if (!isEditing()) return;
+            input.focus();
+            if (input.matches('input[type="text"], input:not([type]), textarea')) {
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
     }
 
     /**
@@ -5655,7 +5536,7 @@
         container.innerHTML = `<div class="ptodo-card">${todos.map(todo => {
             const dueDate = parseTodoDueDate(todo.due_date);
             const dueText = dueDate
-                ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: dueDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+                ? window.CRMFormat.date(dueDate)
                 : '';
             const priorityMeta = getTodoPriorityMeta(todo.priority);
             return `
@@ -5915,7 +5796,6 @@
         // Use data-contact-id attributes instead of inline onclick (avoids pointer-event issues)
         const html = filtered.map(contact => `
             <div class="contact-suggestion" data-contact-id="${contact.id}">
-                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
                     ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
@@ -6088,6 +5968,17 @@
         });
     }
 
+    /**
+     * One value in a sheet's details, or a quiet dash when there is none -
+     * the same "empty" everywhere instead of "N/A", "None" or "No …".
+     */
+    function setDetailValue(node, value) {
+        if (!node) return;
+        const empty = value === null || value === undefined || String(value).trim() === '';
+        node.textContent = empty ? '—' : String(value);
+        node.classList.toggle('detail-empty', empty);
+    }
+
     function escapeHtml(text) {
         // Keep the original falsy handling so nothing renders differently.
         if (!text) return '';
@@ -6202,7 +6093,7 @@
         `;
     }
 
-    const ASSIGN_EMPTY_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+    const ASSIGN_EMPTY_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
 
     /**
      * Write the assignment control into a slot, or clear it.
@@ -6653,9 +6544,14 @@
 
         // Overview modal
         elements.closeOverviewModal.addEventListener('click', closeOverviewModal);
-        elements.closeOverviewBtn.addEventListener('click', closeOverviewModal);
         elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', closeOverviewModal);
         elements.editContactBtn.addEventListener('click', openEditFromOverview);
+        // Click a detail (not its mail, phone or web link) to change it.
+        elements.overviewDetails.addEventListener('click', (e) => {
+            if (e.target.closest('a, button')) return;
+            if (String(window.getSelection ? window.getSelection() : '').trim()) return;
+            if (e.target.closest('.detail-item, .empty-hint')) openEditFromOverview();
+        });
         elements.addNoteBtn.addEventListener('click', addNote);
         if (elements.addContactTodoBtn) {
             elements.addContactTodoBtn.addEventListener('click', () => {
@@ -6875,6 +6771,8 @@
         // Editing happens in the sheet itself
         if (elements.editProjectBtn) {
             elements.editProjectBtn.addEventListener('click', enterProjectEdit);
+            bindClickToEdit(elements.projectOverviewModal, elements.editProjectBtn,
+                () => elements.projectOverviewModal.classList.contains('is-editing'), enterProjectEdit);
         }
         if (elements.cancelProjectEditBtn) {
             elements.cancelProjectEditBtn.addEventListener('click', cancelProjectEdit);

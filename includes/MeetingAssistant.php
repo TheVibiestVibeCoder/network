@@ -339,7 +339,7 @@ class MeetingAssistant
         $result = self::analyze($context, $text);
 
         $projectId = $context['project']['id'];
-        $reason = ($fromCard ? 'Asked on the project card on ' : 'From the project meeting on ') . date('d.m.Y') . ': "'
+        $reason = ($fromCard ? 'Asked on the project card on ' : 'From the project meeting on ') . date('M j, Y') . ': "'
             . (mb_strlen($text) > 300 ? mb_substr($text, 0, 300) . '…' : $text) . '"';
 
         // Everything below is written in Claude's name, as through the connector.
@@ -397,7 +397,7 @@ class MeetingAssistant
                         ]);
                         $collect($answer);
                         if (($answer['status'] ?? '') !== 'no_change') {
-                            $created[] = ['type' => 'update_project', 'label' => $action['field'] . ': ' . $action['value']];
+                            $created[] = ['type' => 'update_project', 'label' => self::changeLabel((string) $action['field'], $action['value'])];
                         }
                         break;
 
@@ -719,4 +719,32 @@ PROMPT;
 
         return null;
     }
+
+    /**
+     * A field change as the meeting window lists it, in the CRM's words and
+     * formats (assets/js/format.js): "Budget max: 28.000 €", "Start date:
+     * Dec 1, 2026", "Success chance: 70 %".
+     */
+    private static function changeLabel(string $field, $value): string
+    {
+        $names = [
+            'stage' => 'Stage', 'budget_min' => 'Budget min', 'budget_max' => 'Budget max',
+            'success_chance' => 'Success chance', 'start_date' => 'Start date',
+            'estimated_completion' => 'Est. completion', 'description' => 'Description',
+        ];
+        $text = (string) $value;
+
+        if (($field === 'budget_min' || $field === 'budget_max') && is_numeric($value)) {
+            $n = (float) $value;
+            $text = number_format($n, fmod($n, 1.0) == 0.0 ? 0 : 2, ',', '.') . ' €';
+        } elseif (($field === 'start_date' || $field === 'estimated_completion') && preg_match('/^\d{4}-\d{2}-\d{2}$/', $text)) {
+            $time = strtotime($text);
+            $text = date('Y', $time) === date('Y') ? date('M j', $time) : date('M j, Y', $time);
+        } elseif ($field === 'success_chance' && is_numeric($value)) {
+            $text = (int) $value . ' %';
+        }
+
+        return ($names[$field] ?? $field) . ': ' . $text;
+    }
+
 }

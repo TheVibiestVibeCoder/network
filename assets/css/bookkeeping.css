@@ -635,9 +635,8 @@ body.bk-col-resizing * {
     color: var(--color-text-muted);
 }
 
-.bk-row-excluded .bk-badge-missing::before {
-    background: var(--color-text-muted);
-    opacity: 0.55;
+.bk-row-excluded .bk-badge-missing {
+    background: var(--c-tint-2);
 }
 
 
@@ -949,39 +948,25 @@ body.bk-col-resizing * {
     color: var(--color-danger);
 }
 
-/* Status as a dot plus a word, rather than a saturated pill repeated down
-   the whole page. */
+/* Status as a pill in its colour, as every coloured value in the CRM. */
 .bk-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--font-size-sm);
+    height: 22px;
+    padding: 0 9px;
+    border-radius: var(--r-full);
+    font: 600 var(--t-xs)/1 var(--font);
     white-space: nowrap;
 }
 
-.bk-badge::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-full);
-    flex-shrink: 0;
-}
-
 .bk-badge-missing {
-    color: var(--color-danger);
-}
-
-.bk-badge-missing::before {
-    background: var(--color-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
 }
 
 .bk-badge-nopdf {
-    color: var(--color-text-muted);
-}
-
-.bk-badge-nopdf::before {
-    background: var(--color-text-muted);
-    opacity: 0.55;
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
 }
 
 /* ==========================================================================

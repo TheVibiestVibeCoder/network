@@ -83,7 +83,10 @@
 
 /* Everything that does not change with the theme. */
 :root {
-    --font: 'General Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Helvetica Neue (test, Nov 2026). General Sans stays declared above:
+       put it back in front to return to it. Windows has no Helvetica Neue
+       and shows Arial. */
+    --font: 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
 
     --t-xs: 12px;
     --t-sm: 13px;
@@ -166,14 +169,14 @@
 
     --c-scrim: rgba(28, 50, 88, 0.34);
 
-    /* The pipeline follows the project: a plain grey for a lead, a light
+    /* The pipeline follows the project: a light blue-grey for a lead, a light
        tint of the accent while it is negotiated, the accent blue for an
        offer out, a teal while it runs, the company green when done - one
        run from light blue through blue and teal to green. The teal is
        deeper than the green so the last two stages stay apart. The label
        is always shown next to the colour, so colour is never the only
        signal; the light blue is a fill colour only, never text. */
-    --stage-lead: #8E929A;
+    --stage-lead: #AAB5C5;
     --stage-negotiation: #8FB4E4;
     --stage-proposal: #30599D;
     --stage-progress: #1C7E7E;
@@ -240,7 +243,7 @@
 
     --c-scrim: rgba(3, 7, 14, 0.62);
 
-    --stage-lead: #83868C;
+    --stage-lead: #7E8A9E;
     --stage-negotiation: #B5D4F8;
     --stage-proposal: #6C92D2;
     --stage-progress: #6BCAC9;
@@ -746,13 +749,6 @@ h1, h2, h3, h4 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.team-count {
-    flex-shrink: 0;
-    font-size: var(--t-xs);
-    font-weight: 500;
-    color: var(--c-ink-3);
 }
 
 /* ---- Foot: settings and you -------------------------------------------- */
@@ -1307,38 +1303,30 @@ input[type="checkbox"] {
 
 /* ---- Pills: stage, priority, tags --------------------------------------- */
 
+/* The stage as a pill in its colour - the same pill as the headings on the
+   Projects page, so a stage looks the same wherever it is named. The text
+   mixes the colour with the ink, so the pale stages stay readable in both
+   themes. */
 .project-stage-badge {
+    --stage-tone: var(--stage-lead);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px 0 8px;
+    height: 22px;
+    padding: 0 9px;
     border: 0;
     border-radius: var(--r-full);
-    background: var(--c-tint-3);
-    color: var(--c-ink-2);
-    font: 500 var(--t-xs)/1 var(--font);
+    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
+    font: 600 var(--t-xs)/1 var(--font);
     letter-spacing: 0;
     text-transform: none;
     white-space: nowrap;
 }
 
-.project-stage-badge::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: var(--stage-lead);
-}
-
-.project-stage-badge.stage-in-progress { background: color-mix(in srgb, var(--stage-progress) 13%, transparent); color: var(--c-ink); }
-.project-stage-badge.stage-in-progress::before { background: var(--stage-progress); }
-.project-stage-badge.stage-proposal::before { background: var(--stage-proposal); }
-.project-stage-badge.stage-negotiation::before { background: var(--stage-negotiation); }
-.project-stage-badge.stage-lead::before { background: var(--stage-lead); }
-.project-stage-badge.stage-complete { background: var(--c-success-soft); color: var(--c-ink-2); }
-.project-stage-badge.stage-complete::before { background: var(--stage-complete); }
+.project-stage-badge.stage-in-progress { --stage-tone: var(--stage-progress); }
+.project-stage-badge.stage-proposal { --stage-tone: var(--stage-proposal); }
+.project-stage-badge.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.project-stage-badge.stage-complete { --stage-tone: var(--stage-complete); }
 
 
 /* --------------------------------------------------------------------------
@@ -2244,13 +2232,45 @@ input[type="checkbox"] {
     width: min(24px, 62%);
 }
 
-.rf-ghost {
-    border-radius: 4px 4px 0 0;
-    background: var(--c-tint-2);
+/* The best case above each bar: hatched, so it reads as "possible" and not
+   as one more stage colour. A real border, with the stripes clipped to the
+   inside of it and a hair of space, so no stripe runs into the edge. */
+.rf-ghost,
+.rf-best-swatch {
+    --rf-hatch: color-mix(in srgb, var(--c-ink) 24%, transparent);
+    --rf-edge: color-mix(in srgb, var(--c-ink) 18%, transparent);
+    box-sizing: border-box;
+    border: 1px solid var(--rf-edge);
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1.5px, transparent 1.5px 5px) content-box;
 }
 
-:root[data-theme="dark"] .rf-ghost {
-    background: var(--c-tint);
+/* The stripes sit on their own layer inside the border, rounded with it,
+   so even the corners keep clear of the edge. */
+.rf-ghost {
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    background: none;
+}
+
+.rf-ghost::before {
+    content: "";
+    position: absolute;
+    inset: 2px 2px 0;
+    border-radius: 2px 2px 0 0;
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1.5px, transparent 1.5px 5px);
+}
+
+.rf-best-swatch {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    padding: 1px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1px, transparent 1px 2.5px) content-box;
+}
+
+.rf-col.has-best .rf-seg:last-child {
+    border-radius: 0;
 }
 
 .rf-stack {
@@ -3048,8 +3068,7 @@ input[type="checkbox"] {
     text-overflow: ellipsis;
 }
 
-.project-row-main .review-badge,
-.project-row-main .review-change-badge {
+.project-row-main .review-mark {
     align-self: center;
 }
 
@@ -3123,8 +3142,7 @@ input[type="checkbox"] {
         max-width: 100%;
     }
 
-    .project-row-main .review-badge,
-    .project-row-main .review-change-badge {
+    .project-row-main .review-mark {
         align-self: flex-start;
     }
 
@@ -3251,32 +3269,26 @@ input[type="checkbox"] {
     opacity: 1;
 }
 
-/* Priority and due date as quiet text with a dot, not coloured blocks. */
+/* Priority as a pill in its colour - the one look for every coloured
+   value in the CRM (stage, priority, status). */
 .todo-priority {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 0;
+    height: 22px;
+    padding: 0 9px;
     border: 0;
-    background: none;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-2);
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-.todo-priority::before {
-    content: "";
-    width: 7px;
-    height: 7px;
     border-radius: var(--r-full);
-    background: var(--c-ink-4);
+    font: 600 var(--t-xs)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
 }
 
-.todo-priority--high::before { background: var(--c-danger); }
-.todo-priority--medium::before { background: var(--pri-medium); }
-.todo-priority--low::before { background: var(--c-ink-4); }
+.todo-priority--high { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.todo-priority--medium { background: var(--pri-medium-soft); color: var(--pri-medium-ink); }
+.todo-priority--low { background: var(--c-tint-2); color: var(--c-ink-2); }
 
 .todo-due-overdue {
     color: var(--c-danger-ink);
@@ -3322,18 +3334,6 @@ input[type="checkbox"] {
     margin-top: 4px;
     font-size: var(--t-sm);
     color: var(--c-ink-3);
-}
-
-#workloadView .workload-switch-label {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-#workloadView .workload-switch .form-select {
-    min-width: 180px;
 }
 
 /* Sections */
@@ -3779,7 +3779,6 @@ input[type="checkbox"] {
     .nav-label,
     .sidebar-heading,
     .team-name,
-    .team-count,
     .user-chip-text {
         display: none;
     }
@@ -3889,7 +3888,6 @@ input[type="checkbox"] {
     .sidebar-collapsed .nav-label,
     .sidebar-collapsed .sidebar-heading,
     .sidebar-collapsed .team-name,
-    .sidebar-collapsed .team-count,
     .sidebar-collapsed .user-chip-text {
         display: none;
     }
@@ -4220,15 +4218,6 @@ input[type="checkbox"] {
 
     #workloadView .workload-head {
         margin-bottom: 16px;
-    }
-
-    #workloadView .workload-switch {
-        width: 100%;
-    }
-
-    #workloadView .workload-switch .form-select {
-        flex: 1;
-        min-width: 0;
     }
 
     #workloadView .workload-row {
@@ -4672,11 +4661,30 @@ input[type="checkbox"] {
     box-shadow: none;
 }
 
-/* Project facts are a label over a value, with no icon. */
+/* Facts in every sheet are a label over a value, with no icon. */
+.detail-item,
 .overview-detail-item {
     flex-direction: column;
     gap: 2px;
     padding: 10px 12px;
+}
+
+/* The contact's grid sits inside .overview-details, which already reaches
+   into the sheet's padding: only one of them should. */
+.overview-details > .detail-grid {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* A contact's details open the edit form when clicked. */
+#overviewDetails .detail-item {
+    border-radius: var(--r-sm);
+    cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#overviewDetails .detail-item:hover {
+    background: var(--c-tint-3);
 }
 
 /* Five short project facts read best three to a row. */
@@ -4688,22 +4696,6 @@ input[type="checkbox"] {
 .detail-item.detail-item-full,
 .overview-detail-item.full-width {
     grid-column: 1 / -1;
-}
-
-.detail-icon {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
-    color: var(--c-ink-3);
-}
-
-.detail-icon svg {
-    width: 16px;
-    height: 16px;
 }
 
 .detail-content {
@@ -4933,6 +4925,21 @@ a.detail-value:hover,
     padding: 14px 0;
     font-size: var(--t-sm);
     color: var(--c-ink-3);
+}
+
+/* Inside a sheet, "nothing here" is one plain line, left-aligned, wherever
+   it appears - a list without entries or a field without a value. */
+.modal .empty-hint,
+.modal .notes-empty {
+    padding: 2px 0;
+    text-align: left;
+    font-style: normal;
+}
+
+.detail-value.detail-empty,
+.detail-empty {
+    color: var(--c-ink-3);
+    font-weight: 400;
 }
 
 
@@ -6769,11 +6776,6 @@ details.import-instructions p {
     display: none;
 }
 
-#projectOverviewModal .empty-hint {
-    padding: 2px 0;
-    text-align: left;
-}
-
 /* ---- Tags: small pills on one wrapping line ---- */
 
 #projectOverviewModal .tags-container {
@@ -6811,7 +6813,7 @@ details.import-instructions p {
     gap: 6px;
     max-width: 100%;
     height: 28px;
-    padding: 0 4px 0 2px;
+    padding: 0 4px 0 12px;
     border: 1px solid transparent;
     border-radius: var(--r-full);
     background: var(--c-tint-2);
@@ -6982,7 +6984,6 @@ details.import-instructions p {
     gap: 10px;
 }
 
-.ptodo-meta .todo-priority,
 .ptodo-meta .todo-due {
     font-size: var(--t-xs);
     white-space: nowrap;
@@ -7042,17 +7043,7 @@ details.import-instructions p {
 }
 
 @media (max-width: 480px) {
-    /* The priority word gives way to its dot on a phone. */
-    .ptodo-meta .todo-priority {
-        font-size: 0;
-        gap: 0;
-    }
 
-    /* "Awaiting review" shrinks to its mark, so the title keeps the room;
-       the orange frame round the row already says it. */
-    .ptodo-row .review-badge > span {
-        display: none;
-    }
 }
 
 /* ---- Documents: one line per file ---- */
@@ -7190,14 +7181,20 @@ details.import-instructions p {
 
 /* ---- Footer: delete on the left, quietly; the main action right ---- */
 
-.ov-footer .ov-delete-btn {
-    margin-right: auto;
+/* The destructive action: red text without a frame, a soft red behind it on
+   hover - never the secondary button's grey border or navy text. */
+.ov-footer .ov-delete-btn,
+.ov-footer .ov-delete-btn:hover:not(:disabled) {
     border-color: transparent;
-    background: transparent;
     color: var(--c-danger-ink);
 }
 
-.ov-footer .ov-delete-btn:hover {
+.ov-footer .ov-delete-btn {
+    margin-right: auto;
+    background: transparent;
+}
+
+.ov-footer .ov-delete-btn:hover:not(:disabled) {
     background: var(--c-danger-soft);
 }
 
@@ -7221,6 +7218,25 @@ details.import-instructions p {
 #todoDetailModal:not(.is-editing) [data-ov="edit"],
 #todoDetailModal.is-editing [data-ov="view"] {
     display: none !important;
+}
+
+#projectTagsSection[hidden] {
+    display: none !important;
+}
+
+/* A value that opens its field when clicked. */
+#projectOverviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"],
+#todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"] {
+    margin-left: -6px;
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#projectOverviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"]:hover,
+#todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"]:hover {
+    background: var(--c-tint-3);
 }
 
 #projectOverviewModal .modal-content,
@@ -8262,12 +8278,6 @@ details.import-instructions p {
     margin-bottom: 22px;
 }
 
-#todoDetailModal .empty-hint,
-#reviewDetailModal .empty-hint {
-    padding: 2px 0;
-    text-align: left;
-}
-
 /* What the to-do belongs to: links in the header's subtitle line. */
 .tdetail-context-link {
     padding: 0;
@@ -8291,25 +8301,21 @@ details.import-instructions p {
 .tdetail-status {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-}
-
-.tdetail-status::before {
-    content: "";
-    width: 8px;
-    height: 8px;
+    height: 22px;
+    padding: 0 9px;
+    border: 0;
     border-radius: var(--r-full);
-    border: 1.5px solid var(--c-line-strong);
+    font: 600 var(--t-xs)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
 }
 
-.tdetail-status.is-done::before {
-    border-color: var(--c-success);
-    background: var(--c-success);
-}
-
-.tdetail-muted {
-    color: var(--c-ink-3);
-    font-weight: 400;
+.tdetail-status.is-done {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
 }
 
 .tdetail-description {
@@ -8719,19 +8725,6 @@ details.import-instructions p {
     flex-shrink: 0;
 }
 
-#workloadView .workload-switch-label {
-    display: none;
-}
-
-#workloadView .workload-switch .form-select {
-    min-width: 0;
-    height: 34px;
-    padding-left: 14px;
-    border-radius: var(--r-full);
-    background-color: var(--c-surface);
-    font-size: var(--t-sm);
-}
-
 /* ---- Rows: bookkeeping and contacts in their small cards ---- */
 
 #workloadView .workload-row,
@@ -9115,61 +9108,27 @@ details.import-instructions p {
     flex: 1 1 250px;
 }
 
-.home-donut {
-    position: relative;
-    width: 68px;
-    height: 68px;
-    flex-shrink: 0;
-}
-
-.home-donut svg {
-    display: block;
-    /* As big as the ring, whatever size a screen gives it: the count in
-       the middle is centred on the ring's box. */
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-}
-
-.home-donut circle {
-    fill: none;
-    stroke-width: 10;
-}
-
-.home-donut-track {
-    stroke: var(--c-line-2);
-}
-
-.home-donut-arc {
-    stroke: var(--c-line-strong);
-    transition: stroke-opacity var(--dur-2) var(--ease);
-}
-
-.home-donut-arc.is-dim {
-    stroke-opacity: 0.25;
-}
-
-.home-donut-center {
-    position: absolute;
-    inset: 0;
+/* The count beside the legend: a plain number, no chart. */
+.home-total {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: flex-start;
+    flex-shrink: 0;
+    min-width: 64px;
     line-height: 1;
 }
 
-.home-donut-value {
-    font-size: var(--t-xl);
+.home-total-value {
+    font-size: 40px;
     font-weight: 700;
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
     color: var(--c-ink);
 }
 
-.home-donut-label {
-    margin-top: 3px;
-    font-size: 11px;
+.home-total-label {
+    margin-top: 6px;
+    font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
 
@@ -9236,6 +9195,31 @@ details.import-instructions p {
     opacity: 0.45;
 }
 
+/* The filters beside the count: each value as its pill, as in every list. */
+.home-legend-pill {
+    --tone: var(--c-ink-4);
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font: 600 var(--t-xs)/1 var(--font);
+    white-space: nowrap;
+}
+
+.home-legend-pill[data-tone="high"] { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.home-legend-pill[data-tone="medium"] { background: var(--pri-medium-soft); color: var(--pri-medium-ink); }
+.home-legend-pill[data-tone="none"] { background: transparent; color: var(--c-ink-3); box-shadow: inset 0 0 0 1px var(--c-line); }
+.home-legend-pill:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) {
+    background: color-mix(in srgb, var(--tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--tone) 70%, var(--c-ink));
+}
+.home-legend-pill[data-tone="progress"] { --tone: var(--stage-progress); }
+.home-legend-pill[data-tone="proposal"] { --tone: var(--stage-proposal); }
+.home-legend-pill[data-tone="negotiation"] { --tone: var(--stage-negotiation); }
+
 /* One dot vocabulary for priorities and stages. */
 .home-dot {
     width: 8px;
@@ -9247,19 +9231,11 @@ details.import-instructions p {
 
 :is(.home-dot, .home-project-bar)[data-tone="high"] { background: var(--c-danger); }
 :is(.home-dot, .home-project-bar)[data-tone="medium"] { background: var(--pri-medium); }
-:is(.home-dot, .home-project-bar)[data-tone="low"] { background: var(--c-success); }
+:is(.home-dot, .home-project-bar)[data-tone="low"] { background: var(--c-ink-4); }
 :is(.home-dot, .home-project-bar)[data-tone="none"] { background: var(--c-line-strong); }
 :is(.home-dot, .home-project-bar)[data-tone="progress"] { background: var(--stage-progress); }
 :is(.home-dot, .home-project-bar)[data-tone="proposal"] { background: var(--stage-proposal); }
 :is(.home-dot, .home-project-bar)[data-tone="negotiation"] { background: var(--stage-negotiation); }
-
-.home-donut-arc[data-tone="high"] { stroke: var(--c-danger); }
-.home-donut-arc[data-tone="medium"] { stroke: var(--pri-medium); }
-.home-donut-arc[data-tone="low"] { stroke: var(--c-success); }
-.home-donut-arc[data-tone="none"] { stroke: var(--c-line-strong); }
-.home-donut-arc[data-tone="progress"] { stroke: var(--stage-progress); }
-.home-donut-arc[data-tone="proposal"] { stroke: var(--stage-proposal); }
-.home-donut-arc[data-tone="negotiation"] { stroke: var(--stage-negotiation); }
 
 /* The week: today and the six days after it, each a filter. */
 .home-week {
@@ -9592,8 +9568,8 @@ details.import-instructions p {
 }
 
 .home-prio-pill[data-tone="low"] {
-    background: var(--c-success-soft);
-    color: var(--c-success-ink);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
 }
 
 /* Just ticked off: greyed and struck through until the next refresh. */
@@ -9841,13 +9817,10 @@ details.import-instructions p {
 .home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); }
 .home-skel.is-day { height: 52px; border-radius: var(--r-md); }
 
-.home-skel.is-donut {
-    width: 84px;
-    height: 84px;
+.home-skel.is-total {
+    width: 64px;
+    height: 56px;
     flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: none;
-    border: 10px solid var(--c-tint-2);
 }
 
 .home-skel-row {
@@ -9970,7 +9943,7 @@ details.import-instructions p {
 
 .fin-kpis {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -10020,44 +9993,58 @@ details.import-instructions p {
 .fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning-ink); }
 .fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger-ink); }
 
-/* The bank balance carries the page: navy, with a soft glow. */
-.fin-kpi--balance {
-    border-color: transparent;
-    background:
-        radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--c-accent) 55%, transparent) 0%, transparent 55%),
-        linear-gradient(140deg, var(--c-primary) 0%, var(--c-primary-2) 100%);
-    color: var(--c-on-primary);
-    box-shadow: var(--e-2);
+/* Today's bank balance, in the header: where the plan starts from, quiet
+   beside "Months ahead". Its form drops down from there. */
+.fin-balance {
+    position: relative;
 }
 
-.fin-kpi--balance :is(.fin-kpi-label, .fin-kpi-sub) {
-    color: color-mix(in srgb, var(--c-on-primary) 72%, transparent);
+.fin-balance-value {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.fin-kpi--balance .fin-kpi-value {
-    color: var(--c-on-primary);
+.fin-balance.is-empty .fin-balance-value {
+    color: var(--c-ink-3);
 }
 
+.fin-balance-pop {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 30;
+    width: min(360px, calc(100vw - 32px));
+    padding: 14px 16px 16px;
+    background: var(--c-raised);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-3);
+    animation: dsDialogIn var(--dur-2) var(--ease) both;
+}
+
+.fin-balance-note {
+    margin: 0 0 4px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-balance-pop .fin-balance-form {
+    margin-top: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+}
+
+/* "Set buffer" / "Buffer 15.000 €": top right, on the label's line. */
 .fin-kpi-action {
     position: absolute;
     top: 16px;
-    right: 16px;
+    right: 18px;
 }
 
-.fin-kpi--balance .fin-kpi-action {
-    padding: 4px 10px;
-    border-radius: var(--r-full);
-    background: color-mix(in srgb, var(--c-on-primary) 14%, transparent);
-    color: var(--c-on-primary);
-    text-decoration: none;
-}
-
-.fin-kpi--balance .fin-kpi-action:hover {
-    background: color-mix(in srgb, var(--c-on-primary) 22%, transparent);
-    text-decoration: none;
-}
-
-/* The balance form opens inside the navy tile, on a light card. */
+/* The balance and buffer forms. */
 .fin-balance-form {
     display: flex;
     flex-direction: column;
@@ -10583,26 +10570,27 @@ details.import-instructions p {
     color: var(--c-ink-3);
 }
 
+/* The stage as the same pill as on the project cards. */
 .fin-stage {
+    --stage-tone: var(--stage-lead);
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-weight: 500;
-    color: var(--c-ink-2);
+    height: 22px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--r-full);
+    font: 600 var(--t-xs)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
 }
 
-.fin-stage::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--stage-lead);
-}
-
-.fin-stage[data-stage="in-progress"]::before { background: var(--stage-progress); }
-.fin-stage[data-stage="proposal"]::before { background: var(--stage-proposal); }
-.fin-stage[data-stage="negotiation"]::before { background: var(--stage-negotiation); }
-.fin-stage[data-stage="complete"]::before { background: var(--stage-complete); }
+.fin-stage[data-stage="in-progress"] { --stage-tone: var(--stage-progress); }
+.fin-stage[data-stage="proposal"] { --stage-tone: var(--stage-proposal); }
+.fin-stage[data-stage="negotiation"] { --stage-tone: var(--stage-negotiation); }
+.fin-stage[data-stage="complete"] { --stage-tone: var(--stage-complete); }
 
 .fin-income-amount {
     display: flex;
@@ -10928,11 +10916,13 @@ details.import-instructions p {
 /* ---- Narrower screens ---- */
 
 @media (max-width: 1100px) {
-    .fin-kpis {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .fin-columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+    .fin-kpis {
         grid-template-columns: minmax(0, 1fr);
     }
 }

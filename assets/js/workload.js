@@ -24,7 +24,6 @@
         nextWho: null,
         data: null,
         person: null,
-        counts: {},   // assignee key -> { todos, projects, contacts, bookkeeping }
         loaded: false,
         news: null,       // "New for you": { items, total }, only on your own home
         busy: new Set(),  // to-do ids with a check-off request in flight
@@ -111,11 +110,7 @@
      */
     function formatDate(value) {
         if (!value) return '';
-
-        const date = new Date(value + 'T00:00:00');
-        if (isNaN(date.getTime())) return String(value);
-
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        return window.CRMFormat.date(value) || String(value);
     }
 
     // ------------------------------------------------------------------
@@ -212,30 +207,18 @@
     }
 
     /**
-     * The ring beside a legend. Hidden from screen readers: the legend
-     * buttons beside it carry the same numbers in words.
+     * The count beside a legend, as a plain number. Hidden from screen
+     * readers: the legend buttons beside it carry the same numbers in words.
      */
-    function donut(segments, tones, value, label) {
-        const r = HD.DONUT_RADIUS;
-        const circumference = HD.DONUT_CIRCUMFERENCE.toFixed(2);
-        const arcs = segments.map((segment, i) => segment.length > 0
-            ? `<circle class="home-donut-arc${segment.dimmed ? ' is-dim' : ''}" data-tone="${tones[i]}" cx="46" cy="46" r="${r}"
-                       stroke-dasharray="${segment.length.toFixed(2)} ${circumference}" stroke-dashoffset="${segment.offset.toFixed(2)}"></circle>`
-            : '').join('');
-
+    function total(value, label) {
         return `
-            <span class="home-donut" aria-hidden="true">
-                <svg viewBox="0 0 92 92" width="68" height="68" focusable="false">
-                    <circle class="home-donut-track" cx="46" cy="46" r="${r}"></circle>${arcs}
-                </svg>
-                <span class="home-donut-center">
-                    <span class="home-donut-value">${value}</span>
-                    <span class="home-donut-label">${escapeHtml(label)}</span>
-                </span>
+            <span class="home-total" aria-hidden="true">
+                <span class="home-total-value">${value}</span>
+                <span class="home-total-label">${escapeHtml(label)}</span>
             </span>`;
     }
 
-    /** One legend entry: a filter button with its dot, name and count. */
+    /** One filter entry: its value as the same coloured pill as in the lists, and the count. */
     function legendButton(kind, key, label, tone, count, selected) {
         const pressed = selected === key;
         const dim = (selected && !pressed) || count === 0;
@@ -243,8 +226,7 @@
         return `
             <button type="button" class="home-legend-btn${pressed ? ' is-active' : ''}${dim ? ' is-dim' : ''}"
                     data-home-${kind}="${escapeHtml(key)}" data-fk="${kind}-${escapeHtml(key)}" aria-pressed="${pressed}">
-                <span class="home-dot" data-tone="${tone}"></span>
-                <span class="home-legend-name">${escapeHtml(label)}</span>
+                <span class="home-legend-name"><span class="home-legend-pill" data-tone="${tone}">${escapeHtml(label)}</span></span>
                 <span class="home-legend-count">${count}</span>
             </button>`;
     }
@@ -272,19 +254,15 @@
     /**
      * The To-dos card: priorities and the week on top, the list under them.
      * Every number comes from the same open to-dos (HomeDashboard), so a
-     * tick moves the donut, the legend, the badges and the list together.
+     * tick moves the count, the legend, the badges and the list together.
      */
     function todosCard(todos, openTodos, today) {
         const ui = state.ui;
         const filters = { prio: ui.prio, day: dayFilter(today) };
         const summary = HD.todoSummary(openTodos, ui.prio, today);
 
-        // Donut and legend. "No priority" only shows up when there is some.
+        // Count and legend. "No priority" only shows up when there is some.
         const priorities = HD.PRIORITIES.filter(p => p.key !== 'none' || summary.priorities.none > 0 || ui.prio === 'none');
-        const segments = HD.donutSegments(
-            priorities.map(p => summary.priorities[p.key]),
-            priorities.findIndex(p => p.key === ui.prio)
-        );
         const legend = priorities.map(p =>
             legendButton('prio', p.key, p.label, p.key, summary.priorities[p.key], ui.prio)
         ).join('');
@@ -340,7 +318,7 @@
                     ${cardHead(cardTitle('to-dos'), 'todo')}
                     <div class="home-summary">
                         <div class="home-breakdown">
-                            ${donut(segments, priorities.map(p => p.key), summary.open, 'open')}
+                            ${total(summary.open, 'open')}
                             <div class="home-legend">${legend}</div>
                         </div>
                         ${weekShown ? `<div class="home-week">
@@ -422,10 +400,6 @@
         const ui = state.ui;
         const counts = HD.stageCounts(projects);
         const active = HD.filterProjects(projects, null);
-        const segments = HD.donutSegments(
-            HD.STAGES.map(s => counts[s.key]),
-            HD.STAGES.findIndex(s => s.key === ui.stage)
-        );
         const legend = HD.STAGES.map(s =>
             legendButton('stage', s.key, s.label, s.tone, counts[s.key], ui.stage)
         ).join('');
@@ -444,7 +418,7 @@
                 <div class="home-card-top">
                     ${cardHead(cardTitle('projects'), 'project')}
                     <div class="home-breakdown">
-                        ${donut(segments, HD.STAGES.map(s => s.tone), active.length, 'active')}
+                        ${total(active.length, 'active')}
                         <div class="home-legend">${legend}</div>
                     </div>
                 </div>
@@ -643,19 +617,9 @@
             </section>`;
     }
 
-    /** "5 min ago", "Yesterday", "Oct 3" - for when something was assigned. */
+    /** "5 minutes ago", "Yesterday", "Oct 3" - for when something was assigned. */
     function describeWhen(value) {
-        if (!value) return '';
-        const date = new Date(String(value).replace(' ', 'T') + 'Z');
-        if (isNaN(date.getTime())) return '';
-
-        const minutes = Math.round((Date.now() - date.getTime()) / 60000);
-        if (minutes < 1) return 'just now';
-        if (minutes < 60) return `${minutes} min ago`;
-        const hours = Math.round(minutes / 60);
-        if (hours < 24) return `${hours} h ago`;
-        if (hours < 48) return 'yesterday';
-        return date.toLocaleDateString('en-US', { timeZone: HD.TIME_ZONE, month: 'short', day: 'numeric' });
+        return value ? window.CRMFormat.ago(value) : '';
     }
 
     async function markNewsSeen(button) {
@@ -689,7 +653,6 @@
         return `
             <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}"
                     data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
-                <span class="workload-row-mark is-icon">${ICON_RECEIPT}</span>
                 <span class="workload-row-body">
                     <span class="workload-row-title">${escapeHtml(entry.summary || '')}${newTag('bookkeeping', entry.id)}</span>
                     <span class="workload-row-context">${entry.no_pdf_needed ? 'Marked as needing no PDF' : 'PDF missing'}</span>
@@ -706,7 +669,6 @@
 
         return `
             <button type="button" class="workload-row${isProposed(contact) ? ' is-proposed' : ''}" data-workload-open="contact" data-id="${contact.id}">
-                <span class="workload-row-mark is-initials">${escapeHtml(getInitials(contact.name))}</span>
                 <span class="workload-row-body">
                     <span class="workload-row-title">${escapeHtml(contact.name || '')}${newTag('contact', contact.id)}${reviewMarks('contact', contact)}</span>
                     ${sub ? `<span class="workload-row-context">${escapeHtml(sub)}</span>` : ''}
@@ -730,7 +692,7 @@
             </div>`).join('');
         const breakdown = `
             <div class="home-breakdown">
-                <span class="home-skel is-donut"></span>
+                <span class="home-skel is-total"></span>
                 <div class="home-legend">${legend(3)}</div>
             </div>`;
 
@@ -871,71 +833,19 @@
     }
 
     // "New for you": a bell.
-    const ICON_NEW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>';
+    const ICON_NEW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
 
     // The small cards' icons: one per kind of thing.
     const TYPE_ICONS = {
-        contact: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
-        bookkeeping: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v20l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5V2l-1.5 1.5zM17 19H7V5h10v14zM8 13h8v2H8v-2zm0-4h8v2H8V9z"/></svg>'
+        contact: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>',
+        bookkeeping: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>'
     };
 
-    const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-    const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v20l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5V2l-1.5 1.5zM17 19H7V5h10v14zM8 13h8v2H8v-2zm0-4h8v2H8V9z"/></svg>';
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+    const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>';
     // The empty list: a check in a circle.
     const ICON_DONE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5 5-5.5"/></svg>';
-    const ICON_INBOX = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19v10z"/></svg>';
-
-    // ------------------------------------------------------------------
-    // The person switcher
-    // ------------------------------------------------------------------
-
-    function populateSwitcher() {
-        if (!els.who) return;
-
-        const people = window.CRMPeople ? window.CRMPeople.list() : [];
-        const meKey = window.CRMPeople ? window.CRMPeople.meKey() : null;
-
-        let html = `<option value="me">Me${countSuffix(meKey)}</option>`;
-
-        people.forEach(person => {
-            const key = person.id === null ? 'owner' : String(person.id);
-            // "Me" already covers the signed-in identity; listing it twice
-            // would just be a way to pick the same thing by another name.
-            if (meKey && key === meKey) return;
-            html += `<option value="${escapeHtml(key)}">${escapeHtml(person.name)}${countSuffix(key)}</option>`;
-        });
-
-        html += '<option value="unassigned">Unassigned</option>';
-
-        els.who.innerHTML = html;
-        els.who.value = state.who;
-    }
-
-    /**
-     * " (3)" for somebody carrying three open items, or nothing at all.
-     *
-     * The owner is keyed 0 in the database but addressed as 'owner' here, so
-     * the lookup translates before reading the bucket.
-     */
-    function countSuffix(key) {
-        if (!key) return '';
-
-        const bucket = state.counts[key === 'owner' ? '0' : key];
-        if (!bucket) return '';
-
-        const total = (bucket.todos || 0) + (bucket.projects || 0)
-            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
-        return total ? ` (${total})` : '';
-    }
-
-    async function loadCounts() {
-        try {
-            const result = await api('?action=summary');
-            state.counts = result.counts || {};
-        } catch (e) {
-            state.counts = {};
-        }
-    }
+    const ICON_INBOX = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5"/><path d="M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z"/></svg>';
 
     // ------------------------------------------------------------------
     // Checking to-dos off
@@ -1025,9 +935,8 @@
 
         repaint();
 
-        // The nav badge and the per-person counts both count open to-dos.
+        // The nav badge counts open to-dos.
         refreshBadge();
-        loadCounts().then(populateSwitcher);
     }
 
     // ------------------------------------------------------------------
@@ -1049,13 +958,11 @@
         }
 
         try {
-            // The directory drives both the switcher and the faces, so make
-            // sure it has arrived before drawing either.
+            // The directory drives the faces, so make sure it has arrived
+            // before drawing them.
             if (window.CRMPeople && !window.CRMPeople.ready()) {
                 await window.CRMPeople.reload();
             }
-            await loadCounts();
-            populateSwitcher();
 
             // What was assigned to you since you last looked - only on your
             // own home; a missing feed never stops the page from loading.
@@ -1114,9 +1021,8 @@
     /**
      * List everyone in the sidebar, each one click from their workload.
      *
-     * The same people the "Showing" switch offers, surfaced where they are
-     * always visible - so "what is Anna working on?" is one click, not a
-     * dropdown hunt. Only people who can sign in now: invited and disabled
+     * The way to anyone else's plate: "what is Anna working on?" is one
+     * click. Only people who can sign in now: invited and disabled
      * accounts stay out. Hidden entirely until there is somebody besides you.
      */
     function renderTeam() {
@@ -1146,7 +1052,6 @@
                 <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="Open ${escapeHtml(person.name)}'s work">
                     ${face}
                     <span class="team-name">${escapeHtml(person.name)}</span>
-                    ${countBadge(key)}
                 </button>
             `;
         }).join('');
@@ -1154,21 +1059,7 @@
         wrap.hidden = false;
     }
 
-    /**
-     * A small count of open items for one person, or nothing.
-     */
-    function countBadge(key) {
-        const bucket = state.counts[key === 'owner' ? '0' : key];
-        if (!bucket) return '';
-
-        const total = (bucket.todos || 0) + (bucket.projects || 0)
-            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
-
-        return total ? `<span class="team-count">${total}</span>` : '';
-    }
-
-    async function refreshTeam() {
-        await loadCounts();
+    function refreshTeam() {
         renderTeam();
         syncNav();
     }
@@ -1350,9 +1241,6 @@
         els.title = $('workloadTitle');
         els.summary = $('workloadSummary');
         els.face = $('workloadFace');
-        els.who = $('workloadWho');
-
-        els.who.addEventListener('change', () => load(els.who.value));
 
         const team = $('sidebarTeam');
         if (team) {

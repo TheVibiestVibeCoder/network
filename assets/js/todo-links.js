@@ -24,8 +24,8 @@
         + '<path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>'
         + '</svg>';
 
-    const ICON_LINK = '<svg class="tlink-icon tlink-icon--web" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
-        + '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>'
+    const ICON_LINK = '<svg class="tlink-icon tlink-icon--web" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
         + '</svg>';
 
     function escapeHtml(value) {
@@ -129,7 +129,7 @@
                 </a>
                 <a class="btn btn-secondary btn-small tlink-row-open" href="${escapeHtml(safeUrl(link.url))}" target="_blank" rel="noopener noreferrer">Open</a>
                 <button type="button" class="pdoc-act pdoc-act--danger" data-link-delete="${link.id}" title="Remove link" aria-label="Remove ${escapeHtml(link.title)}">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
                 </button>
             </div>`;
     }

@@ -60,11 +60,7 @@
 
     /** "Nov 1, 10:42" from the database's UTC timestamp. */
     function formatWhen(value) {
-        if (!value) return '';
-        const date = new Date(String(value).replace(' ', 'T') + 'Z');
-        if (Number.isNaN(date.getTime())) return '';
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-            + ', ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return value ? window.CRMFormat.dateTime(value) : '';
     }
 
     /** Claude's plain text: sentences as paragraphs, "- " lines as a list. */

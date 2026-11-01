@@ -103,7 +103,7 @@
         const groups = HD.groupTodos(HD.filterTodos(sample(), {}, TODAY), TODAY);
 
         eq(groups.map(g => g.head), ['Overdue', 'Today', 'Tomorrow', 'Friday', 'Tuesday', 'Later', 'No due date']);
-        eq(groups.map(g => g.sub), ['', 'Wed 7 Oct', 'Thu 8 Oct', 'Fri 9 Oct', 'Tue 13 Oct', '', '']);
+        eq(groups.map(g => g.sub), ['', 'Wed, Oct 7', 'Thu, Oct 8', 'Fri, Oct 9', 'Tue, Oct 13', '', '']);
         eq(groups.map(g => g.urgent), [true, true, false, false, false, false, false], 'urgent');
     });
 
@@ -113,7 +113,7 @@
         const overdue = groups.find(g => g.key === 'overdue');
         const today = groups.find(g => g.key === 'd0');
 
-        eq(later.items[0].dueNote, 'due Wed 14 Oct');
+        eq(later.items[0].dueNote, 'due Wed, Oct 14');
         eq(overdue.items[0].dueNote, '2 days overdue');
         eq(today.items[0].dueNote, '');
     });

@@ -71,8 +71,8 @@
     const MINUS = '−';
     /** "+1.200 €" / "−300 €" / "0 €". */
     const signed = n => (Math.round(n) > 0 ? '+' : Math.round(n) < 0 ? MINUS : '') + PP.euro(Math.abs(Math.round(n)));
-    /** "€57.5k", with a minus when below zero - for the chart's axis. */
-    const short = n => (n < 0 ? MINUS : '') + RF.money(Math.abs(n));
+    /** "57,5k €", with a minus when below zero - for the chart's axis. */
+    const short = n => RF.moneyShort(n);
     const plural = (n, word, many) => n + ' ' + (n === 1 ? word : (many || word + 's'));
 
     /** An amount field's value: a number, null when empty, NaN when it cannot be read. */
@@ -84,10 +84,10 @@
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    /** "2026-10-01" -> "1 Oct 2026". */
+    /** "2026-10-01" -> "Oct 1" (format.js). */
     function dayName(iso) {
-        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
-        return m ? Number(m[3]) + ' ' + RF.MONTHS_SHORT[Number(m[2]) - 1] + ' ' + m[1] : '';
+        const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(iso || ''));
+        return m ? window.CRMFormat.date(m[1]) : '';
     }
 
     function monthKey(offset, now) {
@@ -125,10 +125,10 @@
     }
 
     const ICON = {
-        plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',
+        plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
-        trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
+        trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>'
     };
 
     // ------------------------------------------------------------------
@@ -222,7 +222,7 @@
 
     function renderSkeleton() {
         els.finPage.setAttribute('aria-busy', 'true');
-        els.finKpis.innerHTML = [0, 1, 2, 3].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
+        els.finKpis.innerHTML = [0, 1, 2].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
         els.finChart.innerHTML = '<div class="fin-skel is-chart"></div>';
     }
 
@@ -238,7 +238,6 @@
         const focusKey = active && els.financialsView.contains(active) ? active.getAttribute('data-fin-focus') : null;
 
         els.finPage.setAttribute('aria-busy', 'false');
-        renderHead();
         renderKpis();
         renderAlerts();
         renderChart();
@@ -266,20 +265,21 @@
         return active ? RF.presetByKey(active).label + ' scenario' : 'Custom scenario';
     }
 
+    /**
+     * The header: today's bank balance - where the page starts from, not its
+     * headline - and how many months ahead it plans.
+     */
     function renderHead() {
         els.finHeadTools.innerHTML = `
+            ${state.plan ? balanceTool() : ''}
             <div class="fin-tool">
                 <span class="fin-tool-label">Months ahead</span>
                 ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: String(n) })), state.months)}
             </div>`;
     }
 
-    // ---- The four figures on top ----
-
-    function renderKpis() {
-        const p = state.plan;
-        const k = p.kpis;
-        const b = p.balance;
+    function balanceTool() {
+        const b = state.plan.balance;
 
         let balanceSub;
         if (!b) {
@@ -291,6 +291,27 @@
         }
         if (state.tx.error) balanceSub += ' · Bookkeeping could not be read';
 
+        return `
+            <div class="fin-tool fin-balance${b ? '' : ' is-empty'}">
+                <span class="fin-tool-label">Bank balance</span>
+                <span class="fin-balance-value" title="${esc(balanceSub)}">${b ? esc(euro(b.amount)) : '—'}</span>
+                <button type="button" class="fin-link" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}">${b ? 'Update' : 'Enter balance'}</button>
+                ${state.balanceOpen ? `<div class="fin-balance-pop">
+                    <p class="fin-balance-note">${esc(balanceSub)}</p>
+                    ${balanceForm()}
+                </div>` : ''}
+            </div>`;
+    }
+
+    // ---- The three figures on top ----
+
+    function renderKpis() {
+        const p = state.plan;
+        const k = p.kpis;
+
+        // The balance lives in the header; its form is redrawn from here too.
+        renderHead();
+
         const lowTone = !k.lowest ? '' : k.lowest.amount < 0 ? 'is-danger' : (k.belowBuffer ? 'is-warn' : 'is-ok');
         let lowSub = '';
         if (k.belowZero) lowSub = `Below zero from ${k.belowZero.label}`;
@@ -301,13 +322,6 @@
         const costsAhead = p.costs.filter(c => c.kind === 'once' && c.occurrences.length).length;
 
         els.finKpis.innerHTML = `
-            <article class="fin-kpi fin-kpi--balance${b ? '' : ' is-empty'}">
-                <span class="fin-kpi-label">Bank balance today</span>
-                <span class="fin-kpi-value">${b ? esc(euro(b.amount)) : '—'}</span>
-                <span class="fin-kpi-sub">${esc(balanceSub)}</span>
-                <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}">${b ? 'Update' : 'Enter balance'}</button>
-                ${state.balanceOpen ? balanceForm() : ''}
-            </article>
             <article class="fin-kpi fin-kpi--in">
                 <span class="fin-kpi-label">Coming in · next 3 months</span>
                 <span class="fin-kpi-value">${esc(euro(k.incomeNext3))}</span>
@@ -892,7 +906,7 @@
         if (amount === null || Number.isNaN(amount)) {
             state.balanceError = 'Enter the balance, e.g. 48.500,00';
             renderKpis();
-            const field = els.finKpis.querySelector('[data-fin-focus="balance-amount"]');
+            const field = els.finHeadTools.querySelector('[data-fin-focus="balance-amount"]');
             if (field) field.focus();
             return;
         }
@@ -967,12 +981,12 @@
                 state.balanceOpen = !state.balanceOpen;
                 state.balanceError = '';
                 renderKpis();
-                const field = els.finKpis.querySelector('[data-fin-focus="balance-amount"]');
+                const field = els.finHeadTools.querySelector('[data-fin-focus="balance-amount"]');
                 if (field) { field.focus(); field.select(); }
             } else if (t.hasAttribute('data-fin-balance-cancel')) {
                 state.balanceOpen = false;
                 renderKpis();
-                const btn = els.finKpis.querySelector('[data-fin-balance]');
+                const btn = els.finHeadTools.querySelector('[data-fin-balance]');
                 if (btn) btn.focus();
             } else if (t.hasAttribute('data-fin-buffer')) {
                 state.bufferOpen = !state.bufferOpen;
@@ -1055,7 +1069,7 @@
             } else if (state.balanceOpen && e.target.closest('[data-fin-balance-form]')) {
                 state.balanceOpen = false;
                 renderKpis();
-                const btn = els.finKpis.querySelector('[data-fin-balance]');
+                const btn = els.finHeadTools.querySelector('[data-fin-balance]');
                 if (btn) btn.focus();
             }
         });

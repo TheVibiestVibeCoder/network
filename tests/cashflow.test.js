@@ -5,7 +5,7 @@
  *   - in a browser: open tests/cashflow.test.html straight from disk (file://)
  *   - in a terminal on macOS, with the JavaScriptCore shell:
  *       /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc \
- *           assets/js/project-payments.js assets/js/revenue-forecast.js assets/js/cashflow.js tests/cashflow.test.js
+ *           assets/js/format.js assets/js/project-payments.js assets/js/revenue-forecast.js assets/js/cashflow.js tests/cashflow.test.js
  *
  * Today is fixed at 9 October 2026.
  */
