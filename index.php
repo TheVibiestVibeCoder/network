@@ -14,6 +14,7 @@ require_once APP_ROOT . '/includes/Mailer.php';
 // Meeting assistant (test): see includes/MeetingAssistant.php
 require_once APP_ROOT . '/includes/Project.php';
 require_once APP_ROOT . '/includes/MeetingAssistant.php';
+require_once APP_ROOT . '/includes/ProjectSummary.php';
 require_once APP_ROOT . '/includes/UserPrefs.php';
 
 // Start session
@@ -283,6 +284,8 @@ $meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
 // Quick add (test, assets/js/compose.js): hidden for now. true brings the
 // tab and its page back.
 $quickAddEnabled = true;
+// Claude's summary under a project's description: on while the API key is set.
+$summaryEnabled = ProjectSummary::enabled();
 
 // Get contact count for dashboard
 $contactCount = 0;
@@ -486,6 +489,9 @@ function assetUrl(string $path): string
          final word over the two stylesheets above. -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/design.css') ?>">
     <link rel="stylesheet" href="<?= assetUrl('assets/css/review.css') ?>">
+    <?php if ($summaryEnabled): ?>
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/project-summary.css') ?>">
+    <?php endif; ?>
     <!-- Quick add (test) -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/compose.css') ?>">
     <?php if ($meetingEnabled): ?>
@@ -2031,6 +2037,14 @@ function assetUrl(string $path): string
                                 <span class="detail-value" id="projectOverviewDescription" data-ov="view"></span>
                                 <textarea id="projectEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="What the project is about" required></textarea>
                             </div>
+                            <?php if ($summaryEnabled): ?>
+                            <!-- Claude's summary of the description and all notes,
+                                 kept up to date by assets/js/project-summary.js -->
+                            <div class="overview-detail-item full-width ov-claude-summary" id="projectSummaryItem" data-ov="view" hidden>
+                                <span class="detail-label ov-claude-summary-label" id="projectSummaryLabel"></span>
+                                <div class="detail-value ov-claude-summary-text" id="projectSummaryText" aria-live="polite"></div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -2476,6 +2490,9 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/financials.js') ?>"></script>
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
+        <?php if ($summaryEnabled): ?>
+        <script src="<?= assetUrl('assets/js/project-summary.js') ?>"></script>
+        <?php endif; ?>
         <script src="<?= assetUrl('assets/js/todo-links.js') ?>"></script>
         <!-- Quick add (test) -->
         <script src="<?= assetUrl('assets/js/compose.js') ?>"></script>

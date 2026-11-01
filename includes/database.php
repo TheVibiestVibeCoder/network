@@ -568,6 +568,13 @@ class Database
         self::addColumnIfMissing($db, 'project_notes', 'author_id', 'INTEGER');
         self::addColumnIfMissing($db, 'project_notes', 'author_name', 'VARCHAR(255)');
 
+        // Claude's summary of a project's description and notes
+        // (includes/ProjectSummary.php). The hash is of what it was written
+        // from, so it is only written again once that changes.
+        self::addColumnIfMissing($db, 'projects', 'claude_summary', 'TEXT');
+        self::addColumnIfMissing($db, 'projects', 'claude_summary_hash', 'VARCHAR(64)');
+        self::addColumnIfMissing($db, 'projects', 'claude_summary_at', 'DATETIME');
+
         self::addColumnIfMissing($db, 'activity_events', 'actor_id', 'INTEGER');
         self::addColumnIfMissing($db, 'activity_events', 'actor_name', 'VARCHAR(255)');
 

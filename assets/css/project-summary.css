@@ -1,0 +1,112 @@
+/* ==========================================================================
+   Claude summary under a project's description - assets/js/project-summary.js
+
+   Claude's mark beside the label says who wrote it. The panel itself stays
+   neutral: an orange tint is what proposals waiting for a decision look
+   like, and this is something to read, not to act on.
+   ========================================================================== */
+
+#projectOverviewModal .ov-claude-summary[hidden] {
+    display: none;
+}
+
+#projectOverviewModal .ov-claude-summary {
+    margin-top: 4px;
+    padding: 12px 14px 13px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.ov-claude-summary-label {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 6px;
+}
+
+.ov-claude-summary-mark {
+    flex-shrink: 0;
+    color: var(--c-claude);
+}
+
+.ov-claude-summary-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.ov-claude-summary-retry {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--c-claude-2);
+    cursor: pointer;
+}
+
+.ov-claude-summary-retry:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+#projectOverviewModal .ov-claude-summary-text {
+    display: block;
+    margin-top: 4px;
+    color: var(--c-ink);
+    line-height: 1.55;
+    white-space: normal;
+}
+
+.ov-claude-summary-text p {
+    margin: 0 0 6px;
+}
+
+.ov-claude-summary-text p:last-child {
+    margin-bottom: 0;
+}
+
+.ov-claude-summary-text ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
+.ov-claude-summary-text li {
+    margin: 2px 0;
+}
+
+.ov-claude-summary-text li::marker {
+    color: var(--c-claude);
+}
+
+.ov-claude-summary-text .ov-claude-summary-hint {
+    color: var(--c-ink-3);
+}
+
+/* The old summary stays readable while the new one is written. */
+#projectOverviewModal .ov-claude-summary.is-updating .ov-claude-summary-text {
+    opacity: 0.55;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
+.ov-claude-summary-spinner {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--c-claude-soft);
+    border-top-color: var(--c-claude);
+    border-radius: var(--r-full);
+    animation: ovSummarySpin 0.8s linear infinite;
+}
+
+@keyframes ovSummarySpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ov-claude-summary-spinner {
+        animation: none;
+    }
+}

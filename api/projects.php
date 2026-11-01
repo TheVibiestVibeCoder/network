@@ -11,6 +11,7 @@ require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Project.php';
 require_once APP_ROOT . '/includes/ReviewQueue.php';
+require_once APP_ROOT . '/includes/ProjectSummary.php';
 
 // Set JSON response headers and security headers
 header('Content-Type: application/json');
@@ -104,6 +105,23 @@ function handleGet(Project $model, string $action, ?int $id): void
         return;
     }
 
+    // Claude's summary of the project, and whether it is behind the notes
+    if ($action === 'summary' && $id !== null) {
+        if (!ProjectSummary::enabled()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'The Claude summary is not switched on.']);
+            return;
+        }
+        $summary = ProjectSummary::get(Database::getInstance(), $id);
+        if ($summary === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $summary]);
+        return;
+    }
+
     // Get notes for a project
     if ($action === 'notes' && $id !== null) {
         $notes = $model->getNotes($id);
@@ -148,6 +166,39 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // Have Claude write the project's summary again, if the description or
+    // the notes changed since it last did: POST ?action=summary-refresh&id=..
+    if ($action === 'summary-refresh') {
+        $projectId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+        if (!ProjectSummary::enabled()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'The Claude summary is not switched on.']);
+            return;
+        }
+
+        // Claude takes a few seconds: let go of the session meanwhile, so the
+        // rest of the page is not queued behind this request, and finish
+        // writing even if the browser stops waiting.
+        session_write_close();
+        ignore_user_abort(true);
+        set_time_limit(180);
+
+        try {
+            $summary = ProjectSummary::refresh(Database::getInstance(), $projectId);
+        } catch (RuntimeException $e) {
+            http_response_code(502);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+        if ($summary === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $summary]);
+        return;
+    }
+
     // Expected payments that came in (asked after a bookkeeping import):
     // { payments: [{ project_id, month, amount }] }.
     if ($action === 'mark-payments-paid') {

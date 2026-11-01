@@ -5098,6 +5098,12 @@
             : 'N/A';
         elements.projectOverviewDescription.textContent = project.description || 'No description';
 
+        // Claude's summary of the description and notes, written again when
+        // either changed since (project-summary.js)
+        if (window.CRMProjectSummary) {
+            window.CRMProjectSummary.show(project.id);
+        }
+
         // What Claude proposes about this project, if anything
         if (window.CRMReview) {
             window.CRMReview.renderRecordPanel('project', project.id, document.getElementById('projectOverviewReview'));
@@ -5327,6 +5333,7 @@
             if (result.success) {
                 closeProjectNoteForm();
                 await loadProjectNotes(state.viewingProjectId);
+                if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
             } else {
                 alert(result.error || 'Error adding note');
             }
@@ -5357,6 +5364,7 @@
             if (result.success) {
                 if (state.viewingProjectId) {
                     await loadProjectNotes(state.viewingProjectId);
+                    if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
                 }
             } else {
                 alert(result.error || 'Error deleting note');
@@ -5368,6 +5376,7 @@
     }
 
     function closeProjectOverview() {
+        if (window.CRMProjectSummary) window.CRMProjectSummary.show(null);
         state.projectDraft = null;
         state.projectCloseAfterEdit = false;
         elements.projectOverviewModal.classList.remove('active');
@@ -5449,6 +5458,7 @@
 
         state.viewingProjectId = null;
         state.viewingProject = null;
+        if (window.CRMProjectSummary) window.CRMProjectSummary.show(null);
         state.projectDraft = { tags: [], contacts: [], notes: [], todos: [] };
         state.expandedProjectTodos.clear();
         if (window.ProjectDocuments) {
