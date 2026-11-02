@@ -548,15 +548,7 @@
             parts.push(`<line class="fin-today" x1="${todayX}" x2="${todayX}" y1="${todayPt[1]}" y2="${top + H1}"/>`);
             parts.push(`<circle class="fin-dot-mark" cx="${todayPt[0]}" cy="${todayPt[1]}" r="6"/>`);
 
-            // Where it crosses below zero, and where the last month ends.
-            const k = p.kpis;
-            if (k.belowZero) {
-                const i = p.past.length + k.belowZero.offset;
-                const prev = i > p.past.length ? [cx(i - 1), y1(cols[i - 1].closing)] : todayPt;
-                const cur = [cx(i), y1(cols[i].closing)];
-                const t = (y0 - prev[1]) / ((cur[1] - prev[1]) || 1);
-                parts.push(`<circle class="fin-dot-mark is-neg" cx="${prev[0] + (cur[0] - prev[0]) * Math.max(0, Math.min(1, t))}" cy="${y0}" r="5"/>`);
-            }
+            // Where the last month ends.
             const endValue = cols[cols.length - 1].closing;
             parts.push(`<circle class="fin-dot-mark${endValue < 0 ? ' is-neg' : ''}" cx="${last[0]}" cy="${last[1]}" r="6"/>`);
         }

@@ -9102,6 +9102,9 @@ details.import-instructions p {
     min-width: auto;
     display: flex;
     flex-direction: column;
+    /* Said outright: Safari's buttons do not stretch their blocks otherwise,
+       and each colour would shrink to its number. */
+    align-items: stretch;
     gap: 9px;
     padding: 0;
     border: 0;
