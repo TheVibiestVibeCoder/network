@@ -10051,6 +10051,7 @@ details.import-instructions p {
 /* The year card: the result so far in its colour, then year end and balance. */
 .fin-kpi-value.is-pos { color: var(--c-success-ink); }
 .fin-kpi-value.is-neg { color: var(--c-danger-ink); }
+.fin-kpi-sub strong.is-pos { color: var(--c-success-ink); }
 
 /* The (i) on "Year end": a projection, said in its tooltip. */
 .fin-kpi-info {

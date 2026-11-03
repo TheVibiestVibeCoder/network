@@ -384,11 +384,14 @@
         const y = state.year;
         const b = state.plan.balance;
         const tone = v => (Math.round(v) > 0 ? 'is-pos' : Math.round(v) < 0 ? 'is-neg' : '');
+        // What came in and went out this year, each without its VAT.
+        const income = y.months.reduce((sum, m) => sum + m.income, 0);
+        const costs = y.months.reduce((sum, m) => sum + m.costs, 0);
         return `
             <article class="fin-kpi fin-kpi--year">
                 <span class="fin-kpi-label">Result ${y.year}</span>
                 <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
-                <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping">Preliminary result</span>
+                <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping, without VAT">In <strong class="is-pos">${esc(signed(income))}</strong> · Out <strong>${esc(signed(-costs))}</strong></span>
                 <dl class="fin-kpi-lines">
                     <div title="A projection: the result so far plus what the plan nets until December - income under the ${esc(scenarioName())} scenario less the costs still to come">
                         <dt>Year end · ${esc(scenarioName())}<span class="fin-kpi-info" aria-label="A projection">${ICON.info}</span></dt>
