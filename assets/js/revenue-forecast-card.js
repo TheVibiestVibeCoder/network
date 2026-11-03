@@ -342,11 +342,10 @@
             const px = v => Math.round((v / f.scale.max) * H);
             const focus = Math.min(state.focusMonth, columnCount(f) - 1);
 
+            // The scale, collapsed or not: a line and its amount at each step.
             const ticks = [];
-            if (state.expanded) {
-                for (let v = 0; v <= f.scale.max; v += f.scale.step) {
-                    ticks.push(`<span class="rf-tick${v === 0 ? ' is-base' : ''}" style="bottom:${px(v)}px"><span>${esc(RF.moneyShort(v))}</span></span>`);
-                }
+            for (let v = 0; v <= f.scale.max; v += f.scale.step) {
+                ticks.push(`<span class="rf-tick${v === 0 ? ' is-base' : ''}" style="bottom:${px(v)}px"><span>${esc(RF.moneyShort(v))}</span></span>`);
             }
 
             const cols = [];

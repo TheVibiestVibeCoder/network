@@ -48,6 +48,13 @@
         balanceError: '',
         bufferOpen: false,
         bufferError: '',
+        // The fixed and planned cost cards, unfolded to edit what is in them.
+        fixedOpen: false,
+        plannedOpen: false,
+        // Recurring payments in Bookkeeping that no fixed cost covers yet.
+        suggestions: [],
+        // This year's result so far and where it ends (cashflow.js yearResult).
+        year: null,
         openMonths: new Set(),
         showPastPlanned: false,
         hover: null,
@@ -128,6 +135,8 @@
         plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+        info: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>',
+        repeat: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5 20.5 6 17 9.5"/><path d="M3.5 11.5V10a4 4 0 0 1 4-4h13"/><path d="M7 21.5 3.5 18 7 14.5"/><path d="M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>',
         trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>',
         bank: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7"/><path d="M3.5 19.5h17"/></svg>'
     };
@@ -140,7 +149,7 @@
         if (state.inited) return;
         state.inited = true;
         ['financialsView', 'finHeadTools', 'finPage', 'finKpis', 'finAlerts', 'finChart', 'finMonths',
-            'finCosts', 'finCostsModal', 'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
+            'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
             const stored = Number(localStorage.getItem(HORIZON_KEY));
@@ -204,7 +213,7 @@
     }
 
     function compute() {
-        state.plan = CF.plan({
+        const input = {
             projects: state.projects,
             costs: state.overview.costs,
             balances: state.overview.balances,
@@ -214,7 +223,13 @@
             months: state.months,
             now: RF.monthOf(new Date()),
             today: todayIso()
-        });
+        };
+        state.plan = CF.plan(input);
+        // The year's end needs the plan to reach December, whatever is shown.
+        const toDecember = state.months >= 12 ? state.plan : CF.plan(Object.assign({}, input, { months: 12 }));
+        state.year = CF.yearResult(state.tx.rows, toDecember, input.now);
+        state.suggestions = CF.recurringSuggestions(state.tx.rows, state.overview.costs,
+            (state.overview.settings || {}).dismissed_recurring || [], todayIso());
     }
 
     // ------------------------------------------------------------------
@@ -223,7 +238,7 @@
 
     function renderSkeleton() {
         els.finPage.setAttribute('aria-busy', 'true');
-        els.finKpis.innerHTML = [0, 1].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
+        els.finKpis.innerHTML = [0, 1, 2, 3].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
         els.finChart.innerHTML = '<div class="fin-skel is-chart"></div>';
     }
 
@@ -243,7 +258,6 @@
         renderAlerts();
         renderChart();
         renderMonths();
-        renderCosts();
 
         if (focusKey) {
             const again = els.financialsView.querySelector(`[data-fin-focus="${focusKey}"]`);
@@ -266,7 +280,6 @@
      */
     function renderHead() {
         els.finHeadTools.innerHTML = `
-            ${state.plan ? balanceTool() : ''}
             <div class="fin-tool fin-months">
                 ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: n + 'M', hint: n + ' months ahead' })), state.months)}
             </div>`;
@@ -287,30 +300,13 @@
         return note;
     }
 
-    function balanceTool() {
-        const b = state.plan.balance;
-        const balanceSub = balanceNote();
-
-        return `
-            <div class="fin-tool fin-balance${b ? '' : ' is-empty'}">
-                <button type="button" class="fin-balance-btn" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
-                    title="Bank balance · ${esc(balanceSub)} · click to update">
-                    ${ICON.bank}<span class="fin-balance-value">${b ? esc(euro(b.amount)) : 'Enter balance'}</span>
-                </button>
-                ${state.balanceOpen ? `<div class="fin-balance-pop">
-                    <p class="fin-balance-note">${esc(balanceSub)}</p>
-                    ${balanceForm()}
-                </div>` : ''}
-            </div>`;
-    }
-
     /** How the lowest balance stands, as the colour of its figure. */
     function lowestTone() {
         const k = state.plan.kpis;
         return !k.lowest ? '' : k.lowest.amount < 0 ? 'is-danger' : (k.belowBuffer ? 'is-warn' : 'is-ok');
     }
 
-    // ---- The two figures on top ----
+    // ---- The three figures on top ----
 
     function renderKpis() {
         const p = state.plan;
@@ -320,21 +316,91 @@
         renderHead();
 
         const lowTone = lowestTone();
+        const span = `over the next ${plural(p.months, 'month')}`;
+        const suggestions = state.suggestions.length;
+        const y = state.year;
+        const now = RF.monthOf(new Date());
+        const plannedCount = state.overview.costs.filter(c => {
+            const o = c.kind === 'once' ? RF.offsetOf(c.start_month, now) : null;
+            return o !== null && o >= 0 && o < p.months;
+        }).length;
+        const zero = k.belowZero ? k.belowZero.label : `not within ${p.months} months`;
 
-        // Fixed costs open the costs sheet (renderCosts), where they are edited.
+        // Each cost card unfolds downwards to edit what is in it, as the
+        // buffer does on "Lowest balance".
         els.finKpis.innerHTML = `
-            <button type="button" class="fin-kpi fin-kpi--out is-link" data-fin-costs data-fin-focus="costs" aria-haspopup="dialog"
-                title="See and edit the costs">
+            ${yearCard()}
+            <article class="fin-kpi fin-kpi--costs${state.fixedOpen ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Fixed costs</span>
                 <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}<span class="fin-kpi-unit">/month</span></span>
-            </button>
+                <span class="fin-kpi-sub"><strong>${esc(euro(k.fixedTotal))}</strong> ${esc(span)}</span>
+                ${kpiLines([['Until Dec ' + y.year, euro(y.fixedRest)], ['Per year', euro(k.fixedPerMonth * 12)]])}
+                ${suggestions && !state.fixedOpen ? `<button type="button" class="fin-suggest-pill" data-fin-fixed data-fin-focus="fixed-suggest"
+                    title="Recurring payments in Bookkeeping that are not among the fixed costs yet">${ICON.repeat}${esc(plural(suggestions, 'suggestion'))}</button>` : ''}
+                <button type="button" class="fin-link fin-kpi-action" data-fin-fixed data-fin-focus="fixed" aria-expanded="${state.fixedOpen}">Edit</button>
+                ${state.fixedOpen ? fixedPanel() : ''}
+            </article>
+            <article class="fin-kpi fin-kpi--costs${state.plannedOpen ? ' is-open' : ''}">
+                <span class="fin-kpi-label">Planned costs</span>
+                <span class="fin-kpi-value">${esc(euro(k.plannedTotal))}</span>
+                <span class="fin-kpi-sub">${esc(span)}</span>
+                ${kpiLines([['Until Dec ' + y.year, euro(y.plannedRest)], ['Planned', plural(plannedCount, 'cost')]])}
+                <button type="button" class="fin-link fin-kpi-action" data-fin-planned data-fin-focus="planned" aria-expanded="${state.plannedOpen}">Edit</button>
+                ${state.plannedOpen ? plannedPanel() : ''}
+            </article>
             <article class="fin-kpi fin-kpi--low ${lowTone}">
                 <span class="fin-kpi-label">Lowest balance</span>
                 <span class="fin-kpi-value">${k.lowest ? esc((k.lowest.amount < 0 ? MINUS : '') + euro(Math.abs(k.lowest.amount))) : '—'}</span>
                 ${k.lowest ? `<span class="fin-kpi-sub"><strong>${esc(k.lowest.label)}</strong></span>` : ''}
+                ${kpiLines([['Below zero from', zero, k.belowZero ? 'is-neg' : ''],
+                    p.settings.buffer > 0
+                        ? ['Below buffer from', k.belowBuffer ? k.belowBuffer.label : `not within ${p.months} months`, k.belowBuffer ? 'is-warn' : '']
+                        : ['Buffer', 'not set']])}
                 <button type="button" class="fin-link fin-kpi-action" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
                     title="The least that should always be in the account; the chart and this figure warn below it">${p.settings.buffer > 0 ? 'Buffer ' + esc(euro(p.settings.buffer)) : 'Set buffer'}</button>
                 ${state.bufferOpen ? bufferForm() : ''}
+            </article>`;
+    }
+
+    /** The two lines under a card's figure: [[label, value, class?], ...]. */
+    function kpiLines(lines) {
+        return `<dl class="fin-kpi-lines">${lines.map(([label, value, cls]) => `
+            <div><dt>${esc(label)}</dt><dd class="${cls || ''}">${esc(value)}</dd></div>`).join('')}</dl>`;
+    }
+
+    /** "Realistic", or "custom" for a scenario adjusted by hand. */
+    function scenarioName() {
+        const key = RF.activePreset(Card.getSettings());
+        const preset = key ? RF.presetByKey(key) : null;
+        return preset ? preset.label : 'custom scenario';
+    }
+
+    /**
+     * The first card: this year's result so far - profit or loss without the
+     * VAT, from Bookkeeping - where it ends in December under the scenario,
+     * and today's bank balance, which is updated from here.
+     */
+    function yearCard() {
+        const y = state.year;
+        const b = state.plan.balance;
+        const tone = v => (Math.round(v) > 0 ? 'is-pos' : Math.round(v) < 0 ? 'is-neg' : '');
+        return `
+            <article class="fin-kpi fin-kpi--year">
+                <span class="fin-kpi-label">Result ${y.year}</span>
+                <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
+                <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping">Preliminary result</span>
+                <dl class="fin-kpi-lines">
+                    <div title="A projection: the result so far plus what the plan nets until December - income under the ${esc(scenarioName())} scenario less the costs still to come">
+                        <dt>Year end · ${esc(scenarioName())}<span class="fin-kpi-info" aria-label="A projection">${ICON.info}</span></dt>
+                        <dd class="${tone(y.projected)}">${esc(signed(y.projected))}</dd>
+                    </div>
+                    <div>
+                        <dt>Bank balance</dt>
+                        <dd><button type="button" class="fin-link fin-balance-link" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
+                            title="${esc(balanceNote())} · click to update">${b ? esc(euro(b.amount)) : 'Enter balance'}</button></dd>
+                    </div>
+                </dl>
+                ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
             </article>`;
     }
 
@@ -397,7 +463,7 @@
             alerts.push({ tone: 'warn', html: `<strong>${esc(euro(k.overdue.amount))} overdue</strong> · ${esc(oldest.name)}${k.overdue.count > 1 ? ` and ${k.overdue.count - 1} more` : ''}` });
         }
         if (!p.hasBalance) {
-            alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one above.' });
+            alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one on the first card.' });
         }
         els.finAlerts.innerHTML = alerts.length
             ? `<div class="fin-alerts">${alerts.map(a => `<p class="fin-alert is-${a.tone}">${ICON.warn}<span>${a.html}</span></p>`).join('')}</div>`
@@ -409,8 +475,16 @@
     /** Past months (actuals) then the plan, as columns. */
     function chartColumns() {
         const p = state.plan;
-        return p.past.map(m => ({ past: true, label: m.label, offset: m.offset, in: m.income, out: m.expenses, closing: m.closing }))
-            .concat(p.rows.map(r => ({ past: false, label: r.label, offset: r.offset, in: r.in, out: r.out, closing: p.hasBalance ? r.closing : null, row: r })));
+        // A past month's net is its result without VAT where this year's
+        // bookkeeping gives it, otherwise what came in less what went out.
+        const result = o => {
+            const m = state.year && state.year.months.find(x => x.offset === o);
+            return m ? m.result : null;
+        };
+        return p.past.map(m => {
+            const r = result(m.offset);
+            return { past: true, label: m.label, offset: m.offset, in: m.income, out: m.expenses, net: r !== null ? r : m.income - m.expenses, closing: m.closing };
+        }).concat(p.rows.map(r => ({ past: false, label: r.label, offset: r.offset, in: r.in, out: r.out, net: r.net, closing: p.hasBalance ? r.closing : null, row: r })));
     }
 
     function renderChart() {
@@ -434,6 +508,7 @@
             <strong class="fin-hover-month">${esc(c.label)}${c.past ? ' <span class="fin-tag">actual</span>' : ''}</strong>
             <span><span>In</span><strong class="is-pos">${esc(signed(c.in))}</strong></span>
             <span><span>Out</span><strong>${esc(signed(-c.out))}</strong></span>
+            <span><span>Net</span><strong class="${c.net < 0 ? 'is-neg' : 'is-pos'}">${esc(signed(c.net))}</strong></span>
             ${c.closing === null ? '' : `<span><span>Balance</span><strong class="${c.closing < 0 ? 'is-neg' : ''}">${money(c.closing)}</strong></span>`}`;
     }
 
@@ -478,7 +553,8 @@
     /**
      * The cashflow: the balance as one smooth line - blue above zero, red
      * below - with "Today" marked above its point and the last month's
-     * balance at the end. Hovering a month reads its in and out above the chart.
+     * balance at the end, and each month's net as a bar from zero. Hovering
+     * a month reads its in, out and net above the chart.
      */
     function drawPlot() {
         const plot = els.finChart && els.finChart.querySelector('[data-fin-plot]');
@@ -497,7 +573,7 @@
         const cx = i => padL + cw * (i + 0.5);
         const todayX = padL + cw * p.past.length;
 
-        const values = cols.filter(c => c.closing !== null).map(c => c.closing);
+        const values = cols.filter(c => c.closing !== null).map(c => c.closing).concat(cols.map(c => c.net));
         if (p.hasBalance) values.push(p.balance.amount);
         if (p.settings.buffer > 0) values.push(p.settings.buffer);
         values.push(0);
@@ -528,6 +604,14 @@
             parts.push(`<line class="fin-buffer" x1="${padL}" x2="${right}" y1="${y}" y2="${y}"/>`);
             parts.push(`<text class="fin-buffer-label" x="${right - 4}" y="${y - 5}" text-anchor="end">Buffer ${esc(short(p.settings.buffer))}</text>`);
         }
+        // Each month's net as a quiet bar from zero, under the balance line.
+        const barW = Math.max(3, Math.min(18, cw * 0.36));
+        cols.forEach((c, i) => {
+            if (Math.abs(c.net) < 0.5) return;
+            const yTop = Math.min(y1(c.net), y0);
+            const h = Math.max(1, Math.abs(y1(c.net) - y0));
+            parts.push(`<rect class="fin-net-bar${c.net < 0 ? ' is-neg' : ''}${c.past ? ' is-past' : ''}" x="${cx(i) - barW / 2}" y="${yTop}" width="${barW}" height="${h}" rx="2"/>`);
+        });
         parts.push(`<rect class="fin-hover-band" data-fin-band x="0" y="${top - 6}" width="${cw}" height="${H1 + 12}" rx="8" visibility="hidden"/>`);
 
         if (p.hasBalance) {
@@ -617,7 +701,20 @@
         const buffer = p.settings.buffer;
         const balClass = v => (v < 0 ? 'is-neg' : buffer > 0 && v < buffer ? 'is-low' : '');
 
-        const body = p.rows.map(r => {
+        // This year's months gone by, as their actual result from Bookkeeping.
+        const dash = '<span class="fin-muted">–</span>';
+        const past = state.year.months.filter(m => m.offset < 0).map(m => `
+                <tr class="fin-month is-past">
+                    <th scope="row">
+                        <span class="fin-month-label"><span>${esc(m.label)}</span><span class="fin-tag">actual</span></span>
+                    </th>
+                    <td class="is-pos">${m.income > 0.005 ? esc(signed(m.income)) : dash}</td>
+                    <td>${m.costs > 0.005 ? esc(signed(-m.costs)) : dash}</td>
+                    <td class="${m.result < 0 ? 'is-neg' : 'is-pos'}">${m.rows ? `<strong>${esc(signed(m.result))}</strong>` : dash}</td>
+                    <td class="fin-col-balance ${m.rows && m.closing !== null ? balClass(m.closing) : ''}">${m.rows && m.closing !== null ? esc((m.closing < 0 ? MINUS : '') + euro(Math.abs(m.closing))) : dash}</td>
+                </tr>`).join('');
+
+        const body = past + p.rows.map(r => {
             const open = state.openMonths.has(r.offset);
             return `
                 <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}">
@@ -642,7 +739,7 @@
                 <table class="fin-table">
                     <thead><tr>
                         <th scope="col">Month</th><th scope="col">In</th><th scope="col">Costs</th>
-                        <th scope="col">Net</th><th scope="col">Balance</th>
+                        <th scope="col" title="Past months: the actual result, without VAT. From this month on: what the plan nets">Net</th><th scope="col">Balance</th>
                     </tr></thead>
                     <tbody>${body}</tbody>
                 </table>
@@ -659,7 +756,11 @@
         const costs = r.items.costs.map(c => line(esc(c.cost.name),
             esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost), c.paid ? 'already paid this month' : ''].filter(Boolean).join(' · ')),
             esc(signed(-c.amount)), c.paid ? 'is-paid' : 'is-out'));
-        const all = income.concat(costs);
+        const sofar = r.offset === 0 ? state.year.months.find(m => m.offset === 0) : null;
+        const actual = sofar && sofar.rows ? [line('So far this month',
+            esc('actual, from Bookkeeping'),
+            esc(signed(sofar.result)), 'is-actual')] : [];
+        const all = actual.concat(income, costs);
         return all.length ? `<ul class="fin-detail">${all.join('')}</ul>` : '<p class="fin-muted fin-detail-empty">Nothing planned this month.</p>';
     }
 
@@ -679,54 +780,96 @@
         return key ? PP.monthName(key) : '';
     }
 
-    function renderCosts() {
-        const p = state.plan;
-        const now = RF.monthOf(new Date());
-        const current = monthKey(0, now);
+    /** Planned costs from this month on, soonest first. */
+    function upcomingPlanned() {
+        const current = monthKey(0, RF.monthOf(new Date()));
+        return state.overview.costs.filter(c => c.kind === 'once' && c.start_month >= current)
+            .sort((a, b) => (a.start_month < b.start_month ? -1 : a.start_month > b.start_month ? 1 : 0));
+    }
+
+    function costRow(c) {
+        const current = monthKey(0, RF.monthOf(new Date()));
+        const once = c.kind === 'once';
+        const ended = !once && c.end_month && c.end_month < current;
+        const meta = once
+            ? monthLabelOf(c.start_month)
+            : `${rhythm(c)} · ${monthLabelOf(c.start_month)}${c.end_month ? ' – ' + monthLabelOf(c.end_month) : ' onwards'}${ended ? ' · ended' : ''}`;
+        return `
+            <li>
+                <button type="button" class="fin-cost${ended ? ' is-ended' : ''}" data-fin-edit="${c.id}" data-fin-focus="cost-${c.id}">
+                    <span class="fin-cost-main">
+                        <span class="fin-cost-name">${esc(c.name)}${c.category ? `<span class="fin-chip">${esc(c.category)}</span>` : ''}</span>
+                        <span class="fin-cost-meta">${esc(meta)}</span>
+                    </span>
+                    <span class="fin-cost-amount"><strong>${esc(euro(c.amount))}</strong>${!once && Number(c.interval_months) > 1 ? `<span>≈ ${esc(euro(c.amount / c.interval_months))} / month</span>` : ''}</span>
+                </button>
+            </li>`;
+    }
+
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+    const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+    /**
+     * A recurring payment from Bookkeeping, to take on as a fixed cost or
+     * turn down - with the same round reject / accept buttons as Claude's
+     * proposals (review.css), though no Claude is involved.
+     */
+    function suggestionRow(s) {
+        const iv = INTERVALS.find(x => x.value === s.interval) || INTERVALS[0];
+        return `
+            <li class="fin-suggestion">
+                <button type="button" class="fin-cost" data-fin-suggest-edit="${esc(s.key)}" data-fin-focus="suggest-${esc(s.key)}"
+                    title="Adjust it before adding">
+                    <span class="fin-cost-main">
+                        <span class="fin-cost-name">${esc(s.name)}</span>
+                        <span class="fin-cost-meta">${esc(iv.short)} on the ${esc(ordinal(s.day))} · paid ${s.count}× since ${esc(dayName(s.first))}</span>
+                    </span>
+                    <span class="fin-cost-amount"><strong>${esc(euro(s.amount))}</strong><span>${s.net ? 'excl. VAT' : 'as paid'}</span></span>
+                </button>
+                <span class="review-inline">
+                    <button type="button" class="review-inline-btn review-inline-btn--reject" data-fin-dismiss="${esc(s.key)}" title="Not a fixed cost" aria-label="Turn down ${esc(s.name)}">${ICON_X}</button>
+                    <button type="button" class="review-inline-btn review-inline-btn--accept" data-fin-accept="${esc(s.key)}" title="Add as a fixed cost" aria-label="Add ${esc(s.name)} as a fixed cost">${ICON_CHECK}</button>
+                </span>
+            </li>`;
+    }
+
+    function fixedPanel() {
         const fixed = state.overview.costs.filter(c => c.kind !== 'once');
-        const once = state.overview.costs.filter(c => c.kind === 'once');
-        const upcoming = once.filter(c => c.start_month >= current).sort((a, b) => (a.start_month < b.start_month ? -1 : 1));
-        const past = once.filter(c => c.start_month < current);
-        const ended = c => c.end_month && c.end_month < current;
+        const draft = state.draft && state.draft.kind !== 'once' ? state.draft : null;
+        return `
+            <div class="fin-kpi-panel">
+                ${state.suggestions.length ? `
+                <section class="fin-group">
+                    <h3 class="fin-group-title"><span>${ICON.repeat} Suggested from Bookkeeping</span></h3>
+                    <ul class="fin-cost-list">${state.suggestions.map(suggestionRow).join('')}</ul>
+                </section>` : ''}
+                <section class="fin-group">
+                    <h3 class="fin-group-title"><span>Fixed costs</span>
+                        <button type="button" class="ov-add-btn" data-fin-add="recurring" data-fin-focus="add-recurring">${ICON.plus}Add</button></h3>
+                    ${draft ? costForm(draft) : ''}
+                    ${fixed.length ? `<ul class="fin-cost-list">${fixed.map(costRow).join('')}</ul>`
+                        : (draft ? '' : '<p class="fin-muted fin-panel-empty">No fixed costs yet.</p>')}
+                </section>
+            </div>`;
+    }
 
-        const fixedRow = c => `
-            <li>
-                <button type="button" class="fin-cost${ended(c) ? ' is-ended' : ''}" data-fin-edit="${c.id}" data-fin-focus="cost-${c.id}">
-                    <span class="fin-cost-main">
-                        <span class="fin-cost-name">${esc(c.name)}${c.category ? `<span class="fin-chip">${esc(c.category)}</span>` : ''}</span>
-                        <span class="fin-cost-meta">${esc(rhythm(c))} · ${esc(monthLabelOf(c.start_month))}${c.end_month ? ' – ' + esc(monthLabelOf(c.end_month)) : ' onwards'}${ended(c) ? ' · ended' : ''}</span>
-                    </span>
-                    <span class="fin-cost-amount"><strong>${esc(euro(c.amount))}</strong>${Number(c.interval_months) > 1 ? `<span>≈ ${esc(euro(c.amount / c.interval_months))} / month</span>` : ''}</span>
-                </button>
-            </li>`;
-        const onceRow = c => `
-            <li>
-                <button type="button" class="fin-cost" data-fin-edit="${c.id}" data-fin-focus="cost-${c.id}">
-                    <span class="fin-cost-main">
-                        <span class="fin-cost-name">${esc(c.name)}${c.category ? `<span class="fin-chip">${esc(c.category)}</span>` : ''}</span>
-                        <span class="fin-cost-meta">${esc(monthLabelOf(c.start_month))}</span>
-                    </span>
-                    <span class="fin-cost-amount"><strong>${esc(euro(c.amount))}</strong></span>
-                </button>
-            </li>`;
-
-        const editing = state.draft;
-        els.finCosts.innerHTML = `
-            ${editing ? costForm(editing) : ''}
-            <section class="fin-group">
-                <h3 class="fin-group-title"><span>Fixed costs <span class="fin-muted">· ${esc(euro(p.kpis.fixedPerMonth))}/month</span></span>
-                    <button type="button" class="ov-add-btn" data-fin-add="recurring" data-fin-focus="add-recurring">${ICON.plus}Add</button></h3>
-                ${fixed.length ? `<ul class="fin-cost-list">${fixed.map(fixedRow).join('')}</ul>`
-                    : ''}
-            </section>
-            <section class="fin-group">
-                <h3 class="fin-group-title"><span>Planned costs</span>
-                    <button type="button" class="ov-add-btn" data-fin-add="once" data-fin-focus="add-once">${ICON.plus}Add</button></h3>
-                ${upcoming.length ? `<ul class="fin-cost-list">${upcoming.map(onceRow).join('')}</ul>`
-                    : ''}
-                ${past.length ? `<button type="button" class="fin-link" data-fin-past>${state.showPastPlanned ? 'Hide' : 'Show'} ${esc(plural(past.length, 'past planned cost'))}</button>
-                    ${state.showPastPlanned ? `<ul class="fin-cost-list is-past">${past.map(onceRow).join('')}</ul>` : ''}` : ''}
-            </section>`;
+    function plannedPanel() {
+        const current = monthKey(0, RF.monthOf(new Date()));
+        const upcoming = upcomingPlanned();
+        const past = state.overview.costs.filter(c => c.kind === 'once' && c.start_month < current);
+        const draft = state.draft && state.draft.kind === 'once' ? state.draft : null;
+        return `
+            <div class="fin-kpi-panel">
+                <section class="fin-group">
+                    <h3 class="fin-group-title"><span>Planned costs</span>
+                        <button type="button" class="ov-add-btn" data-fin-add="once" data-fin-focus="add-once">${ICON.plus}Add</button></h3>
+                    ${draft ? costForm(draft) : ''}
+                    ${upcoming.length ? `<ul class="fin-cost-list">${upcoming.map(costRow).join('')}</ul>`
+                        : (draft ? '' : '<p class="fin-muted fin-panel-empty">Nothing planned.</p>')}
+                    ${past.length ? `<button type="button" class="fin-link" data-fin-past>${state.showPastPlanned ? 'Hide' : 'Show'} ${esc(plural(past.length, 'past planned cost'))}</button>
+                        ${state.showPastPlanned ? `<ul class="fin-cost-list is-past">${past.map(costRow).join('')}</ul>` : ''}` : ''}
+                </section>
+            </div>`;
     }
 
     function monthOptions(selected, from, to, now) {
@@ -804,8 +947,8 @@
         const amount = readAmount(d.amount);
         if (amount === null || Number.isNaN(amount) || amount <= 0) {
             state.draftError = 'Enter an amount above 0, e.g. 1.234,56';
-            renderCosts();
-            const field = els.finCosts.querySelector('[data-fin-cost-form] [name="amount"]');
+            renderKpis();
+            const field = els.finKpis.querySelector('[data-fin-cost-form] [name="amount"]');
             if (field) field.focus();
             return;
         }
@@ -820,12 +963,12 @@
             state.draftError = '';
             compute();
             render();
-            const saved = els.finCosts.querySelector(`[data-fin-edit="${result.id}"]`);
+            const saved = els.finKpis.querySelector(`[data-fin-edit="${result.id}"]`);
             if (saved) saved.focus();
         } catch (error) {
             state.draftError = error.message;
-            renderCosts();
-            const name = els.finCosts.querySelector('[data-fin-focus="draft-name"]');
+            renderKpis();
+            const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
             if (name && !d.name) name.focus();
         }
     }
@@ -840,7 +983,41 @@
             render();
         } catch (error) {
             state.draftError = error.message;
-            renderCosts();
+            renderKpis();
+        }
+    }
+
+    /** Take a recurring payment on as a fixed cost, as it was spotted. */
+    async function acceptSuggestion(key) {
+        const sug = state.suggestions.find(x => x.key === key);
+        if (!sug) return;
+        try {
+            const result = await post('save-cost', {
+                id: null, name: sug.name, category: '', amount: sug.amount,
+                kind: 'recurring', interval_months: sug.interval, day: sug.day,
+                start_month: sug.start_month, end_month: null
+            });
+            state.overview = result.data;
+            compute();
+            render();
+        } catch (error) {
+            state.draftError = error.message;
+            renderKpis();
+        }
+    }
+
+    /** Not a fixed cost: it does not come back. */
+    async function dismissSuggestion(key) {
+        try {
+            const result = await post('save-settings', { dismiss_recurring: key });
+            state.overview = result.data;
+            compute();
+            renderKpis();
+            const next = els.finKpis.querySelector('[data-fin-accept]') || els.finKpis.querySelector('[data-fin-focus="fixed"]');
+            if (next) next.focus();
+        } catch (error) {
+            state.draftError = error.message;
+            renderKpis();
         }
     }
 
@@ -910,17 +1087,40 @@
         const view = els.financialsView;
 
         view.addEventListener('click', e => {
-            if (e.target.closest('[data-fin-costs-close]')) {
-                closeCosts();
-                return;
-            }
             const t = e.target.closest('button');
             if (!t || !view.contains(t) || els.finForecast.contains(t)) return;
 
             if (t.hasAttribute('data-fin-retry')) {
                 load();
-            } else if (t.hasAttribute('data-fin-costs')) {
-                openCosts();
+            } else if (t.hasAttribute('data-fin-fixed')) {
+                // The suggestions open the card too, and stay at its top.
+                const opening = !state.fixedOpen || t.classList.contains('fin-suggest-pill');
+                state.fixedOpen = opening;
+                if (!opening && state.draft && state.draft.kind !== 'once') state.draft = null;
+                renderKpis();
+                const again = els.finKpis.querySelector('[data-fin-focus="fixed"]');
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-planned')) {
+                state.plannedOpen = !state.plannedOpen;
+                if (!state.plannedOpen && state.draft && state.draft.kind === 'once') state.draft = null;
+                renderKpis();
+                const again = els.finKpis.querySelector('[data-fin-focus="planned"]');
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-accept')) {
+                acceptSuggestion(t.getAttribute('data-fin-accept'));
+            } else if (t.hasAttribute('data-fin-dismiss')) {
+                dismissSuggestion(t.getAttribute('data-fin-dismiss'));
+            } else if (t.hasAttribute('data-fin-suggest-edit')) {
+                const sug = state.suggestions.find(x => x.key === t.getAttribute('data-fin-suggest-edit'));
+                if (!sug) return;
+                state.draft = Object.assign(newDraft('recurring'), {
+                    name: sug.name, amount: showAmount(sug.amount), interval_months: sug.interval,
+                    day: sug.day, start_month: sug.start_month
+                });
+                state.draftError = '';
+                renderKpis();
+                const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
+                if (name) name.focus();
             } else if (t.hasAttribute('data-fin-months')) {
                 state.months = Number(t.getAttribute('data-fin-months'));
                 try { localStorage.setItem(HORIZON_KEY, String(state.months)); } catch (err) { /* fine */ }
@@ -959,31 +1159,31 @@
                 if (again) again.focus();
             } else if (t.hasAttribute('data-fin-add')) {
                 state.draft = newDraft(t.getAttribute('data-fin-add'));
+                if (state.draft.kind === 'once') state.plannedOpen = true; else state.fixedOpen = true;
                 state.draftError = '';
-                renderCosts();
-                const name = els.finCosts.querySelector('[data-fin-focus="draft-name"]');
+                renderKpis();
+                const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
                 if (name) name.focus();
             } else if (t.hasAttribute('data-fin-edit')) {
                 const cost = state.overview.costs.find(c => c.id === Number(t.getAttribute('data-fin-edit')));
                 if (!cost) return;
                 state.draft = Object.assign({}, cost, { end_month: cost.end_month || '', amount: showAmount(cost.amount) });
                 state.draftError = '';
-                renderCosts();
-                els.finCosts.scrollTop = 0;
-                const name = els.finCosts.querySelector('[data-fin-focus="draft-name"]');
+                renderKpis();
+                const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
                 if (name) name.focus();
             } else if (t.hasAttribute('data-fin-cancel')) {
                 const id = state.draft && state.draft.id;
                 state.draft = null;
                 state.draftError = '';
-                renderCosts();
-                const back = id ? els.finCosts.querySelector(`[data-fin-edit="${id}"]`) : null;
+                renderKpis();
+                const back = id ? els.finKpis.querySelector(`[data-fin-edit="${id}"]`) : null;
                 if (back) back.focus();
             } else if (t.hasAttribute('data-fin-delete')) {
                 deleteCost(Number(t.getAttribute('data-fin-delete')));
             } else if (t.hasAttribute('data-fin-past')) {
                 state.showPastPlanned = !state.showPastPlanned;
-                renderCosts();
+                renderKpis();
             }
         });
 
@@ -1010,9 +1210,14 @@
             if (e.key !== 'Escape') return;
             if (state.draft && e.target.closest('[data-fin-cost-form]')) {
                 state.draft = null;
-                renderCosts();
-            } else if (els.finCostsModal.classList.contains('active')) {
-                closeCosts();
+                renderKpis();
+            } else if (e.target.closest('.fin-kpi-panel')) {
+                // Folds the card the focus is in.
+                const planned = !!e.target.closest('.fin-kpi').querySelector('[data-fin-planned]');
+                if (planned) state.plannedOpen = false; else state.fixedOpen = false;
+                renderKpis();
+                const btn = els.finKpis.querySelector(planned ? '[data-fin-planned]' : '[data-fin-fixed].fin-kpi-action');
+                if (btn) btn.focus();
             } else if (state.bufferOpen && e.target.closest('[data-fin-buffer-form]')) {
                 state.bufferOpen = false;
                 renderKpis();
@@ -1036,22 +1241,6 @@
             const hit = e.target.closest('[data-fin-col]');
             if (hit) hoverColumn(Number(hit.getAttribute('data-fin-col')));
         }, { passive: true });
-    }
-
-    /** The costs sheet, opened from the "Fixed costs" figure. */
-    function openCosts() {
-        renderCosts();
-        els.finCostsModal.classList.add('active');
-        const close = els.finCostsModal.querySelector('.modal-close');
-        if (close) close.focus();
-    }
-
-    function closeCosts() {
-        els.finCostsModal.classList.remove('active');
-        state.draft = null;
-        state.draftError = '';
-        const card = els.finKpis.querySelector('[data-fin-costs]');
-        if (card) card.focus();
     }
 
     window.Financials = { load };

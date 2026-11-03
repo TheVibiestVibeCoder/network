@@ -24,6 +24,13 @@
  * passed) is taken to be in the balance already. A planned cost once, in its
  * month.
  *
+ * The year's result: this year's months in Bookkeeping as profit or loss,
+ * without the VAT in them, and where the year ends if the plan holds
+ * (yearMonths, yearResult).
+ *
+ * Recurring payments in Bookkeeping that no fixed cost covers yet are
+ * offered as suggestions (recurringSuggestions).
+ *
  * The balance today is the one last entered, moved by every bookkeeping row
  * dated after it (rows left out of the month totals do not count). Each month
  * then closes at its opening plus what comes in less what goes out.
@@ -237,6 +244,194 @@
     }
 
     // ------------------------------------------------------------------
+    // The year's result
+    // ------------------------------------------------------------------
+
+    /**
+     * Each month of this year so far, from Bookkeeping, as our financial
+     * result: what came in and went out, each without the VAT in it - the
+     * VAT on our own invoices is owed, the VAT on what we paid comes back
+     * (the rows' `vat`). Income less costs is the month's profit or loss.
+     *
+     * `open` counts entries still without their invoice: until it is 0 the
+     * VAT, and so the result, is not final. With a balance, `closing` is
+     * where the account stood at the month's end. Always from January to
+     * this month, which is included as far as it has gone; a month without
+     * rows counts as 0.
+     *
+     *   -> [{ offset, label, income, costs, result, open, rows, closing }]
+     */
+    function yearMonths(transactions, now, today) {
+        const rows = (transactions || []).filter(t => !t.excluded);
+        const net = t => t.amount + (number(t.vat) || 0);
+        const out = [];
+        for (let m = 0; m <= now.month; m++) {
+            const o = m - now.month;
+            const prefix = now.year + '-' + String(m + 1).padStart(2, '0');
+            const inMonth = rows.filter(t => t.date.slice(0, 7) === prefix);
+            const income = sum(inMonth.filter(t => t.amount > 0), net);
+            const costs = -sum(inMonth.filter(t => t.amount < 0), net);
+            const end = lastDayOf(o, now);
+            out.push({
+                offset: o,
+                label: RF.monthName(o, now),
+                income: round2(income),
+                costs: round2(costs),
+                result: round2(income - costs),
+                open: inMonth.filter(t => t.open).length,
+                rows: inMonth.length,
+                closing: today && o < 0 ? round2(today.amount - sum(rows.filter(t => t.date > end), t => t.amount)) : null
+            });
+        }
+        return out;
+    }
+
+    /**
+     * The year so far and where it is heading: the actual result of this
+     * year's months in Bookkeeping, plus what the plan nets in the months
+     * left until December - income under the chosen scenario less the costs
+     * still to come, both net like the actuals. This month counts with what
+     * has happened (actual) and what is still planned (the plan leaves out
+     * costs already paid).
+     *
+     *   plan: a plan() reaching at least to December
+     *   -> { year, months, actual, planned, projected,
+     *        fixedRest, plannedRest (the costs of each kind until December) }
+     */
+    function yearResult(transactions, plan, now) {
+        const months = yearMonths(transactions, now, plan.balance);
+        const rest = plan.rows.filter(r => RF.calendarMonth(r.offset, now).year === now.year);
+        const actual = round2(sum(months, m => m.result));
+        const planned = round2(sum(rest, r => r.net));
+        return {
+            year: now.year,
+            months,
+            actual,
+            planned,
+            projected: round2(actual + planned),
+            fixedRest: round2(sum(rest, r => r.fixed)),
+            plannedRest: round2(sum(rest, r => r.planned))
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Recurring costs, spotted in Bookkeeping
+    // ------------------------------------------------------------------
+
+    // How far apart payments of each rhythm land, in days, and how many it
+    // takes before a rhythm is believed: three for monthly and quarterly,
+    // two for the longer ones, which a few months of bookkeeping rarely
+    // show more often.
+    const RHYTHMS = [
+        { interval: 1, min: 24, max: 38, count: 3 },
+        { interval: 3, min: 80, max: 101, count: 3 },
+        { interval: 6, min: 170, max: 195, count: 2 },
+        { interval: 12, min: 350, max: 380, count: 2 }
+    ];
+
+    // Words that say what kind of company it is, not which one.
+    const NAME_NOISE = ['gmbh', 'ltd', 'limited', 'inc', 'llc', 'ag', 'kg', 'og', 'eu', 'co', 'bv', 'sarl', 'se', 'srl',
+        'und', 'and', 'the', 'der', 'die', 'das', 'von', 'for', 'für'];
+
+    function nameWords(name) {
+        return String(name || '').toLowerCase()
+            .split(/[^a-z0-9äöüß]+/)
+            .filter(w => w.length >= 3 && NAME_NOISE.indexOf(w) < 0 && !/^\d+$/.test(w));
+    }
+
+    function median(list) {
+        const s = list.slice().sort((a, b) => a - b);
+        const mid = Math.floor(s.length / 2);
+        return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    }
+
+    const daysApart = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
+
+    /**
+     * Payments in Bookkeeping that look like a fixed cost nobody has entered:
+     * money out to the same party, about the same amount each time (within
+     * 15%), on a steady rhythm - and still going, the last one no longer ago
+     * than the rhythm allows.
+     *
+     * Left out: anything an existing fixed cost already covers (a word of its
+     * name in the party, or the same rhythm and about the same amount) and
+     * what somebody turned down (its key in `dismissed`).
+     *
+     * The amount is net, as costs are entered: the payment less the VAT its
+     * invoices give back, where Bookkeeping knows it (net: false where it
+     * does not, and the amount is what was paid). The first month is the
+     * last payment's, so the cost carries on from there on its rhythm.
+     *
+     *   transactions: [{ date, amount, excluded, party, vat }]
+     *   -> [{ key, name, amount, net, interval, day, start_month, count, first, last }]
+     */
+    function recurringSuggestions(transactions, costs, dismissed, today) {
+        const groups = new Map();
+        (transactions || []).forEach(t => {
+            if (t.excluded || !(t.amount < 0) || !t.party) return;
+            const words = nameWords(t.party);
+            if (!words.length) return;
+            const key = words.slice(0, 2).join(' ');
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(t);
+        });
+
+        const currentMonth = String(today).slice(0, 7);
+        const fixed = (costs || []).filter(c => c.kind !== 'once' && (!c.end_month || c.end_month >= currentMonth));
+        const out = [];
+
+        groups.forEach((all, partyKey) => {
+            const typical = median(all.map(t => -t.amount));
+            const rows = all.filter(t => Math.abs(-t.amount - typical) <= Math.max(typical * 0.15, 1))
+                .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+            if (rows.length < 2) return;
+
+            const gaps = [];
+            for (let i = 1; i < rows.length; i++) gaps.push(daysApart(rows[i - 1].date, rows[i].date));
+            const gap = median(gaps);
+            const rhythm = RHYTHMS.find(r => gap >= r.min && gap <= r.max);
+            if (!rhythm || rows.length < rhythm.count) return;
+            // Most gaps have to keep the rhythm, not just the middle one.
+            if (gaps.filter(g => g >= rhythm.min && g <= rhythm.max).length < gaps.length * 0.6) return;
+
+            const last = rows[rows.length - 1];
+            if (daysApart(last.date, today) > rhythm.max + 20) return;
+
+            const key = partyKey + '|' + rhythm.interval;
+            if ((dismissed || []).indexOf(key) >= 0) return;
+
+            // The VAT share of the payments whose invoice Bookkeeping has
+            // read, applied to the typical payment: one read invoice is
+            // enough to tell what the others leave behind.
+            const withVat = rows.filter(t => t.vat > 0);
+            const vatShare = withVat.length ? median(withVat.map(t => t.vat / -t.amount)) : 0;
+            const amount = round2(median(rows.map(t => -t.amount)) * (1 - vatShare));
+            const words = nameWords(last.party);
+            const covered = fixed.some(c => nameWords(c.name).some(w => words.indexOf(w) >= 0)
+                || (Math.max(1, number(c.interval_months) || 1) === rhythm.interval
+                    && Math.abs((number(c.amount) || 0) - amount) <= amount * 0.1));
+            if (covered) return;
+
+            out.push({
+                key,
+                name: last.party,
+                amount,
+                // False when no invoice told the VAT: then it is the amount paid.
+                net: withVat.length > 0,
+                interval: rhythm.interval,
+                day: dayOf(last.date) || 1,
+                start_month: last.date.slice(0, 7),
+                count: rows.length,
+                first: rows[0].date,
+                last: last.date
+            });
+        });
+
+        // The ones that weigh most on a month first.
+        return out.sort((a, b) => b.amount / b.interval - a.amount / a.interval);
+    }
+
+    // ------------------------------------------------------------------
     // The plan
     // ------------------------------------------------------------------
 
@@ -314,6 +509,9 @@
                 incomeTotal: round2(sum(rows, r => r.income)),
                 outTotal: round2(sum(rows, r => r.out)),
                 fixedPerMonth: round2(monthlyFixed(input.costs, now)),
+                // What each kind of cost comes to over the months shown.
+                fixedTotal: round2(sum(rows, r => r.fixed)),
+                plannedTotal: round2(sum(rows, r => r.planned)),
                 lowest: lowest ? { offset: lowest.offset, label: lowest.label, amount: lowest.closing } : null,
                 end: rows.length ? rows[rows.length - 1].closing : null,
                 belowBuffer: settings.buffer > 0 ? below(settings.buffer) : null,
@@ -329,6 +527,7 @@
         HORIZONS, DEFAULT_HORIZON, PAST_MONTHS, DEFAULT_SETTINGS,
         cleanSettings, incomeItems, costOccurrences, monthlyFixed,
         anchorOf, balanceToday, pastMonths, lastDayOf,
+        yearMonths, yearResult, recurringSuggestions,
         plan
     };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -2003,11 +2003,9 @@ input[type="checkbox"] {
     color: var(--c-ink-3);
 }
 
+/* Room on the left for the scale's amounts, and above for the top one. */
 .rf-plot-wrap {
     position: relative;
-}
-
-.rf-body.is-expanded .rf-plot-wrap {
     margin-top: 8px;
     padding-left: 48px;
 }
@@ -2281,9 +2279,6 @@ input[type="checkbox"] {
 .rf-axis {
     display: flex;
     gap: 2px;
-}
-
-.rf-body.is-expanded .rf-axis {
     padding-left: 48px;
 }
 
@@ -9892,30 +9887,9 @@ details.import-instructions p {
     gap: 8px 16px;
 }
 
-.fin-head-tools :is(.fin-scenario, .fin-months) {
+.fin-head-tools .fin-months {
     padding-left: 16px;
     border-left: 1px solid var(--c-line);
-}
-
-.fin-balance-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    height: 30px;
-    padding: 0 12px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
-    background: var(--c-surface);
-    color: var(--c-ink-3);
-    font: inherit;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-
-.fin-balance-btn:hover,
-.fin-balance-btn[aria-expanded="true"] {
-    background: var(--c-tint-3);
-    border-color: var(--c-line-strong);
 }
 
 .fin-tool {
@@ -9930,15 +9904,14 @@ details.import-instructions p {
     color: var(--c-ink-3);
 }
 
-/* Balance, scenario, months ahead - in that order. The balance and the
-   months are financials.js's, the scenario the forecast card's. */
+/* Scenario, then months ahead. The months are financials.js's, the
+   scenario the forecast card's; the bank balance is on the first card. */
 .fin-head-own {
     display: contents;
 }
 
-.fin-head-tools .fin-balance { order: 1; }
-.fin-head-tools .fin-scenario { order: 2; }
-.fin-head-tools .fin-months { order: 3; }
+.fin-head-tools .fin-scenario { order: 1; }
+.fin-head-tools .fin-months { order: 2; }
 
 /* Empty while the forecast loads. A plain :empty, not :has(): Safari does
    not redraw a :has(:empty) parent once its child is filled in. */
@@ -10004,21 +9977,8 @@ details.import-instructions p {
 
 .fin-kpis {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
-}
-
-/* "Fixed costs" opens the costs sheet: the whole figure is the button. */
-.fin-kpi.is-link {
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: box-shadow var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-
-.fin-kpi.is-link:hover {
-    border-color: var(--c-line-strong);
-    box-shadow: var(--e-2);
 }
 
 .fin-kpi-unit {
@@ -10075,48 +10035,10 @@ details.import-instructions p {
 .fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning-ink); }
 .fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger-ink); }
 
-/* Today's bank balance, in the header: where the plan starts from, quiet
-   beside "Months ahead". Its form drops down from there. */
-.fin-balance {
-    position: relative;
-}
-
-.fin-balance-value {
-    font-size: var(--t-base);
-    font-weight: 600;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.fin-balance.is-empty .fin-balance-value {
-    color: var(--c-ink-3);
-}
-
-.fin-balance-pop {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    z-index: 30;
-    width: min(360px, calc(100vw - 32px));
-    padding: 14px 16px 16px;
-    background: var(--c-raised);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e-3);
-    animation: dsDialogIn var(--dur-2) var(--ease) both;
-}
-
 .fin-balance-note {
     margin: 0 0 4px;
     font-size: var(--t-xs);
     color: var(--c-ink-3);
-}
-
-.fin-balance-pop .fin-balance-form {
-    margin-top: 0;
-    padding: 0;
-    background: none;
-    box-shadow: none;
 }
 
 /* "Set buffer" / "Buffer 15.000 €": top right, on the label's line. */
@@ -10124,6 +10046,155 @@ details.import-instructions p {
     position: absolute;
     top: 11px;
     right: 18px;
+}
+
+/* The year card: the result so far in its colour, then year end and balance. */
+.fin-kpi-value.is-pos { color: var(--c-success-ink); }
+.fin-kpi-value.is-neg { color: var(--c-danger-ink); }
+
+/* The (i) on "Year end": a projection, said in its tooltip. */
+.fin-kpi-info {
+    display: inline-flex;
+    margin-left: 5px;
+    vertical-align: -2px;
+    color: var(--c-warning-ink);
+    cursor: help;
+}
+
+.fin-kpi-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 10px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.fin-kpi-lines > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+}
+
+.fin-kpi-lines dt {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-lines dd {
+    margin: 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-kpi-lines dd.is-pos { color: var(--c-success-ink); }
+.fin-kpi-lines dd.is-neg { color: var(--c-danger-ink); }
+.fin-kpi-lines dd.is-warn { color: var(--c-warning-ink); }
+
+.fin-balance-link {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-kpi--year .fin-balance-note {
+    margin: 10px 0 0;
+}
+
+.fin-kpi--year .fin-balance-form {
+    margin-top: 6px;
+}
+
+/* A quarter of the page is too narrow for amount and date side by side. */
+.fin-kpi--year .fin-field-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* "3 suggestions" on the fixed costs: recurring payments from Bookkeeping. */
+.fin-suggest-pill {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 5px;
+    height: 24px;
+    margin-top: 6px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font: 600 var(--t-xs)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.fin-suggest-pill:hover {
+    background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+}
+
+.fin-suggest-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+/* A cost card unfolded takes two columns, so its list has room; the other
+   cards close up around it. One column on phones, where it already has all. */
+@media (min-width: 761px) {
+    .fin-kpis {
+        grid-auto-flow: row dense;
+    }
+
+    .fin-kpi--costs.is-open {
+        grid-column: span 2;
+    }
+}
+
+/* A cost card unfolded: its costs, to edit, below the figure. */
+.fin-kpi-panel {
+    margin-top: 14px;
+}
+
+.fin-kpi-panel .fin-group-title > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-kpi-panel .fin-cost-form .fin-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.fin-panel-empty {
+    margin: 4px 0 0;
+    font-size: var(--t-sm);
+}
+
+.fin-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 8px;
+    border-radius: var(--r-md);
+    background: var(--c-accent-softer);
+}
+
+.fin-suggestion + .fin-suggestion {
+    margin-top: 4px;
+}
+
+.fin-suggestion .fin-cost {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+}
+
+.fin-suggestion .fin-cost:hover {
+    background: var(--c-accent-soft);
 }
 
 /* The balance and buffer forms. */
@@ -10352,6 +10423,20 @@ details.import-instructions p {
 }
 
 /* The balance as one smooth line: accent blue above zero, red below. */
+/* A month's net, as a quiet bar from zero under the balance line. */
+.fin-net-bar {
+    fill: var(--c-success);
+    opacity: 0.45;
+}
+
+.fin-net-bar.is-neg {
+    fill: var(--c-danger);
+}
+
+.fin-net-bar.is-past {
+    opacity: 0.3;
+}
+
 .fin-line {
     fill: none;
     stroke: var(--c-accent);
@@ -10552,6 +10637,22 @@ details.import-instructions p {
 .fin-detail .is-in .fin-detail-amount { color: var(--c-success-ink); }
 .fin-detail .is-out .fin-detail-amount { color: var(--c-ink-2); }
 .fin-detail .is-paid { opacity: 0.55; }
+.fin-detail .is-actual .fin-detail-amount { font-weight: 600; color: var(--c-ink); }
+
+/* This year's months gone by, above the plan: actual, so not unfolded. */
+.fin-month-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 20px;
+    font: 600 var(--t-sm)/1.4 var(--font);
+    color: var(--c-ink-2);
+}
+
+.fin-month.is-past td,
+.fin-month.is-past th {
+    background: var(--c-tint-3);
+}
 
 .fin-detail-empty {
     margin: 0;
@@ -10855,6 +10956,12 @@ details.import-instructions p {
 }
 
 /* ---- Narrower screens ---- */
+
+@media (max-width: 1400px) {
+    .fin-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
 
 @media (max-width: 760px) {
     .fin-kpis {

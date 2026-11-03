@@ -217,6 +217,112 @@
         near(p.past[0].closing, 10500, 'end of August');
     });
 
+    // ---- The year's result ----
+
+    const row = (date, amount, vat, open) => ({ date, amount, excluded: false, party: '', vat: vat === undefined ? null : vat, open: !!open });
+
+    test('each month of the year so far, without the VAT, always from January', () => {
+        const months = CF.yearMonths([
+            row('2026-08-05', 9600, -1600), row('2026-08-20', -71.39, 11.9),
+            row('2026-09-10', -1200, null, true), row('2026-10-02', 4800, -800),
+            row('2025-12-30', 5000)
+        ], NOW, null);
+        eq(months.length, 10, 'January to now');
+        eq([months[0].label, months[0].rows, months[0].result], ['Jan 2026', 0, 0], 'January, nothing imported');
+        eq([months[7].income, months[7].costs, months[7].result], [8000, 59.49, 7940.51], 'August net');
+        eq([months[8].result, months[8].open], [-1200, 1], 'September: one entry without invoice');
+        eq(months[9].result, 4000, 'October so far');
+        eq(months[7].closing, null, 'no balance, no closing');
+    });
+
+    test('the year: actual so far plus the plan to December', () => {
+        const p = run({
+            months: 6,
+            balances: [{ id: 1, amount: 20000, as_of: '2026-10-01' }],
+            transactions: [row('2026-09-15', 6000, -1000), row('2026-10-03', -500, 0)],
+            costs: [{ id: 1, kind: 'recurring', amount: 1000, interval_months: 1, start_month: '2026-10', day: 28 }]
+        });
+        const y = CF.yearResult([row('2026-09-15', 6000, -1000), row('2026-10-03', -500, 0)], p, NOW);
+        eq([y.year, y.actual, y.months.length], [2026, 4500, 10], 'January to October');
+        near(y.planned, -3000, 'rent for October to December');
+        near(y.projected, 1500, 'year end');
+        eq([y.fixedRest, y.plannedRest], [3000, 0], 'costs until December');
+        near(y.months[8].closing, 20000, 'end of September');
+    });
+
+    // ---- Recurring costs spotted in Bookkeeping ----
+
+    const bank = (date, party, amount, vat) => ({ date, amount, excluded: false, party, vat: vat === undefined ? null : vat });
+
+    test('a monthly payment becomes a suggestion, net of the VAT it gives back', () => {
+        const list = CF.recurringSuggestions([
+            bank('2026-07-26', 'Adobe Systems Software', -71.39, 11.9),
+            bank('2026-08-26', 'Adobe Systems Software', -71.39, 11.9),
+            bank('2026-09-26', 'Adobe Systems Software', -71.39, 11.9),
+            bank('2026-09-28', 'Alpenblick Hotels GmbH', 9600)
+        ], [], [], TODAY);
+        eq(list.length, 1, 'one suggestion');
+        eq([list[0].name, list[0].interval, list[0].day, list[0].start_month, list[0].count],
+            ['Adobe Systems Software', 1, 26, '2026-09', 3]);
+        near(list[0].amount, 59.49, 'net');
+    });
+
+    test('one read invoice tells the VAT for the whole series', () => {
+        const list = CF.recurringSuggestions([
+            bank('2026-07-26', 'Adobe Systems Software', -71.39), bank('2026-08-26', 'Adobe Systems Software', -71.39),
+            bank('2026-09-26', 'Adobe Systems Software', -71.39, 11.9)
+        ], [], [], TODAY);
+        near(list[0].amount, 59.49, 'net');
+        eq(list[0].net, true, 'net');
+        const unknown = CF.recurringSuggestions([
+            bank('2026-07-26', 'Adobe Systems Software', -71.39), bank('2026-08-26', 'Adobe Systems Software', -71.39),
+            bank('2026-09-26', 'Adobe Systems Software', -71.39)
+        ], [], [], TODAY);
+        eq([unknown[0].amount, unknown[0].net], [71.39, false], 'as paid');
+    });
+
+    test('quarterly needs three, yearly two; small changes in amount still count', () => {
+        const list = CF.recurringSuggestions([
+            bank('2026-01-15', 'Steuerberater Huber', -900), bank('2026-04-15', 'Steuerberater Huber', -950),
+            bank('2026-07-15', 'Steuerberater Huber', -900),
+            bank('2025-10-01', 'Uniqa Versicherung AG', -1200), bank('2026-10-01', 'Uniqa Versicherung AG', -1200)
+        ], [], [], TODAY);
+        eq(list.map(s => [s.name, s.interval]), [['Steuerberater Huber', 3], ['Uniqa Versicherung AG', 12]]);
+    });
+
+    test('no suggestion when the payments stopped, are irregular, too few, covered or turned down', () => {
+        const stopped = [bank('2026-03-05', 'Hetzner Online GmbH', -38.56), bank('2026-04-05', 'Hetzner Online GmbH', -38.56),
+            bank('2026-05-05', 'Hetzner Online GmbH', -38.56)];
+        eq(CF.recurringSuggestions(stopped, [], [], TODAY).length, 0, 'stopped in May');
+
+        const irregular = [bank('2026-06-01', 'Kaffee Hummel', -40), bank('2026-06-09', 'Kaffee Hummel', -40),
+            bank('2026-08-20', 'Kaffee Hummel', -40), bank('2026-09-02', 'Kaffee Hummel', -40)];
+        eq(CF.recurringSuggestions(irregular, [], [], TODAY).length, 0, 'irregular');
+
+        const two = [bank('2026-08-05', 'A1 Telekom Austria', -59.9), bank('2026-09-05', 'A1 Telekom Austria', -59.9)];
+        eq(CF.recurringSuggestions(two, [], [], TODAY).length, 0, 'two monthly ones are not enough');
+
+        const three = two.concat([bank('2026-10-05', 'A1 Telekom Austria', -59.9)]);
+        eq(CF.recurringSuggestions(three, [], [], TODAY).length, 1, 'three are');
+        eq(CF.recurringSuggestions(three, [{ kind: 'recurring', name: 'Telekom (Internet)', amount: 49.9, interval_months: 1 }], [], TODAY).length, 0, 'covered by name');
+        eq(CF.recurringSuggestions(three, [{ kind: 'recurring', name: 'Internet', amount: 59.9, interval_months: 1 }], [], TODAY).length, 0, 'covered by amount');
+        eq(CF.recurringSuggestions(three, [{ kind: 'recurring', name: 'Telekom', amount: 59.9, interval_months: 1, end_month: '2026-06' }], [], TODAY).length, 1, 'an ended cost covers nothing');
+        eq(CF.recurringSuggestions(three, [], ['telekom austria|1'], TODAY).length, 0, 'turned down');
+    });
+
+    test('the horizon totals of fixed and planned costs', () => {
+        const p = run({
+            months: 6,
+            costs: [
+                { id: 1, kind: 'recurring', amount: 1000, interval_months: 1, start_month: '2026-10', day: 28 },
+                { id: 2, kind: 'once', amount: 3000, start_month: '2026-12' },
+                { id: 3, kind: 'once', amount: 500, start_month: '2027-06' }
+            ]
+        });
+        near(p.kpis.fixedTotal, 6000, 'six months of rent');
+        near(p.kpis.plannedTotal, 3000, 'only what falls inside the six months');
+    });
+
     root.cashflowTestResults = results;
 
     if (typeof document === 'undefined') {

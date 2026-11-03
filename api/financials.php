@@ -11,7 +11,7 @@
  * POST ?action=delete-cost      { id }
  * POST ?action=set-balance      { amount, as_of, note? }
  * POST ?action=delete-balance   { id }
- * POST ?action=save-settings    { buffer? }
+ * POST ?action=save-settings    { buffer?, dismiss_recurring? (a suggestion's key, turned down) }
  */
 
 define('APP_ROOT', dirname(__DIR__));

@@ -1127,18 +1127,6 @@ function assetUrl(string $path): string
                     </div>
                     <!-- The costs, opened from the "Fixed costs" figure: a sheet like
                          a project's, where they are added and edited (financials.js). -->
-                    <div class="modal fin-costs-modal" id="finCostsModal">
-                        <div class="modal-backdrop" data-fin-costs-close></div>
-                        <div class="modal-content modal-large" role="dialog" aria-modal="true" aria-labelledby="finCostsTitle">
-                            <div class="modal-header">
-                                <div class="overview-title-info">
-                                    <h2 id="finCostsTitle">Costs</h2>
-                                </div>
-                                <button type="button" class="modal-close" data-fin-costs-close aria-label="Close">&times;</button>
-                            </div>
-                            <div class="modal-body fin-costs-body" id="finCosts"></div>
-                        </div>
-                    </div>
                 </div>
                 <?php endif; ?>
 
@@ -1152,6 +1140,12 @@ function assetUrl(string $path): string
                         <div class="bk-bar-lead">
                             <h1 class="view-title bk-bar-title">Bookkeeping</h1>
                             <span class="view-count bk-row-count" id="bkRowCount">0 entries</span>
+                            <!-- Invoices in the drop zone that fit a row without a PDF
+                                 (bookkeeping.js); opens the list to assign them all. -->
+                            <button type="button" class="bk-match-pill" id="bkMatchPill" title="Invoices in the drop zone that fit an entry" hidden>
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-.8.8"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l.8-.8"/></svg>
+                                <span id="bkMatchPillLabel"></span>
+                            </button>
                         </div>
 
                         <div class="bk-bar-tools">
@@ -1234,6 +1228,7 @@ function assetUrl(string $path): string
                                     </svg>
                                 </button>
                             </div>
+                            <p class="bk-pool-reading" id="bkPoolReading" hidden></p>
                             <div class="bk-pool-list" id="bkPoolList">
                                 <!-- Unassigned PDFs rendered by JS -->
                             </div>

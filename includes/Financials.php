@@ -30,6 +30,9 @@ class Financials
     /** Settings with their defaults; stored in app_settings as fin_<key>. */
     public const SETTINGS = [
         'buffer' => 0.0,
+        // Recurring costs spotted in Bookkeeping that somebody turned down
+        // (cashflow.js recurringSuggestions), as a JSON list of their keys.
+        'dismissed_recurring' => '[]',
     ];
 
     private PDO $db;
@@ -244,6 +247,8 @@ class Financials
             $default = self::SETTINGS[$name];
             $out[$name] = is_bool($default) ? $value === '1' : (is_float($default) ? (float) $value : (string) $value);
         }
+        $dismissed = json_decode($out['dismissed_recurring'], true);
+        $out['dismissed_recurring'] = is_array($dismissed) ? array_values(array_filter($dismissed, 'is_string')) : [];
         return $out;
     }
 
@@ -258,6 +263,17 @@ class Financials
                 return 'The cash buffer must be 0 or more';
             }
             $clean['buffer'] = (string) round((float) $in['buffer'], 2);
+        }
+        if (array_key_exists('dismiss_recurring', $in)) {
+            $key = trim((string) $in['dismiss_recurring']);
+            if ($key === '' || mb_strlen($key) > 120) {
+                return 'Unknown suggestion';
+            }
+            $list = $this->settings()['dismissed_recurring'];
+            if (!in_array($key, $list, true)) {
+                $list[] = $key;
+            }
+            $clean['dismissed_recurring'] = json_encode(array_slice($list, -500));
         }
 
         $stmt = $this->db->prepare("
