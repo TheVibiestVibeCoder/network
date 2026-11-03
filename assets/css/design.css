@@ -10059,14 +10059,6 @@ details.import-instructions p {
     vertical-align: 1px;
 }
 
-/* The (i) on the projection: what it is, said in its tooltip. */
-.fin-kpi-info {
-    display: inline-flex;
-    margin-left: 5px;
-    vertical-align: -2px;
-    color: var(--c-warning-ink);
-    cursor: help;
-}
 
 .fin-kpi-lines {
     display: flex;

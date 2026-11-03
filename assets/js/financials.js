@@ -39,6 +39,8 @@
         projects: [],
         overview: { costs: [], balances: [], settings: CF.DEFAULT_SETTINGS },
         tx: { rows: [], amountColumn: null, error: null },
+        // 6, 12, 24 - or 'year': this month until December.
+        horizon: CF.DEFAULT_HORIZON,
         months: CF.DEFAULT_HORIZON,
         plan: null,
         // A cost being added or edited: a draft of its fields, id null for new.
@@ -135,7 +137,6 @@
         plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
-        info: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>',
         repeat: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5 20.5 6 17 9.5"/><path d="M3.5 11.5V10a4 4 0 0 1 4-4h13"/><path d="M7 21.5 3.5 18 7 14.5"/><path d="M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>',
         trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>',
         bank: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7"/><path d="M3.5 19.5h17"/></svg>'
@@ -152,12 +153,14 @@
             'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
-            const stored = Number(localStorage.getItem(HORIZON_KEY));
-            if (CF.HORIZONS.indexOf(stored) >= 0) state.months = stored;
+            const stored = localStorage.getItem(HORIZON_KEY);
+            if (stored === 'year') state.horizon = 'year';
+            else if (CF.HORIZONS.indexOf(Number(stored)) >= 0) state.horizon = Number(stored);
         } catch (e) { /* no storage: a year */ }
 
         Card.init(els.finForecast, { name: 'financials', controls: els.finScenario, adjust: els.finAdjust });
         // The forecast looks as far ahead as the rest of the page.
+        state.months = monthsFor(state.horizon);
         Card.setMonths(state.months);
         Card.onChange(() => {
             if (!state.loaded) return;
@@ -212,7 +215,20 @@
         }
     }
 
+    /** How many months a horizon shows, this one included. */
+    function monthsFor(horizon) {
+        return horizon === 'year' ? 12 - RF.monthOf(new Date()).month : horizon;
+    }
+
+    /** "over the next 12 months", or "until Dec 2026" for the year. */
+    function horizonText() {
+        return state.horizon === 'year'
+            ? `until Dec ${RF.monthOf(new Date()).year}`
+            : `over the next ${plural(state.months, 'month')}`;
+    }
+
     function compute() {
+        state.months = monthsFor(state.horizon);
         const input = {
             projects: state.projects,
             costs: state.overview.costs,
@@ -226,7 +242,11 @@
         };
         state.plan = CF.plan(input);
         // The year's end needs the plan to reach December, whatever is shown.
-        const toDecember = state.months >= 12 ? state.plan : CF.plan(Object.assign({}, input, { months: 12 }));
+        // A year ahead, whatever is shown: for the year's end, and for the
+        // cost cards' other figure while the page shows only until December.
+        const twelve = state.months === 12 ? state.plan : CF.plan(Object.assign({}, input, { months: 12 }));
+        state.next12 = twelve.kpis;
+        const toDecember = state.months >= 12 - input.now.month ? state.plan : twelve;
         state.year = CF.yearResult(state.tx.rows, toDecember, input.now);
         state.suggestions = CF.recurringSuggestions(state.tx.rows, state.overview.costs,
             (state.overview.settings || {}).dismissed_recurring || [], todayIso());
@@ -281,7 +301,8 @@
     function renderHead() {
         els.finHeadTools.innerHTML = `
             <div class="fin-tool fin-months">
-                ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: n + 'M', hint: n + ' months ahead' })), state.months)}
+                ${segmented('months', 'Months ahead', CF.HORIZONS.map(n => ({ key: n, label: n + 'M', hint: n + ' months ahead' }))
+                    .concat({ key: 'year', label: String(RF.monthOf(new Date()).year), hint: 'Until December' }), state.horizon)}
             </div>`;
     }
 
@@ -316,7 +337,8 @@
         renderHead();
 
         const lowTone = lowestTone();
-        const span = `over the next ${plural(p.months, 'month')}`;
+        const span = horizonText();
+        const notWithin = state.horizon === 'year' ? 'not this year' : `not within ${p.months} months`;
         const suggestions = state.suggestions.length;
         const y = state.year;
         const now = RF.monthOf(new Date());
@@ -324,7 +346,7 @@
             const o = c.kind === 'once' ? RF.offsetOf(c.start_month, now) : null;
             return o !== null && o >= 0 && o < p.months;
         }).length;
-        const zero = k.belowZero ? k.belowZero.label : `not within ${p.months} months`;
+        const zero = k.belowZero ? k.belowZero.label : notWithin;
 
         // Each cost card unfolds downwards to edit what is in it, as the
         // buffer does on "Lowest balance".
@@ -334,7 +356,8 @@
                 <span class="fin-kpi-label">Fixed costs</span>
                 <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}<span class="fin-kpi-unit">/month</span></span>
                 <span class="fin-kpi-sub"><strong>${esc(euro(k.fixedTotal))}</strong> ${esc(span)}</span>
-                ${kpiLines([['Until Dec ' + y.year, euro(y.fixedRest)], ['Per year', euro(k.fixedPerMonth * 12)]])}
+                ${kpiLines([state.horizon === 'year' ? ['Next 12 months', euro(state.next12.fixedTotal)] : ['Until Dec ' + y.year, euro(y.fixedRest)],
+                    ['Per year', euro(k.fixedPerMonth * 12)]])}
                 ${suggestions && !state.fixedOpen ? `<button type="button" class="fin-suggest-pill" data-fin-fixed data-fin-focus="fixed-suggest"
                     title="Recurring payments in Bookkeeping that are not among the fixed costs yet">${ICON.repeat}${esc(plural(suggestions, 'suggestion'))}</button>` : ''}
                 <button type="button" class="fin-link fin-kpi-action" data-fin-fixed data-fin-focus="fixed" aria-expanded="${state.fixedOpen}">Edit</button>
@@ -344,7 +367,8 @@
                 <span class="fin-kpi-label">Planned costs</span>
                 <span class="fin-kpi-value">${esc(euro(k.plannedTotal))}</span>
                 <span class="fin-kpi-sub">${esc(span)}</span>
-                ${kpiLines([['Until Dec ' + y.year, euro(y.plannedRest)], ['Planned', plural(plannedCount, 'cost')]])}
+                ${kpiLines([state.horizon === 'year' ? ['Next 12 months', euro(state.next12.plannedTotal)] : ['Until Dec ' + y.year, euro(y.plannedRest)],
+                    ['Planned', plural(plannedCount, 'cost')]])}
                 <button type="button" class="fin-link fin-kpi-action" data-fin-planned data-fin-focus="planned" aria-expanded="${state.plannedOpen}">Edit</button>
                 ${state.plannedOpen ? plannedPanel() : ''}
             </article>
@@ -354,7 +378,7 @@
                 ${k.lowest ? `<span class="fin-kpi-sub"><strong>${esc(k.lowest.label)}</strong></span>` : ''}
                 ${kpiLines([['Below zero from', zero, k.belowZero ? 'is-neg' : ''],
                     p.settings.buffer > 0
-                        ? ['Below buffer from', k.belowBuffer ? k.belowBuffer.label : `not within ${p.months} months`, k.belowBuffer ? 'is-warn' : '']
+                        ? ['Below buffer from', k.belowBuffer ? k.belowBuffer.label : notWithin, k.belowBuffer ? 'is-warn' : '']
                         : ['Buffer', 'not set']])}
                 <button type="button" class="fin-link fin-kpi-action" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
                     title="The least that should always be in the account; the chart and this figure warn below it">${p.settings.buffer > 0 ? 'Buffer ' + esc(euro(p.settings.buffer)) : 'Set buffer'}</button>
@@ -394,7 +418,7 @@
                 <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping, without VAT">In <strong class="is-pos">${esc(signed(income))}</strong> · Out <strong>${esc(signed(-costs))}</strong></span>
                 <dl class="fin-kpi-lines">
                     <div title="A projection: the result so far plus what the plan nets until December - income under the ${esc(scenarioName())} scenario less the costs still to come">
-                        <dt>${y.year} projection<span class="fin-tag fin-kpi-scenario">${esc(scenarioName())}</span><span class="fin-kpi-info" aria-label="A projection">${ICON.info}</span></dt>
+                        <dt>${y.year} projection<span class="fin-tag fin-kpi-scenario">${esc(scenarioName())}</span></dt>
                         <dd class="${tone(y.projected)}">${esc(signed(y.projected))}</dd>
                     </div>
                     <div>
@@ -1125,8 +1149,10 @@
                 const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
                 if (name) name.focus();
             } else if (t.hasAttribute('data-fin-months')) {
-                state.months = Number(t.getAttribute('data-fin-months'));
-                try { localStorage.setItem(HORIZON_KEY, String(state.months)); } catch (err) { /* fine */ }
+                const value = t.getAttribute('data-fin-months');
+                state.horizon = value === 'year' ? 'year' : Number(value);
+                state.months = monthsFor(state.horizon);
+                try { localStorage.setItem(HORIZON_KEY, String(state.horizon)); } catch (err) { /* fine */ }
                 Card.setMonths(state.months);
                 compute();
                 render();

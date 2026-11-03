@@ -439,12 +439,14 @@
      * Everything the tab shows, for one scenario.
      *   input: { projects, costs, balances, transactions, settings, scenario,
      *            months, now: {year, month}, today: "YYYY-MM-DD" }
+     * months: how many months ahead, this one included - one of HORIZONS, or
+     * any other count up to 36 (Financials' "until December").
      */
     function plan(input) {
         const now = input.now;
         const today = input.today;
         const todayDay = dayOf(today);
-        const months = HORIZONS.indexOf(input.months) >= 0 ? input.months : DEFAULT_HORIZON;
+        const months = Number.isInteger(input.months) && input.months >= 1 && input.months <= 36 ? input.months : DEFAULT_HORIZON;
         const settings = cleanSettings(input.settings);
 
         const income = incomeItems(input.projects, input.scenario, now);

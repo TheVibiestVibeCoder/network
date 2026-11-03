@@ -310,6 +310,12 @@
         eq(CF.recurringSuggestions(three, [], ['telekom austria|1'], TODAY).length, 0, 'turned down');
     });
 
+    test('any count of months up to 36, the default for anything else', () => {
+        eq(run({ months: 3 }).rows.map(r => r.label), ['Oct 2026', 'Nov 2026', 'Dec 2026'], 'until December');
+        eq(run({ months: 0 }).rows.length, 12, 'nothing is a year');
+        eq(run({ months: 'year' }).rows.length, 12, 'not a number');
+    });
+
     test('the horizon totals of fixed and planned costs', () => {
         const p = run({
             months: 6,
