@@ -15,14 +15,18 @@
  *
  * On while ANTHROPIC_API_KEY is set in .env, like the meeting assistant;
  * INVOICE_READER=off switches it off. INVOICE_MODEL and INVOICE_EFFORT
- * choose the model and how hard it thinks - reading an invoice is easy,
- * so Haiku at low effort is the default.
+ * choose the model and how hard it thinks. Opus at low effort by default:
+ * Haiku missed the VAT on too many of our own invoices. What one model read
+ * counts as out of date once another is set, and is read again.
  */
 
 class InvoiceReader
 {
     private const API_URL = 'https://api.anthropic.com/v1/messages';
     private const API_VERSION = '2026-10-21';
+    // Lets the API retry a declined request on the model it recommends for
+    // that kind of decline. Haiku has no such fallback, so not for Haiku.
+    private const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
     /**
      * Above this the base64 form no longer fits into one request (32 MB).
@@ -50,10 +54,21 @@ class InvoiceReader
         return trim((string) ($_ENV['ANTHROPIC_WORKSPACE_ID'] ?? ''));
     }
 
-    private static function model(): string
+    public static function model(): string
     {
         $model = trim((string) ($_ENV['INVOICE_MODEL'] ?? ''));
-        return $model !== '' ? $model : 'claude-haiku-5-5';
+        return $model !== '' ? $model : 'claude-opus-5-5';
+    }
+
+    /** True when what was read came from the model now set. */
+    public static function isCurrent(?array $invoice): bool
+    {
+        return $invoice !== null && ($invoice['model'] ?? '') === self::model();
+    }
+
+    private static function hasFallback(): bool
+    {
+        return strpos(self::model(), 'claude-haiku') !== 0;
     }
 
     private static function effort(): string
@@ -85,8 +100,6 @@ class InvoiceReader
             throw new RuntimeException('The file is too large for Claude to read.');
         }
 
-        // No 'fallbacks' here: Haiku has no server-side fallback, and an
-        // invoice is not the kind of text that gets declined.
         $request = [
             'model' => self::model(),
             'max_tokens' => 8000,
@@ -110,12 +123,18 @@ class InvoiceReader
                 ],
             ]],
         ];
+        if (self::hasFallback()) {
+            $request['fallbacks'] = 'default';
+        }
 
         $headers = [
             'Content-Type: application/json',
             'x-api-key: ' . self::apiKey(),
             'anthropic-version: ' . self::API_VERSION,
         ];
+        if (self::hasFallback()) {
+            $headers[] = 'anthropic-beta: ' . self::FALLBACK_BETA;
+        }
         if (self::workspaceId() !== '') {
             $headers[] = 'anthropic-workspace-id: ' . self::workspaceId();
         }
@@ -224,9 +243,14 @@ Fill in:
 - currency: ISO code of the amounts, e.g. "EUR".
 - gross: the total to be paid, including VAT. net: the total before VAT. vat: the total VAT amount, added up over all VAT rates.
 
+VAT goes by many names: USt, Umsatzsteuer, MwSt, Mehrwertsteuer, VAT, TVA, IVA. Look for it in the totals, in a VAT breakdown under them, and in phrases like "zzgl. 20 % USt" or "inkl. 10 % MwSt". The company's own invoices are as likely to carry VAT as the ones it received.
+
 Rules:
 - Amounts are positive numbers with a dot as decimal separator, also on a credit note.
+- Only a rate given ("zzgl. 20 % USt") but no VAT amount: work it out from the net, rounded to the cent.
+- VAT included in the prices ("inkl. MwSt"): take the VAT amount stated; if only the rate is given, work it out from the gross.
 - No VAT on the document (reverse charge, small business, abroad): vat is 0 and net equals gross.
+- Check before answering: net + vat must equal gross, give or take a cent. If they do not, read the totals again.
 - Only what the document says. If a figure is not there and cannot be worked out from the others, use null.
 PROMPT;
     }

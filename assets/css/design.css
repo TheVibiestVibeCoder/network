@@ -10053,7 +10053,13 @@ details.import-instructions p {
 .fin-kpi-value.is-neg { color: var(--c-danger-ink); }
 .fin-kpi-sub strong.is-pos { color: var(--c-success-ink); }
 
-/* The (i) on "Year end": a projection, said in its tooltip. */
+/* The scenario the projection uses, as a label beside it. */
+.fin-kpi-scenario {
+    margin-left: 6px;
+    vertical-align: 1px;
+}
+
+/* The (i) on the projection: what it is, said in its tooltip. */
 .fin-kpi-info {
     display: inline-flex;
     margin-left: 5px;

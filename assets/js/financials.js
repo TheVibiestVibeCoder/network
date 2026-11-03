@@ -372,7 +372,7 @@
     function scenarioName() {
         const key = RF.activePreset(Card.getSettings());
         const preset = key ? RF.presetByKey(key) : null;
-        return preset ? preset.label : 'custom scenario';
+        return preset ? preset.label : 'Custom';
     }
 
     /**
@@ -389,12 +389,12 @@
         const costs = y.months.reduce((sum, m) => sum + m.costs, 0);
         return `
             <article class="fin-kpi fin-kpi--year">
-                <span class="fin-kpi-label">Result ${y.year}</span>
+                <span class="fin-kpi-label">Net result YTD</span>
                 <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
                 <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping, without VAT">In <strong class="is-pos">${esc(signed(income))}</strong> · Out <strong>${esc(signed(-costs))}</strong></span>
                 <dl class="fin-kpi-lines">
                     <div title="A projection: the result so far plus what the plan nets until December - income under the ${esc(scenarioName())} scenario less the costs still to come">
-                        <dt>Year end · ${esc(scenarioName())}<span class="fin-kpi-info" aria-label="A projection">${ICON.info}</span></dt>
+                        <dt>${y.year} projection<span class="fin-tag fin-kpi-scenario">${esc(scenarioName())}</span><span class="fin-kpi-info" aria-label="A projection">${ICON.info}</span></dt>
                         <dd class="${tone(y.projected)}">${esc(signed(y.projected))}</dd>
                     </div>
                     <div>

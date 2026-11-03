@@ -539,6 +539,8 @@ function bkGetTable(PDO $db): void
                 'date_column' => bkGetSetting($db, 'csv_date_column'),
                 // Claude reads the invoices only while there is an API key.
                 'invoice_reader' => InvoiceReader::enabled(),
+                // What another model read is read again (InvoiceReader::isCurrent).
+                'invoice_model' => InvoiceReader::model(),
                 'dismissed_matches' => bkDismissedMatches($db),
             ],
             'limits' => [
@@ -1069,7 +1071,8 @@ function bkInvoiceData(?string $json): ?array
  * bookkeeping.js calls this for every file that has not been read, one after
  * the other - new uploads and, the first time round, every file there is.
  * A file Claude cannot read keeps the reason, so it is not tried on every
- * visit; "busy" or "unreachable" leaves it unread for the next try.
+ * visit; "busy" or "unreachable" leaves it unread for the next try. What
+ * another model read is read again, and kept until the new reading is in.
  */
 function bkReadInvoice(PDO $db): void
 {
@@ -1088,7 +1091,7 @@ function bkReadInvoice(PDO $db): void
         bkJson(['error' => 'PDF not found'], 404);
     }
 
-    if (!$again && ($pdf['invoice_data'] !== null || $pdf['invoice_error'] !== null)) {
+    if (!$again && (InvoiceReader::isCurrent(bkInvoiceData($pdf['invoice_data'])) || $pdf['invoice_error'] !== null)) {
         bkJson([
             'success' => true,
             'id' => $id,
@@ -1109,15 +1112,24 @@ function bkReadInvoice(PDO $db): void
         SET invoice_data = :data, invoice_error = :error, invoice_read_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ");
+    $mark = $db->prepare("UPDATE bookkeeping_pdfs SET invoice_error = :error WHERE id = :id");
+
+    // Marked first: should PHP die on the way (a huge scan running out of
+    // memory), the mark stays and the file is not tried on every visit.
+    // Every way out below replaces it.
+    $mark->execute(['error' => 'The server stopped while reading this file.', 'id' => $id]);
+    $previous = bkInvoiceData($pdf['invoice_data']);
 
     try {
         $invoice = InvoiceReader::read(BK_PDF_DIR . '/' . $pdf['stored_name']);
     } catch (RuntimeException $e) {
         if ($e->getCode() === InvoiceReader::TEMPORARY) {
+            $mark->execute(['error' => null, 'id' => $id]);
             bkJson(['error' => $e->getMessage(), 'temporary' => true], 503);
         }
-        $update->execute(['data' => null, 'error' => $e->getMessage(), 'id' => $id]);
-        bkJson(['success' => true, 'id' => $id, 'invoice' => null, 'invoice_error' => $e->getMessage()]);
+        // An older reading, if there is one, is better than none.
+        $update->execute(['data' => $pdf['invoice_data'], 'error' => $e->getMessage(), 'id' => $id]);
+        bkJson(['success' => true, 'id' => $id, 'invoice' => $previous, 'invoice_error' => $e->getMessage()]);
     }
 
     $update->execute(['data' => json_encode($invoice, JSON_UNESCAPED_UNICODE), 'error' => null, 'id' => $id]);
