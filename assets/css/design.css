@@ -9977,7 +9977,7 @@ details.import-instructions p {
 
 .fin-kpis {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -10031,9 +10031,6 @@ details.import-instructions p {
     font-weight: 600;
 }
 
-.fin-kpi--low.is-ok .fin-kpi-value { color: var(--c-success-ink); }
-.fin-kpi--low.is-warn .fin-kpi-value { color: var(--c-warning-ink); }
-.fin-kpi--low.is-danger .fin-kpi-value { color: var(--c-danger-ink); }
 
 .fin-balance-note {
     margin: 0 0 4px;
@@ -10138,18 +10135,6 @@ details.import-instructions p {
 .fin-suggest-pill:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--c-accent-soft);
-}
-
-/* A cost card unfolded takes two columns, so its list has room; the other
-   cards close up around it. One column on phones, where it already has all. */
-@media (min-width: 761px) {
-    .fin-kpis {
-        grid-auto-flow: row dense;
-    }
-
-    .fin-kpi--costs.is-open {
-        grid-column: span 2;
-    }
 }
 
 /* A cost card unfolded: its costs, to edit, below the figure. */
@@ -10422,18 +10407,40 @@ details.import-instructions p {
 }
 
 /* The balance as one smooth line: accent blue above zero, red below. */
-/* A month's net, as a quiet bar from zero under the balance line. */
-.fin-net-bar {
+/* A month's money in (up from zero) and out (down), under the balance line. */
+.fin-flow-bar.is-in {
     fill: var(--c-success);
     opacity: 0.45;
 }
 
-.fin-net-bar.is-neg {
+.fin-flow-bar.is-out {
     fill: var(--c-danger);
+    opacity: 0.4;
 }
 
-.fin-net-bar.is-past {
-    opacity: 0.3;
+.fin-flow-bar.is-past {
+    opacity: 0.25;
+}
+
+/* The balance from the worst to the best scenario, around the line. */
+.fin-scenario-band {
+    fill: var(--c-accent);
+    opacity: 0.12;
+}
+
+/* Worst, Realistic and Best inside the band, faint, named at their ends. */
+.fin-scenario-line {
+    fill: none;
+    stroke: var(--c-accent);
+    stroke-width: 1.25;
+    stroke-opacity: 0.45;
+    stroke-dasharray: 3 4;
+}
+
+.fin-scenario-label {
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--c-ink-3);
 }
 
 .fin-line {
@@ -10450,14 +10457,6 @@ details.import-instructions p {
     stroke: var(--c-ink-4);
     stroke-width: 2.5;
     stroke-dasharray: 2 7;
-}
-
-.fin-area-top { stop-color: var(--c-accent); stop-opacity: 0.22; }
-.fin-area-bottom { stop-color: var(--c-accent); stop-opacity: 0; }
-
-.fin-area.is-neg {
-    fill: var(--c-danger);
-    fill-opacity: 0.14;
 }
 
 .fin-grid.is-dashed { stroke-dasharray: 4 6; }
@@ -10955,12 +10954,6 @@ details.import-instructions p {
 }
 
 /* ---- Narrower screens ---- */
-
-@media (max-width: 1400px) {
-    .fin-kpis {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
 
 @media (max-width: 760px) {
     .fin-kpis {

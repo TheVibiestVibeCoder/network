@@ -50,9 +50,8 @@
         balanceError: '',
         bufferOpen: false,
         bufferError: '',
-        // The fixed and planned cost cards, unfolded to edit what is in them.
-        fixedOpen: false,
-        plannedOpen: false,
+        // The costs card, unfolded to edit the fixed and planned costs.
+        costsOpen: false,
         // Recurring payments in Bookkeeping that no fixed cost covers yet.
         suggestions: [],
         // This year's result so far and where it ends (cashflow.js yearResult).
@@ -241,6 +240,12 @@
             today: todayIso()
         };
         state.plan = CF.plan(input);
+        // Worst and best around the scenario in use: the band in the chart.
+        state.band = {
+            worst: CF.plan(Object.assign({}, input, { scenario: RF.settingsFor('worst') })),
+            realistic: CF.plan(Object.assign({}, input, { scenario: RF.settingsFor('realistic') })),
+            best: CF.plan(Object.assign({}, input, { scenario: RF.settingsFor('best') }))
+        };
         // The year's end needs the plan to reach December, whatever is shown.
         // A year ahead, whatever is shown: for the year's end, and for the
         // cost cards' other figure while the page shows only until December.
@@ -258,7 +263,7 @@
 
     function renderSkeleton() {
         els.finPage.setAttribute('aria-busy', 'true');
-        els.finKpis.innerHTML = [0, 1, 2, 3].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
+        els.finKpis.innerHTML = [0, 1, 2].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
         els.finChart.innerHTML = '<div class="fin-skel is-chart"></div>';
     }
 
@@ -321,67 +326,93 @@
         return note;
     }
 
-    /** How the lowest balance stands, as the colour of its figure. */
-    function lowestTone() {
-        const k = state.plan.kpis;
-        return !k.lowest ? '' : k.lowest.amount < 0 ? 'is-danger' : (k.belowBuffer ? 'is-warn' : 'is-ok');
-    }
-
     // ---- The three figures on top ----
 
     function renderKpis() {
         const p = state.plan;
         const k = p.kpis;
 
-        // The balance lives in the header; its form is redrawn from here too.
         renderHead();
 
-        const lowTone = lowestTone();
         const span = horizonText();
-        const notWithin = state.horizon === 'year' ? 'not this year' : `not within ${p.months} months`;
         const suggestions = state.suggestions.length;
-        const y = state.year;
         const now = RF.monthOf(new Date());
         const plannedCount = state.overview.costs.filter(c => {
             const o = c.kind === 'once' ? RF.offsetOf(c.start_month, now) : null;
             return o !== null && o >= 0 && o < p.months;
         }).length;
-        const zero = k.belowZero ? k.belowZero.label : notWithin;
+        const total = k.fixedTotal + k.plannedTotal;
 
-        // Each cost card unfolds downwards to edit what is in it, as the
-        // buffer does on "Lowest balance".
+        // The costs card unfolds downwards to edit what is in it, as the
+        // balance and the buffer do on the liquidity card.
         els.finKpis.innerHTML = `
             ${yearCard()}
-            <article class="fin-kpi fin-kpi--costs${state.fixedOpen ? ' is-open' : ''}">
-                <span class="fin-kpi-label">Fixed costs</span>
-                <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}<span class="fin-kpi-unit">/month</span></span>
-                <span class="fin-kpi-sub"><strong>${esc(euro(k.fixedTotal))}</strong> ${esc(span)}</span>
-                ${kpiLines([state.horizon === 'year' ? ['Next 12 months', euro(state.next12.fixedTotal)] : ['Until Dec ' + y.year, euro(y.fixedRest)],
-                    ['Per year', euro(k.fixedPerMonth * 12)]])}
-                ${suggestions && !state.fixedOpen ? `<button type="button" class="fin-suggest-pill" data-fin-fixed data-fin-focus="fixed-suggest"
+            <article class="fin-kpi fin-kpi--costs${state.costsOpen ? ' is-open' : ''}">
+                <span class="fin-kpi-label">Costs</span>
+                <span class="fin-kpi-value">${esc(euro(total))}</span>
+                <span class="fin-kpi-sub">${esc(span)} · <strong>Ø ${esc(euro(total / Math.max(1, p.months)))}</strong>/month</span>
+                ${kpiLines([
+                    [`Fixed · ${euro(k.fixedPerMonth)}/month`, euro(k.fixedTotal)],
+                    [`Planned · ${plural(plannedCount, 'cost')}`, euro(k.plannedTotal)]
+                ])}
+                ${suggestions && !state.costsOpen ? `<button type="button" class="fin-suggest-pill" data-fin-costs data-fin-focus="costs-suggest"
                     title="Recurring payments in Bookkeeping that are not among the fixed costs yet">${ICON.repeat}${esc(plural(suggestions, 'suggestion'))}</button>` : ''}
-                <button type="button" class="fin-link fin-kpi-action" data-fin-fixed data-fin-focus="fixed" aria-expanded="${state.fixedOpen}">Edit</button>
-                ${state.fixedOpen ? fixedPanel() : ''}
+                <button type="button" class="fin-link fin-kpi-action" data-fin-costs data-fin-focus="costs" aria-expanded="${state.costsOpen}">Edit</button>
+                ${state.costsOpen ? costsPanel() : ''}
             </article>
-            <article class="fin-kpi fin-kpi--costs${state.plannedOpen ? ' is-open' : ''}">
-                <span class="fin-kpi-label">Planned costs</span>
-                <span class="fin-kpi-value">${esc(euro(k.plannedTotal))}</span>
-                <span class="fin-kpi-sub">${esc(span)}</span>
-                ${kpiLines([state.horizon === 'year' ? ['Next 12 months', euro(state.next12.plannedTotal)] : ['Until Dec ' + y.year, euro(y.plannedRest)],
-                    ['Planned', plural(plannedCount, 'cost')]])}
-                <button type="button" class="fin-link fin-kpi-action" data-fin-planned data-fin-focus="planned" aria-expanded="${state.plannedOpen}">Edit</button>
-                ${state.plannedOpen ? plannedPanel() : ''}
-            </article>
-            <article class="fin-kpi fin-kpi--low ${lowTone}">
-                <span class="fin-kpi-label">Lowest balance</span>
-                <span class="fin-kpi-value">${k.lowest ? esc((k.lowest.amount < 0 ? MINUS : '') + euro(Math.abs(k.lowest.amount))) : '—'}</span>
-                ${k.lowest ? `<span class="fin-kpi-sub"><strong>${esc(k.lowest.label)}</strong></span>` : ''}
-                ${kpiLines([['Below zero from', zero, k.belowZero ? 'is-neg' : ''],
-                    p.settings.buffer > 0
-                        ? ['Below buffer from', k.belowBuffer ? k.belowBuffer.label : notWithin, k.belowBuffer ? 'is-warn' : '']
-                        : ['Buffer', 'not set']])}
-                <button type="button" class="fin-link fin-kpi-action" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
-                    title="The least that should always be in the account; the chart and this figure warn below it">${p.settings.buffer > 0 ? 'Buffer ' + esc(euro(p.settings.buffer)) : 'Set buffer'}</button>
+            ${liquidityCard()}`;
+    }
+
+    /**
+     * Liquidity: today's bank balance, how long it lasts under the scenario
+     * (the last month before it would fall below zero), the low point, and
+     * the buffer. The balance and the buffer are updated from here.
+     */
+    function liquidityCard() {
+        const p = state.plan;
+        const k = p.kpis;
+        const b = p.balance;
+        const now = RF.monthOf(new Date());
+        const money = v => (v < 0 ? MINUS : '') + euro(Math.abs(v));
+
+        let lasts = '—';
+        let lastsTone = '';
+        if (b) {
+            if (b.amount < 0) {
+                lasts = 'below zero now';
+                lastsTone = 'is-neg';
+            } else if (k.belowZero) {
+                lasts = k.belowZero.offset === 0 ? 'not past this month' : RF.monthName(k.belowZero.offset - 1, now);
+                lastsTone = k.belowZero.offset < 6 ? 'is-neg' : 'is-warn';
+            } else {
+                lasts = state.horizon === 'year' ? 'past December' : `past ${p.rows[p.rows.length - 1].label}`;
+                lastsTone = 'is-pos';
+            }
+        }
+        const low = k.lowest;
+        const lowTone = !low ? '' : low.amount < 0 ? 'is-neg' : (k.belowBuffer ? 'is-warn' : '');
+
+        return `
+            <article class="fin-kpi fin-kpi--liquidity">
+                <span class="fin-kpi-label">Liquidity</span>
+                <span class="fin-kpi-value${b && b.amount < 0 ? ' is-neg' : ''}">${b ? esc(money(b.amount)) : '—'}</span>
+                <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
+                <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
+                    title="${esc(balanceNote())}">${b ? 'Update' : 'Enter balance'}</button>
+                <dl class="fin-kpi-lines">
+                    <div title="The last month before the balance would fall below zero, under the ${esc(scenarioName())} scenario">
+                        <dt>Lasts until</dt><dd class="${lastsTone}">${esc(lasts)}</dd>
+                    </div>
+                    <div>
+                        <dt>Low point${low ? ` · ${esc(low.label)}` : ''}</dt><dd class="${lowTone}">${low && b ? esc(money(low.amount)) : '—'}</dd>
+                    </div>
+                    <div>
+                        <dt>Buffer</dt>
+                        <dd><button type="button" class="fin-link fin-balance-link" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
+                            title="The least that should always be in the account; the chart and the low point warn below it">${p.settings.buffer > 0 ? esc(euro(p.settings.buffer)) : 'Set'}</button></dd>
+                    </div>
+                </dl>
+                ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
                 ${state.bufferOpen ? bufferForm() : ''}
             </article>`;
     }
@@ -401,12 +432,11 @@
 
     /**
      * The first card: this year's result so far - profit or loss without the
-     * VAT, from Bookkeeping - where it ends in December under the scenario,
-     * and today's bank balance, which is updated from here.
+     * VAT, from Bookkeeping - what the plan adds until December, and where
+     * the year ends under the scenario.
      */
     function yearCard() {
         const y = state.year;
-        const b = state.plan.balance;
         const tone = v => (Math.round(v) > 0 ? 'is-pos' : Math.round(v) < 0 ? 'is-neg' : '');
         // What came in and went out this year, each without its VAT.
         const income = y.months.reduce((sum, m) => sum + m.income, 0);
@@ -417,17 +447,15 @@
                 <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
                 <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping, without VAT">In <strong class="is-pos">${esc(signed(income))}</strong> · Out <strong>${esc(signed(-costs))}</strong></span>
                 <dl class="fin-kpi-lines">
-                    <div title="A projection: the result so far plus what the plan nets until December - income under the ${esc(scenarioName())} scenario less the costs still to come">
+                    <div title="What the plan nets from now until December: income under the scenario less the costs still to come">
+                        <dt>Planned until Dec</dt>
+                        <dd class="${tone(y.planned)}">${esc(signed(y.planned))}</dd>
+                    </div>
+                    <div title="A projection: the result so far plus what the plan nets until December">
                         <dt>${y.year} projection<span class="fin-tag fin-kpi-scenario">${esc(scenarioName())}</span></dt>
                         <dd class="${tone(y.projected)}">${esc(signed(y.projected))}</dd>
                     </div>
-                    <div>
-                        <dt>Bank balance</dt>
-                        <dd><button type="button" class="fin-link fin-balance-link" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
-                            title="${esc(balanceNote())} · click to update">${b ? esc(euro(b.amount)) : 'Enter balance'}</button></dd>
-                    </div>
                 </dl>
-                ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
             </article>`;
     }
 
@@ -440,7 +468,7 @@
                     <span class="fin-amount"><input type="text" class="form-input" name="buffer" data-amount inputmode="decimal" autocomplete="off"
                         value="${buffer > 0 ? esc(showAmount(buffer)) : ''}" placeholder="0" data-fin-focus="buffer-amount"><span aria-hidden="true">€</span></span>
                 </label>
-                <p class="fin-hint">The least that should always be in the account. The chart and this figure warn below it; 0 turns it off.</p>
+                <p class="fin-hint">The least that should always be in the account. The chart and the low point warn below it; 0 turns it off.</p>
                 ${state.bufferError ? `<p class="fin-form-error">${esc(state.bufferError)}</p>` : ''}
                 <div class="fin-form-actions">
                     <button type="button" class="btn btn-secondary btn-small" data-fin-buffer-cancel>Cancel</button>
@@ -514,9 +542,20 @@
         }).concat(p.rows.map(r => ({ past: false, label: r.label, offset: r.offset, in: r.in, out: r.out, net: r.net, closing: p.hasBalance ? r.closing : null, row: r })));
     }
 
+    /** Each planned month's balance under worst and best: the band's edges. */
+    function bandPoints() {
+        const p = state.plan;
+        if (!p.hasBalance || !state.band) return [];
+        return p.rows.map((r, i) => {
+            const all = [r.closing, state.band.worst.rows[i].closing, state.band.best.rows[i].closing];
+            return { lo: Math.min(...all), hi: Math.max(...all) };
+        });
+    }
+
     function renderChart() {
-        // No key: the line is the balance, red is below zero, and the
-        // buffer line carries its own label.
+        // The line is the balance, red below zero; the band around it runs
+        // from the worst to the best scenario; the buffer line carries its
+        // own label.
         els.finChart.innerHTML = `
             <div class="fin-card-head">
                 <h2 class="fin-card-title">Cashflow</h2>
@@ -579,9 +618,10 @@
 
     /**
      * The cashflow: the balance as one smooth line - blue above zero, red
-     * below - with "Today" marked above its point and the last month's
-     * balance at the end, and each month's net as a bar from zero. Hovering
-     * a month reads its in, out and net above the chart.
+     * below - with "Today" marked on it, worst to best as a band around it
+     * with the three scenarios as faint lines named at their ends, and each
+     * month's money in (up) and out (down) as bars. Hovering a month reads
+     * its in, out and net above the chart.
      */
     function drawPlot() {
         const plot = els.finChart && els.finChart.querySelector('[data-fin-plot]');
@@ -593,14 +633,17 @@
         const cols = chartColumns();
         const n = cols.length;
         const narrow = W < 560;
-        const padL = 48, padR = 12;
+        // On the right, room for the scenarios' names at the ends of their lines.
+        const padL = 48, padR = p.hasBalance && state.band ? 70 : 12;
         const top = 16, H1 = narrow ? 190 : 250, axisH = 30;
         const H = top + H1 + axisH;
         const cw = (W - padL - padR) / n;
         const cx = i => padL + cw * (i + 0.5);
         const todayX = padL + cw * p.past.length;
 
-        const values = cols.filter(c => c.closing !== null).map(c => c.closing).concat(cols.map(c => c.net));
+        const band = bandPoints();
+        const values = cols.filter(c => c.closing !== null).map(c => c.closing)
+            .concat(cols.map(c => c.in), cols.map(c => -c.out), band.flatMap(x => [x.lo, x.hi]));
         if (p.hasBalance) values.push(p.balance.amount);
         if (p.settings.buffer > 0) values.push(p.settings.buffer);
         values.push(0);
@@ -611,11 +654,14 @@
         hi = Math.ceil(hi / step) * step;
         const y1 = v => top + (hi - v) / (hi - lo) * H1;
         const y0 = y1(0);
-        const right = W - padR;
+        // Grid, zero line, the red below it, the lines and the band all end
+        // together, just past the last month's bars, so no bar is cut.
+        const barW = Math.max(3, Math.min(16, cw * 0.32));
+        const right = cx(n - 1) + barW / 2 + 3;
+        const tail = pts => pts.concat([[right, pts[pts.length - 1][1]]]);
 
         const parts = [];
         parts.push(`<defs>
-            <linearGradient id="finArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="fin-area-top"/><stop offset="1" class="fin-area-bottom"/></linearGradient>
             <clipPath id="finAbove"><rect x="0" y="0" width="${W}" height="${y0}"/></clipPath>
             <clipPath id="finBelow"><rect x="0" y="${y0}" width="${W}" height="${H - y0}"/></clipPath>
         </defs>`);
@@ -631,27 +677,49 @@
             parts.push(`<line class="fin-buffer" x1="${padL}" x2="${right}" y1="${y}" y2="${y}"/>`);
             parts.push(`<text class="fin-buffer-label" x="${right - 4}" y="${y - 5}" text-anchor="end">Buffer ${esc(short(p.settings.buffer))}</text>`);
         }
-        // Each month's net as a quiet bar from zero, under the balance line.
-        const barW = Math.max(3, Math.min(18, cw * 0.36));
+        // Each month's money in as a bar up from zero, money out as one down.
         cols.forEach((c, i) => {
-            if (Math.abs(c.net) < 0.5) return;
-            const yTop = Math.min(y1(c.net), y0);
-            const h = Math.max(1, Math.abs(y1(c.net) - y0));
-            parts.push(`<rect class="fin-net-bar${c.net < 0 ? ' is-neg' : ''}${c.past ? ' is-past' : ''}" x="${cx(i) - barW / 2}" y="${yTop}" width="${barW}" height="${h}" rx="2"/>`);
+            const past = c.past ? ' is-past' : '';
+            if (c.in > 0.5) {
+                parts.push(`<rect class="fin-flow-bar is-in${past}" x="${cx(i) - barW / 2}" y="${y1(c.in)}" width="${barW}" height="${Math.max(1, y0 - y1(c.in))}" rx="2"/>`);
+            }
+            if (c.out > 0.5) {
+                parts.push(`<rect class="fin-flow-bar is-out${past}" x="${cx(i) - barW / 2}" y="${y0}" width="${barW}" height="${Math.max(1, y1(-c.out) - y0)}" rx="2"/>`);
+            }
         });
         parts.push(`<rect class="fin-hover-band" data-fin-band x="0" y="${top - 6}" width="${cw}" height="${H1 + 12}" rx="8" visibility="hidden"/>`);
 
         if (p.hasBalance) {
             const pastPts = cols.map((c, i) => (c.past && c.closing !== null ? [cx(i), y1(c.closing)] : null)).filter(Boolean);
             const todayPt = [todayX, y1(p.balance.amount)];
-            const futurePts = [todayPt].concat(cols.map((c, i) => (!c.past ? [cx(i), y1(c.closing)] : null)).filter(Boolean));
+            const futurePts = tail([todayPt].concat(cols.map((c, i) => (!c.past ? [cx(i), y1(c.closing)] : null)).filter(Boolean)));
             const line = smoothPath(futurePts);
-            const last = futurePts[futurePts.length - 1];
+
+            // Worst to best, as a band around the line.
+            if (band.length) {
+                const firstFuture = cols.findIndex(c => !c.past);
+                const upper = tail([todayPt].concat(band.map((x, j) => [cx(firstFuture + j), y1(x.hi)])));
+                const lower = tail([todayPt].concat(band.map((x, j) => [cx(firstFuture + j), y1(x.lo)]))).reverse();
+                parts.push(`<path class="fin-scenario-band" d="${smoothPath(upper)} ${smoothPath(lower).replace(/^M/, 'L')} Z"/>`);
+
+                // The three scenarios as faint lines in it, each named where
+                // it ends; names pushed apart when the ends lie close.
+                const ends = [];
+                ['worst', 'realistic', 'best'].forEach(key => {
+                    const rows = state.band[key].rows;
+                    const pts = tail([todayPt].concat(rows.map((r, j) => [cx(firstFuture + j), y1(r.closing)])));
+                    parts.push(`<path class="fin-scenario-line is-${key}" d="${smoothPath(pts)}"/>`);
+                    ends.push({ key, x: pts[pts.length - 1][0], y: pts[pts.length - 1][1] });
+                });
+                ends.sort((a, b) => a.y - b.y);
+                for (let j = 1; j < ends.length; j++) ends[j].y = Math.max(ends[j].y, ends[j - 1].y + 12);
+                ends.forEach(e => {
+                    parts.push(`<text class="fin-scenario-label is-${e.key}" x="${e.x + 6}" y="${e.y + 4}">${esc(RF.presetByKey(e.key).label)}</text>`);
+                });
+            }
 
             if (pastPts.length) parts.push(`<path class="fin-line is-past" d="${smoothPath(pastPts.concat([todayPt]))}"/>`);
-            const area = `${line} L${last[0]},${y0} L${todayPt[0]},${y0} Z`;
-            parts.push(`<path class="fin-area" d="${area}" fill="url(#finArea)" clip-path="url(#finAbove)"/>`);
-            parts.push(`<path class="fin-area is-neg" d="${area}" clip-path="url(#finBelow)"/>`);
+            // No fill under the line: the band around it says enough.
             parts.push(`<path class="fin-line" d="${line}" clip-path="url(#finAbove)"/>`);
             parts.push(`<path class="fin-line is-neg" d="${line}" clip-path="url(#finBelow)"/>`);
 
@@ -659,9 +727,6 @@
             parts.push(`<line class="fin-today" x1="${todayX}" x2="${todayX}" y1="${todayPt[1]}" y2="${top + H1}"/>`);
             parts.push(`<circle class="fin-dot-mark" cx="${todayPt[0]}" cy="${todayPt[1]}" r="6"/>`);
 
-            // Where the last month ends.
-            const endValue = cols[cols.length - 1].closing;
-            parts.push(`<circle class="fin-dot-mark${endValue < 0 ? ' is-neg' : ''}" cx="${last[0]}" cy="${last[1]}" r="6"/>`);
         }
         parts.push(`<circle class="fin-dot is-hover" data-fin-dot cx="0" cy="0" r="5" visibility="hidden"/>`);
 
@@ -741,18 +806,25 @@
                     <td class="fin-col-balance ${m.rows && m.closing !== null ? balClass(m.closing) : ''}">${m.rows && m.closing !== null ? esc((m.closing < 0 ? MINUS : '') + euro(Math.abs(m.closing))) : dash}</td>
                 </tr>`).join('');
 
+        const sofar = state.year.months.find(m => m.offset === 0);
         const body = past + p.rows.map(r => {
             const open = state.openMonths.has(r.offset);
+            // This month counts in full: what Bookkeeping already has (net)
+            // plus what the plan still expects - not only what is left.
+            const now = r.offset === 0 && sofar;
+            const inV = r.in + (now ? sofar.income : 0);
+            const outV = r.fixed + r.planned + (now ? sofar.costs : 0);
+            const net = inV - outV;
             return `
-                <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}">
+                <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}"${now ? ' title="Already in Bookkeeping this month plus what is still planned"' : ''}>
                     <th scope="row">
                         <button type="button" class="fin-month-toggle" data-fin-month="${r.offset}" data-fin-focus="month-${r.offset}" aria-expanded="${open}">
                             ${ICON.chevron}<span>${esc(r.label)}</span>${r.offset === 0 ? '<span class="fin-tag">now</span>' : ''}
                         </button>
                     </th>
-                    <td class="is-pos">${r.in > 0.005 ? esc(signed(r.in)) : '<span class="fin-muted">–</span>'}</td>
-                    <td>${r.fixed + r.planned > 0.005 ? esc(signed(-(r.fixed + r.planned))) : '<span class="fin-muted">–</span>'}</td>
-                    <td class="${r.net < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(r.net))}</strong></td>
+                    <td class="is-pos">${inV > 0.005 ? esc(signed(inV)) : '<span class="fin-muted">–</span>'}</td>
+                    <td>${outV > 0.005 ? esc(signed(-outV)) : '<span class="fin-muted">–</span>'}</td>
+                    <td class="${net < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(net))}</strong></td>
                     <td class="fin-col-balance ${p.hasBalance ? balClass(r.closing) : ''}">${p.hasBalance ? esc((r.closing < 0 ? MINUS : '') + euro(Math.abs(r.closing))) : '<span class="fin-muted">–</span>'}</td>
                 </tr>
                 ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(r)}</td></tr>` : ''}`;
@@ -860,11 +932,14 @@
             </li>`;
     }
 
-    function fixedPanel() {
+    function costsPanel() {
+        return `<div class="fin-kpi-panel">${fixedSection()}${plannedSection()}</div>`;
+    }
+
+    function fixedSection() {
         const fixed = state.overview.costs.filter(c => c.kind !== 'once');
         const draft = state.draft && state.draft.kind !== 'once' ? state.draft : null;
         return `
-            <div class="fin-kpi-panel">
                 ${state.suggestions.length ? `
                 <section class="fin-group">
                     <h3 class="fin-group-title"><span>${ICON.repeat} Suggested from Bookkeeping</span></h3>
@@ -876,17 +951,15 @@
                     ${draft ? costForm(draft) : ''}
                     ${fixed.length ? `<ul class="fin-cost-list">${fixed.map(costRow).join('')}</ul>`
                         : (draft ? '' : '<p class="fin-muted fin-panel-empty">No fixed costs yet.</p>')}
-                </section>
-            </div>`;
+                </section>`;
     }
 
-    function plannedPanel() {
+    function plannedSection() {
         const current = monthKey(0, RF.monthOf(new Date()));
         const upcoming = upcomingPlanned();
         const past = state.overview.costs.filter(c => c.kind === 'once' && c.start_month < current);
         const draft = state.draft && state.draft.kind === 'once' ? state.draft : null;
         return `
-            <div class="fin-kpi-panel">
                 <section class="fin-group">
                     <h3 class="fin-group-title"><span>Planned costs</span>
                         <button type="button" class="ov-add-btn" data-fin-add="once" data-fin-focus="add-once">${ICON.plus}Add</button></h3>
@@ -895,8 +968,7 @@
                         : (draft ? '' : '<p class="fin-muted fin-panel-empty">Nothing planned.</p>')}
                     ${past.length ? `<button type="button" class="fin-link" data-fin-past>${state.showPastPlanned ? 'Hide' : 'Show'} ${esc(plural(past.length, 'past planned cost'))}</button>
                         ${state.showPastPlanned ? `<ul class="fin-cost-list is-past">${past.map(costRow).join('')}</ul>` : ''}` : ''}
-                </section>
-            </div>`;
+                </section>`;
     }
 
     function monthOptions(selected, from, to, now) {
@@ -1119,19 +1191,12 @@
 
             if (t.hasAttribute('data-fin-retry')) {
                 load();
-            } else if (t.hasAttribute('data-fin-fixed')) {
+            } else if (t.hasAttribute('data-fin-costs')) {
                 // The suggestions open the card too, and stay at its top.
-                const opening = !state.fixedOpen || t.classList.contains('fin-suggest-pill');
-                state.fixedOpen = opening;
-                if (!opening && state.draft && state.draft.kind !== 'once') state.draft = null;
+                state.costsOpen = !state.costsOpen || t.classList.contains('fin-suggest-pill');
+                if (!state.costsOpen) state.draft = null;
                 renderKpis();
-                const again = els.finKpis.querySelector('[data-fin-focus="fixed"]');
-                if (again) again.focus();
-            } else if (t.hasAttribute('data-fin-planned')) {
-                state.plannedOpen = !state.plannedOpen;
-                if (!state.plannedOpen && state.draft && state.draft.kind === 'once') state.draft = null;
-                renderKpis();
-                const again = els.finKpis.querySelector('[data-fin-focus="planned"]');
+                const again = els.finKpis.querySelector('[data-fin-focus="costs"]');
                 if (again) again.focus();
             } else if (t.hasAttribute('data-fin-accept')) {
                 acceptSuggestion(t.getAttribute('data-fin-accept'));
@@ -1188,7 +1253,7 @@
                 if (again) again.focus();
             } else if (t.hasAttribute('data-fin-add')) {
                 state.draft = newDraft(t.getAttribute('data-fin-add'));
-                if (state.draft.kind === 'once') state.plannedOpen = true; else state.fixedOpen = true;
+                state.costsOpen = true;
                 state.draftError = '';
                 renderKpis();
                 const name = els.finKpis.querySelector('[data-fin-focus="draft-name"]');
@@ -1241,11 +1306,9 @@
                 state.draft = null;
                 renderKpis();
             } else if (e.target.closest('.fin-kpi-panel')) {
-                // Folds the card the focus is in.
-                const planned = !!e.target.closest('.fin-kpi').querySelector('[data-fin-planned]');
-                if (planned) state.plannedOpen = false; else state.fixedOpen = false;
+                state.costsOpen = false;
                 renderKpis();
-                const btn = els.finKpis.querySelector(planned ? '[data-fin-planned]' : '[data-fin-fixed].fin-kpi-action');
+                const btn = els.finKpis.querySelector('[data-fin-focus="costs"]');
                 if (btn) btn.focus();
             } else if (state.bufferOpen && e.target.closest('[data-fin-buffer-form]')) {
                 state.bufferOpen = false;
