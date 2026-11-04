@@ -11,6 +11,7 @@ require_once APP_ROOT . '/vendor/autoload.php';
 require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/InvoiceReader.php';
 
 use ZipStream\Option\Archive;
 use ZipStream\ZipStream;
@@ -26,6 +27,9 @@ if (!Auth::isAuthenticated()) {
     echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
+
+// Bookkeeping - bank entries and invoices - is for administrators only.
+Auth::requireAdmin();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
@@ -98,12 +102,15 @@ try {
                 bkSetExcluded($db);
                 break;
 
-            case 'set-month-tax':
-                bkSetMonthTax($db);
-                break;
-
             case 'set-no-pdf':
                 bkSetNoPdf($db);
+                break;
+
+            case 'read-invoice':
+                bkReadInvoice($db);
+                break;
+            case 'dismiss-match':
+                bkDismissMatch($db);
                 break;
             default:
                 bkJson(['error' => 'Unknown action'], 400);
@@ -274,6 +281,14 @@ function bkEnsureSchema(PDO $db): void
         $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN review_status VARCHAR(16)");
     }
 
+    // What Claude read from the invoice (includes/InvoiceReader.php), as JSON.
+    // Neither this nor an error: not read yet.
+    if (!in_array('invoice_data', $pdfColumns, true)) {
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_data TEXT");
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_error TEXT");
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_read_at DATETIME");
+    }
+
     if (!is_dir(BK_PDF_DIR)) {
         mkdir(BK_PDF_DIR, 0700, true);
     }
@@ -332,71 +347,6 @@ function bkSetSetting(PDO $db, string $key, string $value): void
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
     ");
     $stmt->execute(['key' => $key, 'value' => $value]);
-}
-
-/**
- * The per-month tax amounts, as {"YYYY-MM": float}.
- *
- * A flat amount the user types in, not a rate: it is subtracted from that
- * month's result to give the net. Stored as one JSON blob rather than a table
- * because it is a handful of numbers keyed by month, only ever read and
- * written whole.
- */
-function bkGetMonthTax(PDO $db): array
-{
-    $raw = bkGetSetting($db, 'month_tax');
-    if ($raw === null || $raw === '') {
-        return [];
-    }
-
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return [];
-    }
-
-    $out = [];
-    foreach ($decoded as $month => $amount) {
-        if (is_string($month) && preg_match('/^\d{4}-\d{2}$/', $month) && is_numeric($amount)) {
-            $out[$month] = (float) $amount;
-        }
-    }
-
-    return $out;
-}
-
-/**
- * Set or clear one month's tax amount.
- */
-function bkSetMonthTax(PDO $db): void
-{
-    $body = bkReadJsonBody();
-    $month = (string) ($body['month'] ?? '');
-
-    if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
-        bkJson(['error' => 'Invalid month'], 400);
-    }
-
-    $current = bkGetMonthTax($db);
-    $raw = $body['amount'] ?? null;
-
-    // null or an empty string clears the entry, so the month goes back to
-    // showing no net line at all rather than a net that equals the result.
-    if ($raw === null || $raw === '') {
-        unset($current[$month]);
-    } elseif (is_numeric($raw)) {
-        $amount = round((float) $raw, 2);
-        if (abs($amount) > 1e12) {
-            bkJson(['error' => 'Amount out of range'], 400);
-        }
-        $current[$month] = $amount;
-    } else {
-        bkJson(['error' => 'Invalid amount'], 400);
-    }
-
-    ksort($current);
-    bkSetSetting($db, 'month_tax', json_encode($current, JSON_THROW_ON_ERROR));
-
-    bkJson(['success' => true, 'month_tax' => (object) $current]);
 }
 
 /**
@@ -533,7 +483,8 @@ function bkGetTable(PDO $db): void
         SELECT r.id, r.row_date, r.data, r.no_pdf_needed, r.excluded, r.import_batch,
                r.assigned_to, r.assigned_to_name,
                p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size,
-               p.review_status AS pdf_review_status
+               p.review_status AS pdf_review_status,
+               p.invoice_data AS pdf_invoice_data, p.invoice_error AS pdf_invoice_error
         FROM bookkeeping_rows r
         LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
         ORDER BY (r.row_date IS NULL), r.row_date, r.id
@@ -554,12 +505,15 @@ function bkGetTable(PDO $db): void
                 'name' => $row['pdf_name'],
                 'size' => (int) $row['pdf_size'],
                 'review_status' => $row['pdf_review_status'],
+                'invoice' => bkInvoiceData($row['pdf_invoice_data']),
+                'invoice_error' => $row['pdf_invoice_error'],
             ] : null,
         ];
     }
 
     $pool = $db->query("
-        SELECT id, original_name AS name, file_size AS size, created_at, review_status
+        SELECT id, original_name AS name, file_size AS size, created_at, review_status,
+               invoice_data, invoice_error
         FROM bookkeeping_pdfs
         WHERE row_id IS NULL
         ORDER BY created_at DESC, id DESC
@@ -567,6 +521,8 @@ function bkGetTable(PDO $db): void
     foreach ($pool as &$item) {
         $item['id'] = (int) $item['id'];
         $item['size'] = (int) $item['size'];
+        $item['invoice'] = bkInvoiceData($item['invoice_data']);
+        unset($item['invoice_data']);
     }
     unset($item);
 
@@ -581,10 +537,11 @@ function bkGetTable(PDO $db): void
             'settings' => [
                 'selected_columns' => is_array($selection) ? $selection : [],
                 'date_column' => bkGetSetting($db, 'csv_date_column'),
-                // Cast so an empty map serialises as {} and not [] - the
-                // client indexes it by month key either way, but an array
-                // there is a lie about the shape.
-                'month_tax' => (object) bkGetMonthTax($db),
+                // Claude reads the invoices only while there is an API key.
+                'invoice_reader' => InvoiceReader::enabled(),
+                // What another model read is read again (InvoiceReader::isCurrent).
+                'invoice_model' => InvoiceReader::model(),
+                'dismissed_matches' => bkDismissedMatches($db),
             ],
             'limits' => [
                 'max_upload_bytes' => bkMaxUploadBytes(),
@@ -1092,4 +1049,121 @@ function bkSetNoPdf(PDO $db): void
     $stmt->execute(array_merge([$value], $ids));
 
     bkJson(['success' => true]);
+}
+
+// ----------------------------------------------------------------------------
+// Claude reading the invoices
+// ----------------------------------------------------------------------------
+
+/** What Claude read from an invoice, decoded - or null if it has not yet. */
+function bkInvoiceData(?string $json): ?array
+{
+    if ($json === null || $json === '') {
+        return null;
+    }
+    $data = json_decode($json, true);
+    return is_array($data) ? $data : null;
+}
+
+/**
+ * Have Claude read one invoice, unless it already has (again: read it anew).
+ *
+ * bookkeeping.js calls this for every file that has not been read, one after
+ * the other - new uploads and, the first time round, every file there is.
+ * A file Claude cannot read keeps the reason, so it is not tried on every
+ * visit; "busy" or "unreachable" leaves it unread for the next try. What
+ * another model read is read again, and kept until the new reading is in.
+ */
+function bkReadInvoice(PDO $db): void
+{
+    if (!InvoiceReader::enabled()) {
+        bkJson(['error' => 'Reading invoices is not switched on.'], 404);
+    }
+
+    $body = bkReadJsonBody();
+    $id = (int) ($body['id'] ?? 0);
+    $again = !empty($body['again']);
+
+    $stmt = $db->prepare("SELECT id, stored_name, invoice_data, invoice_error FROM bookkeeping_pdfs WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+    $pdf = $stmt->fetch();
+    if (!$pdf) {
+        bkJson(['error' => 'PDF not found'], 404);
+    }
+
+    if (!$again && (InvoiceReader::isCurrent(bkInvoiceData($pdf['invoice_data'])) || $pdf['invoice_error'] !== null)) {
+        bkJson([
+            'success' => true,
+            'id' => $id,
+            'invoice' => bkInvoiceData($pdf['invoice_data']),
+            'invoice_error' => $pdf['invoice_error'],
+        ]);
+    }
+
+    // Claude takes a few seconds: let go of the session so the page's other
+    // requests are not queued behind this one, and finish even if the
+    // browser stops waiting.
+    session_write_close();
+    ignore_user_abort(true);
+    set_time_limit(180);
+
+    $update = $db->prepare("
+        UPDATE bookkeeping_pdfs
+        SET invoice_data = :data, invoice_error = :error, invoice_read_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ");
+    $mark = $db->prepare("UPDATE bookkeeping_pdfs SET invoice_error = :error WHERE id = :id");
+
+    // Marked first: should PHP die on the way (a huge scan running out of
+    // memory), the mark stays and the file is not tried on every visit.
+    // Every way out below replaces it.
+    $mark->execute(['error' => 'The server stopped while reading this file.', 'id' => $id]);
+    $previous = bkInvoiceData($pdf['invoice_data']);
+
+    try {
+        $invoice = InvoiceReader::read(BK_PDF_DIR . '/' . $pdf['stored_name']);
+    } catch (RuntimeException $e) {
+        if ($e->getCode() === InvoiceReader::TEMPORARY) {
+            $mark->execute(['error' => null, 'id' => $id]);
+            bkJson(['error' => $e->getMessage(), 'temporary' => true], 503);
+        }
+        // An older reading, if there is one, is better than none.
+        $update->execute(['data' => $pdf['invoice_data'], 'error' => $e->getMessage(), 'id' => $id]);
+        bkJson(['success' => true, 'id' => $id, 'invoice' => $previous, 'invoice_error' => $e->getMessage()]);
+    }
+
+    $update->execute(['data' => json_encode($invoice, JSON_UNESCAPED_UNICODE), 'error' => null, 'id' => $id]);
+
+    bkJson(['success' => true, 'id' => $id, 'invoice' => $invoice, 'invoice_error' => null]);
+}
+
+/**
+ * Suggested invoice-to-row pairs somebody turned down, as "rowId:pdfId", so
+ * the same suggestion does not come back on every visit.
+ */
+function bkDismissedMatches(PDO $db): array
+{
+    $list = json_decode(bkGetSetting($db, 'dismissed_matches') ?? '[]', true);
+    return is_array($list) ? array_values(array_filter($list, 'is_string')) : [];
+}
+
+function bkDismissMatch(PDO $db): void
+{
+    $body = bkReadJsonBody();
+    $rowId = (int) ($body['row_id'] ?? 0);
+    $pdfId = (int) ($body['pdf_id'] ?? 0);
+    if ($rowId <= 0 || $pdfId <= 0) {
+        bkJson(['error' => 'Missing PDF or row'], 400);
+    }
+
+    $list = bkDismissedMatches($db);
+    $key = $rowId . ':' . $pdfId;
+    if (!in_array($key, $list, true)) {
+        $list[] = $key;
+    }
+    // The oldest go first; by then their rows have long been settled.
+    $list = array_slice($list, -1000);
+    bkSetSetting($db, 'dismissed_matches', json_encode($list));
+
+    bkJson(['success' => true, 'dismissed_matches' => $list]);
 }

@@ -125,6 +125,47 @@ final class ReviewQueue
         return (int) $db->lastInsertId();
     }
 
+    /**
+     * A change to an existing record, as one proposal per field, so each can
+     * be accepted or rejected on its own. A budget's two ends stay together:
+     * they are checked against each other.
+     *
+     * @param array $diff     field => proposed value
+     * @param array $previous field => value before
+     * @return int[] the new proposals' ids, in field order
+     */
+    public static function addUpdates(string $entityType, int $entityId, string $label, array $diff, array $previous, ?string $comment = null): array
+    {
+        $work = function () use ($entityType, $entityId, $label, $diff, $previous, $comment): array {
+            $ids = [];
+            foreach (self::fieldGroups(array_keys($diff)) as $group) {
+                $keys = array_flip($group);
+                $ids[] = self::add('update', $entityType, $entityId, $label,
+                    array_intersect_key($diff, $keys), array_intersect_key($previous, $keys), $comment);
+            }
+            return $ids;
+        };
+
+        return Database::getInstance()->inTransaction() ? $work() : Database::transactional($work);
+    }
+
+    /** Fields as they are proposed: one by one, but both ends of a budget together. */
+    private static function fieldGroups(array $fields): array
+    {
+        $groups = [];
+        $budget = array_values(array_intersect($fields, ['budget_min', 'budget_max']));
+        foreach ($fields as $field) {
+            if (in_array($field, $budget, true)) {
+                if ($field === $budget[0]) {
+                    $groups[] = $budget;
+                }
+                continue;
+            }
+            $groups[] = [$field];
+        }
+        return $groups;
+    }
+
     public static function pendingCount(): int
     {
         return (int) Database::getInstance()
@@ -159,6 +200,38 @@ final class ReviewQueue
         $row = $stmt->fetch();
 
         return $row ?: null;
+    }
+
+    /**
+     * The open proposals to change existing records (edit, assign, delete...),
+     * as their kinds per record id - for marking those records where they are
+     * listed. Records without any are left out.
+     *
+     * @param int[] $ids
+     * @return array<int, string[]>
+     */
+    public static function pendingChangesFor(string $entityType, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+        if (!$ids || !isset(self::ENTITY_TABLES[$entityType])) {
+            return [];
+        }
+
+        $byId = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $marks = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = Database::getInstance()->prepare("
+                SELECT entity_id, kind FROM review_items
+                WHERE status = 'pending' AND kind <> 'create' AND entity_type = ? AND entity_id IN ($marks)
+                ORDER BY created_at ASC, id ASC
+            ");
+            $stmt->execute(array_merge([$entityType], $chunk));
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $byId[(int) $row['entity_id']][] = (string) $row['kind'];
+            }
+        }
+
+        return $byId;
     }
 
     // -------------------------------------------------------------------------
@@ -384,6 +457,8 @@ final class ReviewQueue
         self::ensureBookkeepingColumn();
 
         $db = Database::getInstance();
+        self::splitCombinedUpdates($db);
+
         $pending = $db->query("SELECT id, kind, entity_type, entity_id FROM review_items WHERE status = 'pending'")->fetchAll();
         if (empty($pending)) {
             return;
@@ -414,6 +489,54 @@ final class ReviewQueue
             } elseif ($item['kind'] === 'create' && $hasReviewColumn && $record['review_status'] !== self::PENDING) {
                 self::mark($db, (int) $item['id'], 'accepted', $system);
             }
+        }
+    }
+
+    /**
+     * Older proposals changed several fields at once. Split each open one the
+     * way addUpdates() proposes now: it keeps its id for its first field, and
+     * every further field becomes a proposal of its own with the same note,
+     * source and date.
+     */
+    private static function splitCombinedUpdates(PDO $db): void
+    {
+        $rows = $db->query("SELECT * FROM review_items WHERE status = 'pending' AND kind = 'update'")->fetchAll();
+
+        foreach ($rows as $row) {
+            $payload = json_decode((string) $row['payload'], true) ?: [];
+            $groups = self::fieldGroups(array_keys($payload));
+            if (count($groups) < 2) {
+                continue;
+            }
+            $previous = $row['previous'] === null ? [] : (json_decode((string) $row['previous'], true) ?: []);
+
+            Database::transactional(function (PDO $db) use ($row, $payload, $previous, $groups) {
+                $first = array_flip(array_shift($groups));
+                $db->prepare("UPDATE review_items SET payload = :payload, previous = :previous WHERE id = :id AND status = 'pending'")
+                    ->execute([
+                        'payload' => self::encode(array_intersect_key($payload, $first)),
+                        'previous' => self::encode(array_intersect_key($previous, $first)),
+                        'id' => (int) $row['id'],
+                    ]);
+
+                $insert = $db->prepare("
+                    INSERT INTO review_items (kind, entity_type, entity_id, entity_label, payload, previous, comment, source, created_at)
+                    VALUES ('update', :type, :entity_id, :label, :payload, :previous, :comment, :source, :created_at)
+                ");
+                foreach ($groups as $group) {
+                    $keys = array_flip($group);
+                    $insert->execute([
+                        'type' => $row['entity_type'],
+                        'entity_id' => (int) $row['entity_id'],
+                        'label' => $row['entity_label'],
+                        'payload' => self::encode(array_intersect_key($payload, $keys)),
+                        'previous' => self::encode(array_intersect_key($previous, $keys)),
+                        'comment' => $row['comment'],
+                        'source' => $row['source'],
+                        'created_at' => $row['created_at'],
+                    ]);
+                }
+            });
         }
     }
 

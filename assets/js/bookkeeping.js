@@ -13,6 +13,9 @@
 
     const DATE_SORT_KEY = '__date__';
     const PDF_SORT_KEY = '__pdf__';
+    // The VAT Claude read from the row's invoice - a column of our own,
+    // after the PDF column, not one of the imported ones.
+    const VAT_SORT_KEY = '__vat__';
 
     /**
      * Where a row sits when sorting by its PDF state.
@@ -37,7 +40,7 @@
         columns: [],
         rows: [],
         pool: [],
-        settings: { selected_columns: [], date_column: null, month_tax: {} },
+        settings: { selected_columns: [], date_column: null },
         limits: { maxUploadBytes: 0, maxUploadLabel: '' },
         selection: new Set(),
         loaded: false,
@@ -53,7 +56,18 @@
         previewColumns: [],
         previewExcludedColumns: new Set(),
         previewDateColumn: null,
-        previewRows: [] // [{ data, isDuplicate, selected }]
+        previewRows: [], // [{ data, isDuplicate, selected }]
+        // Invoices Claude is reading right now, by PDF id.
+        reading: new Set(),
+        // Row id -> { row, pdf }: invoices in the drop zone that fit a row
+        // without one (invoiceMatches), worked out on every render.
+        matches: new Map(),
+        // A word of our own company's name (ownNameWord), to tell whom an
+        // invoice is with.
+        ownWord: null,
+        // Set when Claude was busy or unreachable: no more tries until the
+        // next visit to the tab.
+        readingPaused: false
     };
 
     // ------------------------------------------------------------------
@@ -105,13 +119,53 @@
         }
     }
 
+    // The drop zone can be folded into a narrow rail, so the table gets the
+    // width; remembered per browser, like the column widths.
+    const DROPZONE_FOLDED_KEY = 'crm-bk-dropzone-folded';
+
+    function setDropzoneFolded(folded) {
+        els.dropzone.classList.toggle('is-folded', folded);
+        els.dropzoneCollapse.setAttribute('aria-expanded', String(!folded));
+        els.dropzoneExpand.setAttribute('aria-expanded', String(!folded));
+        try {
+            localStorage.setItem(DROPZONE_FOLDED_KEY, folded ? '1' : '0');
+        } catch (e) {
+            // Ignore storage errors; it stays folded until the page reloads
+        }
+    }
+
+    function bindDropzoneFold() {
+        if (!els.dropzoneCollapse || !els.dropzoneExpand) return;
+        let folded = false;
+        try {
+            folded = localStorage.getItem(DROPZONE_FOLDED_KEY) === '1';
+        } catch (e) {
+            folded = false;
+        }
+        setDropzoneFolded(folded);
+        els.dropzoneCollapse.addEventListener('click', () => setDropzoneFolded(true));
+        els.dropzoneExpand.addEventListener('click', () => setDropzoneFolded(false));
+    }
+
     function colWidth(key) {
         return colWidths.stored[key] || colWidths.measured[key] || null;
     }
 
-    /** Resizable columns in table order: the imported ones, then the PDF column. */
+    /**
+     * Resizable columns in table order: the imported ones with VAT right
+     * after the amount it belongs to, then the PDF column. Without an amount
+     * column there is no VAT to work out, and it goes last.
+     */
     function resizableColKeys() {
-        return state.columns.map(c => c.name).concat(PDF_SORT_KEY);
+        const amountColumn = detectAmountColumn();
+        const keys = [];
+        state.columns.forEach(col => {
+            keys.push(col.name);
+            if (col.name === amountColumn) keys.push(VAT_SORT_KEY);
+        });
+        keys.push(PDF_SORT_KEY);
+        if (!amountColumn) keys.push(VAT_SORT_KEY);
+        return keys;
     }
 
     function applyColWidths(table) {
@@ -270,7 +324,10 @@
         }
 
         if (!response.ok || result.error) {
-            throw new Error(result.error || 'Request failed');
+            const error = new Error(result.error || 'Request failed');
+            // "Claude is busy": reading invoices stops until the next visit.
+            error.temporary = !!result.temporary;
+            throw error;
         }
         return result;
     }
@@ -357,6 +414,8 @@
 
     function load() {
         init();
+        // Admins only: without the view there is nothing to load into.
+        if (!$('bookkeepingView')) return Promise.resolve();
         loading = true;
         loadPromise = (async () => {
             try {
@@ -383,6 +442,7 @@
                 state.selection.forEach(id => { if (!rowIds.has(id)) state.selection.delete(id); });
                 state.loaded = true;
                 render();
+                readPendingInvoices();
             } catch (error) {
                 showToast('Failed to load bookkeeping data: ' + error.message, true);
             } finally {
@@ -406,9 +466,14 @@
     }
 
     function render() {
+        // Worked out once per render: the table draws each suggestion in its
+        // row, the header counts them.
+        state.ownWord = ownNameWord();
+        state.matches = invoiceMatches();
         renderTable();
         renderPool();
         updateToolbar();
+        updateMatchPill();
         populateSelectTools();
         ensureValidSortColumn();
     }
@@ -420,6 +485,7 @@
     function ensureValidSortColumn() {
         const stillExists = state.sortColumn === DATE_SORT_KEY
             || state.sortColumn === PDF_SORT_KEY
+            || state.sortColumn === VAT_SORT_KEY
             || state.columns.some(c => c.name === state.sortColumn);
         if (!stillExists) {
             state.sortColumn = DATE_SORT_KEY;
@@ -448,98 +514,7 @@
     }
 
     /**
-     * Read what is typed in a tax box, accepting either decimal convention.
-     *
-     * Returns null for an empty field, which means "no tax set" rather than
-     * zero - the difference decides whether a net line is shown at all.
-     */
-    function parseTaxInput(text) {
-        const raw = String(text ?? '').trim();
-        if (raw === '') return null;
-
-        const value = parseDecimalValue(raw);
-        if (value !== null) return value;
-
-        // parseDecimalValue deliberately refuses whole numbers (so a date or a
-        // reference is never mistaken for an amount). Here the field can only
-        // be an amount, so a plain integer is fine.
-        const plain = raw.replace(/[\s'.]/g, '').replace(',', '.');
-        const num = Number(plain);
-        return Number.isFinite(num) ? num : null;
-    }
-
-    /**
-     * Recompute one month's net line from what is currently in its tax box.
-     */
-    /**
-     * Recompute what a month shows from what is currently in its tax box.
-     *
-     * Two places move together: the Net line inside the breakdown, and the
-     * single figure on the month row behind it - which switches between
-     * showing the result and the net as the tax is typed in or cleared.
-     */
-    function updateNetFor(input) {
-        const key = input.dataset.month;
-        const totals = monthTotals(getDisplayRows(), detectAmountColumn());
-        const sums = totals.get(key);
-        if (!sums) return;
-
-        const tax = parseTaxInput(input.value);
-        const hasTax = tax !== null && tax !== 0;
-        const net = sums.result - (tax ?? 0);
-
-        const netCell = document.querySelector(`[data-net-for="${CSS.escape(key)}"]`);
-        if (netCell) {
-            netCell.textContent = formatSigned(net);
-            netCell.className = signClass(net);
-        }
-
-        const shown = hasTax ? net : sums.result;
-        const totalCell = document.querySelector(`[data-total-for="${CSS.escape(key)}"]`);
-        if (totalCell) {
-            totalCell.textContent = formatSigned(shown);
-            totalCell.className = signClass(shown);
-            const label = totalCell.parentElement.querySelector('.bk-month-stat-label');
-            if (label) label.textContent = hasTax ? 'Net' : 'Gross';
-        }
-    }
-
-    /**
-     * Persist one month's tax amount.
-     */
-    async function saveMonthTax(input) {
-        const key = input.dataset.month;
-        const tax = parseTaxInput(input.value);
-
-        if (input.value.trim() !== '' && tax === null) {
-            // Unparseable: put back whatever was last saved rather than leaving
-            // a number on screen that is not the number being used.
-            const stored = state.settings.month_tax?.[key];
-            input.value = stored ? stored.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-            updateNetFor(input);
-            return;
-        }
-
-        if (!state.settings.month_tax) state.settings.month_tax = {};
-        if (tax === null) {
-            delete state.settings.month_tax[key];
-        } else {
-            state.settings.month_tax[key] = tax;
-        }
-
-        // Normalize what is displayed to the stored value.
-        input.value = tax === null ? '' : tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        updateNetFor(input);
-
-        try {
-            await postJson('set-month-tax', { month: key, amount: tax });
-        } catch (error) {
-            showToast(`Could not save the tax amount: ${error.message}`, true);
-        }
-    }
-
-    /**
-     * "2026-07" for a row, used as the key for month totals and month tax.
+     * "2026-07" for a row, used as the key for month totals.
      */
     function monthKey(dateStr) {
         return /^\d{4}-\d{2}/.test(String(dateStr || '')) ? String(dateStr).slice(0, 7) : '';
@@ -555,24 +530,24 @@
      * column ("Betrag", "Amount", "Umsatz"). A name match is preferred when it
      * also carries numbers, so a stray numeric reference column cannot win.
      */
-    function detectAmountColumn() {
-        if (!state.columns.length || !state.rows.length) return null;
+    function detectAmountColumn(columns = state.columns, rows = state.rows, isDateColumn = isDateSortColumn) {
+        if (!columns.length || !rows.length) return null;
 
         const named = /^(betrag|amount|umsatz|summe|value|wert|saldo|total)$/i;
         let best = null;
 
-        state.columns.forEach(col => {
-            if (isDateSortColumn(col.name)) return;
+        columns.forEach(col => {
+            if (isDateColumn(col.name)) return;
 
             let parsed = 0;
-            state.rows.forEach(row => {
+            rows.forEach(row => {
                 if (parseDecimalValue(row.data[col.name]) !== null) parsed++;
             });
             if (parsed === 0) return;
 
             // A column has to look like an amount in most of its rows before it
             // is believed at all - one numeric cell in a text column is noise.
-            const ratio = parsed / state.rows.length;
+            const ratio = parsed / rows.length;
             if (ratio < 0.5) return;
 
             const score = ratio + (named.test(col.name.trim()) ? 1 : 0);
@@ -585,12 +560,18 @@
     }
 
     /**
-     * Income, expenses and result per month, over the rows currently shown.
+     * Income, expenses, result and VAT per month, over the rows currently shown.
      *
      * Built from the displayed rows rather than every row, so the totals always
      * describe the list underneath them - filter the table and the sums follow.
      *
-     * @return {Map<string, {income: number, expenses: number, result: number}>}
+     * The VAT is what the month's invoices mean for it (rowVat): owed on our
+     * own, back on those we paid. Gross plus VAT is the month's net - our
+     * financial result - but only once every entry has its invoice or is
+     * marked as needing none; until then `open` counts what is still missing,
+     * an invoice Claude has not read yet included.
+     *
+     * @return {Map<string, {income: number, expenses: number, result: number, vat: number, open: number, excluded: number}>}
      */
     function monthTotals(rows, amountColumn) {
         const totals = new Map();
@@ -604,7 +585,7 @@
             if (value === null) return;
 
             if (!totals.has(key)) {
-                totals.set(key, { income: 0, expenses: 0, result: 0, excluded: 0 });
+                totals.set(key, { income: 0, expenses: 0, result: 0, vat: 0, open: 0, excluded: 0 });
             }
             const bucket = totals.get(key);
 
@@ -623,8 +604,15 @@
                 bucket.expenses += value;
             }
             bucket.result += value;
+            bucket.vat += rowVat(row, amountColumn) ?? 0;
+
+            const unread = row.pdf && !row.pdf.invoice && !row.pdf.invoice_error && state.settings.invoice_reader;
+            if ((!row.pdf && !row.no_pdf_needed) || unread) bucket.open += 1;
         });
 
+        totals.forEach(bucket => {
+            bucket.vat = Math.round(bucket.vat * 100) / 100;
+        });
         return totals;
     }
 
@@ -638,25 +626,37 @@
     }
 
     /**
-     * Format a signed amount the way the table's own values read: German
-     * grouping, two decimals, explicit sign.
+     * A signed amount the way the table's own values read (format.js):
+     * German grouping, two decimals, explicit sign - "+17.100,15 €".
      */
     function formatSigned(value) {
-        const sign = value > 0 ? '+' : value < 0 ? '\u2212' : '';
-        return sign + Math.abs(value).toLocaleString('de-DE', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
+        return window.CRMFormat.amount(value, { sign: true, cents: 'always' });
+    }
+
+    /**
+     * A cell as the bank wrote it, shown the CRM's way: dates as "Sep 19",
+     * amounts as "−1.950,00 €". Anything else, or a value that does not
+     * read as one, exactly as imported.
+     */
+    function displayCell(value, columnName, isAmount) {
+        if (value === '' || value === null || value === undefined) return '';
+        if (isDateSortColumn(columnName)) {
+            return window.CRMFormat.date(String(value).trim()) || String(value);
+        }
+        if (isAmount) {
+            const n = parseDecimalValue(value);
+            return n === null ? String(value) : window.CRMFormat.amount(n, { cents: 'always' });
+        }
+        return String(value);
     }
 
     /**
      * A month separator: its name and one number.
      *
-     * The line used to carry Income, Expenses, Result, a tax box and Net all
-     * at once, which is five figures competing for attention on a row that is
-     * mostly a label. Only the conclusion stays out here - labelled Gross
-     * while no tax has been entered, and Net once one has - and the workings
-     * move into the breakdown popover behind it.
+     * Only the conclusion stays out here and the workings move into the
+     * breakdown popover behind it: Net - gross plus the VAT of the month's
+     * invoices, our result - once every entry has its invoice or needs none,
+     * and Gross until then, when the VAT is not complete yet.
      */
     function monthRowContent(dateStr, label, totals) {
         const key = monthKey(dateStr);
@@ -668,9 +668,11 @@
             return `<div class="bk-month-line"><span class="bk-month-name">${escapeHtml(label)}</span></div>`;
         }
 
-        const tax = Number(state.settings.month_tax?.[key] ?? 0);
-        const hasTax = Number.isFinite(tax) && tax !== 0;
-        const shown = hasTax ? sums.result - tax : sums.result;
+        const complete = sums.open === 0;
+        const shown = complete ? sums.result + sums.vat : sums.result;
+        const title = complete
+            ? `Net for ${label}: every entry has its invoice. Show income, expenses and VAT`
+            : `Gross for ${label}: ${sums.open} entr${sums.open === 1 ? 'y' : 'ies'} without an invoice yet, so the net is not final. Show income, expenses and VAT`;
 
         return `
             <div class="bk-month-line">
@@ -681,13 +683,12 @@
                         data-month="${key}"
                         aria-haspopup="dialog"
                         aria-expanded="false"
-                        title="Show income, expenses and tax for ${escapeHtml(label)}">
-                    <span class="bk-month-stat-label">${hasTax ? 'Net' : 'Gross'}</span>
-                    <span class="${signClass(shown)}" data-total-for="${key}">${formatSigned(shown)}</span>
+                        title="${escapeHtml(title)}">
+                    <span class="bk-month-stat-label">${complete ? 'Net' : 'Gross'}</span>
+                    <span class="${signClass(shown)}">${formatSigned(shown)}</span>
+                    ${!complete ? `<span class="bk-month-open">${sums.open} open</span>` : ''}
                     ${sums.excluded > 0 ? `<span class="bk-month-excluded-dot" title="${sums.excluded} entr${sums.excluded === 1 ? 'y' : 'ies'} excluded"></span>` : ''}
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="bk-month-chevron" aria-hidden="true">
-                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="bk-month-chevron" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
                 </button>
             </div>`;
     }
@@ -706,9 +707,14 @@
         const sums = totals.get(key);
         if (!sums) return;
 
-        const tax = Number(state.settings.month_tax?.[key] ?? 0);
-        const hasTax = Number.isFinite(tax) && tax !== 0;
-        const net = sums.result - tax;
+        const net = sums.result + sums.vat;
+        const notes = [];
+        if (sums.open > 0) {
+            notes.push(`${sums.open} entr${sums.open === 1 ? 'y has' : 'ies have'} no invoice yet, so the VAT and the net are not final.`);
+        }
+        if (sums.excluded > 0) {
+            notes.push(`${sums.excluded} entr${sums.excluded === 1 ? 'y is' : 'ies are'} excluded from these totals.`);
+        }
 
         const panel = document.createElement('div');
         panel.className = 'bk-breakdown';
@@ -730,26 +736,16 @@
                 <span>Gross</span>
                 <span class="${signClass(sums.result)}">${formatSigned(sums.result)}</span>
             </div>
-            <div class="bk-breakdown-row">
-                <label for="bkTax-${key}">Tax</label>
-                <input type="text"
-                       inputmode="decimal"
-                       id="bkTax-${key}"
-                       class="bk-month-tax-input"
-                       data-month="${key}"
-                       value="${hasTax ? escapeHtml(tax.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}"
-                       placeholder="0,00"
-                       title="A flat amount deducted from this month's result. Negative adds it back.">
+            <div class="bk-breakdown-row" title="From the month's invoices: VAT we owe on our own, VAT we get back on those we paid">
+                <span>VAT</span>
+                <span class="${signClass(sums.vat)}">${formatSigned(sums.vat)}</span>
             </div>
             <div class="bk-breakdown-sep"></div>
             <div class="bk-breakdown-row bk-breakdown-row--strong">
-                <span>Net</span>
-                <span class="${signClass(net)}" data-net-for="${key}">${formatSigned(net)}</span>
+                <span>Net${sums.open > 0 ? ' <span class="bk-breakdown-provisional">so far</span>' : ''}</span>
+                <span class="${signClass(net)}">${formatSigned(net)}</span>
             </div>
-            ${sums.excluded > 0 ? `
-                <p class="bk-breakdown-note">
-                    ${sums.excluded} entr${sums.excluded === 1 ? 'y is' : 'ies are'} excluded from these totals.
-                </p>` : ''}
+            ${notes.map(note => `<p class="bk-breakdown-note">${note}</p>`).join('')}
         `;
 
         document.body.appendChild(panel);
@@ -766,9 +762,6 @@
 
         button.setAttribute('aria-expanded', 'true');
         button.classList.add('is-open');
-
-        const input = panel.querySelector('.bk-month-tax-input');
-        if (input) input.focus();
     }
 
     function closeMonthBreakdown() {
@@ -979,6 +972,9 @@
             rows = rows.filter(row => {
                 if (String(row.row_date || '').toLowerCase().includes(query)) return true;
                 if (row.pdf && row.pdf.name.toLowerCase().includes(query)) return true;
+                const invoice = row.pdf && row.pdf.invoice;
+                if (invoice && [invoice.issuer, invoice.invoice_number, invoice.subject]
+                    .some(value => String(value || '').toLowerCase().includes(query))) return true;
                 return state.columns.some(col => String(row.data[col.name] ?? '').toLowerCase().includes(query));
             });
         }
@@ -987,11 +983,22 @@
         const sortCol = state.sortColumn;
         const byDate = isDateSortColumn(sortCol);
         const byPdf = sortCol === PDF_SORT_KEY;
+        const byVat = sortCol === VAT_SORT_KEY;
+        const amountColumn = byVat ? detectAmountColumn() : null;
 
         rows = [...rows].sort((a, b) => {
             let cmp;
 
-            if (byPdf) {
+            if (byVat) {
+                // Rows without a VAT figure sort last either way round.
+                const va = rowVat(a, amountColumn);
+                const vb = rowVat(b, amountColumn);
+                if (va === null || vb === null) {
+                    if (va === vb) return a.id - b.id;
+                    return va === null ? 1 : -1;
+                }
+                cmp = va - vb;
+            } else if (byPdf) {
                 cmp = pdfStatusRank(a) - pdfStatusRank(b);
                 // Within one status the rows are still a statement, so they
                 // stay in date order rather than falling back to insertion id.
@@ -1062,7 +1069,7 @@
         // Month separators stay visible for any chronological sort, not just
         // the implicit default one.
         const groupByMonth = isDateSortColumn(state.sortColumn);
-        const colCount = state.columns.length + 4; // checkbox + menu + columns + pdf + filler
+        const colCount = state.columns.length + 5; // checkbox + menu + columns + pdf + vat + filler
 
         // With the default (implicit) date sort, highlight the date column's
         // own header so the active sort is always visible on a real column.
@@ -1071,10 +1078,9 @@
             ? (dateColumn ? dateColumn.name : null)
             : state.sortColumn;
 
-        // Tight viewBox around the triangle so the rendered size is the arrow
-        // size (a 24x24 icon only uses ~20% of its box and looks like a dot).
-        const triangleDown = '<svg class="bk-sort-arrow" viewBox="0 0 10 6" width="10.5" height="6.3" fill="currentColor" aria-hidden="true"><path d="M0 0 L5 6 L10 0 Z"/></svg>';
-        const triangleUp = '<svg class="bk-sort-arrow" viewBox="0 0 10 6" width="10.5" height="6.3" fill="currentColor" aria-hidden="true"><path d="M0 6 L5 0 L10 6 Z"/></svg>';
+        // The sort direction as a small outline chevron, like every other arrow.
+        const triangleDown = '<svg class="bk-sort-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>';
+        const triangleUp = '<svg class="bk-sort-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14.5 6-6 6 6"/></svg>';
         const dirIndicator = state.sortDirection === 'desc' ? triangleUp : triangleDown;
 
         // Resolved before any markup is built: the header row needs to know
@@ -1101,21 +1107,31 @@
         html += '<col class="bk-col-fill"></colgroup><thead><tr>';
         html += `<th class="bk-col-check"><input type="checkbox" id="bkSelectAll" title="Select all" ${displayRows.length > 0 && displayRows.every(r => state.selection.has(r.id)) ? 'checked' : ''}></th>`;
         html += '<th class="bk-col-menu"></th>';
-        state.columns.forEach(col => {
-            const active = col.name === activeSortCol;
-            const amount = isAmountCol(col.name) ? ' bk-col-amount' : '';
-            html += `<th class="bk-sortable-th${amount} ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(col.name)}" data-col-key="${escapeHtml(col.name)}" title="Sort by ${escapeHtml(col.name)}">
-                <span>${escapeHtml(col.name)}</span>${active ? dirIndicator : ''}${resizer(col.name)}
-            </th>`;
-        });
         // Sortable like any other header, but by state rather than by text:
         // "PDF missing" is not a value in a cell, so it needs its own key.
         const pdfActive = state.sortColumn === PDF_SORT_KEY;
-        html += `<th class="bk-sortable-th bk-col-pdf ${pdfActive ? 'bk-sort-active' : ''}"
-                     data-sort-key="${PDF_SORT_KEY}" data-col-key="${PDF_SORT_KEY}"
-                     title="Sort by PDF status">
-                <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}${resizer(PDF_SORT_KEY)}
-            </th>`;
+        const vatActive = state.sortColumn === VAT_SORT_KEY;
+        colKeys.forEach(key => {
+            if (key === PDF_SORT_KEY) {
+                html += `<th class="bk-sortable-th bk-col-pdf ${pdfActive ? 'bk-sort-active' : ''}"
+                             data-sort-key="${PDF_SORT_KEY}" data-col-key="${PDF_SORT_KEY}"
+                             title="Sort by PDF status">
+                        <span>PDF / Invoice</span>${pdfActive ? dirIndicator : ''}${resizer(PDF_SORT_KEY)}
+                    </th>`;
+            } else if (key === VAT_SORT_KEY) {
+                html += `<th class="bk-sortable-th bk-col-amount bk-col-vat ${vatActive ? 'bk-sort-active' : ''}"
+                             data-sort-key="${VAT_SORT_KEY}" data-col-key="${VAT_SORT_KEY}"
+                             title="VAT from the invoice, as Claude read it: − what we owe on our own invoices, + what we get back on invoices we paid">
+                        <span>VAT</span>${vatActive ? dirIndicator : ''}${resizer(VAT_SORT_KEY)}
+                    </th>`;
+            } else {
+                const active = key === activeSortCol;
+                const amount = isAmountCol(key) ? ' bk-col-amount' : '';
+                html += `<th class="bk-sortable-th${amount} ${active ? 'bk-sort-active' : ''}" data-sort-key="${escapeHtml(key)}" data-col-key="${escapeHtml(key)}" title="Sort by ${escapeHtml(key)}">
+                        <span>${escapeHtml(key)}</span>${active ? dirIndicator : ''}${resizer(key)}
+                    </th>`;
+            }
+        });
         html += '<th class="bk-col-fill" aria-hidden="true"></th>';
         html += '</tr></thead><tbody>';
 
@@ -1134,27 +1150,18 @@
             html += `<tr class="bk-row ${ok ? 'bk-row-ok' : 'bk-row-missing'} ${selected ? 'bk-row-selected' : ''} ${row.excluded ? 'bk-row-excluded' : ''}" data-row-id="${row.id}">`;
             html += `<td class="bk-col-check"><input type="checkbox" class="bk-row-check" data-row-id="${row.id}" ${selected ? 'checked' : ''}></td>`;
             html += `<td class="bk-col-menu">${rowMenuCell(row)}</td>`;
-            state.columns.forEach(col => {
-                const value = row.data[col.name] ?? '';
-                const classes = [amountClass(value, col.name)];
-                if (isAmountCol(col.name)) classes.push('bk-col-amount');
-                html += `<td class="${classes.filter(Boolean).join(' ')}">${escapeHtml(value)}</td>`;
+            colKeys.forEach(key => {
+                if (key === PDF_SORT_KEY) {
+                    html += `<td class="bk-col-pdf">${pdfCell(row)}</td>`;
+                } else if (key === VAT_SORT_KEY) {
+                    html += `<td class="bk-col-amount bk-col-vat">${vatCell(row, amountColumn)}</td>`;
+                } else {
+                    const value = row.data[key] ?? '';
+                    const classes = [amountClass(value, key)];
+                    if (isAmountCol(key)) classes.push('bk-col-amount');
+                    html += `<td class="${classes.filter(Boolean).join(' ')}">${escapeHtml(displayCell(value, key, isAmountCol(key)))}</td>`;
+                }
             });
-
-            // PDF status cell
-            html += '<td class="bk-col-pdf">';
-            if (row.pdf) {
-                html += `
-                    <span class="bk-pdf-chip" title="${escapeHtml(row.pdf.name)}">
-                        <a href="#" data-action="preview-pdf" data-pdf-id="${row.pdf.id}" data-pdf-name="${escapeHtml(row.pdf.name)}">${escapeHtml(row.pdf.name)}</a>
-                        <button type="button" class="bk-pdf-remove" data-action="remove-pdf" data-row-id="${row.id}" title="Remove PDF">&times;</button>
-                    </span>`;
-            } else if (row.no_pdf_needed) {
-                html += '<span class="bk-badge bk-badge-nopdf">No PDF needed</span>';
-            } else {
-                html += '<span class="bk-badge bk-badge-missing">PDF missing</span>';
-            }
-            html += '</td>';
             html += '<td class="bk-col-fill"></td>';
 
             html += '</tr>';
@@ -1171,9 +1178,25 @@
         }
     }
 
+    /** A row's PDF state: its file, "No PDF needed", a suggestion, or missing. */
+    function pdfCell(row) {
+        if (row.pdf) {
+            return `
+                <span class="bk-pdf-chip" title="${escapeHtml(row.pdf.name)}">
+                    <a href="#" data-action="preview-pdf" data-pdf-id="${row.pdf.id}" data-pdf-name="${escapeHtml(row.pdf.name)}">${escapeHtml(row.pdf.name)}</a>
+                    <button type="button" class="bk-pdf-remove" data-action="remove-pdf" data-row-id="${row.id}" title="Remove PDF">&times;</button>
+                </span>`;
+        }
+        if (row.no_pdf_needed) return '<span class="bk-badge bk-badge-nopdf">No PDF needed</span>';
+        if (state.matches.has(row.id)) return matchChip(row, state.matches.get(row.id).pdf);
+        return '<span class="bk-badge bk-badge-missing">PDF missing</span>';
+    }
+
     function renderPool() {
+        updateReadingStatus();
         const count = state.pool.length;
         els.poolCount.textContent = count === 1 ? '1 file' : `${count} files`;
+        if (els.poolRailCount) els.poolRailCount.textContent = count ? String(count) : '';
 
         if (count === 0) {
             els.poolList.innerHTML = '<p class="bk-pool-empty">No unassigned PDFs.<br>Drop files here to store them until the matching bank entry is imported.</p>';
@@ -1184,18 +1207,448 @@
         // here, or by simply dragging it onto its row.
         const review = window.CRMReview;
         els.poolList.innerHTML = state.pool.map(pdf => `
-            <div class="bk-pool-item${pdf.review_status === 'pending' ? ' is-proposed' : ''}" draggable="true" data-pdf-id="${pdf.id}" title="Drag onto a table row to assign">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="bk-pool-item-icon"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            <div class="bk-pool-item${pdf.review_status === 'pending' ? ' is-proposed' : ''}" draggable="true" data-pdf-id="${pdf.id}" title="${escapeHtml(poolItemTooltip(pdf))}">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="bk-pool-item-icon"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/></svg>
                 <div class="bk-pool-item-info">
-                    <a class="bk-pool-item-name" href="#" data-action="preview-pdf" data-pdf-id="${pdf.id}" data-pdf-name="${escapeHtml(pdf.name)}">${escapeHtml(pdf.name)}</a>
-                    <span class="bk-pool-item-size">${formatSize(pdf.size)} ${review ? review.badge(pdf) : ''}</span>
+                    <a class="bk-pool-item-name" href="#" data-action="preview-pdf" data-pdf-id="${pdf.id}" data-pdf-name="${escapeHtml(pdf.name)}">${escapeHtml(poolItemTitle(pdf))}</a>
+                    <span class="bk-pool-item-size">${poolItemMeta(pdf)} ${review ? review.badge(pdf) : ''}</span>
                 </div>
                 ${pdf.review_status === 'pending' && review ? review.inlineActions('bookkeeping_pdf', pdf.id) : ''}
                 <button type="button" class="bk-icon-btn bk-icon-btn-danger" data-action="delete-pool-pdf" data-pdf-id="${pdf.id}" title="Delete PDF">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                 </button>
             </div>
         `).join('');
+    }
+
+    // ------------------------------------------------------------------
+    // Claude reading the invoices
+    //
+    // Every PDF is read once (includes/InvoiceReader.php): who issued it,
+    // its date, net, VAT and gross. Whatever has not been read yet - a new
+    // upload, or the first time round every file there is - is read here in
+    // the background, a few at a time, while the tab is open. The drop zone
+    // then shows an invoice by what it is, the table its VAT, and a row
+    // without a PDF the invoice from the drop zone that fits it.
+    // ------------------------------------------------------------------
+
+    // Claude's mark, as on "From Claude" in the sidebar.
+    const ICON_CLAUDE = '<svg class="bk-claude-mark" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>';
+
+    const READ_CONCURRENCY = 3;
+    // Claude busy: wait this long, and give up for the visit after so many
+    // busy answers in a row.
+    const BUSY_WAIT_MS = 30000;
+    const BUSY_LIMIT = 4;
+    let readWorkers = 0;
+    let busyUntil = 0;
+    let busyStreak = 0;
+    let invoiceRenderTimer = null;
+
+    /** An invoice amount: "71,39 €", or "120,00 USD" in another currency. */
+    function invoiceAmount(value, currency) {
+        if (currency && currency !== 'EUR') {
+            return `${Number(value).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+        }
+        return window.CRMFormat.amount(value, { cents: 'always' });
+    }
+
+    /** True when Claude read the file and it is a bill of some kind. */
+    function isBill(invoice) {
+        return !!invoice && invoice.kind !== 'other';
+    }
+
+    /** The drop zone names an invoice by the other party, else by its file. */
+    function poolItemTitle(pdf) {
+        return isBill(pdf.invoice) && counterparty(pdf.invoice) ? counterparty(pdf.invoice) : pdf.name;
+    }
+
+    // Words that say what kind of company it is, not which one.
+    const NAME_NOISE = new Set(['gmbh', 'ltd', 'limited', 'inc', 'llc', 'ag', 'kg', 'og', 'eu', 'co', 'bv', 'sarl', 'se', 'srl',
+        'und', 'and', 'the', 'der', 'die', 'das', 'von', 'for', 'für']);
+
+    function nameWords(name) {
+        return normalizeForCompare(name)
+            .split(/[^a-z0-9äöüß]+/)
+            .filter(word => word.length >= 3 && !NAME_NOISE.has(word));
+    }
+
+    /**
+     * A word of our own company's name, learnt from the invoices themselves:
+     * it is on nearly every one, as issuer or as recipient. Null while there
+     * are too few to tell.
+     */
+    function ownNameWord() {
+        const invoices = state.pool.concat(state.rows.map(r => r.pdf))
+            .filter(pdf => pdf && pdf.invoice)
+            .map(pdf => pdf.invoice);
+        if (invoices.length < 3) return null;
+
+        const counts = new Map();
+        invoices.forEach(invoice => {
+            new Set(nameWords(invoice.issuer).concat(nameWords(invoice.recipient)))
+                .forEach(word => counts.set(word, (counts.get(word) || 0) + 1));
+        });
+        let best = null;
+        counts.forEach((count, word) => {
+            if (!best || count > best.count) best = { word, count };
+        });
+        return best && best.count >= invoices.length * 0.6 ? best.word : null;
+    }
+
+    /**
+     * Who the invoice is with: the issuer of one we received, the recipient
+     * of one we sent - "Alpenblick Hotels", not our own name.
+     */
+    function counterparty(invoice) {
+        if (state.ownWord && invoice.recipient && nameWords(invoice.issuer).includes(state.ownWord)) {
+            return invoice.recipient;
+        }
+        return invoice.issuer;
+    }
+
+    function poolItemMeta(pdf) {
+        const invoice = pdf.invoice;
+        if (state.reading.has(pdf.id)) {
+            return '<span class="bk-reading-spinner" aria-hidden="true"></span>Claude is reading…';
+        }
+        if (isBill(invoice)) {
+            const parts = [];
+            if (invoice.kind === 'credit_note') parts.push('Credit note');
+            if (invoice.gross !== null) parts.push(invoiceAmount(invoice.gross, invoice.currency));
+            if (invoice.invoice_date) parts.push(window.CRMFormat.date(invoice.invoice_date));
+            return escapeHtml(parts.join(' · ') || formatSize(pdf.size));
+        }
+        if (invoice) {
+            return `Not an invoice · ${escapeHtml(formatSize(pdf.size))}`;
+        }
+        if (pdf.invoice_error) {
+            return `<span class="bk-read-failed" title="${escapeHtml(pdf.invoice_error)}">Could not be read</span>`
+                + ` · <button type="button" class="bk-read-again" data-action="read-again" data-pdf-id="${pdf.id}">Try again</button>`;
+        }
+        return escapeHtml(formatSize(pdf.size));
+    }
+
+    /** The file name, and what Claude read that the line has no room for. */
+    function poolItemTooltip(pdf) {
+        const lines = [pdf.name];
+        const invoice = pdf.invoice;
+        if (isBill(invoice)) {
+            if (invoice.invoice_number) lines.push(`No. ${invoice.invoice_number}`);
+            if (invoice.subject) lines.push(invoice.subject);
+        }
+        lines.push('Drag onto a table row to assign');
+        return lines.join('\n');
+    }
+
+    /**
+     * What a row's invoice means for our VAT, signed like the money: on money
+     * coming in (our own invoice) the VAT is still owed to the tax office, so
+     * it counts against us; on money going out (an invoice we paid) we get it
+     * back. A credit note follows the same rule, as its money flows the other
+     * way. A payment of part of an invoice carries that part of its VAT, so a
+     * deposit of half the gross brings half the VAT.
+     *
+     * Null when there is nothing to work it out from: no invoice, not read,
+     * no VAT on it, or no amount in the row.
+     */
+    function rowVat(row, amountColumn) {
+        const invoice = row.pdf && row.pdf.invoice;
+        if (!isBill(invoice) || invoice.vat === null || !amountColumn) return null;
+        const amount = parseDecimalValue(row.data[amountColumn]);
+        if (amount === null || amount === 0) return null;
+
+        // The share needs the invoice in the bank's currency; otherwise the
+        // whole VAT, as the best there is.
+        const share = invoice.gross > 0 && (invoice.currency || 'EUR') === 'EUR'
+            ? Math.min(1, Math.abs(amount) / invoice.gross)
+            : 1;
+        const vat = -Math.sign(amount) * invoice.vat * share;
+        return Math.round(vat * 100) / 100;
+    }
+
+    function vatCell(row, amountColumn) {
+        if (!row.pdf) return '';
+        if (state.reading.has(row.pdf.id)) {
+            return '<span class="bk-reading-spinner" title="Claude is reading the invoice"></span>';
+        }
+        const vat = rowVat(row, amountColumn);
+        if (vat === null) return '';
+        const currency = row.pdf.invoice.currency;
+        const text = currency && currency !== 'EUR'
+            ? `${vat > 0 ? '+' : ''}${invoiceAmount(vat, currency)}`
+            : formatSigned(vat);
+        return `<span class="${signClass(vat)}">${escapeHtml(text)}</span>`;
+    }
+
+    /** A row's suggested invoice, in place of "PDF missing". */
+    function matchChip(row, pdf) {
+        const invoice = pdf.invoice;
+        const label = [counterparty(invoice) || pdf.name, invoice.invoice_date ? window.CRMFormat.date(invoice.invoice_date) : '']
+            .filter(Boolean).join(' · ');
+        return `
+            <span class="bk-match" title="${escapeHtml('Claude suggests this invoice from the drop zone\n' + poolItemTooltip(pdf).split('\n').slice(0, -1).join('\n'))}">
+                ${ICON_CLAUDE}
+                <a href="#" data-action="preview-pdf" data-pdf-id="${pdf.id}" data-pdf-name="${escapeHtml(pdf.name)}">${escapeHtml(label)}</a>
+                <button type="button" class="bk-match-accept" data-action="accept-match" data-row-id="${row.id}" data-pdf-id="${pdf.id}">Assign</button>
+                <button type="button" class="bk-match-dismiss" data-action="dismiss-match" data-row-id="${row.id}" data-pdf-id="${pdf.id}" title="Not this invoice">&times;</button>
+            </span>`;
+    }
+
+    /** True when a word of the name (not "GmbH" or "Ltd") turns up in the text. */
+    function nameAppears(name, text) {
+        return nameWords(name).some(word => text.includes(word));
+    }
+
+    function daysBetween(fromIso, toIso) {
+        return Math.round((Date.parse(toIso) - Date.parse(fromIso)) / 86400000);
+    }
+
+    /**
+     * Which invoice in the drop zone fits which row without a PDF.
+     *
+     * The amount has to be the invoice's gross to the cent, and the booking
+     * between a month before the invoice date (paid in advance) and four
+     * months after it. Of several candidates, an invoice number or a name
+     * that turns up in the bank's text counts most, then the closer date.
+     * Each invoice is suggested for one row only, and a pair somebody turned
+     * down does not come back.
+     */
+    function invoiceMatches() {
+        const matches = new Map();
+        const amountColumn = detectAmountColumn();
+        const pdfs = state.pool.filter(pdf => isBill(pdf.invoice) && pdf.invoice.gross > 0
+            && (pdf.invoice.currency || 'EUR') === 'EUR');
+        if (!amountColumn || pdfs.length === 0) return matches;
+
+        const dismissed = new Set(state.settings.dismissed_matches || []);
+        const pairs = [];
+        state.rows.forEach(row => {
+            if (row.pdf || row.no_pdf_needed || row.excluded) return;
+            const amount = parseDecimalValue(row.data[amountColumn]);
+            if (amount === null) return;
+            const text = normalizeForCompare(Object.values(row.data).join(' '));
+
+            pdfs.forEach(pdf => {
+                const invoice = pdf.invoice;
+                if (Math.abs(Math.abs(amount) - invoice.gross) > 0.005) return;
+                if (dismissed.has(`${row.id}:${pdf.id}`)) return;
+
+                let score = 1;
+                if (invoice.invoice_date && row.row_date) {
+                    const days = daysBetween(invoice.invoice_date, row.row_date);
+                    if (days < -31 || days > 120) return;
+                    score += 1 - Math.abs(days) / 120;
+                }
+                if (invoice.invoice_number && text.includes(normalizeForCompare(invoice.invoice_number))) score += 3;
+                if (nameAppears(counterparty(invoice), text)) score += 2;
+                pairs.push({ row, pdf, score });
+            });
+        });
+
+        pairs.sort((a, b) => b.score - a.score);
+        const taken = new Set();
+        pairs.forEach(pair => {
+            if (matches.has(pair.row.id) || taken.has(pair.pdf.id)) return;
+            matches.set(pair.row.id, pair);
+            taken.add(pair.pdf.id);
+        });
+        return matches;
+    }
+
+    /** "3 invoice matches" next to the title, while there are any. */
+    function updateMatchPill() {
+        if (!els.matchPill) return;
+        const count = state.matches.size;
+        els.matchPill.hidden = count === 0;
+        els.matchPillLabel.textContent = count === 1 ? '1 invoice match' : `${count} invoice matches`;
+    }
+
+    /** All suggestions in one list, to assign at once. */
+    function openMatchList() {
+        const pairs = Array.from(state.matches.values());
+        if (pairs.length === 0) return;
+        const amountColumn = detectAmountColumn();
+        const partyColumn = findColumnByNames(state.columns.map(c => c.name),
+            ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'auftraggeber', 'beschreibung', 'description']);
+
+        // The entry as the bank has it, then the invoice that fits it.
+        const list = pairs.map(({ row, pdf }) => {
+            const amount = amountColumn ? parseDecimalValue(row.data[amountColumn]) : null;
+            const entry = [
+                window.CRMFormat.date(row.row_date),
+                partyColumn ? String(row.data[partyColumn] || '').trim() : rowSummary(row),
+                amount !== null ? formatSigned(amount) : ''
+            ].filter(Boolean).join(' · ');
+            const invoice = [poolItemTitle(pdf), pdf.invoice.invoice_number, pdf.invoice.subject].filter(Boolean).join(' · ');
+            return `
+                <li class="bk-match-list-item">
+                    <span class="bk-match-list-row">${escapeHtml(entry)}</span>
+                    <span class="bk-match-list-pdf">${ICON_CLAUDE} ${escapeHtml(invoice)}</span>
+                </li>`;
+        }).join('');
+
+        showConfirm({
+            title: 'Matching invoices',
+            message: `Claude found an invoice in the drop zone for ${pairs.length === 1 ? '1 entry' : `${pairs.length} entries`}:<ul class="bk-match-list">${list}</ul>`,
+            actions: [{
+                label: pairs.length === 1 ? 'Assign' : `Assign all ${pairs.length}`,
+                className: 'btn-primary',
+                handler: async () => {
+                    let done = 0;
+                    try {
+                        for (const { row, pdf } of pairs) {
+                            await postJson('assign-pdf', { pdf_id: pdf.id, row_id: row.id });
+                            done++;
+                        }
+                    } finally {
+                        if (done > 0) {
+                            showToast(`${plural(done, 'invoice')} assigned`);
+                            await load();
+                        }
+                    }
+                }
+            }]
+        });
+    }
+
+    async function acceptMatch(rowId, pdfId) {
+        const pdf = state.pool.find(p => p.id === pdfId);
+        try {
+            const result = await postJson('assign-pdf', { pdf_id: pdfId, row_id: rowId });
+            showToast(pdfAssignedMessage(pdf ? poolItemTitle(pdf) : 'Invoice', result));
+            await load();
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    async function dismissMatch(rowId, pdfId) {
+        try {
+            const result = await postJson('dismiss-match', { row_id: rowId, pdf_id: pdfId });
+            state.settings.dismissed_matches = result.dismissed_matches;
+            render();
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /**
+     * Files still to be read - never read, or read by another model than the
+     * one now set: the drop zone first, then the rows.
+     */
+    function unreadInvoices() {
+        return state.pool.concat(state.rows.filter(r => r.pdf).map(r => r.pdf))
+            .filter(pdf => (!pdf.invoice || pdf.invoice.model !== state.settings.invoice_model)
+                && !pdf.invoice_error && !state.reading.has(pdf.id));
+    }
+
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function readPendingInvoices() {
+        if (!state.settings.invoice_reader || state.readingPaused) return;
+        while (readWorkers < READ_CONCURRENCY && unreadInvoices().length > 0) {
+            readWorkers++;
+            readWorker();
+        }
+    }
+
+    async function readWorker() {
+        try {
+            let next;
+            while (!state.readingPaused && (next = unreadInvoices()[0])) {
+                if (Date.now() < busyUntil) {
+                    await wait(busyUntil - Date.now());
+                    continue;
+                }
+                await readInvoice(next.id);
+            }
+        } finally {
+            readWorkers--;
+            scheduleInvoiceRender();
+        }
+    }
+
+    async function readInvoice(pdfId, again = false) {
+        state.reading.add(pdfId);
+        scheduleInvoiceRender();
+        try {
+            const result = await postJson('read-invoice', { id: pdfId, again });
+            applyInvoice(pdfId, result.invoice, result.invoice_error);
+            busyStreak = 0;
+        } catch (error) {
+            if (error.temporary) {
+                // Busy (most often the rate limit): wait a little and go on;
+                // only when it stays busy, leave the rest for the next visit.
+                busyStreak++;
+                busyUntil = Date.now() + BUSY_WAIT_MS;
+                state.readingNote = error.message;
+                if (busyStreak >= BUSY_LIMIT) state.readingPaused = true;
+            } else {
+                // Gone, or the server stumbled: leave it for the next visit
+                // rather than asking again straight away.
+                applyInvoice(pdfId, null, error.message);
+            }
+            if (again) showToast(error.message, true);
+        } finally {
+            state.reading.delete(pdfId);
+            scheduleInvoiceRender();
+        }
+    }
+
+    /** What Claude read, onto the file wherever it is shown. */
+    function applyInvoice(pdfId, invoice, invoiceError) {
+        state.pool.concat(state.rows.map(r => r.pdf)).forEach(pdf => {
+            if (pdf && pdf.id === pdfId) {
+                pdf.invoice = invoice;
+                pdf.invoice_error = invoiceError;
+            }
+        });
+    }
+
+    /**
+     * Redraw after a few files have come back rather than after each one -
+     * and never under somebody's hands: not while a menu or the month
+     * breakdown is open, a file is being dragged or a column resized.
+     */
+    function scheduleInvoiceRender() {
+        clearTimeout(invoiceRenderTimer);
+        invoiceRenderTimer = setTimeout(() => {
+            const busy = document.getElementById('bkRowMenu')
+                || document.getElementById('bkMonthBreakdown')
+                || document.querySelector('.bk-pool-item.dragging')
+                || document.body.classList.contains('bk-col-resizing');
+            if (busy) {
+                scheduleInvoiceRender();
+            } else {
+                render();
+            }
+        }, 700);
+    }
+
+    /** "Claude is reading 12 invoices…" under the drop zone's title. */
+    function updateReadingStatus() {
+        if (!els.poolReading) return;
+        const left = state.settings.invoice_reader ? state.reading.size + unreadInvoices().length : 0;
+        if (left > 0 && !state.readingPaused) {
+            // Read before by another model: once, after the model was changed.
+            const pending = state.pool.concat(state.rows.filter(r => r.pdf).map(r => r.pdf))
+                .filter(pdf => state.reading.has(pdf.id) || unreadInvoices().indexOf(pdf) >= 0);
+            const again = pending.filter(pdf => pdf.invoice && pdf.invoice.model !== state.settings.invoice_model).length;
+            const what = again > 0 && again === pending.length
+                ? `reading ${plural(left, 'invoice')} again with the new model`
+                : `reading ${plural(left, 'invoice')}`;
+            const waiting = Date.now() < busyUntil ? ' - Claude is busy, going on in a moment' : '';
+            els.poolReading.innerHTML = `<span class="bk-reading-spinner" aria-hidden="true"></span>Claude is ${what}…${waiting}`;
+            els.poolReading.title = 'Only while this page is open; what is read is kept.';
+            els.poolReading.hidden = false;
+        } else if (left > 0) {
+            els.poolReading.textContent = `${state.readingNote || 'Claude is busy.'} The rest will be read on your next visit.`;
+            els.poolReading.title = state.readingNote || '';
+            els.poolReading.hidden = false;
+        } else {
+            els.poolReading.hidden = true;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1207,16 +1660,16 @@
     // buttons on every line - and one more each time an action was added.
     // ------------------------------------------------------------------
 
-    const ICON_DOTS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
-    const ICON_UPLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>';
+    const ICON_DOTS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5.5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="18.5" r="1.2"/></svg>';
+    const ICON_UPLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>';
     const ICON_NOPDF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3.5" y1="20.5" x2="20.5" y2="3.5"/></svg>';
-    const ICON_EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>';
-    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92A11.8 11.8 0 0 0 23 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2.7 3.42 1.29 4.83l2.53 2.53A11.77 11.77 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.52 0 2.98-.29 4.32-.82l3.02 3.02 1.41-1.41L2.7 3.42zM7.53 11.07A4.6 4.6 0 0 0 7.5 12a4.5 4.5 0 0 0 6.44 4.06l-1.5-1.5A3 3 0 0 1 9 12l-.02-.2-1.45-1.45z"/></svg>';
-    const ICON_CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M9.3 6.7 14.6 12l-5.3 5.3 1.4 1.4L17.4 12l-6.7-6.7z"/></svg>';
-    const ICON_TICK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-    const ICON_PERSON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+    const ICON_EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 3.5l17 17"/><path d="M10.6 6.1A10.6 10.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3"/><path d="M6.6 7.6C4.1 9.2 2.5 12 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    const ICON_CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>';
+    const ICON_TICK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+    const ICON_PERSON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
     const ICON_NOBODY = '<span class="bk-menu-face is-none"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><line x1="6.1" y1="17.9" x2="17.9" y2="6.1"/></svg></span>';
-    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>';
 
     /**
      * The dots, plus the face of whoever this row is waiting on.
@@ -1322,16 +1775,25 @@
      * submenus, so there is nothing new to learn about how it behaves.
      */
     function assignSubmenuContent(row) {
+        return peopleMenuContent(assigneeKey(row), row.assigned_to_name, row.id,
+            'They see the row on their home page until a PDF is attached.');
+    }
+
+    /**
+     * The people list itself, shared by one row's menu and the selection bar.
+     * `current` is the key that gets the tick (null: none does, as when the
+     * selected rows are on different people's plates).
+     */
+    function peopleMenuContent(current, currentName, rowId, note) {
         const people = window.CRMPeople ? window.CRMPeople.list() : [];
-        const current = assigneeKey(row);
 
         let html = '<p class="bk-rowmenu-subhead">Waiting on</p>';
 
-        html += assignOption(row, '', 'Nobody', ICON_NOBODY, current === '', 'is-nobody');
+        html += assignOption(rowId, '', 'Nobody', ICON_NOBODY, current === '', 'is-nobody');
 
         people.forEach(person => {
             const key = person.id === null ? 'owner' : String(person.id);
-            html += assignOption(row, key, person.name, personFace(key, person.name), key === current);
+            html += assignOption(rowId, key, person.name, personFace(key, person.name), key === current);
         });
 
         // Somebody whose account has since been removed still has to appear,
@@ -1339,20 +1801,20 @@
         // it - and there would be no tick anywhere to explain the face on the
         // row.
         if (current && !people.some(p => (p.id === null ? 'owner' : String(p.id)) === current)) {
-            const name = row.assigned_to_name || 'Unknown';
-            html += assignOption(row, current, name, personFace(current, name), true);
+            const name = currentName || 'Unknown';
+            html += assignOption(rowId, current, name, personFace(current, name), true);
         }
 
-        html += '<p class="bk-rowmenu-subnote">They see the row on their home page until a PDF is attached.</p>';
+        html += `<p class="bk-rowmenu-subnote">${escapeHtml(note)}</p>`;
 
         return html;
     }
 
-    function assignOption(row, value, name, icon, isCurrent, extraClass) {
+    function assignOption(rowId, value, name, icon, isCurrent, extraClass) {
         return `
             <button type="button" class="bk-rowmenu-item bk-rowmenu-option${isCurrent ? ' is-current' : ''}${extraClass ? ' ' + extraClass : ''}"
                     role="menuitemradio" aria-checked="${isCurrent ? 'true' : 'false'}"
-                    data-assign-value="${escapeHtml(value)}" data-row-id="${row.id}">
+                    data-assign-value="${escapeHtml(value)}" data-row-id="${escapeHtml(String(rowId))}">
                 <span class="bk-rowmenu-item-icon">${icon}</span>
                 <span class="bk-rowmenu-item-label">${escapeHtml(name)}</span>
                 <span class="bk-rowmenu-item-tick">${isCurrent ? ICON_TICK : ''}</span>
@@ -1527,6 +1989,9 @@
         const returnFocus = panel.contains(document.activeElement);
         panel.remove();
 
+        els.assignSelectedBtn.classList.remove('is-open');
+        els.assignSelectedBtn.setAttribute('aria-expanded', 'false');
+
         els.tableWrap.querySelectorAll('.bk-row-menu-btn.is-open').forEach(btn => {
             btn.classList.remove('is-open');
             btn.setAttribute('aria-expanded', 'false');
@@ -1609,6 +2074,170 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // Actions on the selected rows (the selection bar)
+    // ------------------------------------------------------------------
+
+    function selectedRows() {
+        return state.rows.filter(r => state.selection.has(r.id));
+    }
+
+    function plural(count, word) {
+        return `${count} ${word}${count === 1 ? '' : 's'}`;
+    }
+
+    /**
+     * The people list for the whole selection, opened above its button. It
+     * takes the row menu's place (and id), so it closes the way that does: on
+     * Escape, a click elsewhere, scrolling the table or resizing the window.
+     */
+    function openBulkAssignMenu(button) {
+        const wasOpen = !!document.getElementById('bkRowMenu') && button.classList.contains('is-open');
+        closeRowMenu();
+        if (wasOpen) return;
+
+        const rows = selectedRows();
+        if (rows.length === 0) return;
+
+        // Ticked only when every selected row is on the same person's plate.
+        const keys = new Set(rows.map(assigneeKey));
+        const current = keys.size === 1 ? assigneeKey(rows[0]) : null;
+        const currentName = keys.size === 1 ? rows[0].assigned_to_name : null;
+
+        const panel = document.createElement('div');
+        panel.className = 'bk-rowmenu bk-rowmenu-sub';
+        panel.id = 'bkRowMenu';
+        panel.setAttribute('role', 'menu');
+        panel.setAttribute('aria-label', 'Waiting on');
+        panel.innerHTML = peopleMenuContent(current, currentName, '',
+            'Rows that already have their PDF are left as they are.');
+        document.body.appendChild(panel);
+
+        const r = button.getBoundingClientRect();
+        const left = Math.min(Math.max(8, r.left), window.innerWidth - panel.offsetWidth - 8);
+        panel.style.left = `${left}px`;
+        panel.style.top = `${Math.max(8, r.top - panel.offsetHeight - 8)}px`;
+
+        button.classList.add('is-open');
+        button.setAttribute('aria-expanded', 'true');
+
+        panel.addEventListener('click', event => {
+            const option = event.target.closest('[data-assign-value]');
+            if (!option) return;
+            closeRowMenu();
+            assignRows(rows.map(row => row.id), option.dataset.assignValue);
+        });
+
+        const first = panel.querySelector('.bk-rowmenu-item');
+        if (first) first.focus();
+    }
+
+    async function assignRows(ids, value) {
+        try {
+            const response = await fetch('api/assign.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({
+                    type: 'bookkeeping',
+                    ids,
+                    assigned_to: value === '' ? null : value
+                })
+            });
+
+            const text = await response.text();
+            let payload;
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch (e) {
+                throw new Error('The server returned an unexpected response.');
+            }
+
+            if (!response.ok || payload.error) {
+                throw new Error(payload.error || 'Could not change the assignment.');
+            }
+
+            const data = payload.data || {};
+            const done = new Set(data.ids || []);
+            state.rows.forEach(row => {
+                if (!done.has(row.id)) return;
+                row.assigned_to = data.assigned_to;
+                row.assigned_to_name = data.assigned_to_name;
+            });
+            render();
+
+            let message = data.assigned_to_name
+                ? `${plural(done.size, 'row')} now waiting on ${data.assigned_to_name}`
+                : `${plural(done.size, 'row')} no longer assigned`;
+            if (data.skipped > 0) {
+                message += ` - ${plural(data.skipped, 'row')} already ${data.skipped === 1 ? 'has its' : 'have their'} PDF`;
+            }
+            showToast(message);
+
+            if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /**
+     * A row with its PDF has nothing to mark, so only the others count: when
+     * all of those are marked already, the button takes the mark off instead.
+     */
+    async function toggleNoPdfSelected() {
+        const rows = selectedRows().filter(r => !r.pdf);
+        if (rows.length === 0) {
+            showToast('All selected rows already have their PDF', true);
+            return;
+        }
+
+        const value = !rows.every(r => r.no_pdf_needed);
+        try {
+            await postJson('set-no-pdf', { ids: rows.map(r => r.id), value });
+            await load();
+            showToast(value
+                ? `${plural(rows.length, 'row')} marked as no PDF needed`
+                : `${plural(rows.length, 'row')} need a PDF again`);
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
+    /** Like one row's exclude: asks before taking rows out, not before putting them back. */
+    function toggleExcludedSelected() {
+        const rows = selectedRows();
+        if (rows.length === 0) return;
+
+        if (rows.every(r => r.excluded)) {
+            setExcludedRows(rows.map(r => r.id), false);
+            return;
+        }
+
+        const ids = rows.filter(r => !r.excluded).map(r => r.id);
+        showConfirm({
+            title: 'Exclude from totals?',
+            message: `<p>${ids.length === 1 ? 'This entry stays' : `These <strong>${ids.length} entries</strong> stay`}
+                      in the list and keep any PDF, but stop counting towards their month's
+                      income, expenses and result.</p>`,
+            actions: [{
+                label: 'Exclude',
+                className: 'btn-primary',
+                handler: () => setExcludedRows(ids, true)
+            }]
+        });
+    }
+
+    async function setExcludedRows(ids, value) {
+        try {
+            await postJson('set-excluded', { ids, value });
+            closeMonthBreakdown();
+            await load();
+            const entries = ids.length === 1 ? '1 entry' : `${ids.length} entries`;
+            showToast(value ? `${entries} excluded from the totals` : `${entries} counted again`);
+        } catch (error) {
+            showToast(error.message, true);
+        }
+    }
+
     /**
      * Open the table on one particular row and light it up briefly.
      *
@@ -1645,6 +2274,21 @@
         const count = state.selection.size;
         els.selectionBar.style.display = count > 0 ? 'flex' : 'none';
         els.selectionCount.textContent = count === 1 ? '1 row selected' : `${count} rows selected`;
+
+        // The two toggles say what a click would do to the selection now.
+        const rows = selectedRows();
+        const withoutPdf = rows.filter(r => !r.pdf);
+        const allMarked = withoutPdf.length > 0 && withoutPdf.every(r => r.no_pdf_needed);
+        els.noPdfSelectedLabel.textContent = allMarked ? 'PDF required' : 'No PDF needed';
+        els.noPdfSelectedBtn.disabled = withoutPdf.length === 0;
+        els.noPdfSelectedBtn.title = withoutPdf.length === 0
+            ? 'All selected rows already have their PDF'
+            : (allMarked ? 'Mark the selected rows as needing a PDF again' : 'Mark the selected rows as not needing a PDF');
+        const allExcluded = rows.length > 0 && rows.every(r => r.excluded);
+        els.excludeSelectedLabel.textContent = allExcluded ? 'Include' : 'Exclude';
+        els.excludeSelectedBtn.title = allExcluded
+            ? 'Count the selected rows in their month totals again'
+            : 'Leave the selected rows out of their month totals';
         els.rowCount.textContent = state.rows.length === 1 ? '1 entry' : `${state.rows.length} entries`;
     }
 
@@ -1884,31 +2528,59 @@
     }
 
     /**
+     * A CSV date as "YYYY-MM-DD", or '' when it cannot be read. The same
+     * rules as bkParseDate() in api/bookkeeping.php, which fills row_date on
+     * import, so an imported "07.03.2026" compares equal to a stored row.
+     */
+    function parseBookingDate(raw) {
+        const value = String(raw ?? '').trim();
+        let y, m, d, match;
+        if ((match = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(value))) {
+            [, y, m, d] = match;
+        } else if ((match = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/.exec(value))) {
+            [, d, m, y] = match;
+            // If day-first is impossible but month-first is valid, swap.
+            if (Number(m) > 12 && Number(d) <= 12) [d, m] = [m, d];
+            if (y.length === 2) y = (Number(y) < 70 ? '20' : '19') + y;
+        } else {
+            return '';
+        }
+        y = Number(y); m = Number(m); d = Number(d);
+        const date = new Date(Date.UTC(y, m - 1, d));
+        if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+        return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    /**
      * Flags rows that look like they might already exist, checked against
      * both the table's current rows and other rows in this same import
      * batch. Prefers matching on "Betrag"/amount + "Partnername"/payee
-     * columns (the fields that most reliably identify a duplicate bank
-     * transaction); falls back to comparing every imported column's value
-     * when those aren't present.
+     * columns plus the booking date (the fields that most reliably identify
+     * a duplicate bank transaction - without the date, every monthly payment
+     * of the same amount to the same payee would look like a duplicate);
+     * falls back to comparing every imported column's value, the date
+     * column included, when those aren't present.
      */
-    function computeDuplicateFlags(candidateRows, selectedColumns) {
+    function computeDuplicateFlags(candidateRows, selectedColumns, dateColumn) {
         const amountCol = findColumnByNames(selectedColumns, ['betrag', 'amount', 'sum', 'value']);
         const partyCol = findColumnByNames(selectedColumns, ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'beschreibung', 'description']);
         const useSpecificKey = amountCol && partyCol;
 
-        const keyOf = (getValue) => useSpecificKey
-            ? `${normalizeForCompare(getValue(amountCol))}|${normalizeForCompare(getValue(partyCol))}`
+        // Dates are compared normalized: stored rows by their row_date, new
+        // ones parsed from the chosen date column.
+        const keyOf = (getValue, date) => useSpecificKey
+            ? `${normalizeForCompare(getValue(amountCol))}|${normalizeForCompare(getValue(partyCol))}|${date}`
             : selectedColumns.map(c => normalizeForCompare(getValue(c))).join('|');
 
         const existingKeys = new Set();
         state.rows.forEach(row => {
-            const key = keyOf(col => row.data[col]);
+            const key = keyOf(col => row.data[col], row.row_date || '');
             if (key.replace(/\|/g, '') !== '') existingKeys.add(key);
         });
 
         const seenInBatch = new Set();
         return candidateRows.map(row => {
-            const key = keyOf(col => row[col]);
+            const key = keyOf(col => row[col], dateColumn ? parseBookingDate(row[dateColumn]) : '');
             const isDup = key.replace(/\|/g, '') !== '' && (existingKeys.has(key) || seenInBatch.has(key));
             seenInBatch.add(key);
             return isDup;
@@ -1950,7 +2622,7 @@
             return;
         }
 
-        const dupFlags = computeDuplicateFlags(candidateData, selectedColumns);
+        const dupFlags = computeDuplicateFlags(candidateData, selectedColumns, dateColumn);
 
         state.previewColumns = selectedColumns;
         state.previewExcludedColumns = new Set();
@@ -1992,7 +2664,7 @@
         // Duplicate detection depends on which columns are included, so it is
         // recalculated whenever the column selection changes.
         const cols = activePreviewColumns();
-        const dupFlags = computeDuplicateFlags(state.previewRows.map(r => r.data), cols);
+        const dupFlags = computeDuplicateFlags(state.previewRows.map(r => r.data), cols, state.previewDateColumn);
         state.previewRows.forEach((row, i) => { row.isDuplicate = dupFlags[i]; });
 
         const dupCount = state.previewRows.filter(r => r.isDuplicate).length;
@@ -2048,20 +2720,56 @@
             return;
         }
 
+        const dateColumn = state.previewDateColumn;
         els.importConfirmBtn.disabled = true;
         try {
             const result = await postJson('import', {
                 columns: cols,
-                date_column: state.previewDateColumn,
+                date_column: dateColumn,
                 rows: selectedRows
             });
             closeImportModal();
-            showToast(`Imported ${result.imported} rows` + (result.new_columns > 0 ? ` (${result.new_columns} new columns added)` : ''));
             await load();
+            // Said after the reload, which is when the new rows meet the
+            // invoices waiting in the drop zone.
+            const matched = state.matches.size;
+            showToast(`Imported ${result.imported} rows`
+                + (result.new_columns > 0 ? ` (${result.new_columns} new columns added)` : '')
+                + (matched > 0 ? ` - Claude found a matching invoice for ${matched === 1 ? '1 entry' : `${matched} entries`}` : ''));
+            await askAboutExpectedPayments(selectedRows, cols, dateColumn);
         } catch (error) {
             showToast('Import failed: ' + error.message, true);
         } finally {
             els.importConfirmBtn.disabled = false;
+        }
+    }
+
+    /**
+     * Income in an import may pay a project's expected payments: when the
+     * imported rows hold any, project-payments.js asks which ones. The
+     * amount column is the one the table already uses for its totals, read
+     * after the reload so the new rows count too.
+     */
+    async function askAboutExpectedPayments(importedRows, cols, dateColumn) {
+        if (!window.ProjectPayments || !window.ProjectPayments.askAfterImport) return;
+        const amountCol = detectAmountColumn();
+        if (!amountCol || !cols.includes(amountCol)) return;
+        const partyCol = findColumnByNames(cols, ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'auftraggeber', 'beschreibung', 'description']);
+
+        const incomes = importedRows
+            .map(row => ({
+                amount: parseDecimalValue(row[amountCol]),
+                party: partyCol ? String(row[partyCol] || '').trim() : '',
+                date: dateColumn ? parseBookingDate(row[dateColumn]) : ''
+            }))
+            .filter(x => x.amount !== null && x.amount > 0);
+        if (!incomes.length) return;
+
+        try {
+            const marked = await window.ProjectPayments.askAfterImport(incomes);
+            if (marked > 0) showToast(`${marked} expected payment${marked === 1 ? '' : 's'} marked as paid`);
+        } catch (error) {
+            console.error('Asking about expected payments failed:', error);
         }
     }
 
@@ -2111,6 +2819,10 @@
 
         els.pdfPreviewTitle.textContent = name || 'PDF';
         els.pdfPreviewOpenBtn.href = url;
+        // Same origin, so the download attribute saves the file instead of
+        // opening it, whatever the server's "inline" disposition says.
+        els.pdfPreviewDownloadBtn.href = url;
+        els.pdfPreviewDownloadBtn.download = name || '';
         els.pdfPreviewFrame.hidden = true;
         els.pdfPreviewPages.hidden = false;
         els.pdfPreviewPages.innerHTML = '<p class="bk-pdf-preview-status">Loading preview…</p>';
@@ -2771,6 +3483,11 @@
             dropPill: $('bkRowDropPill'),
             rowCount: $('bkRowCount'),
             selectionBar: $('bkSelectionBar'),
+            assignSelectedBtn: $('bkAssignSelectedBtn'),
+            noPdfSelectedBtn: $('bkNoPdfSelectedBtn'),
+            noPdfSelectedLabel: $('bkNoPdfSelectedLabel'),
+            excludeSelectedBtn: $('bkExcludeSelectedBtn'),
+            excludeSelectedLabel: $('bkExcludeSelectedLabel'),
             selectionCount: $('bkSelectionCount'),
             csvInput: $('bkCsvInput'),
             importCsvBtn: $('bkImportCsvBtn'),
@@ -2782,6 +3499,12 @@
             poolCount: $('bkPoolCount'),
             poolInput: $('bkPoolInput'),
             poolBrowseBtn: $('bkPoolBrowseBtn'),
+            poolRailCount: $('bkPoolRailCount'),
+            poolReading: $('bkPoolReading'),
+            matchPill: $('bkMatchPill'),
+            matchPillLabel: $('bkMatchPillLabel'),
+            dropzoneCollapse: $('bkDropzoneCollapse'),
+            dropzoneExpand: $('bkDropzoneExpand'),
             selectToolsBtn: $('bkSelectToolsBtn'),
             selectTools: $('bkSelectTools'),
             selectMonth: $('bkSelectMonth'),
@@ -2797,6 +3520,7 @@
             pdfPreviewFrame: $('bkPdfPreviewFrame'),
             pdfPreviewPages: $('bkPdfPreviewPages'),
             pdfPreviewOpenBtn: $('bkPdfPreviewOpenBtn'),
+            pdfPreviewDownloadBtn: $('bkPdfPreviewDownloadBtn'),
             pdfPreviewCloseBtn: $('bkPdfPreviewCloseBtn'),
             pdfPreviewDoneBtn: $('bkPdfPreviewDoneBtn'),
             // Import modal
@@ -2837,6 +3561,12 @@
             confirmActions: $('bkConfirmActions'),
             confirmCloseBtn: $('bkConfirmCloseBtn')
         });
+
+        // The PDF preview is shared - project documents open in it too - so
+        // it is wired for everyone. The rest needs the Bookkeeping view,
+        // which is only on the page for admins.
+        bindPreview();
+        if (!$('bookkeepingView')) return;
 
         // CSV import
         els.importCsvBtn.addEventListener('click', () => els.csvInput.click());
@@ -2891,37 +3621,15 @@
             if (state.selection.size > 0) confirmDeleteRows(Array.from(state.selection));
         });
         els.exportSelectedBtn.addEventListener('click', exportSelected);
+        els.assignSelectedBtn.addEventListener('click', () => openBulkAssignMenu(els.assignSelectedBtn));
+        els.noPdfSelectedBtn.addEventListener('click', toggleNoPdfSelected);
+        els.excludeSelectedBtn.addEventListener('click', toggleExcludedSelected);
         els.clearSelectionBtn.addEventListener('click', () => {
             state.selection.clear();
             render();
         });
 
-        // Table interactions (delegated)
-        // The tax box lives inside the table, so it is delegated like everything
-        // else here. Typing updates the net figure in place - re-rendering the
-        // table on each keystroke would tear the focus out of the field - and
-        // the value is only written back when the field is left or Enter is
-        // pressed.
-        // The tax box lives in the breakdown popover, which is appended to
-        // <body> so the scrolling table cannot clip it - so these are delegated
-        // from document rather than from the table. Typing updates the figures
-        // in place; the value is written back on blur or Enter.
-        document.addEventListener('input', event => {
-            const taxInput = event.target.closest?.('.bk-month-tax-input');
-            if (taxInput) updateNetFor(taxInput);
-        });
-
-        document.addEventListener('change', event => {
-            const taxInput = event.target.closest?.('.bk-month-tax-input');
-            if (taxInput) saveMonthTax(taxInput);
-        });
-
         document.addEventListener('keydown', event => {
-            const taxInput = event.target.closest?.('.bk-month-tax-input');
-            if (taxInput && event.key === 'Enter') {
-                event.preventDefault();
-                taxInput.blur(); // fires change, which saves
-            }
             if (event.key === 'Escape' && document.getElementById('bkMonthBreakdown')) {
                 closeMonthBreakdown();
             }
@@ -2947,7 +3655,8 @@
             if (event.target.closest?.('#bkRowSubmenu')) return;
             // The dots themselves toggle the menu; leave that to the handler
             // on the table, or this would close what that is about to open.
-            if (event.target.closest?.('.bk-row-menu-btn')) return;
+            // The same goes for the selection bar's "Waiting on".
+            if (event.target.closest?.('.bk-row-menu-btn, #bkAssignSelectedBtn')) return;
             closeRowMenu();
         });
 
@@ -3053,6 +3762,15 @@
                 case 'remove-pdf':
                     confirmRemovePdf(rowId);
                     break;
+                // A suggested invoice: the click is the decision, so no
+                // confirm in between.
+                case 'accept-match':
+                    actionBtn.disabled = true;
+                    acceptMatch(rowId, parseInt(actionBtn.dataset.pdfId, 10));
+                    break;
+                case 'dismiss-match':
+                    dismissMatch(rowId, parseInt(actionBtn.dataset.pdfId, 10));
+                    break;
             }
         });
 
@@ -3072,6 +3790,8 @@
         bindFileDrops();
 
         els.poolBrowseBtn.addEventListener('click', () => els.poolInput.click());
+        bindDropzoneFold();
+        els.matchPill.addEventListener('click', openMatchList);
 
         // Select-by-date tools, now inside a popover
         els.selectMonthBtn.addEventListener('click', () => { selectRowsByMonth(); closeSelectTools(); });
@@ -3119,6 +3839,13 @@
                 return;
             }
 
+            const readAgainBtn = event.target.closest('[data-action="read-again"]');
+            if (readAgainBtn) {
+                state.readingPaused = false;
+                readInvoice(parseInt(readAgainBtn.dataset.pdfId, 10), true).then(readPendingInvoices);
+                return;
+            }
+
             const previewLink = event.target.closest('[data-action="preview-pdf"]');
             if (previewLink) {
                 event.preventDefault();
@@ -3140,11 +3867,6 @@
         // Confirm modal
         els.confirmCloseBtn.addEventListener('click', closeConfirm);
 
-        // PDF preview modal
-        els.pdfPreviewCloseBtn.addEventListener('click', closePdfPreview);
-        els.pdfPreviewDoneBtn.addEventListener('click', closePdfPreview);
-        els.pdfPreviewModal.querySelector('.modal-backdrop').addEventListener('click', closePdfPreview);
-
         // Close modals on backdrop click
         [els.importModal, els.pdfModal, els.confirmModal].forEach(modal => {
             modal.querySelector('.modal-backdrop').addEventListener('click', () => {
@@ -3153,9 +3875,52 @@
         });
     }
 
+    function bindPreview() {
+        if (!els.pdfPreviewModal) return;
+        els.pdfPreviewCloseBtn.addEventListener('click', closePdfPreview);
+        els.pdfPreviewDoneBtn.addEventListener('click', closePdfPreview);
+        els.pdfPreviewModal.querySelector('.modal-backdrop').addEventListener('click', closePdfPreview);
+    }
+
+    /**
+     * Every bookkeeping row as { date, amount, excluded, party, vat, open },
+     * without drawing the table - for Financials, which works out the bank
+     * balance, past months and their results from them. The amount is read from the same column the table's
+     * month totals use.
+     */
+    async function transactions() {
+        const result = await apiJson('table');
+        const { columns, rows, settings } = result.data;
+        const dateColumn = settings && settings.date_column;
+        const amountColumn = detectAmountColumn(columns, rows, name => name === dateColumn || looksLikeDateColumn(name));
+        if (!amountColumn) return { amountColumn: null, rows: [] };
+        // Who the money went to or came from, for spotting recurring costs.
+        const partyColumn = findColumnByNames(columns.map(c => c.name),
+            ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'auftraggeber', 'beschreibung', 'description']);
+
+        return {
+            amountColumn,
+            rows: rows
+                .map(r => ({
+                    date: r.row_date,
+                    amount: parseDecimalValue(r.data[amountColumn]),
+                    excluded: !!Number(r.excluded),
+                    party: partyColumn ? String(r.data[partyColumn] || '').trim() : '',
+                    // Signed as in the table: + on a cost is VAT we get back.
+                    vat: rowVat(r, amountColumn),
+                    // Still without its invoice (or one not read yet), so
+                    // the month's result is not final.
+                    open: (!r.pdf && !r.no_pdf_needed)
+                        || !!(r.pdf && !r.pdf.invoice && !r.pdf.invoice_error && settings && settings.invoice_reader)
+                }))
+                .filter(r => r.date && r.amount !== null)
+        };
+    }
+
     window.Bookkeeping = {
         load,
         focusRow,
+        transactions,
         // The preview dialog belongs to this module; init() only wires it up
         // and fetches nothing, so it is safe to call from any view.
         preview(url, name, kind) {

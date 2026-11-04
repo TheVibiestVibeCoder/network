@@ -19,9 +19,13 @@ if (!defined('APP_ROOT')) {
 // Deleting a project has to take its documents' files along, wherever the
 // delete is called from.
 require_once APP_ROOT . '/includes/ProjectDocument.php';
+require_once APP_ROOT . '/includes/ProjectArchive.php';
 
 class Project
 {
+    /** The most expected payments one project can hold. */
+    public const MAX_PAYMENTS = 60;
+
     private PDO $db;
 
     public function __construct()
@@ -92,6 +96,25 @@ class Project
     }
 
     /**
+     * The stages that count as live work on the home page: being run or being
+     * won. A lead is not work yet and a complete project no longer is.
+     */
+    public const ACTIVE_STAGES = ['In Progress', 'Proposal', 'Negotiation'];
+
+    /**
+     * "stage IN (...)" for ACTIVE_STAGES, so the home page's list and the
+     * per-person counts in its switcher use one rule.
+     */
+    public static function activeStageSql(string $column = 'stage'): string
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_.]*$/', $column)) {
+            $column = 'stage';
+        }
+
+        return $column . " IN ('" . implode("', '", self::ACTIVE_STAGES) . "')";
+    }
+
+    /**
      * Get a single project by ID
      */
     public function getById(int $id): ?array
@@ -110,10 +133,10 @@ class Project
     {
         $stmt = $this->db->prepare("
             INSERT INTO projects (name, start_date, description, company, budget_min, budget_max,
-                                success_chance, stage, estimated_completion,
+                                success_chance, stage, estimated_completion, payments,
                                 created_by, created_by_name, updated_by, updated_by_name)
             VALUES (:name, :start_date, :description, :company, :budget_min, :budget_max,
-                    :success_chance, :stage, :estimated_completion,
+                    :success_chance, :stage, :estimated_completion, :payments,
                     :actor_id, :actor_name, :actor_id2, :actor_name2)
         ");
 
@@ -134,19 +157,24 @@ class Project
             'success_chance' => $data['success_chance'] ?? null,
             'stage' => $data['stage'] ?? 'Lead',
             'estimated_completion' => $data['estimated_completion'] ?? null,
+            'payments' => self::encodePayments($data['payments'] ?? []),
         ]);
 
         return (int) $this->db->lastInsertId();
     }
 
     /**
-     * Update an existing project
+     * Update an existing project. Its expected payments are only replaced
+     * when $data has a 'payments' key, so an update that does not know
+     * about them (a proposal Claude made) leaves them as they are.
      */
     public function update(int $id, array $data): bool
     {
+        $withPayments = array_key_exists('payments', $data);
         $stmt = $this->db->prepare("
             UPDATE projects
-            SET name = :name,
+            SET " . ($withPayments ? "payments = :payments," : "") . "
+                name = :name,
                 start_date = :start_date,
                 description = :description,
                 company = :company,
@@ -163,7 +191,7 @@ class Project
 
         $actor = Auth::actor();
 
-        return $stmt->execute([
+        $params = [
             'id' => $id,
             'actor_id' => $actor['id'],
             'actor_name' => $actor['name'],
@@ -176,26 +204,158 @@ class Project
             'success_chance' => $data['success_chance'] ?? null,
             'stage' => $data['stage'] ?? 'Lead',
             'estimated_completion' => $data['estimated_completion'] ?? null,
-        ]);
+        ];
+        if ($withPayments) {
+            $params['payments'] = self::encodePayments($data['payments'] ?? []);
+        }
+
+        return $stmt->execute($params);
     }
 
     /**
-     * Delete a project
+     * Cleans expected payments as they come in: a list of
+     * {month: "YYYY-MM", amount > 0, paid: bool}, returned ordered by month
+     * (stable, so equal months keep their order). Null or an empty list is
+     * no payments. Returns an error message instead when anything is off;
+     * nothing is guessed or dropped silently.
+     *
+     * @return array|string
+     */
+    public static function normalizePayments($input)
+    {
+        if ($input === null || $input === '') {
+            return [];
+        }
+        if (!is_array($input) || array_values($input) !== $input) {
+            return 'payments must be a list';
+        }
+        if (count($input) > self::MAX_PAYMENTS) {
+            return 'A project can have at most ' . self::MAX_PAYMENTS . ' expected payments';
+        }
+
+        $payments = [];
+        foreach ($input as $i => $row) {
+            $n = $i + 1;
+            if (!is_array($row)) {
+                return 'Payment ' . $n . ' is not valid';
+            }
+            $month = is_string($row['month'] ?? null) ? trim($row['month']) : '';
+            if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+                return 'Payment ' . $n . ' needs a month (YYYY-MM)';
+            }
+            $amount = $row['amount'] ?? null;
+            if (!is_numeric($amount) || (float) $amount <= 0 || (float) $amount > 1e10) {
+                return 'Payment ' . $n . ' needs an amount above 0';
+            }
+            $payments[] = [
+                'month' => $month,
+                'amount' => round((float) $amount, 2),
+                'paid' => filter_var($row['paid'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            ];
+        }
+
+        // usort is stable since PHP 8.0.
+        usort($payments, fn($a, $b) => strcmp($a['month'], $b['month']));
+        return $payments;
+    }
+
+    /**
+     * Marks expected payments as paid, each named by project, month and
+     * amount: the first unpaid payment of that project that matches both is
+     * the one. A payment that was changed or paid in the meantime matches
+     * nothing and is skipped, never guessed.
+     *
+     * @param array $items [{project_id, month, amount}]
+     * @return array{marked: int, skipped: int, changed: array<int, array{before: array, after: array}>}
+     */
+    public function markPaymentsPaid(array $items): array
+    {
+        return Database::transactional(function (PDO $db) use ($items) {
+            $byProject = [];
+            foreach ($items as $item) {
+                $byProject[(int) ($item['project_id'] ?? 0)][] = $item;
+            }
+
+            $marked = 0;
+            $skipped = 0;
+            $changed = [];
+            $actor = Auth::actor();
+            $read = $db->prepare("SELECT * FROM projects WHERE id = :id");
+            $write = $db->prepare("
+                UPDATE projects
+                SET payments = :payments, updated_by = :actor_id, updated_by_name = :actor_name, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+
+            foreach ($byProject as $projectId => $wanted) {
+                $read->execute(['id' => $projectId]);
+                $before = $read->fetch(PDO::FETCH_ASSOC);
+                if (!$before) {
+                    $skipped += count($wanted);
+                    continue;
+                }
+
+                $payments = self::decodePayments($before['payments'] ?? null);
+                $hits = 0;
+                foreach ($wanted as $item) {
+                    $month = (string) ($item['month'] ?? '');
+                    $amount = (float) ($item['amount'] ?? 0);
+                    $found = false;
+                    foreach ($payments as $i => $p) {
+                        if (empty($p['paid']) && ($p['month'] ?? '') === $month && abs((float) ($p['amount'] ?? 0) - $amount) < 0.005) {
+                            $payments[$i]['paid'] = true;
+                            $found = true;
+                            break;
+                        }
+                    }
+                    $found ? $hits++ : $skipped++;
+                }
+
+                if ($hits > 0) {
+                    $write->execute([
+                        'id' => $projectId,
+                        'payments' => self::encodePayments($payments),
+                        'actor_id' => $actor['id'],
+                        'actor_name' => $actor['name'],
+                    ]);
+                    $read->execute(['id' => $projectId]);
+                    $changed[] = ['before' => $before, 'after' => $read->fetch(PDO::FETCH_ASSOC)];
+                    $marked += $hits;
+                }
+            }
+
+            return ['marked' => $marked, 'skipped' => $skipped, 'changed' => $changed];
+        });
+    }
+
+    /** A project row's stored payments as a list (empty when none or unreadable). */
+    public static function decodePayments($raw): array
+    {
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $list = json_decode($raw, true);
+        return is_array($list) ? $list : [];
+    }
+
+    private static function encodePayments(array $payments): ?string
+    {
+        return $payments ? json_encode(array_values($payments)) : null;
+    }
+
+    /**
+     * Delete a project. It moves to "Deleted projects" (ProjectArchive) with
+     * everything that hangs off it, so it can be restored; its document files
+     * stay on disk until it is deleted from there for good.
      */
     public function delete(int $id): bool
     {
-        // The document rows go with the project (ON DELETE CASCADE); their
-        // files are removed here, and only once the project is really gone.
-        $files = ProjectDocument::filesOfProject($id);
+        return Database::transactional(function (PDO $db) use ($id) {
+            ProjectArchive::archive($db, $id, Auth::actor());
 
-        $stmt = $this->db->prepare("DELETE FROM projects WHERE id = :id");
-        $deleted = $stmt->execute(['id' => $id]);
-
-        if ($deleted) {
-            ProjectDocument::removeFiles($files);
-        }
-
-        return $deleted;
+            $stmt = $db->prepare("DELETE FROM projects WHERE id = :id");
+            return $stmt->execute(['id' => $id]);
+        });
     }
 
     /**

@@ -6,16 +6,31 @@
    surfaces and the app shell are decided here, once, and every screen draws
    from the same small set of parts.
 
-   Palette - a cold winter set:
-     navy  #112D4E   ink and primary actions
-     blue  #3F72AF   the one accent: focus, selection, "in progress"
-     mist  #DBE2EF   tinted surfaces
-     snow  #F9F7F7   the page itself
+   Palette - the company colours:
+     navy   #1C3258   ink and primary actions (the main colour)
+     blue   #30599D   the one accent: focus, selection, the "Proposal" stage
+     grey   #EEEEEE   the page itself
+     green  #63A375   positives: done, accepted, paid
+     red    #D76262   negatives: overdue, rejected, delete
+   Everything else is derived from these. The neutrals (ink, lines, tints)
+   carry the navy's hue. The extra colours are matched in OKLCH: the brand
+   colours sit at hues 22 (red), 152 (green) and 260 (blue), so the others
+   fill the gaps between them - gold 82, teal 200, violet 305, berry 340,
+   orange 60 -
+   at the brand's own lightness and strength (L ~0.6-0.68, C ~0.09-0.13),
+   and slate is the navy's hue with almost no colour. Claude's orange (39)
+   stays its own signal.
+   Green and red are too light for small text, so each has an -ink shade of
+   the same hue for text (AA); the brand value itself is for fills, marks
+   and icons.
 
    Principles
      - One accent. Blue marks what is selected or active, nothing else.
      - Show what you need to recognise and decide; the rest is one click in.
      - Quiet chrome, so the content is the loudest thing on screen.
+     - One label style for small captions over lists and figures: sentence
+       case, --t-xs, weight 600, ink-3, no letter-spacing. No uppercase
+       captions (the brand's TEST tag aside).
 
    Contrast rules the tokens are built around (checked against WCAG AA):
      - ink-3 passes on page and card backgrounds, NOT on mist - secondary text
@@ -68,7 +83,10 @@
 
 /* Everything that does not change with the theme. */
 :root {
-    --font: 'General Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Helvetica Neue (test, Nov 2026). General Sans stays declared above:
+       put it back in front to return to it. Windows has no Helvetica Neue
+       and shows Arial. */
+    --font: 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
 
     --t-xs: 12px;
     --t-sm: 13px;
@@ -99,105 +117,141 @@
     --control-h: 40px;
 }
 
-/* Winter day. */
+/* Light: the company colours. */
 :root,
 :root[data-theme="light"] {
-    --c-bg: #F9F7F7;
+    --c-bg: #EEEEEE;
     --c-surface: #FFFFFF;
     --c-raised: #FFFFFF;
-    --c-sunken: #F2F4F8;
-    --c-tint: #DBE2EF;
-    --c-tint-2: #E9EEF6;
-    --c-tint-3: #F2F5FA;
+    --c-sunken: #F3F4F6;
+    --c-tint: #DCE1EA;
+    --c-tint-2: #E7EAF0;
+    --c-tint-3: #F2F4F7;
 
-    --c-ink: #112D4E;
-    --c-ink-2: #3A5173;
-    --c-ink-3: #5E7190;
-    --c-ink-4: #8594AA;
+    --c-ink: #1C3258;
+    --c-ink-2: #364765;
+    --c-ink-3: #5C6A84;
+    --c-ink-4: #828C9F;
 
-    --c-line: #E2E7EF;
-    --c-line-2: #ECEFF4;
-    --c-line-strong: #CBD4E1;
+    --c-line: #DDE0E6;
+    --c-line-2: #E8EAEE;
+    --c-line-strong: #C5CBD5;
 
-    --c-accent: #3F72AF;
-    --c-accent-2: #2D5D95;
-    --c-accent-soft: rgba(63, 114, 175, 0.11);
-    --c-accent-softer: rgba(63, 114, 175, 0.06);
+    --c-accent: #30599D;
+    --c-accent-2: #254579;
+    --c-accent-soft: rgba(48, 89, 157, 0.11);
+    --c-accent-softer: rgba(48, 89, 157, 0.06);
 
-    --c-primary: #112D4E;
-    --c-primary-2: #1D426F;
-    --c-on-primary: #F9F7F7;
+    /* Claude: everything it proposed or wrote, and the From Claude screen.
+       -2 is for text, darker on light backgrounds so it stays readable.
+       Claude's own colour, apart from the company palette on purpose. */
+    --c-claude: #D97757;
+    --c-claude-2: #B4583A;
+    --c-claude-soft: rgba(217, 119, 87, 0.13);
+    --c-claude-softer: rgba(217, 119, 87, 0.07);
+    --c-on-claude: #FFFFFF;
 
-    --c-danger: #B3453B;
-    --c-danger-soft: rgba(179, 69, 59, 0.10);
-    --c-warning: #94600F;
-    --c-warning-soft: rgba(167, 108, 30, 0.12);
-    --c-success: #2A7550;
-    --c-success-soft: rgba(42, 117, 80, 0.11);
+    --c-primary: #1C3258;
+    --c-primary-2: #27426F;
+    --c-on-primary: #FFFFFF;
 
-    --c-scrim: rgba(17, 45, 78, 0.34);
+    /* The brand value for fills and marks; -ink for text and for solid
+       buttons with white text on them. */
+    --c-danger: #D76262;
+    --c-danger-ink: #BC3F3F;
+    --c-danger-soft: rgba(215, 98, 98, 0.12);
+    --c-warning: #B48B39;
+    --c-warning-ink: #89640D;
+    --c-warning-soft: rgba(180, 139, 57, 0.14);
+    --c-success: #63A375;
+    --c-success-ink: #457553;
+    --c-success-soft: rgba(99, 163, 117, 0.14);
 
-    /* The pipeline: one distinct hue per stage, so they tell apart at a
-       glance - slate for a lead, amber for an offer out, violet while it is
-       negotiated, blue while it runs, green when done. Muted to sit with the
-       winter palette. The label is always shown next to the colour, so colour
-       is never the only signal. */
-    --stage-lead: #8A94A6;
-    --stage-proposal: #C98A2B;
-    --stage-negotiation: #7B5CC0;
-    --stage-progress: #2F6FD0;
-    --stage-complete: #2E8A5C;
+    --c-scrim: rgba(28, 50, 88, 0.34);
 
-    --e-1: 0 1px 2px rgba(17, 45, 78, 0.05);
-    --e-2: 0 1px 2px rgba(17, 45, 78, 0.04), 0 6px 16px -6px rgba(17, 45, 78, 0.10);
-    --e-3: 0 2px 6px rgba(17, 45, 78, 0.05), 0 18px 40px -14px rgba(17, 45, 78, 0.22);
-    --e-4: 0 28px 64px -18px rgba(17, 45, 78, 0.34);
+    /* The pipeline follows the project: a light blue-grey for a lead, a light
+       tint of the accent while it is negotiated, the accent blue for an
+       offer out, a teal while it runs, the company green when done - one
+       run from light blue through blue and teal to green. The teal is
+       deeper than the green so the last two stages stay apart. The label
+       is always shown next to the colour, so colour is never the only
+       signal; the light blue is a fill colour only, never text. */
+    --stage-lead: #AAB5C5;
+    --stage-negotiation: #8FB4E4;
+    --stage-proposal: #30599D;
+    --stage-progress: #1C7E7E;
+    --stage-complete: #63A375;
+
+    /* Medium priority: a light orange of its own, apart from the warning
+       colour. -ink is the same hue deep enough for text on -soft (AA). */
+    --pri-medium: #D08440;
+    --pri-medium-ink: #9E5A12;
+    --pri-medium-soft: rgba(208, 132, 64, 0.16);
+
+    --e-1: 0 1px 2px rgba(28, 50, 88, 0.05);
+    --e-2: 0 1px 2px rgba(28, 50, 88, 0.04), 0 6px 16px -6px rgba(28, 50, 88, 0.10);
+    --e-3: 0 2px 6px rgba(28, 50, 88, 0.05), 0 18px 40px -14px rgba(28, 50, 88, 0.22);
+    --e-4: 0 28px 64px -18px rgba(28, 50, 88, 0.34);
 
     --map-filter: none;
 }
 
-/* Winter night. */
+/* Dark: the same colours at night. The neutrals are deep navy; green, red
+   and amber read on them as they are, the accent is lifted to read. */
 :root[data-theme="dark"] {
-    --c-bg: #0A1422;
-    --c-surface: #0F1D31;
-    --c-raised: #142540;
-    --c-sunken: #0C1829;
-    --c-tint: #1A3050;
-    --c-tint-2: #152843;
-    --c-tint-3: #122239;
+    --c-bg: #0B111C;
+    --c-surface: #101928;
+    --c-raised: #152032;
+    --c-sunken: #0D1421;
+    --c-tint: #1E2C43;
+    --c-tint-2: #192437;
+    --c-tint-3: #151E2E;
 
-    --c-ink: #EEF2F8;
-    --c-ink-2: #C3CEDD;
-    --c-ink-3: #93A2B8;
-    --c-ink-4: #6F809A;
+    --c-ink: #EEEEEE;
+    --c-ink-2: #B8C1D0;
+    --c-ink-3: #8C98AD;
+    --c-ink-4: #5F6B7E;
 
-    --c-line: #1D3252;
-    --c-line-2: #172A45;
-    --c-line-strong: #2A4468;
+    --c-line: #1E2A3E;
+    --c-line-2: #192334;
+    --c-line-strong: #2E3D56;
 
-    --c-accent: #83A9DC;
-    --c-accent-2: #A6C2E9;
-    --c-accent-soft: rgba(131, 169, 220, 0.16);
-    --c-accent-softer: rgba(131, 169, 220, 0.08);
+    --c-accent: #6C92D2;
+    --c-accent-2: #96B1DF;
+    --c-accent-soft: rgba(108, 146, 210, 0.16);
+    --c-accent-softer: rgba(108, 146, 210, 0.08);
 
-    --c-primary: #DBE2EF;
-    --c-primary-2: #F9F7F7;
-    --c-on-primary: #112D4E;
+    --c-claude: #D97757;
+    --c-claude-2: #E8957A;
+    --c-claude-soft: rgba(217, 119, 87, 0.18);
+    --c-claude-softer: rgba(217, 119, 87, 0.09);
+    --c-on-claude: #FFFFFF;
 
-    --c-danger: #EE8A80;
-    --c-danger-soft: rgba(238, 138, 128, 0.14);
-    --c-warning: #E2B26A;
-    --c-warning-soft: rgba(226, 178, 106, 0.14);
-    --c-success: #7ACFA2;
-    --c-success-soft: rgba(122, 207, 162, 0.14);
+    --c-primary: #EEEEEE;
+    --c-primary-2: #FFFFFF;
+    --c-on-primary: #1C3258;
 
-    --c-scrim: rgba(3, 8, 16, 0.62);
+    --c-danger: #D76262;
+    --c-danger-ink: #DE7676;
+    --c-danger-soft: rgba(215, 98, 98, 0.16);
+    --c-warning: #D4AA5A;
+    --c-warning-ink: #D4AA5A;
+    --c-warning-soft: rgba(212, 170, 90, 0.16);
+    --c-success: #63A375;
+    --c-success-ink: #7AB78B;
+    --c-success-soft: rgba(99, 163, 117, 0.16);
 
-    --stage-lead: #8E9AB0;
-    --stage-proposal: #E2A857;
-    --stage-negotiation: #A890E8;
-    --stage-progress: #6FA2F2;
-    --stage-complete: #6CCB97;
+    --c-scrim: rgba(3, 7, 14, 0.62);
+
+    --stage-lead: #7E8A9E;
+    --stage-negotiation: #B5D4F8;
+    --stage-proposal: #6C92D2;
+    --stage-progress: #6BCAC9;
+    --stage-complete: #63A375;
+
+    --pri-medium: #EB9D5A;
+    --pri-medium-ink: #EB9D5A;
+    --pri-medium-soft: rgba(235, 157, 90, 0.16);
 
     --e-1: 0 1px 2px rgba(0, 0, 0, 0.30);
     --e-2: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 20px -8px rgba(0, 0, 0, 0.45);
@@ -229,6 +283,7 @@
     --color-text-secondary: var(--c-ink-2);
     --color-text-tertiary: var(--c-ink-3);
     --color-text-muted: var(--c-ink-3);
+    --color-text-primary: var(--c-ink);
 
     --color-accent: var(--c-primary);
     --color-accent-subtle: var(--c-accent-soft);
@@ -238,12 +293,14 @@
     --color-primary-hover: var(--c-primary-2);
     --color-primary-subtle: var(--c-accent-soft);
 
-    --color-danger: var(--c-danger);
-    --color-danger-hover: var(--c-danger);
+    /* The older rules use these for text and under white text: the -ink shades. */
+    --color-danger: var(--c-danger-ink);
+    --color-danger-hover: var(--c-danger-ink);
     --color-danger-subtle: var(--c-danger-soft);
-    --color-success: var(--c-success);
+    --color-success: var(--c-success-ink);
     --color-success-subtle: var(--c-success-soft);
-    --color-warning: var(--c-warning);
+    --color-warning: var(--c-warning-ink);
+    --color-warning-subtle: var(--c-warning-soft);
     --color-on-danger: var(--c-surface);
     --color-on-success: var(--c-surface);
 
@@ -412,14 +469,62 @@ h1, h2, h3, h4 {
     min-width: 0;
 }
 
+/* The wordmark: the touch icon's tiles in small, the name, and its last word
+   in the accent colour. */
 .brand-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     font-size: var(--t-md);
     font-weight: 600;
     color: var(--c-ink);
     letter-spacing: -0.01em;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.brand-mark {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.brand-tile {
+    stroke: var(--c-surface);
+    stroke-width: 1.4;
+    paint-order: stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: rotate(var(--turn));
+}
+
+.brand-tile--blue  { fill: var(--c-accent);  --turn: -6deg; }
+.brand-tile--green { fill: var(--c-success); --turn: 8deg; }
+.brand-tile--red   { fill: var(--c-danger);  --turn: 4deg; }
+.brand-tile--navy  { fill: var(--c-ink);     --turn: -7deg; }
+
+.brand-word {
+    flex-shrink: 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.brand-accent {
+    flex-shrink: 0;
+    margin-left: -3px;
+    color: var(--c-accent);
+    font-weight: 600;
+}
+
+/* "(Test)" and the like, kept quiet. */
+.brand-tag {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 /* Folds the desktop sidebar into the icon rail. Desktop only: tablets always
@@ -558,6 +663,14 @@ h1, h2, h3, h4 {
     background: var(--c-accent);
 }
 
+.sidebar .nav-count--claude,
+.sidebar .toggle-badge.nav-count--claude,
+.sidebar .nav-item.active .nav-count--claude,
+.tabbar .tab-badge--claude {
+    background: var(--c-claude);
+    color: var(--c-on-claude);
+}
+
 .sidebar .nav-item--quiet {
     height: 38px;
     color: var(--c-ink-3);
@@ -636,13 +749,6 @@ h1, h2, h3, h4 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.team-count {
-    flex-shrink: 0;
-    font-size: var(--t-xs);
-    font-weight: 500;
-    color: var(--c-ink-3);
 }
 
 /* ---- Foot: settings and you -------------------------------------------- */
@@ -725,22 +831,6 @@ h1, h2, h3, h4 {
     line-height: 1.2;
 }
 
-.user-chip-logout {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    color: var(--c-ink-3);
-    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-
-.user-chip-logout:hover {
-    background: var(--c-tint-3);
-    color: var(--c-ink);
-}
-
 /* The profile popover opens upward from the chip at the bottom of the rail. */
 .sidebar .profile-pop {
     top: auto;
@@ -800,13 +890,19 @@ h1, h2, h3, h4 {
 
 /* ---- View head: the same top on every page ------------------------------ */
 
+/* Every page's title in the same place: 12px below the panel's padding,
+   centred in a row 42px high - where the sticky toolbars of Contacts,
+   To-dos and Projects put it (Bookkeeping and Calendar match it below). */
 .view-head {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
+    box-sizing: border-box;
+    min-height: 54px;
     margin-bottom: 20px;
+    padding-top: 12px;
 }
 
 .view-head-text {
@@ -828,7 +924,25 @@ h1, h2, h3, h4 {
     color: var(--c-ink-3);
 }
 
-/* ---- Toolbar: search on the left, actions on the right ------------------ */
+/* ---- Toolbar: title, search, actions - one row ------------------------- */
+/* Contacts, To-dos and Projects carry their title in the toolbar, so the
+   page starts with one row instead of two, and the title stays in view
+   while the list scrolls. */
+
+.list-head-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-right: 14px;
+}
+
+.view-count {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
 
 .view-panel .list-header {
     position: sticky;
@@ -1002,14 +1116,14 @@ h1, h2, h3, h4 {
 }
 
 .btn-danger {
-    background: var(--c-danger);
-    border-color: var(--c-danger);
-    color: var(--c-surface);
+    background: var(--c-danger-ink);
+    border-color: var(--c-danger-ink);
+    color: #FFFFFF;
 }
 
 .btn-danger:hover:not(:disabled) {
     filter: brightness(0.94);
-    background: var(--c-danger);
+    background: var(--c-danger-ink);
 }
 
 .btn-small {
@@ -1195,38 +1309,30 @@ input[type="checkbox"] {
 
 /* ---- Pills: stage, priority, tags --------------------------------------- */
 
+/* The stage as a pill in its colour - the same pill as the headings on the
+   Projects page, so a stage looks the same wherever it is named. The text
+   mixes the colour with the ink, so the pale stages stay readable in both
+   themes. */
 .project-stage-badge {
+    --stage-tone: var(--stage-lead);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px 0 8px;
+    height: 22px;
+    padding: 0 9px;
     border: 0;
     border-radius: var(--r-full);
-    background: var(--c-tint-3);
-    color: var(--c-ink-2);
-    font: 500 var(--t-xs)/1 var(--font);
+    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
+    font: 600 var(--t-xs)/1 var(--font);
     letter-spacing: 0;
     text-transform: none;
     white-space: nowrap;
 }
 
-.project-stage-badge::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    flex-shrink: 0;
-    border-radius: var(--r-full);
-    background: var(--stage-lead);
-}
-
-.project-stage-badge.stage-in-progress { background: var(--c-accent-soft); color: var(--c-ink); }
-.project-stage-badge.stage-in-progress::before { background: var(--stage-progress); }
-.project-stage-badge.stage-proposal::before { background: var(--stage-proposal); }
-.project-stage-badge.stage-negotiation::before { background: var(--stage-negotiation); }
-.project-stage-badge.stage-lead::before { background: var(--stage-lead); }
-.project-stage-badge.stage-complete { background: var(--c-success-soft); color: var(--c-ink-2); }
-.project-stage-badge.stage-complete::before { background: var(--stage-complete); }
+.project-stage-badge.stage-in-progress { --stage-tone: var(--stage-progress); }
+.project-stage-badge.stage-proposal { --stage-tone: var(--stage-proposal); }
+.project-stage-badge.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.project-stage-badge.stage-complete { --stage-tone: var(--stage-complete); }
 
 
 /* --------------------------------------------------------------------------
@@ -1277,16 +1383,27 @@ input[type="checkbox"] {
 /* --------------------------------------------------------------------------
    9. Grouped lists - one pattern for contacts, to-dos and home
    --------------------------------------------------------------------------
-   A group is a single card; its rows are separated by hairlines rather than
-   each wearing a border of its own. Boxes inside boxes are what made the old
-   lists feel busy.
+   The whole list is one white surface without a border; a group is a
+   heading inside it, its rows separated by hairlines. A card per group was
+   one box too many.
    -------------------------------------------------------------------------- */
 
-.group-card,
-#listView .company-group,
-#listView .pinned-section,
-#listView .tag-group,
-#todoView .todo-group {
+.view-panel .contacts-list,
+.view-panel .todos-list {
+    gap: 0;
+    background: var(--c-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+/* Nothing to list: no empty white box. */
+.view-panel .contacts-list:empty,
+.view-panel .todos-list:empty {
+    box-shadow: none;
+}
+
+.group-card {
     margin: 0 0 16px;
     padding: 0;
     background: var(--c-surface);
@@ -1296,23 +1413,42 @@ input[type="checkbox"] {
     overflow: hidden;
 }
 
-/* Group headings: a sentence-case label and a count, not a shouted caption. */
+#listView .company-group,
+#listView .pinned-section,
+#listView .tag-group,
+#todoView .todo-group {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--c-line);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#listView .company-group:first-child,
+#listView .pinned-section:first-child,
+#listView .tag-group:first-child,
+#todoView .todo-group:first-child {
+    border-top: 0;
+}
+
+/* Group headings: a quiet sentence-case label and a count, a little air
+   above, no rule under - the rows' hairlines start right below. */
 #listView .company-header,
 #listView .pinned-header,
 #listView .tag-group-header,
-#todoView .todo-group-header,
-#todoView .todo-group-title {
+#todoView .todo-group-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 44px;
+    min-height: 40px;
     margin: 0;
-    padding: 0 16px;
+    padding: 10px 16px 2px;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid var(--c-line-2);
     border-radius: 0;
-    color: var(--c-ink);
+    color: var(--c-ink-2);
     font: 600 var(--t-sm)/1.3 var(--font);
     letter-spacing: 0;
     text-transform: none;
@@ -1485,7 +1621,7 @@ input[type="checkbox"] {
 #listView.is-map .list-controls,
 #listView.is-map #listFilterToggle,
 #listView.is-map #importExportBtn {
-    visibility: hidden;
+    display: none;
 }
 
 #listView.is-map .list-header {
@@ -1497,7 +1633,7 @@ input[type="checkbox"] {
     flex: 1;
     min-height: 360px;
     position: relative;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
     box-shadow: var(--e-1);
@@ -1516,624 +1652,993 @@ input[type="checkbox"] {
    10. Projects
    -------------------------------------------------------------------------- */
 
-/* ---- Summary bands (Home and Projects) ---------------------------------- */
-/* One quiet mist band per page, three equal tiles. Every tile has the same
-   four rows, each of a fixed height, so the tiles line up whatever they
-   show:
+/* ---- Revenue forecast --------------------------------------------------- */
+/* One card above the project list (revenue-forecast-card.js): what the open
+   pipeline should bring in, month by month, under a chosen scenario.
 
-       label        what it is
-       number       the figure, the only large type on the band
-       key          the legend or the axis letters for the chart below
-       chart        resting on the floor of the band
+   The controls have two levels, and they look it:
+       Scenario      Worst / Realistic / Best - sets everything below at once;
+                     the selected one is filled in primary, the strongest
+                     control on the card
+       Assumptions   chance, budget, stages - fine-tune the scenario; quieter,
+                     smaller, on the plain card surface under it
 
-   Every word on the band is one size (--t-sm); only the number is larger.
-   Narrow tiles keep the rows and swap in shorter words (.kc-short). */
+   Stage colours are the pipeline's own (--stage-*); the stage pills double as
+   the chart's legend. */
 
-.kpi-band {
-    --kpi-pad-x: 22px;
-    --kpi-pad-y: 16px;
-    --kpi-gutter: 20px;
-    --kpi-number: 24px;
-    --kpi-chart: 22px;
-    --kpi-rule: rgba(17, 45, 78, 0.10);
-    --kc-track: rgba(17, 45, 78, 0.10);
-    --kc-quiet: rgba(17, 45, 78, 0.22);
-    position: relative;
-    container: kpiband / inline-size;
-    margin: 0 0 24px;
-    padding: var(--kpi-pad-y) var(--kpi-pad-x);
-    background: var(--c-tint);
+.rf-card {
+    margin: 0 0 16px;
+    background: var(--c-surface);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+    color: var(--c-ink);
+}
+
+.rf-card :is(button, a, summary):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.rf-top {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 22px 22px;
+}
+
+.rf-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+}
+
+.rf-card .rf-title {
+    margin: 0 auto 0 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+/* A plain small button like any other; one width for "Expand" and
+   "Collapse", so nothing beside it moves. */
+.rf-expand.btn {
+    min-width: 104px;
+    gap: 6px;
+}
+
+.rf-expand svg {
+    width: 15px;
+    height: 15px;
+    transition: transform var(--dur-2) var(--ease);
+}
+
+.rf-expand[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+/* ---- Controls: scenario in the header, assumptions behind "Adjust" ----
+   "Adjust" opens a slim panel under the header that pushes the chart down,
+   so no month is ever covered. */
+
+.rf-head {
+    flex-wrap: wrap;
+}
+
+.rf-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rf-presets .segmented-btn {
+    height: 30px;
+    padding: 0 14px;
+}
+
+.rf-presets .segmented-btn.active {
+    font-weight: 600;
+}
+
+.rf-adjust {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rf-adjust:hover,
+.rf-adjust[aria-expanded="true"] {
+    background: var(--c-tint-3);
+    border-color: var(--c-line-strong);
+    color: var(--c-ink);
+}
+
+/* A custom scenario shows on the button that made it. */
+.rf-adjust.is-custom {
+    border-color: transparent;
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font-weight: 600;
+}
+
+.rf-seg-sm .segmented-btn {
+    height: 28px;
+    padding: 0 10px;
     font-size: var(--t-sm);
-    line-height: 16px;
+}
+
+.rf-seg-sm .segmented-btn.active {
+    font-weight: 600;
+}
+
+.rf-adjust-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    margin-top: -4px;
+    padding: 8px 12px;
+    border-radius: var(--r-lg);
+    background: var(--c-tint-3);
+    animation: rf-panel-in var(--dur-2) var(--ease);
+}
+
+@keyframes rf-panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rf-adjust-panel { animation: none; }
+}
+
+.rf-adj-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rf-adj-label {
+    font-size: var(--t-xs);
+    font-weight: 600;
     color: var(--c-ink-2);
 }
 
-:root[data-theme="dark"] .kpi-band {
-    --kpi-rule: rgba(219, 226, 239, 0.12);
-    --kc-track: rgba(219, 226, 239, 0.12);
-    --kc-quiet: rgba(219, 226, 239, 0.28);
+.rf-adj-reset {
+    margin-left: auto;
 }
 
-.kpi-band--projects {
-    margin-bottom: 8px;
+.rf-adj-reset:disabled {
+    visibility: hidden;
 }
 
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: calc(var(--kpi-gutter) * 2 + 1px);
+/* ---- Stages: switches in the Adjust panel, a plain key under the chart ---- */
+
+.rf-adj-stages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
 }
 
-/* Equal tiles: the dividers sit in the gaps, so no tile loses width to
-   padding its neighbours do not have. */
-.kpi {
-    container: kpi / inline-size;
+.rf-stage {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    padding: 0 9px;
+    border: 1px dashed var(--c-line-strong);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-4);
+    font: 500 var(--t-sm)/1 var(--font);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rf-stage:hover:not(:disabled) {
+    background: var(--c-tint-3);
+    color: var(--c-ink-2);
+}
+
+.rf-stage.is-on {
+    border-style: solid;
+    border-color: var(--c-line);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    font-weight: 600;
+    box-shadow: var(--e-1);
+}
+
+.rf-stage:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.rf-stage-count {
+    font-weight: 500;
+    color: var(--c-ink-4);
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-stage-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1.5px var(--c-line-strong);
+}
+
+:is(.rf-stage, .rf-key).is-on .rf-stage-dot {
+    box-shadow: none;
+}
+
+.rf-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 6px;
+}
+
+.rf-body.is-expanded .rf-legend {
+    margin-left: 48px;
+}
+
+.rf-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+    text-decoration: line-through;
+}
+
+.rf-key.is-on {
+    color: var(--c-ink-2);
+    text-decoration: none;
+}
+
+/* ---- Stage colours ---- */
+
+:is(.rf-stage.is-on .rf-stage-dot, .rf-key.is-on .rf-stage-dot, .rf-seg, .rf-row-bar) { background: var(--rf-tone, var(--stage-lead)); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="progress"]    { --rf-tone: var(--stage-progress); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="proposal"]    { --rf-tone: var(--stage-proposal); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="negotiation"] { --rf-tone: var(--stage-negotiation); }
+:is(.rf-card, .rf-adjust-panel) [data-tone="lead"]        { --rf-tone: var(--stage-lead); }
+
+/* ---- Body: the total, and the months ---- */
+
+.rf-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 20px 40px;
+}
+
+/* Top-aligned, so the total sits right under the card's title. */
+.rf-summary {
+    flex: 0 1 260px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.rf-hero {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+/* The three scenarios stacked, label left and amount right, so the
+   amounts line up; the one in use is tinted. */
+.rf-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-width: 220px;
+    margin: 8px 0 0 -8px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.rf-compare-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+}
+
+.rf-compare strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-compare-item.is-active {
+    background: var(--c-accent-softer);
+    color: var(--c-ink);
+    font-weight: 600;
+}
+
+.rf-compare-item.is-active strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.rf-muted {
+    color: var(--c-ink-4);
+}
+
+.rf-chart {
+    flex: 1 1 440px;
+    min-width: 0;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rf-readout {
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 20px;
+    color: var(--c-ink-3);
+}
+
+/* Room on the left for the scale's amounts, and above for the top one. */
+.rf-plot-wrap {
     position: relative;
+    margin-top: 8px;
+    padding-left: 48px;
+}
+
+.rf-plot {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.rf-tick {
+    position: absolute;
+    left: 48px;
+    right: 0;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.rf-tick.is-base {
+    border-top-color: var(--c-line-strong);
+}
+
+.rf-tick span {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: -8px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--c-ink-4);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-col {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xs) var(--r-xs) 0 0;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.rf-col.is-hover {
+    background: var(--c-accent-softer);
+}
+
+/* The column whose panel is open: a firmer tint and a line along its foot. */
+.rf-col.is-selected {
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 -2px 0 var(--c-accent);
+}
+
+/* A clicked column: which projects it comes from, and which payments or
+   budget shares (revenue-forecast-card.js tipHtml). Set beside the column by
+   placeTip; stays until closed, so its project names can be clicked. */
+.rf-tip {
+    position: absolute;
+    top: 0;
+    z-index: 30;
+    width: 300px;
+    max-width: calc(100% - 24px);
+    padding: 10px 12px 8px;
+    background: var(--c-surface);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-3, var(--e-2));
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+    animation: dsFadeIn var(--dur-1) var(--ease) both;
+}
+
+.rf-tip[hidden] {
+    display: none;
+}
+
+.rf-tip-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 7px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--c-line-2);
+    color: var(--c-ink-3);
+}
+
+.rf-tip-head strong {
+    margin-left: auto;
+    color: var(--c-ink);
+    font-weight: 700;
+}
+
+.rf-tip-close {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin: -3px -5px -3px 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.rf-tip-head span + .rf-tip-close {
+    margin-left: auto;
+}
+
+.rf-tip-close:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+.rf-tip-empty {
+    margin: 6px 0 4px;
+    color: var(--c-ink-3);
+}
+
+.rf-tip-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rf-tip-project {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0 8px;
+    padding: 5px 0;
+}
+
+.rf-tip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--r-full);
+    background: var(--rf-tone, var(--stage-lead));
+}
+
+.rf-tip-main {
     display: flex;
     flex-direction: column;
     min-width: 0;
 }
 
-.kpi + .kpi::before {
+.rf-tip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--c-ink);
+    text-decoration: none;
+}
+
+.rf-tip-name:hover {
+    color: var(--c-accent-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.rf-tip-part {
+    font-size: var(--t-xs);
+    line-height: 1.45;
+    color: var(--c-ink-3);
+}
+
+.rf-tip-amount {
+    font-weight: 600;
+}
+
+.rf-tip-more {
+    padding: 5px 0 2px 16px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+/* Projects without an end date: one wider bar after the months, set apart. */
+.rf-col.is-undated,
+.rf-axis-label.is-undated {
+    flex: 1.6;
+    margin-left: 8px;
+}
+
+.rf-col.is-undated::before {
     content: "";
     position: absolute;
     top: 0;
     bottom: 0;
-    left: calc(-1 * var(--kpi-gutter) - 1px);
-    width: 1px;
-    background: var(--kpi-rule);
+    left: -6px;
+    border-left: 1px dashed var(--c-line-strong);
 }
 
-/* Row 1 - label */
-.kpi-head {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    height: 16px;
-    min-width: 0;
-    overflow: hidden;
-    font-weight: 500;
+.rf-axis-label.is-undated {
     white-space: nowrap;
 }
 
-.kpi-label {
-    flex-shrink: 0;
+.rf-ghost,
+.rf-stack {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(18px, 66%);
 }
 
-.kpi-meta {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 400;
+.rf-body.is-expanded :is(.rf-ghost, .rf-stack) {
+    width: min(24px, 62%);
 }
 
-.kpi-meta::before {
-    content: "\00B7";
-    margin-right: 6px;
+/* The best case above each bar: hatched, so it reads as "possible" and not
+   as one more stage colour. A real border, with the stripes clipped to the
+   inside of it and a hair of space, so no stripe runs into the edge. */
+.rf-ghost,
+.rf-best-swatch {
+    --rf-hatch: color-mix(in srgb, var(--c-ink) 24%, transparent);
+    --rf-edge: color-mix(in srgb, var(--c-ink) 18%, transparent);
+    box-sizing: border-box;
+    border: 1px solid var(--rf-edge);
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1.5px, transparent 1.5px 5px) content-box;
 }
 
-/* Room for the chevron in the corner it sits in. */
-.kpi-band--projects .kpi:last-child .kpi-head {
-    padding-right: 30px;
+/* The stripes sit on their own layer inside the border, rounded with it,
+   so even the corners keep clear of the edge. */
+.rf-ghost {
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    background: none;
 }
 
-/* Row 2 - number */
-.kpi-value {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    height: 30px;
-    margin-top: 4px;
-    min-width: 0;
-    white-space: nowrap;
-}
-
-.kpi-number {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: var(--kpi-number);
-    font-weight: 600;
-    line-height: 30px;
-    letter-spacing: -0.02em;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.kpi-unit {
-    flex-shrink: 0;
-    font-weight: 500;
-}
-
-/* "1 overdue": the one thing allowed to raise its voice. A white pill, so
-   the red stays legible on the mist. Same type size as everything else. */
-.kpi-flag {
-    align-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-    height: 20px;
-    padding: 0 8px 0 7px;
-    font-weight: 600;
-    color: var(--c-danger);
-    background: var(--c-surface);
-    border-radius: 999px;
-}
-
-.kpi-flag::before {
+.rf-ghost::before {
     content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
+    position: absolute;
+    inset: 2px 2px 0;
+    border-radius: 2px 2px 0 0;
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1.5px, transparent 1.5px 5px);
 }
 
-/* Row 3 - key */
-.kpi-key {
-    height: 16px;
-    margin-top: 8px;
-    overflow: hidden;
-    white-space: nowrap;
+.rf-best-swatch {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    padding: 1px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1px, transparent 1px 2.5px) content-box;
 }
 
-/* Row 4 - chart, on the floor */
-.kpi-chart {
+.rf-stack {
     display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    height: var(--kpi-chart);
-    margin-top: 6px;
+    flex-direction: column-reverse;
+    gap: 2px;
 }
 
-/* ---- The charts --------------------------------------------------------- */
+.rf-seg {
+    display: block;
+    width: 100%;
+    flex-shrink: 0;
+}
 
-/* A split bar: one whole, parts in proportion; 2px gaps keep neighbouring
-   colours apart. */
-.kc-stack {
+.rf-seg:last-child {
+    border-radius: 4px 4px 0 0;
+}
+
+.rf-axis {
     display: flex;
     gap: 2px;
-    height: 6px;
-    border-radius: 999px;
-    overflow: hidden;
+    padding-left: 48px;
 }
 
-.kc-stack.is-empty {
-    background: var(--kc-track);
-}
-
-.kc-seg {
-    flex: 1 1 0;
-    min-width: 3px;
-    background: var(--kc);
-}
-
-/* A meter: one share of a whole. */
-.kc-meter {
-    height: 6px;
-    border-radius: 999px;
-    background: var(--kc-track);
-    overflow: hidden;
-}
-
-.kc-meter-fill {
-    display: block;
-    width: calc(var(--f, 0) * 100%);
-    height: 100%;
-    border-radius: inherit;
-    background: var(--c-accent);
-}
-
-/* Columns over time, and the letters over them, on one shared grid. */
-.kc-axis,
-.kc-cols {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-}
-
-.kc-axis span {
+.rf-axis-label {
+    flex: 1;
+    min-width: 0;
     text-align: center;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--c-ink-3);
 }
 
-.kc-axis .is-current {
-    font-weight: 600;
+.rf-body.is-expanded .rf-axis-label {
+    font-size: var(--t-xs);
+}
+
+.rf-axis-label.is-now,
+.rf-axis-label.is-hover {
+    font-weight: 700;
+}
+
+.rf-axis-label.is-hover {
     color: var(--c-ink);
 }
 
-.kc-cols {
-    height: 100%;
-    align-items: end;
-}
-
-.kc-col {
-    --kc: var(--c-accent);
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    height: 100%;
-}
-
-.kc-col-bar {
-    width: 100%;
-    max-width: 14px;
-    height: max(2px, calc(var(--h, 0) * var(--kpi-chart)));
-    border-radius: 3px;
-    background: var(--kc);
-}
-
-.kc-col.is-zero .kc-col-bar {
-    height: 2px;
-    border-radius: 1px;
-    background: var(--kc-track);
-}
-
-/* Today: the one navy column. */
-.kc-col.is-current .kc-col-bar {
-    background: var(--c-primary);
-}
-
-/* The key: dot, name, figure - on one line. Entries that do not fit wrap
-   onto a second line the row hides, so an entry is shown whole or not at
-   all; the chart's own label and the breakdown still name every part. */
-.kc-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 12px;
-    height: 16px;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    list-style: none;
-}
-
-.kc-legend li {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 16px;
-    white-space: nowrap;
-}
-
-.kc-legend b {
-    font-weight: 600;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.kc-dot {
-    display: inline-block;
-    flex-shrink: 0;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--kc);
-}
-
-.kc-note {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.kc-short {
+.rf-m-short {
     display: none;
 }
 
-/* Tones, after .kc-col so a tone wins over a column's default. */
-.kc-tone-progress    { --kc: var(--stage-progress); }
-.kc-tone-proposal    { --kc: var(--stage-proposal); }
-.kc-tone-negotiation { --kc: var(--stage-negotiation); }
-.kc-tone-lead        { --kc: var(--stage-lead); }
-.kc-tone-complete    { --kc: var(--stage-complete); }
-.kc-tone-high        { --kc: var(--c-danger); }
-.kc-tone-medium      { --kc: var(--c-warning); }
-.kc-tone-low         { --kc: var(--c-ink-4); }
-.kc-tone-none        { --kc: var(--kc-quiet); }
-.kc-tone-accent      { --kc: var(--c-accent); }
-
-/* ---- Narrow tiles ------------------------------------------------------- */
-/* Same rows, shorter words: short labels and figures, and a key of dots and
-   figures without the names. */
-
-@container kpi (max-width: 190px) {
-    .kpi-number {
-        font-size: 20px;
-    }
-
-    .kc-long,
-    .kpi-meta,
-    .kpi-unit,
-    .kc-legend-name {
-        display: none;
-    }
-
-    .kc-short {
-        display: inline;
-    }
-
-    .kc-legend {
-        gap: 0 9px;
-    }
-
-    .kc-legend li {
-        gap: 4px;
-    }
+@container (max-width: 560px) {
+    .rf-m-long { display: none; }
+    .rf-m-short { display: inline; }
 }
 
-@container kpi (max-width: 118px) {
-    .kpi-number {
-        font-size: 18px;
-    }
-
-    .kpi-flag {
-        padding: 0 6px;
-    }
-
-    .kpi-flag::before {
-        display: none;
-    }
+.rf-axis-year {
+    display: block;
+    min-height: 12px;
+    font-size: 10px;
+    color: var(--c-ink-4);
 }
 
-/* ---- The breakdown behind the chevron (Projects) ------------------------ */
+/* ---- Expanded: one row per project ---- */
 
-.kpi-toggle {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
+.rf-detail-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 22px 4px;
+    border-top: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-ink-3);
+}
+
+.rf-detail-actions {
+    display: flex;
+    gap: 16px;
+}
+
+.rf-table-scroll {
+    overflow-x: auto;
+}
+
+.rf-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: var(--t-base);
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.rf-table th {
+    padding: 10px 7px 4px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    text-align: left;
+    color: var(--c-ink-4);
+}
+
+.rf-table td {
+    padding: 10px 7px;
+    border-top: 1px solid var(--c-line-2);
+    vertical-align: middle;
+}
+
+.rf-table :is(th, td):first-child { padding-left: 22px; width: 34px; }
+.rf-table :is(th, td):last-child { padding-right: 22px; width: 26%; }
+
+.rf-row:hover {
+    background: var(--c-tint-3);
+}
+
+.rf-row.is-off :is(td:not(:first-child)) {
+    opacity: 0.5;
+}
+
+/* max-width: 0 lets a long name ellipsise instead of widening the table. */
+.rf-cell-project {
+    max-width: 0;
+    width: 40%;
+    white-space: nowrap;
+}
+
+.rf-cell-project > * {
+    vertical-align: middle;
+}
+
+.rf-row-bar {
+    display: inline-block;
+    width: 4px;
+    height: 34px;
+    margin-right: 12px;
+    border-radius: 2px;
+}
+
+.rf-row-text {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: calc(100% - 20px);
+}
+
+.rf-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--c-ink);
+    text-decoration: none;
+}
+
+.rf-row-name:hover {
+    color: var(--c-accent-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.rf-row-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.rf-cell-runs {
+    white-space: nowrap;
+    color: var(--c-ink-3);
+}
+
+/* The chance as the same small donut the project cards use. */
+.rf-chance {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+/* Counted: the amount, and under it how it comes about - open payments,
+   what is left of the budget, times the chance (revenue-forecast-card.js
+   howCounted). The full sentence is the cell's tooltip. */
+.rf-table th:last-child,
+.rf-cell-value {
+    text-align: right;
+}
+
+.rf-value {
+    display: block;
+    font-weight: 700;
+}
+
+.rf-how {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--t-xs);
+    line-height: 1.4;
+    color: var(--c-ink-3);
+}
+
+.rf-row.is-off .rf-value {
+    color: var(--c-ink-3);
+}
+
+.rf-switch {
+    position: relative;
+    display: block;
+    width: 34px;
+    height: 20px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--c-ink-2);
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
     cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+    transition: background-color var(--dur-1) var(--ease);
 }
 
-.kpi-toggle:hover {
-    background: rgba(17, 45, 78, 0.07);
-    color: var(--c-ink);
+.rf-switch[aria-checked="true"] {
+    background: var(--c-accent);
 }
 
-:root[data-theme="dark"] .kpi-toggle:hover {
-    background: rgba(219, 226, 239, 0.08);
+.rf-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform var(--dur-1) var(--ease);
 }
 
-.kpi-toggle svg {
-    transition: transform var(--dur-2) var(--ease);
+.rf-switch[aria-checked="true"] .rf-switch-knob {
+    transform: translateX(14px);
 }
 
-.kpi-toggle[aria-expanded="true"] svg {
-    transform: rotate(180deg);
-}
-
-.kpi-detail {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    gap: 36px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--kpi-rule);
-    line-height: 18px;
-}
-
-.kb-block {
-    min-width: 0;
-}
-
-.kb-title {
-    margin: 0 0 8px;
+.rf-missing {
+    margin: 0;
+    padding: 12px 22px;
+    border-top: 1px solid var(--c-line-2);
     font-size: var(--t-sm);
+    color: var(--c-warning-ink);
+}
+
+.rf-missing summary {
+    cursor: pointer;
     font-weight: 600;
-    line-height: 18px;
+}
+
+.rf-missing ul {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rf-missing li {
+    color: var(--c-ink-3);
+}
+
+.rf-missing li a {
+    margin-right: 6px;
+    font-weight: 600;
     color: var(--c-ink);
 }
 
-.kb-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
-}
-
-.kb-table th,
-.kb-table td {
-    padding: 5px 0;
+.rf-empty-missing .rf-missing {
+    padding: 0;
     border: 0;
-    background: transparent;
-    text-align: left;
-    vertical-align: middle;
-    font-size: var(--t-sm);
-    font-weight: 400;
-    color: var(--c-ink);
 }
 
-.kb-table thead th {
-    padding: 0 0 4px;
-    font-weight: 500;
+.rf-foot {
+    margin: 0;
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.rf-foot strong {
+    font-weight: 600;
     color: var(--c-ink-2);
 }
 
-.kb-table tbody th {
-    padding-right: 16px;
-    white-space: nowrap;
+.rf-empty {
+    margin: 0;
+    padding: 24px 0 8px;
+    font-size: var(--t-base);
+    color: var(--c-ink-3);
 }
 
-.kb-table tbody th .kc-dot {
-    margin-right: 8px;
-    vertical-align: 1px;
-}
-
-.kb-table .kb-bar-cell {
-    width: 100%;
-}
-
-.kb-table .kb-num {
-    padding-left: 16px;
-    text-align: right;
-    white-space: nowrap;
-}
-
-.kb-table tbody td.kb-num:nth-last-child(2) {
-    color: var(--c-ink-2);
-}
-
-.kb-sr {
+.rf-sr {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
-    clip-path: inset(50%);
     white-space: nowrap;
 }
 
-/* Per stage: the solid part is the sum of the minimum budgets, the pale
-   part runs on to the sum of the maximums - the range, drawn. */
-.kb-bar {
-    position: relative;
+/* ---- Loading ---- */
+
+.rf-skel {
     display: block;
-    height: 6px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--kc-track);
+    border-radius: var(--r-sm);
+    background: linear-gradient(90deg, var(--c-tint-2) 25%, var(--c-tint-3) 50%, var(--c-tint-2) 75%);
+    background-size: 200% 100%;
+    animation: rf-shimmer 1.4s ease-in-out infinite;
 }
 
-.kb-bar-high,
-.kb-bar-low {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: calc(var(--f, 0) * 100%);
-    border-radius: inherit;
-    background: var(--kc);
+.rf-skel--line { width: 70%; height: 14px; }
+.rf-skel--hero { width: 55%; height: 44px; }
+.rf-skel--chart { height: 140px; }
+
+@keyframes rf-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
 }
 
-.kb-bar-high {
-    opacity: 0.38;
+@media (prefers-reduced-motion: reduce) {
+    .rf-skel { animation: none; }
 }
 
-.kb-scenarios {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.kb-scenario {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.kb-scenario span {
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
-}
-
-.kb-scenario b {
-    font-size: var(--t-lg);
-    font-weight: 600;
-    line-height: 22px;
-    letter-spacing: -0.01em;
-    color: var(--c-ink-2);
-    font-variant-numeric: tabular-nums;
-}
-
-.kb-scenario.is-main b {
-    color: var(--c-ink);
-}
-
-/* The likely range on the scale of the open pipeline, with the realistic
-   figure as a mark inside it. */
-.kb-range {
-    position: relative;
-    height: 6px;
-    margin: 16px 0 8px;
-    border-radius: 999px;
-    background: var(--kc-track);
-}
-
-.kb-range-band {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(var(--a, 0) * 100%);
-    width: calc((var(--b, 0) - var(--a, 0)) * 100%);
-    min-width: 4px;
-    border-radius: 999px;
-    background: var(--c-accent);
-    opacity: 0.45;
-}
-
-.kb-range-mark {
-    position: absolute;
-    top: -5px;
-    bottom: -5px;
-    left: calc(var(--m, 0) * 100%);
-    width: 3px;
-    margin-left: -1.5px;
-    border-radius: 2px;
-    background: var(--c-primary);
-}
-
-.kb-axis {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
-}
-
-.kb-note {
-    margin: 10px 0 0;
-    font-size: var(--t-sm);
-    line-height: 18px;
-    color: var(--c-ink-2);
-}
-
-.kb-note + .kb-note {
-    margin-top: 2px;
-}
-
-@container kpiband (max-width: 640px) {
-    .kpi-detail {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 22px;
-    }
-}
-
-/* ---- Phones ------------------------------------------------------------- */
+/* ---- Phones ---- */
 
 @media (max-width: 768px) {
-    .kpi-band {
-        --kpi-pad-x: 14px;
-        --kpi-pad-y: 14px;
-        --kpi-gutter: 11px;
-        --kpi-chart: 20px;
-        margin-bottom: 20px;
+    .rf-card {
+        margin-bottom: 12px;
     }
 
-    .kpi-band--projects {
-        margin-bottom: 4px;
+    .rf-top {
+        padding: 16px 14px 18px;
     }
 
-    .kpi-toggle {
-        top: 8px;
-        right: 6px;
-        width: 28px;
-        height: 28px;
+    .rf-hero {
+        font-size: 36px;
     }
 
-    .kpi-band--projects .kpi:last-child .kpi-head {
-        padding-right: 22px;
+    .rf-tools {
+        order: 3;
+        flex-basis: 100%;
     }
+
+    /* The scenario switch takes what the row has left. */
+    .rf-presets.segmented {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .rf-presets .segmented-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 0 8px;
+    }
+
+    .rf-adj-field {
+        flex-wrap: wrap;
+    }
+
+    .rf-adj-reset {
+        margin-left: 0;
+    }
+
+    .rf-detail-bar,
+    .rf-missing,
+    .rf-foot {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .rf-table :is(th, td):first-child { padding-left: 14px; }
+    .rf-table :is(th, td):last-child { padding-right: 14px; }
 }
 
 /* ---- Toolbar ------------------------------------------------------------ */
@@ -2178,42 +2683,50 @@ input[type="checkbox"] {
     padding: 0 2px;
 }
 
+/* The stage's name and how many projects are in it, as one pill in the
+   stage's colour. The text mixes that colour with the ink, which darkens it
+   in light mode and lightens it in dark mode - so the pale stages stay
+   readable in both. */
+.project-group-pill {
+    --stage-tone: var(--stage-lead);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 5px 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
+}
+
+.project-group-pill.stage-in-progress { --stage-tone: var(--stage-progress); }
+.project-group-pill.stage-proposal { --stage-tone: var(--stage-proposal); }
+.project-group-pill.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.project-group-pill.stage-complete { --stage-tone: var(--stage-complete); }
+
 .project-group-title {
     margin: 0;
-    font-size: var(--t-lg);
+    font-size: var(--t-md);
     font-weight: 600;
     letter-spacing: -0.01em;
-    color: var(--c-ink);
+    color: inherit;
 }
 
 .project-group-count {
-    min-width: 24px;
+    min-width: 22px;
     height: 22px;
-    padding: 0 8px;
+    padding: 0 7px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
-    background: var(--c-surface);
-    color: var(--c-ink-2);
-    font-size: var(--t-xs);
-    font-weight: 600;
-}
-
-.stage-dot {
-    width: 9px;
-    height: 9px;
-    flex-shrink: 0;
     border-radius: var(--r-full);
-    background: var(--stage-lead);
+    background: color-mix(in srgb, var(--stage-tone) 26%, var(--c-surface));
+    color: inherit;
+    font-size: var(--t-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
-
-.stage-dot.stage-in-progress { background: var(--stage-progress); box-shadow: 0 0 0 4px var(--c-accent-soft); }
-.stage-dot.stage-proposal { background: var(--stage-proposal); }
-.stage-dot.stage-negotiation { background: var(--stage-negotiation); }
-.stage-dot.stage-lead { background: var(--stage-lead); }
-.stage-dot.stage-complete { background: var(--stage-complete); }
 
 /* ---- Cards -------------------------------------------------------------- */
 
@@ -2221,6 +2734,8 @@ input[type="checkbox"] {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 14px;
+    /* Cards in a row share one height; the spare room goes above the
+       dates and figures, so those line up at the bottom of the row. */
     align-items: stretch;
 }
 
@@ -2235,8 +2750,9 @@ input[type="checkbox"] {
     margin: 0;
     padding: 18px 18px 16px;
     background: var(--c-surface);
-    /* The stage, as the colour of the border: softened at rest, full on hover. */
-    border: 1px solid color-mix(in srgb, var(--stage-tone) 55%, var(--c-line));
+    /* No border: white on the grey page is edge enough, and the stage is
+       already the group's heading. Transparent, so focus can still colour it. */
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     cursor: pointer;
@@ -2249,8 +2765,21 @@ input[type="checkbox"] {
 #projectsView .project-card.stage-negotiation { --stage-tone: var(--stage-negotiation); }
 #projectsView .project-card.stage-complete { --stage-tone: var(--stage-complete); }
 
+/* style.css prepared the cards for its old 3D entrance: a layer of their own
+   (will-change, hidden backface) in a 3D space. The entrance is a plain fade
+   now, and that layer made Chrome draw a card's text soft while it moved -
+   with the Claude blur on top, the blur seemed to change after a moment. */
+#projectsView .projects-list {
+    perspective: none;
+    transform-style: flat;
+}
+
+#projectsView .project-card {
+    backface-visibility: visible;
+    will-change: auto;
+}
+
 #projectsView .project-card:hover {
-    border-color: var(--stage-tone);
     box-shadow: var(--e-2);
     transform: translateY(-2px);
 }
@@ -2320,43 +2849,21 @@ input[type="checkbox"] {
     box-shadow: 0 0 0 2px var(--c-surface);
 }
 
-#projectsView .project-card-description {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    min-height: 0;
-    margin: 10px 0 0;
-    font-size: var(--t-sm);
-    line-height: 1.55;
-    color: var(--c-ink-2);
-}
-
-/* Timeline and figures sit at the bottom, so cards in a row line up even
-   when their descriptions differ in length. */
 #projectsView .project-card-bottom {
     margin-top: auto;
-    padding-top: 16px;
+    padding-top: 12px;
 }
 
-/* Small uppercase labels: Start, End, Budget, Chance. */
-.project-meta-label {
-    display: block;
-    margin-bottom: 3px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--c-ink-3);
-}
-
-/* ---- When it runs: one quiet line, lighter than the budget ---- */
+/* ---- When it runs: one quiet line, lighter than the budget ----
+   The span on the left, the status on the right; on a narrow card the
+   status wraps under the span, and nothing is left dangling. */
 
 .project-when {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 6px;
+    justify-content: space-between;
+    gap: 2px 12px;
     margin: 0;
     font-size: var(--t-xs);
     line-height: 1.5;
@@ -2364,53 +2871,39 @@ input[type="checkbox"] {
     font-variant-numeric: tabular-nums;
 }
 
-.project-when-part {
+.project-when-span {
     white-space: nowrap;
     color: var(--c-ink-2);
 }
 
-.project-when-label {
-    font-weight: 500;
+.project-when-span.is-empty {
     color: var(--c-ink-3);
-}
-
-.project-when-empty {
-    color: var(--c-ink-3);
-}
-
-.project-when-arrow,
-.project-when-sep {
-    color: var(--c-ink-3);
-    opacity: 0.7;
-}
-
-.project-when-part.is-late,
-.project-when-part.is-late .project-when-label,
-.project-when-status.is-late {
-    color: var(--c-danger);
 }
 
 .project-when-status {
     white-space: nowrap;
 }
 
+.project-when-status.is-late {
+    color: var(--c-danger-ink);
+    font-weight: 600;
+}
+
 .project-when-status.is-soon {
-    color: var(--c-warning);
+    color: var(--c-warning-ink);
 }
 
 .project-when-status.is-done {
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 /* ---- Figures ---- */
 
 #projectsView .project-card-foot {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 16px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--c-line-2);
+    margin-top: 8px;
 }
 
 .project-stat {
@@ -2449,14 +2942,186 @@ input[type="checkbox"] {
 }
 
 /* Likelihood as a small ring rather than a bar and a sentence. */
+/* The hole is cut out rather than painted over, so the ring sits on
+   whatever is behind it - a hovered table row, a proposed card's tint. */
 .project-chance-ring {
     width: 15px;
     height: 15px;
     flex-shrink: 0;
     border-radius: var(--r-full);
-    background:
-        radial-gradient(closest-side, var(--c-surface) 58%, transparent 62%),
-        conic-gradient(var(--c-accent) calc(var(--chance, 0) * 1%), var(--c-tint-2) 0);
+    background: conic-gradient(var(--c-accent) calc(var(--chance, 0) * 1%), var(--c-tint-2) 0);
+    -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 62%);
+    mask: radial-gradient(closest-side, transparent 58%, #000 62%);
+}
+
+
+/* ---- List view: one row per project ------------------------------------- */
+/* The same facts as a card, side by side, in one white surface per stage.
+   Chosen with the cards / list switch in the toolbar (kept per account). */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.project-view-switch .segmented-btn {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.project-rows {
+    background: var(--c-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.project-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.7fr) minmax(110px, 0.9fr) minmax(0, 1.3fr) 60px 28px;
+    align-items: center;
+    gap: 16px;
+    min-height: 56px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--c-line-2);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.project-row:last-child {
+    border-bottom: 0;
+}
+
+.project-row:hover {
+    background: var(--c-tint-3);
+}
+
+.project-row:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+}
+
+.project-row-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    min-width: 0;
+}
+
+.project-row-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.project-row-company {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.project-row-main .review-mark {
+    align-self: center;
+}
+
+/* In a row the status follows the span, rather than sitting far right. */
+.project-row .project-when {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+.project-row-budget {
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-row-budget.is-empty {
+    color: var(--c-ink-3);
+    font-weight: 500;
+}
+
+.project-row .ppay-card {
+    margin: 0;
+}
+
+.project-row-chance {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    color: var(--c-ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-row-assignee {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.project-row .assignee-chip {
+    width: 28px;
+    height: 28px;
+}
+
+/* Narrow screens: name, budget, chance and face; the rest is in the sheet. */
+@media (max-width: 900px) {
+    .project-row {
+        grid-template-columns: minmax(0, 1fr) auto 52px 28px;
+        gap: 12px;
+    }
+
+    .project-row-when,
+    .project-row-pay {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .project-row-main {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Stacked, name and company are cut short at the column's edge. */
+    .project-row-title,
+    .project-row-company {
+        max-width: 100%;
+    }
+
+    .project-row-main .review-mark {
+        align-self: flex-start;
+    }
+
+    /* The name needs the room more than the chance does. */
+    .project-row {
+        grid-template-columns: minmax(0, 1fr) auto 28px;
+    }
+
+    .project-row-chance {
+        display: none;
+    }
 }
 
 
@@ -2572,35 +3237,29 @@ input[type="checkbox"] {
     opacity: 1;
 }
 
-/* Priority and due date as quiet text with a dot, not coloured blocks. */
+/* Priority as a pill in its colour - the one look for every coloured
+   value in the CRM (stage, priority, status). */
 .todo-priority {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 0;
+    height: 22px;
+    padding: 0 9px;
     border: 0;
-    background: none;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-2);
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-.todo-priority::before {
-    content: "";
-    width: 7px;
-    height: 7px;
     border-radius: var(--r-full);
-    background: var(--c-ink-4);
+    font: 600 var(--t-xs)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
 }
 
-.todo-priority--high::before { background: var(--c-danger); }
-.todo-priority--medium::before { background: var(--c-warning); }
-.todo-priority--low::before { background: var(--c-ink-4); }
+.todo-priority--high { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.todo-priority--medium { background: var(--pri-medium-soft); color: var(--pri-medium-ink); }
+.todo-priority--low { background: var(--c-tint-2); color: var(--c-ink-2); }
 
 .todo-due-overdue {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -2645,18 +3304,6 @@ input[type="checkbox"] {
     color: var(--c-ink-3);
 }
 
-#workloadView .workload-switch-label {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-3);
-    text-transform: none;
-    letter-spacing: 0;
-}
-
-#workloadView .workload-switch .form-select {
-    min-width: 180px;
-}
-
 /* Sections */
 #workloadView .workload-section {
     margin: 0 0 24px;
@@ -2685,9 +3332,9 @@ input[type="checkbox"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-sm);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -2697,7 +3344,7 @@ input[type="checkbox"] {
 #workloadView .workload-list {
     display: block;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -2734,8 +3381,8 @@ input[type="checkbox"] {
    language as dropping onto a row in the Bookkeeping tab. */
 #workloadView .workload-row.is-drop-target {
     position: relative;
-    background: rgba(37, 99, 235, 0.08);
-    box-shadow: inset 0 0 0 2px #2563eb;
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
     border-radius: var(--r-md);
 }
 
@@ -2747,8 +3394,8 @@ input[type="checkbox"] {
     transform: translateY(-50%);
     padding: 5px 11px;
     border-radius: var(--r-full);
-    background: #2563eb;
-    color: #fff;
+    background: var(--c-accent);
+    color: #FFFFFF;
     font-size: var(--t-xs);
     font-weight: 600;
     pointer-events: none;
@@ -2792,7 +3439,7 @@ input[type="checkbox"] {
 }
 
 #workloadView .workload-due.is-overdue {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -2826,7 +3473,7 @@ input[type="checkbox"] {
 }
 
 #workloadView .workload-chip--high::before { background: var(--c-danger); }
-#workloadView .workload-chip--medium::before { background: var(--c-warning); }
+#workloadView .workload-chip--medium::before { background: var(--pri-medium); }
 
 #workloadView details.workload-done > summary {
     padding: 4px 2px;
@@ -2882,25 +3529,12 @@ input[type="checkbox"] {
 }
 
 /* ---- To-do groups ------------------------------------------------------- */
-/* Header, "Open" action and count on one line; the rows below. The action
-   div is a sibling of the header in the markup, so a grid places it there. */
-
-#todoView .todo-group {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-}
+/* Name (it opens the project or contact) and count on one line, the rows
+   below. */
 
 #todoView .todo-group-header {
-    grid-column: 1;
-    grid-row: 1;
-    display: flex;
-    align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 52px;
-    padding: 8px 8px 8px 16px;
-    border: 0;
-    background: transparent;
 }
 
 #todoView .todo-group-title-wrap {
@@ -2915,7 +3549,7 @@ input[type="checkbox"] {
     padding: 0;
     border: 0;
     min-height: 0;
-    font-size: var(--t-base);
+    font-size: var(--t-sm);
     font-weight: 600;
     color: var(--c-ink);
     white-space: nowrap;
@@ -2935,16 +3569,21 @@ input[type="checkbox"] {
     white-space: nowrap;
 }
 
-#todoView .todo-group-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+/* The names open their project or contact: plain text until hovered. */
+#todoView .todo-group-link {
+    background: none;
+    font-family: inherit;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
 }
 
-/* The type label repeats the subtitle word for word. */
-#todoView .todo-group-type {
-    display: none;
+#todoView .todo-group-link:hover,
+#todoView .todo-group-link:focus-visible {
+    outline: none;
+    color: var(--c-accent-2);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 #todoView .todo-group-count {
@@ -2962,36 +3601,12 @@ input[type="checkbox"] {
     font-weight: 600;
 }
 
-#todoView .todo-group-actions {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-    display: flex;
-    gap: 4px;
-    margin: 0;
-    padding: 0 12px 0 0;
-    border: 0;
-}
-
-/* "Open contact / project" as a quiet text action, not a boxed button. */
-#todoView .todo-group-actions .btn {
-    height: 30px;
-    padding: 0 10px;
-    border-color: transparent;
-    background: transparent;
-    color: var(--c-accent-2);
-    font-weight: 500;
-}
-
-#todoView .todo-group-actions .btn:hover {
-    background: var(--c-accent-softer);
-    border-color: transparent;
-    color: var(--c-accent-2);
-}
-
 #todoView .todo-group-items {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--c-line-2);
+    /* style.css makes this a grid; one column no wider than the list, or a
+       long title pushes the row past the edge instead of being cut short. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    border-top: 0;
 }
 
 /* ---- Round checkboxes --------------------------------------------------- */
@@ -3067,7 +3682,7 @@ input[type="checkbox"] {
 #todoView .todo-due-overdue {
     background: none;
     border: 0;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
     font-weight: 500;
 }
 
@@ -3132,7 +3747,6 @@ input[type="checkbox"] {
     .nav-label,
     .sidebar-heading,
     .team-name,
-    .team-count,
     .user-chip-text {
         display: none;
     }
@@ -3144,8 +3758,8 @@ input[type="checkbox"] {
         width: 100%;
     }
 
-    .sidebar .nav-item,
-    .sidebar .nav-item.toggle-btn {
+    .sidebar .nav-item:not(.profile-pop-item),
+    .sidebar .nav-item.toggle-btn:not(.profile-pop-item) {
         width: 48px;
         min-width: 0;
         height: 44px;
@@ -3242,7 +3856,6 @@ input[type="checkbox"] {
     .sidebar-collapsed .nav-label,
     .sidebar-collapsed .sidebar-heading,
     .sidebar-collapsed .team-name,
-    .sidebar-collapsed .team-count,
     .sidebar-collapsed .user-chip-text {
         display: none;
     }
@@ -3254,8 +3867,8 @@ input[type="checkbox"] {
         width: 100%;
     }
 
-    .sidebar-collapsed .sidebar .nav-item,
-    .sidebar-collapsed .sidebar .nav-item.toggle-btn {
+    .sidebar-collapsed .sidebar .nav-item:not(.profile-pop-item),
+    .sidebar-collapsed .sidebar .nav-item.toggle-btn:not(.profile-pop-item) {
         width: 48px;
         min-width: 0;
         height: 44px;
@@ -3480,11 +4093,35 @@ input[type="checkbox"] {
         font-size: 22px;
     }
 
-    /* Toolbar: search fills the row, actions become icons. */
+    /* Toolbar: the title on its own line, then search filling the row and
+       actions as icons. */
     .view-panel .list-header {
         top: -18px;
         margin-bottom: 12px;
         padding: 10px 0;
+    }
+
+    .view-panel .list-header-top {
+        flex-wrap: wrap;
+    }
+
+    .list-head-title {
+        flex-basis: 100%;
+        margin: 0 0 4px;
+    }
+
+    .list-head-title .view-title {
+        font-size: 22px;
+    }
+
+    /* Search and actions share the second line: the search gives way. */
+    .view-panel .list-header-top .search-box {
+        flex: 1 1 0;
+        min-width: 110px;
+    }
+
+    .view-panel .list-header-actions .segmented-btn span {
+        display: none;
     }
 
     .view-panel .search-box {
@@ -3549,15 +4186,6 @@ input[type="checkbox"] {
 
     #workloadView .workload-head {
         margin-bottom: 16px;
-    }
-
-    #workloadView .workload-switch {
-        width: 100%;
-    }
-
-    #workloadView .workload-switch .form-select {
-        flex: 1;
-        min-width: 0;
     }
 
     #workloadView .workload-row {
@@ -3648,12 +4276,8 @@ input[type="checkbox"] {
    into a quiet, cool winter map in either theme - no second tile set needed.
    -------------------------------------------------------------------------- */
 
-/* The toolbar's search and filters do not act on the map, so in map mode the
-   whole bar steps aside; the List/Map switch above is the way back. */
-#listView.is-map .list-header,
-#listView.is-map > .list-header {
-    display: none;
-}
+/* The toolbar's search and filters do not act on the map, so in map mode
+   they step aside (section 9); title, List/Map switch and Add stay. */
 
 .contacts-map .leaflet-container {
     background: var(--c-sunken);
@@ -3769,7 +4393,7 @@ input[type="checkbox"] {
 .modal-content {
     max-height: calc(100dvh - 48px);
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-xl);
     box-shadow: var(--e-4);
     animation: dsDialogIn var(--dur-3) var(--ease) both;
@@ -3860,15 +4484,11 @@ input[type="checkbox"] {
 
 /* ---- Detail sheets (desktop and tablet) ---- */
 
-/* The project form is a sheet too, although it is a form: it opens from the
-   project's detail sheet, and jumping from the right edge to the centre of the
-   screen to edit what was just being read is disorienting. */
 @media (min-width: 769px) {
     #overviewModal,
     #projectOverviewModal,
-    #projectModal,
     #companyNotesModal,
-    #usersModal {
+    #finCostsModal {
         justify-content: flex-end;
         align-items: stretch;
         padding: 12px;
@@ -3876,20 +4496,14 @@ input[type="checkbox"] {
 
     #overviewModal .modal-content,
     #projectOverviewModal .modal-content,
-    #projectModal .modal-content,
     #companyNotesModal .modal-content,
-    #usersModal .modal-content {
+    #finCostsModal .modal-content {
         width: min(600px, 100%);
         max-width: 600px;
         height: 100%;
         max-height: none;
         border-radius: var(--r-xl);
         animation: dsSheetIn var(--dur-3) var(--ease) both;
-    }
-
-    #usersModal .modal-content {
-        width: min(680px, 100%);
-        max-width: 680px;
     }
 }
 
@@ -3985,17 +4599,21 @@ input[type="checkbox"] {
     display: none;
 }
 
-/* ---- Facts: a quiet two-column grid, no box around each one ---- */
+/* ---- Facts: a quiet two-column grid, no box around it or each one ----
+   Pulled out by the items' own padding, so labels line up with the section
+   headings above them. */
 
 .detail-grid,
 .overview-details {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2px 8px;
-    padding: 8px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     overflow: hidden;
 }
 
@@ -4013,11 +4631,30 @@ input[type="checkbox"] {
     box-shadow: none;
 }
 
-/* Project facts are a label over a value, with no icon. */
+/* Facts in every sheet are a label over a value, with no icon. */
+.detail-item,
 .overview-detail-item {
     flex-direction: column;
     gap: 2px;
     padding: 10px 12px;
+}
+
+/* The contact's grid sits inside .overview-details, which already reaches
+   into the sheet's padding: only one of them should. */
+.overview-details > .detail-grid {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* A contact's details open the edit form when clicked. */
+#overviewDetails .detail-item {
+    border-radius: var(--r-sm);
+    cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#overviewDetails .detail-item:hover {
+    background: var(--c-tint-3);
 }
 
 /* Five short project facts read best three to a row. */
@@ -4029,22 +4666,6 @@ input[type="checkbox"] {
 .detail-item.detail-item-full,
 .overview-detail-item.full-width {
     grid-column: 1 / -1;
-}
-
-.detail-icon {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
-    color: var(--c-ink-3);
-}
-
-.detail-icon svg {
-    width: 16px;
-    height: 16px;
 }
 
 .detail-content {
@@ -4087,10 +4708,10 @@ a.detail-value:hover,
 
 .assignee-bar {
     margin: 0 0 22px;
-    padding: 10px 12px 10px 10px;
-    background: var(--c-tint-3);
-    border: 1px solid var(--c-line-2);
-    border-radius: var(--r-lg);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .assignee-bar-face {
@@ -4129,9 +4750,9 @@ a.detail-value:hover,
     gap: 6px;
     height: 28px;
     padding: 0 6px 0 10px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -4237,8 +4858,8 @@ a.detail-value:hover,
 
 .project-mini-card {
     padding: 12px 14px;
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
     box-shadow: none;
     cursor: pointer;
@@ -4246,7 +4867,7 @@ a.detail-value:hover,
 }
 
 .project-mini-card:hover {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     background: var(--c-tint-3);
 }
 
@@ -4274,6 +4895,21 @@ a.detail-value:hover,
     padding: 14px 0;
     font-size: var(--t-sm);
     color: var(--c-ink-3);
+}
+
+/* Inside a sheet, "nothing here" is one plain line, left-aligned, wherever
+   it appears - a list without entries or a field without a value. */
+.modal .empty-hint,
+.modal .notes-empty {
+    padding: 2px 0;
+    text-align: left;
+    font-style: normal;
+}
+
+.detail-value.detail-empty,
+.detail-empty {
+    color: var(--c-ink-3);
+    font-weight: 400;
 }
 
 
@@ -4317,7 +4953,7 @@ a.detail-value:hover,
 /* Required marks stay, but quietly. */
 .form-group label .required,
 .required-mark {
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 
@@ -4409,19 +5045,17 @@ a.detail-value:hover,
 @media (min-width: 769px) {
     #overviewModal .modal-backdrop,
     #projectOverviewModal .modal-backdrop,
-    #projectModal .modal-backdrop,
     #companyNotesModal .modal-backdrop,
-    #usersModal .modal-backdrop {
-        background: rgba(17, 45, 78, 0.18);
+    #finCostsModal .modal-backdrop {
+        background: rgba(28, 50, 88, 0.18);
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
     }
 
     :root[data-theme="dark"] #overviewModal .modal-backdrop,
     :root[data-theme="dark"] #projectOverviewModal .modal-backdrop,
-    :root[data-theme="dark"] #projectModal .modal-backdrop,
     :root[data-theme="dark"] #companyNotesModal .modal-backdrop,
-    :root[data-theme="dark"] #usersModal .modal-backdrop {
+    :root[data-theme="dark"] #finCostsModal .modal-backdrop {
         background: rgba(3, 8, 16, 0.45);
     }
 }
@@ -4450,10 +5084,53 @@ textarea.form-input:focus {
    The month is one card with hairline gridlines, not forty-two boxes.
    -------------------------------------------------------------------------- */
 
+/* Month view: an entry is its dot and its name. The coloured bar down its
+   left edge said the same thing a second time. */
+#calendarView .cal-month-note-dot {
+    border-left: 0;
+    padding-left: 2px;
+}
+
+.cal-kind-dot { background: var(--c-ink-4); }
+.cal-month-note-dot--project-note .cal-kind-dot { background: var(--c-warning); }
+.cal-month-note-dot--todo .cal-kind-dot { background: var(--c-success); }
+.cal-month-note-dot--contact-activity .cal-kind-dot { background: var(--c-primary); }
+.cal-month-note-dot--project-activity .cal-kind-dot { background: var(--c-ink-3); }
+
+
 #calendarView .calendar-toolbar {
-    padding: 0 0 14px;
+    padding: 12px 0 14px;
     border: 0;
     background: transparent;
+}
+
+#calendarView .calendar-toolbar-left {
+    min-height: 42px;
+}
+
+/* The page title starts the toolbar row, as on the other pages. */
+#calendarView .calendar-page-title {
+    margin: 0 14px 0 0;
+}
+
+/* Narrow screens stack the toolbar: the title on top, then the way through
+   the months, then Month / Week / Day. */
+@media (max-width: 768px) {
+    #calendarView .calendar-toolbar-left {
+        order: 1;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    #calendarView .calendar-toolbar-right {
+        order: 2;
+    }
+
+    #calendarView .calendar-page-title {
+        flex-basis: 100%;
+        margin: 0 0 8px;
+        font-size: 22px;
+    }
 }
 
 #calendarView .calendar-title {
@@ -4534,7 +5211,7 @@ textarea.form-input:focus {
 #calendarView .cal-month-body {
     gap: 0;
     background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     overflow: hidden;
@@ -4619,16 +5296,22 @@ textarea.form-input:focus {
     --bk-control-height: 36px;
 }
 
-/* The page title already says Bookkeeping; the bar keeps only its count. */
+/* The page title starts the toolbar, as on Contacts, To-dos and Projects. */
 #bookkeepingView .bk-bar-title {
-    display: none;
+    margin: 0 6px 0 0;
+    font-size: var(--t-2xl);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--c-ink);
 }
 
 #bookkeepingView .bk-bar {
+    box-sizing: border-box;
     height: auto;
-    min-height: 0;
+    min-height: 54px;
     margin: 0 0 16px;
-    padding: 0;
+    padding: 12px 0 0;
     background: transparent;
     border: 0;
 }
@@ -4651,7 +5334,7 @@ textarea.form-input:focus {
 
 #bookkeepingView .bk-table-wrap,
 #bookkeepingView .bk-dropzone {
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
     background: var(--c-surface);
@@ -4689,10 +5372,37 @@ textarea.form-input:focus {
     letter-spacing: 0;
 }
 
+/* Accounts are rows divided by hairlines inside the page's card, not cards
+   of their own. */
+.users-list {
+    gap: 0;
+}
+
 .user-row {
-    padding: 12px 14px;
-    border-color: var(--c-line);
-    border-radius: var(--r-lg);
+    padding: 12px 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+}
+
+.user-row:first-child {
+    border-top: 0;
+}
+
+.user-row:hover {
+    border-color: var(--c-line-2);
+}
+
+/* The fresh invite link: a quiet tinted strip, not a box in the box. */
+.users-link-box {
+    margin: 14px 0 8px;
+    background: var(--c-tint-3);
+    border: 0;
+}
+
+.users-invite {
+    margin-bottom: 8px;
 }
 
 .user-row-role-select {
@@ -4714,10 +5424,233 @@ textarea.form-input:focus {
 .profile-pop {
     padding: 16px;
     background: var(--c-raised);
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     box-shadow: var(--e-3);
     animation: dsDialogIn var(--dur-2) var(--ease) both;
+}
+
+/* Users and the theme switch, under the photo: rows like the sidebar's,
+   set apart by a hairline. */
+.profile-pop-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px -8px -8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.sidebar .profile-pop .profile-pop-item {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+/* Sign out is a link among the buttons. */
+.sidebar .profile-pop a.profile-pop-item {
+    text-decoration: none;
+}
+
+/* The face is the way to the picture. A picture shows a camera over it on
+   hover; without one, a small camera badge says it can be clicked. */
+.profile-pop-head {
+    position: relative;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.profile-pop-face {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    cursor: pointer;
+}
+
+.profile-pop-face .profile-pop-avatar {
+    width: 100%;
+    height: 100%;
+    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.profile-pop-face:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.profile-pop-face-cue {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: rgba(28, 50, 88, 0.6);
+    color: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-1) var(--ease);
+}
+
+.profile-pop-face:hover .profile-pop-face-cue,
+.profile-pop-face:focus-visible .profile-pop-face-cue,
+.profile-pop-face[aria-expanded="true"] .profile-pop-face-cue {
+    opacity: 1;
+}
+
+.profile-pop-face.is-empty .profile-pop-face-cue {
+    inset: auto -3px -3px auto;
+    width: 20px;
+    height: 20px;
+    background: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-raised);
+    opacity: 1;
+}
+
+.profile-pop-face.is-empty .profile-pop-face-cue svg {
+    width: 11px;
+    height: 11px;
+}
+
+.profile-pop-face.is-empty:hover .profile-pop-avatar,
+.profile-pop-face.is-empty[aria-expanded="true"] .profile-pop-avatar {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.profile-pop-face.is-busy {
+    cursor: progress;
+}
+
+.profile-pop-face.is-busy .profile-pop-avatar {
+    opacity: 0.5;
+}
+
+.profile-pop-name-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.profile-pop-edit {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--c-ink-3);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.profile-pop-edit:hover {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+/* Upload / remove, dropping down under the face. */
+.profile-photo-menu {
+    position: absolute;
+    top: 50px;
+    left: -6px;
+    right: -6px;
+    z-index: 2;
+    padding: 6px;
+    background: var(--c-raised);
+    border: 1px solid var(--c-line-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--e-3);
+    animation: dsDialogIn var(--dur-2) var(--ease) both;
+}
+
+.profile-photo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+
+.profile-photo-item[hidden] {
+    display: none;
+}
+
+.profile-photo-item svg {
+    flex-shrink: 0;
+    color: var(--c-ink-3);
+}
+
+.profile-photo-item:hover {
+    background: var(--c-tint-3);
+}
+
+.profile-photo-item.is-danger,
+.profile-photo-item.is-danger svg {
+    color: var(--c-danger);
+}
+
+.profile-photo-item.is-danger:hover {
+    background: var(--c-danger-soft);
+}
+
+.profile-photo-hint span {
+    white-space: nowrap;
+}
+
+.profile-photo-hint {
+    margin: 6px 4px 2px;
+    padding: 8px 6px 0;
+    border-top: 1px solid var(--c-line-2);
+    color: var(--c-ink-3);
+    font-size: var(--t-xs);
+    line-height: 1.4;
+}
+
+/* Your name, being changed: under the head, the full width of the popover. */
+.profile-name-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.profile-name-form[hidden] {
+    display: none;
+}
+
+.profile-name-form .form-input {
+    height: 36px;
+}
+
+.profile-name-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+/* In the narrow rail the sidebar hides its labels and squeezes its rows to
+   icon buttons (those rules skip .profile-pop-item); here they always show. */
+.sidebar .profile-pop .profile-pop-item .nav-label {
+    display: inline;
 }
 
 /* Desktop: sized to the sidebar, so the sidebar's own overflow clipping
@@ -4782,13 +5715,13 @@ textarea.form-input:focus {
 .alert-error {
     background: var(--c-danger-soft);
     border: 1px solid transparent;
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .alert-success {
     background: var(--c-success-soft);
     border: 1px solid transparent;
-    color: var(--c-success);
+    color: var(--c-success-ink);
 }
 
 
@@ -4820,16 +5753,16 @@ textarea.form-input:focus {
     min-height: 100dvh;
     padding: 24px 16px;
     background:
-        radial-gradient(1200px 520px at 50% -140px, rgba(63, 114, 175, 0.30), transparent 70%),
-        radial-gradient(700px 420px at 100% 100%, rgba(219, 226, 239, 0.9), transparent 70%),
-        linear-gradient(180deg, #DBE2EF 0%, #F9F7F7 58%);
+        radial-gradient(1200px 520px at 50% -140px, rgba(48, 89, 157, 0.30), transparent 70%),
+        radial-gradient(700px 420px at 100% 100%, rgba(220, 225, 234, 0.9), transparent 70%),
+        linear-gradient(180deg, #DCE1EA 0%, #EEEEEE 58%);
     overflow: hidden;
 }
 
 :root[data-theme="dark"] .login-container {
     background:
-        radial-gradient(1200px 520px at 50% -140px, rgba(131, 169, 220, 0.20), transparent 70%),
-        linear-gradient(180deg, #112D4E 0%, #0A1422 62%);
+        radial-gradient(1200px 520px at 50% -140px, rgba(108, 146, 210, 0.20), transparent 70%),
+        linear-gradient(180deg, #1C3258 0%, #0B111C 62%);
 }
 
 /* The older stylesheet paints its own blurred backdrop; this one replaces it. */
@@ -4843,9 +5776,9 @@ textarea.form-input:focus {
     max-width: 400px;
     padding: 36px 32px 28px;
     background: var(--c-surface);
-    border: 1px solid rgba(17, 45, 78, 0.06);
+    border: 1px solid rgba(28, 50, 88, 0.06);
     border-radius: var(--r-xl);
-    box-shadow: 0 30px 70px -28px rgba(17, 45, 78, 0.35), 0 2px 6px rgba(17, 45, 78, 0.05);
+    box-shadow: 0 30px 70px -28px rgba(28, 50, 88, 0.35), 0 2px 6px rgba(28, 50, 88, 0.05);
     text-align: center;
     animation: loginBoxIn var(--dur-3) var(--ease) both;
 }
@@ -5036,21 +5969,6 @@ textarea.form-input:focus {
     }
 }
 
-/* "Last edited by ..." in a dialog footer shares the row with the buttons;
-   it stays on one line and gives way (ellipsis) rather than wrapping. */
-.modal-footer-edited {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.modal-footer-edited .edited-by {
-    white-space: nowrap;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 @media (max-width: 768px) {
     /* One person per row is too much for one line on a phone: who they are
        stays on top, what you can do to their account moves underneath. */
@@ -5112,8 +6030,8 @@ textarea.form-input:focus {
 details.import-instructions {
     margin: 0 0 14px;
     padding: 0;
-    background: transparent;
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
 }
 
@@ -5341,7 +6259,7 @@ details.import-instructions p {
 
 /* One hue per label, by its position in the list (Angebot, Hintergrund,
    Rechnung) and borrowed from the pipeline, so no new colour enters the
-   palette: amber for an offer, slate for background, green for an invoice.
+   palette: blue for an offer, grey for background, green for an invoice.
    The name is always written next to the dot - colour is never the only
    signal - and a label added later simply gets the neutral dot. */
 :is(.pdoc-label, .pdoc-chip, .pdoc-drop-target)[data-label-index="0"] { --pdoc-hue: var(--stage-proposal); }
@@ -5373,8 +6291,8 @@ details.import-instructions p {
 }
 
 .pdoc-card {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
     border-radius: var(--r-lg);
     overflow: hidden;
 }
@@ -5576,7 +6494,7 @@ details.import-instructions p {
 .pdoc-act--danger:hover,
 .pdoc-item:hover .pdoc-act--danger:hover {
     background: var(--c-danger-soft);
-    color: var(--c-danger);
+    color: var(--c-danger-ink);
 }
 
 .pdoc-act:focus-visible {
@@ -5635,9 +6553,9 @@ details.import-instructions p {
     gap: 7px;
     height: 30px;
     padding: 0 12px 0 10px;
-    border: 1px solid var(--c-line);
+    border: 1px solid transparent;
     border-radius: var(--r-full);
-    background: var(--c-surface);
+    background: var(--c-tint-2);
     color: var(--c-ink);
     font: 500 var(--t-sm)/1 var(--font);
     cursor: pointer;
@@ -5650,7 +6568,7 @@ details.import-instructions p {
 }
 
 .pdoc-chip:hover:not(:disabled) {
-    border-color: var(--c-line-strong);
+    background: var(--c-tint);
     box-shadow: var(--e-1);
 }
 
@@ -5744,4 +6662,4387 @@ details.import-instructions p {
 .pdoc-dot {
     width: 10px;
     height: 10px;
+}
+
+
+/* --------------------------------------------------------------------------
+   31. The project sheet, compact
+   --------------------------------------------------------------------------
+   One scrolling sheet and nothing scrolling inside it. Every section opens
+   with its heading and, on the right, its one way to add something; lists
+   are one line per item until an item is opened.
+   -------------------------------------------------------------------------- */
+
+#projectOverviewModal .overview-section {
+    margin-bottom: 22px;
+}
+
+#projectOverviewModal .overview-section:last-child {
+    margin-bottom: 0;
+}
+
+/* ---- Section head: title left, "Add" right ---- */
+
+.ov-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 8px;
+}
+
+.ov-section-head .overview-section-title {
+    margin: 0;
+}
+
+/* ---- Text buttons: one look everywhere ----
+   Every button that is only words - "+ New", "+ Add", "Update", "Reset",
+   "Show 3 more" - is accent text with a soft pill behind it on hover; what
+   adds something starts with a +. The negative margin keeps the words where
+   a plain link would sit and lets the pill grow around them. */
+.ov-add-btn,
+.ov-link-btn,
+.home-link,
+.home-clear,
+.home-more,
+.home-foot-link,
+.fin-link,
+.rf-link {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 4px;
+    height: 28px;
+    margin: 0 -10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-accent-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+/* With a +, the icon sits a little closer to the edge. */
+.ov-add-btn,
+.home-link {
+    padding-left: 7px;
+    margin-left: -7px;
+}
+
+:is(.ov-add-btn, .ov-link-btn, .home-link, .home-clear, .home-more, .home-foot-link, .fin-link, .rf-link):hover,
+.ov-add-btn[aria-expanded="true"],
+.fin-link[aria-expanded="true"] {
+    background: var(--c-accent-soft);
+}
+
+:is(.ov-add-btn, .ov-link-btn, .home-link, .home-clear, .home-more, .home-foot-link, .fin-link, .rf-link):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+:is(.ov-add-btn, .home-link) svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* In the foot of a Home card, the same room as before around them. */
+.home-more,
+.home-foot-link {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.home-foot-link {
+    margin-left: auto;
+}
+
+/* The search field an "Add" button opens. */
+.ov-picker {
+    margin: 0 0 8px;
+}
+
+.ov-picker[hidden] {
+    display: none;
+}
+
+.ov-picker .form-input {
+    height: 34px;
+    font-size: var(--t-sm);
+}
+
+/* A link-sized button: "Show more", "Show older notes". */
+.ov-link-btn[hidden] {
+    display: none;
+}
+
+/* ---- Tags: small pills on one wrapping line ---- */
+
+#projectOverviewModal .tags-container {
+    gap: 5px;
+    margin: 0;
+}
+
+#projectOverviewModal .tags-container .tag {
+    height: 24px;
+    gap: 5px;
+    padding: 0 4px 0 8px;
+    font-size: var(--t-xs);
+}
+
+#projectOverviewModal .tag-remove {
+    padding: 0 2px;
+    border: 0;
+    background: none;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* ---- Assigned contacts: chips side by side ---- */
+
+#projectOverviewModal .project-contacts-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pcontact-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 4px 0 12px;
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.pcontact-avatar {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+    color: var(--c-ink-2);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+/* The chip opens the contact; the name is its keyboard handle. */
+.pcontact-chip {
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+
+.pcontact-chip:hover {
+    background: var(--c-tint);
+    background: var(--c-tint-3);
+}
+
+.pcontact-name {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.pcontact-name:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Completed to-dos, when shown, read as done. */
+#projectOverviewModal .ptodo.todo-completed .ptodo-title,
+#todoView .ptodo.todo-completed .ptodo-title {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+    text-decoration-color: var(--c-ink-4);
+}
+
+.ptodo-done-hint .ov-link-btn {
+    font-size: inherit;
+}
+
+.pcontact-remove {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    color: var(--c-ink-4);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pcontact-remove:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+/* ---- To-dos: one line each, open in place ---- */
+
+.ptodo-card {
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+#projectOverviewModal .ptodo,
+#todoView .ptodo {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--c-line-2);
+    border-radius: 0;
+}
+
+#projectOverviewModal .ptodo:last-child,
+#todoView .ptodo:last-child {
+    border-bottom: 0;
+}
+
+/* On the To-dos page a row opens the to-do's sheet; it lines up with the
+   group names above it. */
+#todoView .ptodo-row {
+    min-height: 44px;
+    padding: 6px 14px 6px 16px;
+}
+
+#todoView .ptodo-title {
+    cursor: pointer;
+}
+
+.ptodo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 10px 6px 12px;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.ptodo-row:hover {
+    background: var(--c-tint-3);
+}
+
+/* In the sheet the list itself is tinted; a hovered row one step more. */
+.ptodo-card .ptodo-row:hover {
+    background: var(--c-tint-2);
+}
+
+.ptodo-row .todo-check {
+    margin: 0;
+}
+
+.ptodo-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    color: var(--c-ink);
+    font: 500 var(--t-sm)/1.4 var(--font);
+    cursor: pointer;
+}
+
+.ptodo-title:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ptodo-meta {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.ptodo-meta .todo-due {
+    font-size: var(--t-xs);
+    white-space: nowrap;
+}
+
+/* Fixed slots, so dates and faces line up from row to row. */
+.ptodo-meta .todo-due {
+    min-width: 44px;
+    justify-content: flex-end;
+}
+
+.ptodo-meta .assignee-chip,
+.ptodo-no-assignee {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.ptodo-chevron {
+    flex-shrink: 0;
+    color: var(--c-ink-4);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.ptodo.is-expanded .ptodo-chevron {
+    transform: rotate(180deg);
+}
+
+.ptodo-detail {
+    display: none;
+    padding: 0 12px 10px 42px;
+}
+
+.ptodo.is-expanded .ptodo-detail {
+    display: block;
+}
+
+.ptodo-detail .todo-description {
+    margin: 0 0 8px;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    color: var(--c-ink-2);
+    white-space: pre-wrap;
+}
+
+.ptodo-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ptodo-done-hint {
+    margin: 6px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 480px) {
+
+}
+
+/* ---- Documents: one line per file ---- */
+
+#projectOverviewModal .pdoc-list {
+    margin-bottom: 8px;
+}
+
+#projectOverviewModal .pdoc-list:empty {
+    display: none;
+}
+
+#projectOverviewModal .pdoc-item {
+    gap: 10px;
+    padding: 6px 8px 6px 10px;
+}
+
+#projectOverviewModal .pdoc-type {
+    width: 30px;
+    height: 24px;
+    border-radius: var(--r-sm);
+    font-size: 9px;
+}
+
+#projectOverviewModal .pdoc-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--t-sm);
+}
+
+#projectOverviewModal .pdoc-label {
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.pdoc-date {
+    flex-shrink: 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+#projectOverviewModal .pdoc-act {
+    width: 26px;
+    height: 26px;
+}
+
+#projectOverviewModal .pdoc-tools {
+    gap: 0;
+}
+
+/* Adding: one quiet line, no box. Files can still be dropped anywhere on
+   the sheet. */
+#projectOverviewModal .pdoc-add {
+    padding: 0;
+    background: none;
+    border: 0;
+}
+
+#projectOverviewModal .pdoc-add-text {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+#projectOverviewModal .pdoc-chip {
+    height: 24px;
+    gap: 5px;
+    padding: 0 9px 0 8px;
+    font-size: var(--t-xs);
+}
+
+@media (max-width: 480px) {
+    .pdoc-date {
+        display: none;
+    }
+}
+
+/* ---- Notes: newest few, a few lines each ---- */
+
+#projectOverviewModal .notes-timeline {
+    gap: 6px;
+    margin: 0;
+}
+
+#projectOverviewModal .note-item {
+    padding: 8px 12px;
+}
+
+#projectOverviewModal .note-header {
+    margin-bottom: 2px;
+}
+
+#projectOverviewModal .note-content {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+}
+
+#projectOverviewModal .note-item.is-open .note-content {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+}
+
+#projectOverviewModal .note-more-btn {
+    margin-top: 2px;
+    font-size: var(--t-xs);
+}
+
+#projectOverviewModal .notes-older-btn {
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
+.ov-note-form {
+    margin: 0 0 10px;
+}
+
+.ov-note-form[hidden] {
+    display: none;
+}
+
+.ov-note-form textarea {
+    width: 100%;
+    min-height: 72px;
+}
+
+.ov-note-form-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* ---- Footer: delete on the left, quietly; the main action right ---- */
+
+/* The destructive action: red text without a frame, a soft red behind it on
+   hover - never the secondary button's grey border or navy text. */
+.ov-footer .ov-delete-btn,
+.ov-footer .ov-delete-btn:hover:not(:disabled) {
+    border-color: transparent;
+    color: var(--c-danger-ink);
+}
+
+.ov-footer .ov-delete-btn {
+    margin-right: auto;
+    background: transparent;
+}
+
+.ov-footer .ov-delete-btn:hover:not(:disabled) {
+    background: var(--c-danger-soft);
+}
+
+@media (max-width: 768px) {
+    .ov-footer .btn {
+        flex: 0 1 auto;
+    }
+
+    .ov-footer [data-ov] {
+        flex: 1;
+    }
+}
+
+/* ---- Reading and editing: one layout, two states ----
+   In edit mode every fact keeps its place and shows a field instead of its
+   value and the sheet gets an accent outline, so the mode is obvious without
+   anything moving. */
+
+#projectOverviewModal:not(.is-editing) [data-ov="edit"],
+#projectOverviewModal.is-editing [data-ov="view"],
+#todoDetailModal:not(.is-editing) [data-ov="edit"],
+#todoDetailModal.is-editing [data-ov="view"] {
+    display: none !important;
+}
+
+#projectTagsSection[hidden] {
+    display: none !important;
+}
+
+/* A value that opens its field when clicked. */
+#projectOverviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"],
+#todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"] {
+    margin-left: -6px;
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#projectOverviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"]:hover,
+#todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"]:hover {
+    background: var(--c-tint-3);
+}
+
+#projectOverviewModal .modal-content,
+#todoDetailModal .modal-content,
+#reviewDetailModal .modal-content {
+    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+
+#projectOverviewModal.is-editing .modal-content,
+#todoDetailModal.is-editing .modal-content,
+#reviewDetailModal.is-editing .modal-content {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
+}
+
+/* The name field takes the heading's size, so the header does not change. */
+#projectOverviewModal .ov-edit-title,
+#todoDetailModal .ov-edit-title {
+    width: 100%;
+    height: 36px;
+    padding: 0 8px;
+    margin-left: -9px;
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+#projectOverviewModal .ov-edit-company,
+#todoDetailModal .ov-edit-context {
+    margin: 4px 0 0 -9px;
+}
+
+#projectOverviewModal .ov-edit-company .form-input,
+#todoDetailModal .ov-edit-context .form-select {
+    height: 30px;
+    padding: 0 8px;
+    font-size: var(--t-sm);
+}
+
+#projectOverviewModal.is-editing .overview-details,
+#todoDetailModal.is-editing .overview-details,
+#reviewDetailModal.is-editing .overview-details {
+    border-color: var(--c-accent);
+    background: color-mix(in srgb, var(--c-accent) 4%, var(--c-surface));
+}
+
+#projectOverviewModal .ov-field,
+#todoDetailModal .ov-field,
+#reviewDetailModal .ov-field {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    font-size: var(--t-base);
+    font-weight: 500;
+}
+
+#projectOverviewModal textarea.ov-field,
+#todoDetailModal textarea.ov-field,
+#reviewDetailModal textarea.ov-field {
+    height: auto;
+    min-height: 72px;
+    padding: 6px 8px;
+    line-height: 1.5;
+}
+
+.ov-field-pair {
+    display: flex;
+    gap: 4px;
+}
+
+.ov-field-pair .ov-field {
+    min-width: 0;
+}
+
+#projectOverviewModal .is-invalid,
+#todoDetailModal .is-invalid {
+    border-color: var(--c-danger);
+    box-shadow: 0 0 0 3px var(--c-danger-soft);
+}
+
+#projectOverviewModal.is-editing .overview-header-info,
+#projectOverviewModal.is-editing .overview-title-info,
+#todoDetailModal.is-editing .overview-header-info,
+#todoDetailModal.is-editing .overview-title-info {
+    flex: 1;
+}
+
+/* A project not yet created: every section as when editing - what is added
+   is held and applied right after it is created - but no history, Claude
+   proposals or archiving yet. */
+#projectOverviewModal.is-new #projectOverviewEdited,
+#projectOverviewModal.is-new #projectOverviewReview,
+#projectOverviewModal.is-new .ov-delete-btn {
+    display: none !important;
+}
+
+/* A to-do held for a project being created: no checkbox or detail yet. */
+.ptodo-draft .ptodo-row {
+    cursor: default;
+}
+
+.ptodo-draft .ptodo-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ptodo-draft-assignee {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+#projectOverviewModal.is-new .ov-footer {
+    justify-content: flex-end;
+}
+
+/* A to-do not yet created: no status, history or Claude proposals yet. The
+   assignee and links stay - both are saved right after the to-do is created. */
+#todoDetailModal.is-new .tdetail-status-item,
+#todoDetailModal.is-new #todoDetailEdited,
+#todoDetailModal.is-new #todoDetailReview,
+#todoDetailModal.is-new .ov-delete-btn {
+    display: none !important;
+}
+
+#todoDetailModal.is-new .ov-footer {
+    justify-content: flex-end;
+}
+
+/* The compact padding above must not run text under a select's arrow. */
+#projectOverviewModal select.ov-field,
+#todoDetailModal select.ov-field,
+#reviewDetailModal select.ov-field,
+#todoDetailModal .ov-edit-context .form-select {
+    padding-right: 30px;
+    background-position: right 8px center;
+}
+
+/* Belongs to: the kind takes its width, the record the rest. */
+#todoDetailModal .ov-edit-context #todoEditAssignType {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+#todoDetailModal .ov-edit-context #todoEditAssigneeId {
+    flex: 1;
+    min-width: 0;
+}
+
+
+/* ---- Expected payments (project-payments.js) ----
+   Reading: a short summary under the budget ("3 expected payments", what is
+   still open) and the full-width list. Editing: one row per payment - month,
+   amount, paid. Both end in the same sums against the budget. On a project
+   card: a green band with what is still open. */
+
+.ppay-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ppay-count {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+/* What is still open: the figure that matters once payments are planned.
+   Plain text, so a long range wraps between words, never inside it. */
+.ppay-open {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--c-success-ink);
+}
+
+.ppay-open strong {
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-nowrap {
+    white-space: nowrap;
+}
+
+.ppay-open svg {
+    margin-right: 4px;
+    vertical-align: -2px;
+}
+
+.ppay-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: var(--r-full);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ppay-flag.is-warn {
+    background: var(--c-warning-soft);
+    color: var(--c-warning-ink);
+}
+
+.ppay-flag svg {
+    width: 12px;
+    height: 12px;
+}
+
+.overview-detail-item.ppay-panel {
+    align-items: stretch;
+    gap: 10px;
+}
+
+.ppay-items,
+.ppay-rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ppay-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto 92px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.ppay-item:last-child {
+    border-bottom: 0;
+}
+
+.ppay-num {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-item-month {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.ppay-item-amount {
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-item-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.ppay-item.is-paid .ppay-num {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+.ppay-item.is-paid .ppay-item-status {
+    font-weight: 600;
+    color: var(--c-success-ink);
+}
+
+/* Editing */
+
+.ppay-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ppay-rows {
+    gap: 6px;
+}
+
+.ppay-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1.3fr) minmax(0, 1fr) auto 32px;
+    grid-template-areas: "num month amount paid remove";
+    align-items: center;
+    gap: 8px;
+}
+
+.ppay-row > .ppay-num { grid-area: num; }
+.ppay-row > .ppay-month { grid-area: month; }
+.ppay-row > .ppay-amount { grid-area: amount; }
+.ppay-row > .ppay-paid { grid-area: paid; }
+.ppay-row > .ppay-remove { grid-area: remove; }
+
+.ppay-row.is-paid .ppay-num {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+#projectOverviewModal .ppay-month.is-outside {
+    border-color: var(--c-warning);
+}
+
+.ppay-amount {
+    position: relative;
+    min-width: 0;
+}
+
+#projectOverviewModal .ppay-amount .ov-field {
+    padding-right: 26px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+/* The spinner would sit on top of the € sign. */
+.ppay-amount .ov-field::-webkit-inner-spin-button,
+.ppay-amount .ov-field::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.ppay-currency {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+    pointer-events: none;
+}
+
+/* "Paid": a checkbox that reads as one. */
+.ppay-paid {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px 0 8px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: 500 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.ppay-paid:hover {
+    border-color: var(--c-accent);
+}
+
+.ppay-paid-box {
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border: 1.5px solid var(--c-line-strong);
+    border-radius: 5px;
+    color: transparent;
+    transition: inherit;
+}
+
+.ppay-paid-box svg {
+    width: 12px;
+    height: 12px;
+}
+
+.ppay-paid[aria-checked="true"] {
+    border-color: transparent;
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+    font-weight: 600;
+}
+
+.ppay-paid[aria-checked="true"] .ppay-paid-box {
+    border-color: var(--c-success);
+    background: var(--c-success);
+    color: var(--c-surface);
+}
+
+.ppay-remove {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-4);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.ppay-remove:hover {
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+:is(.ppay-paid, .ppay-remove):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.ppay-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.ppay-add.ov-add-btn {
+    margin-left: -7px;
+}
+
+.ppay-status {
+    align-self: stretch;
+}
+
+/* ---- The sums: head line, budget bar, legend ---- */
+
+.ppay-sum {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 2px;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.ppay-sum-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 16px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.ppay-sum-planned strong {
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-sum-open {
+    font-weight: 500;
+    color: var(--c-success-ink);
+}
+
+.ppay-sum-open strong {
+    font-size: var(--t-base);
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-sum-open svg {
+    margin-right: 4px;
+    vertical-align: -2px;
+}
+
+.ppay-bar {
+    position: relative;
+    height: 8px;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+    overflow: hidden;
+}
+
+.ppay-bar-seg,
+.ppay-bar-range {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+}
+
+.ppay-bar-seg.is-paid {
+    background: var(--c-success);
+}
+
+.ppay-bar-seg.is-expected {
+    background: var(--c-accent);
+}
+
+/* min to max of a budget range: the part that may or may not come */
+.ppay-bar-range {
+    background: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--c-surface) 70%, transparent) 3px 6px);
+}
+
+/* the payments past the budget, and where the budget ends */
+.ppay-bar-over {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    background: repeating-linear-gradient(-45deg, var(--c-warning) 0 3px, transparent 3px 6px);
+    opacity: 0.75;
+}
+
+.ppay-bar-mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--c-warning);
+    box-shadow: 0 0 0 1px var(--c-surface);
+}
+
+.ppay-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.ppay-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ppay-legend strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-key {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.ppay-key.is-paid { background: var(--c-success); }
+.ppay-key.is-expected { background: var(--c-accent); }
+.ppay-key.is-rest { background: var(--c-tint); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+
+.ppay-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    color: var(--c-ink-3);
+}
+
+.ppay-note svg {
+    flex-shrink: 0;
+}
+
+.ppay-note.is-warn,
+.ppay-note.is-warn strong {
+    color: var(--c-warning-ink);
+}
+
+.ppay-note strong {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* On a project card, under the budget: one dash per payment, then a line
+   saying where they stand (project-payments.js, cardSummary). */
+.ppay-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    min-width: 0;
+}
+
+/* Up to 120px wide: a dash is 18px, and shares the room once there are
+   more payments than fit. */
+.ppay-dashes {
+    display: flex;
+    gap: 3px;
+    flex: 0 1 auto;
+    max-width: 120px;
+}
+
+.ppay-dash {
+    width: 18px;
+    flex: 0 1 auto;
+    min-width: 4px;
+    height: 5px;
+    border-radius: var(--r-full);
+    background: var(--c-tint);
+}
+
+.ppay-dash.is-paid { background: var(--c-success); }
+.ppay-dash.is-late { background: var(--c-danger); }
+.ppay-dash.is-due { background: color-mix(in srgb, var(--c-ink) 20%, transparent); }
+
+/* Budget no payment covers yet: hatched, so it reads as "not decided". */
+.ppay-dash.is-unplanned {
+    background: repeating-linear-gradient(-45deg, var(--c-line-strong) 0 2px, transparent 2px 4px);
+    opacity: 0.5;
+}
+
+.ppay-card-text {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 5px;
+    min-width: 0;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppay-card-text > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.ppay-card-text .is-paid { color: var(--c-success-ink); }
+.ppay-card-text .is-late { color: var(--c-danger-ink); font-weight: 600; }
+.ppay-card-text .is-due { color: var(--c-ink-3); }
+.ppay-card-text .is-warn { color: var(--c-warning-ink); }
+.ppay-card-text .ppay-sep { color: var(--c-ink-4); }
+
+.ppay-card-text svg {
+    width: 12px;
+    height: 12px;
+}
+
+@media (max-width: 560px) {
+    .ppay-row {
+        grid-template-columns: 22px minmax(0, 1fr) auto 32px;
+        grid-template-areas:
+            "num month  month month"
+            ".   amount paid  remove";
+        row-gap: 6px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--c-line-2);
+    }
+
+    .ppay-item {
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+    }
+
+    .ppay-item-status {
+        grid-column: 2 / -1;
+        justify-content: flex-start;
+    }
+}
+
+
+/* ---- "Payments received?" after a bookkeeping import ----
+   The imported income on top as reference, then every open expected
+   payment to tick: the ones with the same amount as an income first. */
+
+.ppaid-head {
+    min-width: 0;
+}
+
+.ppaid-sub {
+    margin: 4px 0 0;
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.ppaid-body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.ppaid-incomes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ppaid-income {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    max-width: 100%;
+    padding: 5px 10px;
+    border-radius: var(--r-full);
+    background: var(--c-success-soft);
+    font-size: var(--t-sm);
+}
+
+.ppaid-income.is-more {
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+}
+
+.ppaid-income-amount {
+    font-weight: 700;
+    color: var(--c-success-ink);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppaid-income-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-ink-2);
+}
+
+.ppaid-income-date {
+    margin-left: 6px;
+    color: var(--c-ink-3);
+}
+
+.ppaid-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-ink-3);
+}
+
+.ppaid-group-title span {
+    padding: 0 6px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.ppaid-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ppaid-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto 96px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.ppaid-row:hover {
+    border-color: var(--c-line-strong);
+    background: var(--c-tint-3);
+}
+
+.ppaid-row:has(input:checked) {
+    border-color: color-mix(in srgb, var(--c-success) 45%, transparent);
+    background: var(--c-success-soft);
+}
+
+.ppaid-row input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--c-success);
+    cursor: pointer;
+}
+
+.ppaid-row input:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.ppaid-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.ppaid-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.ppaid-row-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.ppaid-row-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-success-ink);
+}
+
+.ppaid-row-month {
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+    white-space: nowrap;
+}
+
+.ppaid-row-amount {
+    font-weight: 700;
+    text-align: right;
+    color: var(--c-ink);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppaid-foot {
+    align-items: center;
+}
+
+.ppaid-count {
+    margin-right: auto;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-success-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.ppaid-count.is-error {
+    color: var(--c-danger-ink);
+}
+
+@media (max-width: 560px) {
+    .ppaid-row {
+        grid-template-columns: 18px minmax(0, 1fr) auto;
+    }
+
+    .ppaid-row-month {
+        grid-column: 2;
+        grid-row: 2;
+        font-size: var(--t-xs);
+        color: var(--c-ink-3);
+    }
+
+    .ppaid-row-amount {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+    }
+
+    .ppaid-count {
+        flex-basis: 100%;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   32. To-do links and the to-do sheet
+   --------------------------------------------------------------------------
+   A to-do's link - mostly a Google Drive document - is one click from every
+   list the to-do is in: a small pill with the Drive mark and the document's
+   name. The to-do sheet lists them all.
+   -------------------------------------------------------------------------- */
+
+.tlink-icon {
+    width: 16px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.tlink-icon--web {
+    width: 16px;
+    height: 16px;
+    color: var(--c-ink-3);
+}
+
+.tlink-quick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.tlink-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 200px;
+    height: 26px;
+    padding: 0 10px 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font: 500 var(--t-xs)/1 var(--font);
+    text-decoration: none;
+    transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.tlink-pill:hover {
+    background: var(--c-tint);
+    box-shadow: var(--e-1);
+    color: var(--c-ink);
+}
+
+.tlink-pill:focus-visible {
+    outline: none;
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+.tlink-pill-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The mark alone, where a row has no room for a name. */
+.tlink-quick.is-compact .tlink-pill {
+    width: 26px;
+    padding: 0;
+    justify-content: center;
+}
+
+.tlink-more {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+/* Home rows: the pill sits at the end, outside the row's own button. */
+#workloadView .home-todo-titleline .tlink-quick {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+    .tlink-pill {
+        max-width: 130px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* On a phone the mark is enough; the name is in the to-do sheet. */
+    #workloadView .tlink-pill,
+    #todoView .tlink-pill {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    #workloadView .tlink-pill-name,
+    #todoView .tlink-pill-name {
+        display: none;
+    }
+}
+
+/* ---- The to-do sheet ---- */
+
+@media (min-width: 769px) {
+    #todoDetailModal,
+    #reviewDetailModal {
+        justify-content: flex-end;
+        align-items: stretch;
+        padding: 12px;
+    }
+
+    #todoDetailModal .modal-content,
+    #reviewDetailModal .modal-content {
+        width: min(560px, 100%);
+        max-width: 560px;
+        height: 100%;
+        max-height: none;
+        border-radius: var(--r-xl);
+        animation: dsSheetIn var(--dur-3) var(--ease) both;
+    }
+
+    #todoDetailModal .modal-backdrop,
+    #reviewDetailModal .modal-backdrop {
+        background: rgba(28, 50, 88, 0.18);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    :root[data-theme="dark"] #todoDetailModal .modal-backdrop,
+    :root[data-theme="dark"] #reviewDetailModal .modal-backdrop {
+        background: rgba(3, 8, 16, 0.45);
+    }
+}
+
+#todoDetailModal .overview-section,
+#reviewDetailModal .overview-section {
+    margin-bottom: 22px;
+}
+
+/* What the to-do belongs to: links in the header's subtitle line. */
+.tdetail-context-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-accent-2);
+    font: inherit;
+    cursor: pointer;
+}
+
+.tdetail-context-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.tdetail-context-sep {
+    margin: 0 6px;
+    color: var(--c-ink-4);
+}
+
+.tdetail-status {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--r-full);
+    font: 600 var(--t-xs)/1 var(--font);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+}
+
+.tdetail-status.is-done {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+.tdetail-description {
+    white-space: pre-wrap;
+    font-weight: 400;
+    line-height: 1.55;
+}
+
+/* ---- Links in the sheet ---- */
+
+.tlink-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.tlink-form[hidden] {
+    display: none;
+}
+
+.tlink-form .form-input {
+    height: 36px;
+    font-size: var(--t-sm);
+}
+
+.tlink-form .form-input.is-invalid {
+    border-color: var(--c-danger);
+    box-shadow: 0 0 0 3px var(--c-danger-soft);
+}
+
+.tlink-form-hint {
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.tlink-form .ov-note-form-actions {
+    justify-content: flex-end;
+}
+
+.tlink-card {
+    background: var(--c-tint-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.tlink-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 12px;
+    border-bottom: 1px solid var(--c-line-2);
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.tlink-row:last-child {
+    border-bottom: 0;
+}
+
+.tlink-row:hover {
+    background: var(--c-tint-3);
+}
+
+.tlink-row-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.tlink-row-icon .tlink-icon {
+    width: 18px;
+    height: 16px;
+}
+
+.tlink-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+}
+
+.tlink-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+.tlink-row-main:hover .tlink-row-name {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.tlink-row-kind {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.tlink-row-open {
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   33. Home: new for you
+   --------------------------------------------------------------------------
+   What was assigned to you since you last looked, above your lists. Tinted
+   in the accent so it is seen first, and gone once acknowledged.
+   -------------------------------------------------------------------------- */
+
+/* The same news in the lists below: a small tag after the title. */
+.workload-new {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    margin-left: 8px;
+    padding: 0 7px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+
+/* --------------------------------------------------------------------------
+   34. Home: the layout
+   --------------------------------------------------------------------------
+   The page width and the colour of each kind of thing a person can be
+   handed. The dashboard itself is section 42.
+   -------------------------------------------------------------------------- */
+
+:root {
+    --type-todo: var(--c-accent);
+    --type-project: #8A68AE;
+    --type-bookkeeping: #B48B39;
+    --type-contact: #A55F8F;
+}
+
+:root[data-theme="dark"] {
+    --type-todo: var(--c-accent);
+    --type-project: #A886CF;
+    --type-bookkeeping: #D4AA5A;
+    --type-contact: #BF77A7;
+}
+
+#workloadView .workload-wrap {
+    max-width: 1180px;
+}
+
+/* --------------------------------------------------------------------------
+   36. Projects: deleted projects
+   -------------------------------------------------------------------------- */
+
+.deleted-projects {
+    margin: 28px 0 8px;
+}
+
+.deleted-projects[hidden] {
+    display: none;
+}
+
+.deleted-projects-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 2px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.deleted-projects-head::-webkit-details-marker {
+    display: none;
+}
+
+.deleted-projects-head::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-left: 4px;
+    border-right: 1.5px solid var(--c-ink-3);
+    border-bottom: 1.5px solid var(--c-ink-3);
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.deleted-projects[open] .deleted-projects-head::after {
+    transform: rotate(-135deg) translateY(-1px);
+}
+
+.deleted-projects-title {
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.deleted-projects-count {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.deleted-projects-hint {
+    margin: 6px 2px 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.deleted-projects-list {
+    background: var(--c-surface);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+}
+
+.deleted-project {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.deleted-project:last-child {
+    border-bottom: 0;
+}
+
+.deleted-project-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.deleted-project-name {
+    font-size: var(--t-base);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.deleted-project-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.deleted-project-purge {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--c-danger-ink);
+}
+
+.deleted-project-purge:hover:not(:disabled) {
+    background: var(--c-danger-soft);
+}
+
+@media (max-width: 600px) {
+    .deleted-project {
+        flex-wrap: wrap;
+    }
+
+    .deleted-project-body {
+        flex-basis: 100%;
+    }
+
+    .deleted-project-meta {
+        white-space: normal;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   37. Faces: one look everywhere
+   --------------------------------------------------------------------------
+   Every face that stands for a person - by-lines, assignees, the sidebar
+   chip, the profile popover, the home page header, the team and user lists,
+   bookkeeping - shows initials on the same soft tint: light in light mode,
+   dark in dark mode. Some used to take the text colour as their background,
+   which turned them dark in light mode and light in dark mode.
+
+   A face that shows a picture gets no background or ring of its own: the
+   picture (Claude's mark included) brings its own.
+   -------------------------------------------------------------------------- */
+
+:root {
+    --face-bg: var(--c-tint);
+    --face-ink: var(--c-ink-2);
+}
+
+.by-line-avatar,
+.assignee-chip,
+.assignee-bar-face,
+.user-chip-avatar,
+.profile-pop-avatar,
+.user-row-avatar,
+.user-row.is-admin .user-row-avatar,
+.bk-menu-face,
+.bk-assignee,
+.team-face,
+.pcontact-avatar,
+.overview-avatar,
+#workloadView .workload-person-face {
+    background: var(--face-bg);
+    color: var(--face-ink);
+}
+
+/* An admin was marked by an inverted face; the "Admin" badge says it now. */
+.user-row.is-admin .user-row-avatar,
+.bk-assignee {
+    border-color: transparent;
+}
+
+/* "Nobody": an outline, not a face. */
+.assignee-bar-face.is-empty,
+#workloadView .workload-person-face.is-empty {
+    background: transparent;
+    color: var(--c-ink-3);
+    box-shadow: inset 0 0 0 1.5px var(--c-line-strong);
+}
+
+.by-line-avatar.has-photo,
+.assignee-chip.has-photo,
+.assignee-bar-face.has-photo,
+.user-chip-avatar.has-photo,
+.profile-pop-avatar.has-photo,
+.user-row-avatar.has-photo,
+.bk-menu-face.has-photo,
+.bk-assignee.has-photo,
+.team-face.has-photo,
+#workloadView .workload-person-face.has-photo {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   38. Home: the calm version
+   --------------------------------------------------------------------------
+   Fewer boxes, one weight of heading, hairlines instead of bands. Colour is
+   kept for what it means: the type of a thing, a priority, something late.
+   Overrides the home rules above.
+   -------------------------------------------------------------------------- */
+
+/* ---- Header: a greeting, the date above it ---- */
+
+#workloadView .workload-head {
+    align-items: flex-end;
+    margin: 4px 0 28px;
+}
+
+#workloadView .workload-person-text {
+    display: flex;
+    flex-direction: column;
+}
+
+#workloadView .workload-subtitle {
+    order: -1;
+    margin: 0 0 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-ink-3);
+}
+
+#workloadView .workload-title {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+}
+
+/* Your face (or the teammate's) beside the greeting, as tall as the
+   date line and the greeting together. */
+#workloadView .workload-person {
+    align-items: center;
+    gap: 16px;
+}
+
+#workloadView .workload-person-face {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+}
+
+/* ---- Rows: bookkeeping and contacts in their small cards ---- */
+
+#workloadView .workload-row,
+#workloadView div.workload-row {
+    min-height: 0;
+    padding: 0 16px;
+    border-bottom-color: var(--c-line-2);
+}
+
+#workloadView button.workload-row {
+    padding: 10px 16px;
+}
+
+#workloadView .workload-row-title {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+#workloadView .workload-row-context {
+    font-size: var(--t-xs);
+}
+
+#workloadView .workload-row-meta {
+    gap: 10px;
+}
+
+#workloadView .workload-due {
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+    #workloadView .workload-title {
+        font-size: 24px;
+    }
+}
+
+
+/* On someone else's page the line above the name is a summary, not a date:
+   normal case, so it reads as a sentence. */
+#workloadView .workload-head:not(.is-me) .workload-subtitle {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   41. Sidebar labels: room for descenders
+   --------------------------------------------------------------------------
+   Nav items set line-height 1, and the labels clip their overflow for the
+   ellipsis - together they cut the tail off a g, j, p or y ("Bookkeeping").
+   A normal line height gives the letters room; the rows centre their
+   content, so nothing shifts.
+   -------------------------------------------------------------------------- */
+
+.sidebar .nav-label,
+.sidebar .team-name,
+.sidebar .user-chip-name,
+.sidebar .user-chip-role,
+.sidebar .theme-toggle-label,
+.sidebar .header-btn-label {
+    line-height: 1.35;
+}
+
+
+/* --------------------------------------------------------------------------
+   42. Home: the dashboard
+   --------------------------------------------------------------------------
+   A slim "New for you" line, then two cards side by side: To-dos (wide) and
+   Projects (narrow), each a summary on top - a ring and its legend, and for
+   to-dos the week - with its own list underneath. The legend entries and
+   days are filters. Bookkeeping and contacts follow in small cards under
+   Projects. The cards stack on narrow screens.
+
+   Colours are the system's own: priorities in danger / warning / ink-4,
+   stages in the pipeline hues, the accent only for links and selection.
+   -------------------------------------------------------------------------- */
+
+#workloadView .workload-head {
+    margin-bottom: 24px;
+}
+
+/* ---- New for you: a small card above the dashboard ----
+   A head (bell, title, count, "Mark as seen"), then one row per item laid
+   out in columns - kind, title over what it belongs to, who and when - so
+   the rows line up instead of running on as one sentence. */
+
+#workloadView .home-news {
+    margin: 0 0 24px;
+    background: var(--c-surface);
+    border: 0;
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.home-news-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 4px 16px;
+}
+
+.home-news-icon {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.home-news-icon svg {
+    width: 13px;
+    height: 13px;
+}
+
+.home-news-heading {
+    margin: 0;
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.home-news-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    background: var(--c-accent);
+    color: var(--c-bg);
+    font: 600 11px/1 var(--font);
+}
+
+.home-news-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-news-list li + li {
+    border-top: 1px solid var(--c-line-2);
+}
+
+.home-news-row {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 9px 16px;
+    border: 0;
+    background: none;
+    color: var(--c-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-news-row:hover {
+    background: var(--c-tint-3);
+}
+
+/* The kind: a dot in the colour it has everywhere on the home page, and
+   the word - no pill. */
+.home-news-type {
+    --wl-type: var(--type-todo);
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--c-ink-3);
+    font: 500 var(--t-xs)/1.2 var(--font);
+    white-space: nowrap;
+}
+
+.home-news-type::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-full);
+    background: var(--wl-type);
+}
+
+.home-news-type[data-type="project"] { --wl-type: var(--type-project); }
+.home-news-type[data-type="contact"] { --wl-type: var(--type-contact); }
+.home-news-type[data-type="bookkeeping"] { --wl-type: var(--type-bookkeeping); }
+
+.home-news-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.home-news-title,
+.home-news-context {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-news-title {
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.home-news-row:hover .home-news-title {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.home-news-context {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.home-news-meta {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.home-news-foot {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.home-news-rest {
+    padding: 0 8px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.home-news-more,
+.home-news-dismiss {
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    font: 600 var(--t-sm)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-news-dismiss {
+    margin-left: auto;
+    color: var(--c-accent-2);
+}
+
+.home-news-more {
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.home-news-more:hover,
+.home-news-dismiss:hover:not(:disabled) {
+    background: var(--c-accent-soft);
+}
+
+/* ---- The two columns ---- */
+
+#workloadView .home-dash {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+#workloadView .home-todos {
+    flex: 1.7 1 560px;
+    min-width: 0;
+}
+
+#workloadView .home-side {
+    flex: 1 1 340px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ---- Cards ---- */
+
+#workloadView .home-card {
+    background: var(--c-surface);
+    border: 0;
+    border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+    overflow: hidden;
+}
+
+.home-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 22px 18px;
+    container-type: inline-size;
+}
+
+.home-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#workloadView .home-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+/* Every control on the dashboard shows where the keyboard is. */
+#workloadView .home-dash :is(button, a):focus-visible,
+#workloadView .home-news :is(button, a):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+/* ---- The band: one colour block per priority or stage ----
+   A bar of its own at the top of the card, inside its padding and rounded
+   at both ends: each block as wide as its share, its count in it and its
+   name below in the block's colour - and each the filter for it. Blocks sit
+   2px apart, like the stages in a forecast bar. */
+
+.home-meter {
+    display: flex;
+    gap: 2px;
+    margin: 20px 22px 0;
+}
+
+.home-meter-seg:first-child .home-meter-fill {
+    border-top-left-radius: var(--r-md);
+    border-bottom-left-radius: var(--r-md);
+}
+
+.home-meter-seg:last-child .home-meter-fill {
+    border-top-right-radius: var(--r-md);
+    border-bottom-right-radius: var(--r-md);
+}
+
+.home-meter-seg {
+    --meter-bg: var(--c-tint-2);
+    --meter-fg: var(--c-ink);
+    --meter-ink: var(--c-ink-2);
+    /* As wide as its share, never narrower than its name. */
+    flex: 1 1 0;
+    min-width: auto;
+    display: flex;
+    flex-direction: column;
+    /* Said outright: Safari's buttons do not stretch their blocks otherwise,
+       and each colour would shrink to its number. */
+    align-items: stretch;
+    gap: 9px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: opacity var(--dur-2) var(--ease);
+}
+
+.home-meter-fill {
+    display: flex;
+    align-items: center;
+    height: 64px;
+    padding: 0 18px;
+    background: var(--meter-bg);
+    color: var(--meter-fg);
+    transition: filter var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.home-meter-seg:hover .home-meter-fill {
+    filter: brightness(0.95);
+}
+
+/* A filter in use: its block keeps a white line along its foot, the others
+   step back. */
+.home-meter-seg.is-dim {
+    opacity: 0.32;
+}
+
+.home-meter-seg.is-active .home-meter-fill {
+    box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--meter-fg) 80%, transparent);
+}
+
+.home-meter-count {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-meter-label {
+    padding: 0 18px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--meter-ink);
+    white-space: nowrap;
+}
+
+.home-meter-seg[data-tone="high"] { --meter-bg: var(--c-danger); --meter-fg: #FFFFFF; --meter-ink: var(--c-danger-ink); }
+.home-meter-seg[data-tone="medium"] { --meter-bg: var(--pri-medium); --meter-fg: #FFFFFF; --meter-ink: var(--pri-medium-ink); }
+.home-meter-seg[data-tone="low"] { --meter-bg: #AAB5C5; --meter-fg: #1C3258; --meter-ink: var(--c-ink-2); }
+.home-meter-seg[data-tone="none"] { --meter-ink: var(--c-ink-3); }
+.home-meter-seg[data-tone="progress"] { --meter-bg: var(--stage-progress); --meter-fg: #FFFFFF; --meter-ink: color-mix(in srgb, var(--stage-progress) 75%, var(--c-ink)); }
+.home-meter-seg[data-tone="proposal"] { --meter-bg: var(--stage-proposal); --meter-fg: #FFFFFF; --meter-ink: color-mix(in srgb, var(--stage-proposal) 75%, var(--c-ink)); }
+.home-meter-seg[data-tone="negotiation"] { --meter-bg: var(--stage-negotiation); --meter-fg: #1C3258; --meter-ink: color-mix(in srgb, var(--stage-negotiation) 55%, var(--c-ink)); }
+
+/* No priority: hatched, the same "not decided" as the forecast's best case. */
+.home-meter-seg[data-tone="none"] .home-meter-fill {
+    color: var(--c-ink);
+    background: repeating-linear-gradient(135deg, var(--meter-hatch, #DDE2EA) 0 2px, var(--meter-hatch-bg, #F3F5F8) 2px 7px);
+}
+
+.home-meter.is-empty .home-meter-seg {
+    flex: 1;
+    cursor: default;
+    --meter-bg: var(--c-tint-3);
+    --meter-fg: var(--c-ink-3);
+    --meter-ink: var(--c-ink-3);
+}
+
+.home-meter.is-empty .home-meter-seg:hover .home-meter-fill {
+    filter: none;
+}
+
+/* Dark: the light stage fills keep dark text, the low block goes deeper. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .home-meter-seg[data-tone="low"] { --meter-bg: #5E6B80; --meter-fg: #FFFFFF; }
+    :root:not([data-theme="light"]) .home-meter-seg:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) { --meter-fg: #0E1626; --meter-ink: var(--meter-bg); }
+    :root:not([data-theme="light"]) .home-meter-seg[data-tone="none"] { --meter-hatch: #2A3754; --meter-hatch-bg: #1B2742; }
+}
+
+:root[data-theme="dark"] .home-meter-seg[data-tone="low"] { --meter-bg: #5E6B80; --meter-fg: #FFFFFF; }
+:root[data-theme="dark"] .home-meter-seg:is([data-tone="progress"], [data-tone="proposal"], [data-tone="negotiation"]) { --meter-fg: #0E1626; --meter-ink: var(--meter-bg); }
+:root[data-theme="dark"] .home-meter-seg[data-tone="none"] { --meter-hatch: #2A3754; --meter-hatch-bg: #1B2742; }
+
+/* The labels under the band take the place of the card's top padding. */
+.home-meter + .home-card-top {
+    padding-top: 14px;
+}
+
+#workloadView .home-card-title .home-card-sub {
+    font-weight: 400;
+    color: var(--c-ink-3);
+}
+
+/* The week's days: hover, the day in use, and the others stepping back. */
+.home-day-btn:hover {
+    background: var(--c-tint-3);
+}
+
+.home-day-btn.is-active {
+    background: var(--c-tint-2);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+}
+
+.home-day-btn.is-dim {
+    opacity: 0.45;
+}
+
+/* One dot vocabulary for priorities and stages. */
+.home-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+}
+
+:is(.home-dot, .home-project-bar)[data-tone="high"] { background: var(--c-danger); }
+:is(.home-dot, .home-project-bar)[data-tone="medium"] { background: var(--pri-medium); }
+:is(.home-dot, .home-project-bar)[data-tone="low"] { background: var(--c-ink-4); }
+:is(.home-dot, .home-project-bar)[data-tone="none"] { background: var(--c-line-strong); }
+:is(.home-dot, .home-project-bar)[data-tone="progress"] { background: var(--stage-progress); }
+:is(.home-dot, .home-project-bar)[data-tone="proposal"] { background: var(--stage-proposal); }
+:is(.home-dot, .home-project-bar)[data-tone="negotiation"] { background: var(--stage-negotiation); }
+
+/* The week: today and the six days after it, each a filter - under the
+   card's title, the full width of the card. */
+.home-week {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-week-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--t-sm);
+}
+
+.home-week-title {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.home-week-due {
+    color: var(--c-ink-3);
+}
+
+.home-week-due strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.home-week-overdue {
+    color: var(--c-danger-ink);
+    font-weight: 600;
+}
+
+.home-week-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.home-day-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 7px 0;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.home-day-initial {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--c-ink-3);
+}
+
+.home-day-num {
+    font-size: var(--t-md);
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-day-btn.is-today .home-day-initial {
+    color: var(--c-danger-ink);
+}
+
+.home-day-btn.is-today .home-day-num {
+    font-weight: 700;
+}
+
+/* A faint dot for a free day; the count, in red on its tint, for a busy one. */
+.home-day-badge {
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-full);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.home-day-badge:not(.has-due)::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: var(--c-line-strong);
+}
+
+.home-day-badge.has-due {
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+/* ---- Filter bar ---- */
+
+/* What the list below shows, as a quiet label over it - no band. */
+.home-filterbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 34px;
+    padding: 10px 22px 2px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.home-filterbar-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+
+/* ---- Lists ---- */
+
+.home-list-wrap {
+    padding: 2px 0 6px;
+}
+
+.home-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 22px 2px;
+}
+
+.home-group-name {
+    font-size: var(--t-sm);
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.home-group-head.is-urgent .home-group-name {
+    color: var(--c-danger-ink);
+}
+
+.home-group-date {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.home-row-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.home-row-title {
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--c-ink);
+}
+
+.home-row-context {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+/* A to-do: the circle ticks it off, the rest of the row opens it. */
+.home-todo {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 22px;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-todo:hover {
+    background: var(--c-tint-3);
+}
+
+.home-check {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    margin-top: 10px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 2px solid var(--c-line-strong);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: transparent;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+/* A larger target than the drawn circle, for thumbs. */
+.home-check::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+.home-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+.home-check:hover:not(.is-done) {
+    border-color: var(--c-success);
+    color: color-mix(in srgb, var(--c-success) 60%, transparent);
+}
+
+.home-check.is-done {
+    border-color: var(--c-success);
+    background: var(--c-success);
+    color: var(--c-surface);
+}
+
+.home-check:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.home-todo-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 9px 0;
+}
+
+/* The title, then its Drive / link button right after the text - inline,
+   so on a long title it follows the last word. */
+.home-todo-titleline {
+    display: block;
+    min-width: 0;
+}
+
+.home-todo-open {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* The link's name as on the To-dos tab, a little smaller: the home rows are
+   narrower, so a long name ends in an ellipsis sooner. */
+#workloadView .home-todo-titleline .tlink-pill {
+    max-width: 160px;
+    height: 22px;
+    padding: 0 8px 0 6px;
+    gap: 5px;
+}
+
+@media (max-width: 480px) {
+    /* The mark alone, as on the To-dos tab. */
+    #workloadView .home-todo-titleline .tlink-pill {
+        width: 22px;
+        padding: 0;
+    }
+}
+
+/* Priority: a pill in its colour, centred on the row. */
+.home-prio-pill {
+    align-self: center;
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.home-prio-pill[data-tone="high"] {
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+.home-prio-pill[data-tone="medium"] {
+    background: var(--pri-medium-soft);
+    color: var(--pri-medium-ink);
+}
+
+.home-prio-pill[data-tone="low"] {
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
+}
+
+/* Just ticked off: greyed and struck through until the next refresh. */
+.home-todo.is-done .home-row-title {
+    color: var(--c-ink-3);
+    text-decoration: line-through;
+}
+
+.home-todo.is-done .home-prio-pill {
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+}
+
+/* A project: its stage as a bar, then name and client, then its to-dos. */
+.home-project {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 22px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.home-project:hover {
+    background: var(--c-tint-3);
+}
+
+.home-project .home-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-project-bar {
+    width: 4px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 2px;
+}
+
+.home-pill {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--c-ink-3);
+}
+
+.home-pill.has-todos {
+    background: var(--c-tint-2);
+    color: var(--c-accent-2);
+}
+
+.home-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 18px 22px;
+    font-size: var(--t-base);
+    color: var(--c-ink-3);
+}
+
+.home-empty svg {
+    flex-shrink: 0;
+    color: var(--c-accent);
+}
+
+/* ---- Card footer ---- */
+
+.home-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 22px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+
+/* ---- Bookkeeping and contacts: small cards ---- */
+
+#workloadView .home-mini.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
+#workloadView .home-mini.is-contact { --wl-type: var(--type-contact); }
+
+#workloadView .home-mini .home-card-head {
+    padding: 16px 22px 12px;
+}
+
+#workloadView .home-mini .home-card-title {
+    font-size: var(--t-md);
+}
+
+.home-mini-icon {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+/* The rows sit straight in the card: no second outline inside it. */
+#workloadView .home-mini .workload-list {
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#workloadView .home-mini .workload-row {
+    padding: 9px 22px;
+    gap: 10px;
+}
+
+#workloadView .home-mini .workload-row-mark.is-icon,
+#workloadView .home-mini .workload-row-mark.is-initials {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
+    color: var(--wl-type);
+}
+
+#workloadView .home-mini .workload-row-mark.is-initials {
+    border-radius: var(--r-full);
+}
+
+#workloadView .home-mini .workload-row-body {
+    min-width: 0;
+}
+
+#workloadView .home-mini .workload-row-title,
+#workloadView .home-mini .workload-row-context {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Bookkeeping: entries waiting on an invoice (workload.js) ----
+   Above the to-dos and projects, across the full width. A small card like
+   Contacts (.home-mini), but its rows run side by side; each is a row a
+   PDF can be dropped onto. */
+
+#workloadView .home-bk {
+    margin: 0 0 20px;
+}
+
+/* Rows in columns. The line goes above each row rather than under it, so
+   every row of the grid has one, however many columns there are. */
+#workloadView .home-bk .home-bk-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    /* style.css spaces the stacked lists apart; here the lines meet. */
+    gap: 0;
+    border-top: 0;
+}
+
+/* Across the full width, beside "My to-dos": its title size, not the
+   side column's. */
+#workloadView .home-bk .home-card-head {
+    padding: 18px 22px 14px;
+}
+
+#workloadView .home-bk .home-card-title {
+    font-size: var(--t-lg);
+}
+
+#workloadView .home-bk .workload-row,
+#workloadView .home-bk .workload-row:last-child {
+    min-height: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-bottom: 0;
+}
+
+/* The drop frame sits a little inside the row: drawn on the row itself, the
+   card's rounded corners would cut into it on the rows along the card's
+   edge, giving it two different radii. */
+#workloadView .home-bk .workload-row.is-drop-target {
+    isolation: isolate;
+    background: transparent;
+    box-shadow: none;
+}
+
+#workloadView .home-bk .workload-row.is-drop-target::before {
+    content: "";
+    position: absolute;
+    inset: 4px 8px;
+    z-index: -1;
+    border-radius: var(--r-md);
+    background: var(--c-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--c-accent);
+    pointer-events: none;
+}
+
+/* ---- Loading: the cards' shape in placeholders ---- */
+
+.home-skel {
+    display: block;
+    height: 12px;
+    border-radius: var(--r-xs);
+    background: var(--c-tint-2);
+    animation: home-skel-pulse 1.4s var(--ease) infinite alternate;
+}
+
+.home-skel.is-title { height: 18px; }
+.home-skel.is-small { height: 10px; }
+.home-skel.is-line { height: 14px; margin: 7px 0; }
+.home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); }
+.home-skel.is-day { height: 52px; border-radius: var(--r-md); }
+
+.home-skel.is-meter {
+    display: block;
+    height: 64px;
+    margin: 20px 22px 0;
+    border-radius: var(--r-md);
+}
+
+.home-skel-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 22px;
+}
+
+.home-skel-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 2px;
+}
+
+@keyframes home-skel-pulse {
+    from { opacity: 1; }
+    to { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-skel {
+        animation: none;
+    }
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 600px) {
+    .home-card-top {
+        padding: 16px 16px 14px;
+    }
+
+    .home-meter,
+    .home-skel.is-meter {
+        margin: 16px 16px 0;
+    }
+
+    .home-meter-fill,
+    .home-skel.is-meter {
+        height: 54px;
+    }
+
+    .home-meter-fill,
+    .home-meter-label {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .home-meter-count {
+        font-size: 26px;
+    }
+
+    .home-meter-label {
+        font-size: var(--t-xs);
+    }
+
+    .home-filterbar,
+    .home-group-head,
+    .home-todo,
+    .home-project,
+    .home-empty,
+    .home-skel-row,
+    .home-card-foot,
+    #workloadView .home-mini .home-card-head,
+    #workloadView .home-mini .workload-row {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* The kind and who/when move under the title. */
+    .home-news-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+        padding: 10px 14px;
+    }
+
+    .home-news-row .home-news-type {
+        order: -1;
+    }
+
+    .home-news-meta {
+        white-space: normal;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   43. Financials
+   --------------------------------------------------------------------------
+   Admins only (assets/js/financials.js). Four figures on top - the bank
+   balance in navy as the anchor of the page - then the cashflow chart, the
+   months, income and costs side by side, the revenue forecast and the
+   assumptions. Money in is green, money out a muted red, the balance line
+   the accent blue.
+   -------------------------------------------------------------------------- */
+
+.fin-head {
+    align-items: center;
+}
+
+/* "Months ahead" beside its switch, both no taller than the page title,
+   so this header is as high as every other tab's. */
+/* Three groups, each one control, a hairline between them: the balance,
+   the scenario, how far ahead. The controls say what they are, so there
+   are no labels in front of them. */
+.fin-head-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.fin-head-tools .fin-months {
+    padding-left: 16px;
+    border-left: 1px solid var(--c-line);
+}
+
+.fin-tool {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fin-tool-label {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+/* Scenario, then months ahead. The months are financials.js's, the
+   scenario the forecast card's; the bank balance is on the first card. */
+.fin-head-own {
+    display: contents;
+}
+
+.fin-head-tools .fin-scenario { order: 1; }
+.fin-head-tools .fin-months { order: 2; }
+
+/* Empty while the forecast loads. A plain :empty, not :has(): Safari does
+   not redraw a :has(:empty) parent once its child is filled in. */
+.fin-scenario:empty {
+    display: none;
+}
+
+.fin-scenario .rf-presets {
+    padding: 2px;
+}
+
+.fin-scenario .rf-presets .segmented-btn {
+    height: 26px;
+    padding: 0 12px;
+}
+
+.fin-scenario .rf-adjust {
+    min-width: 98px;
+    justify-content: center;
+    height: 30px;
+    border-radius: var(--r-sm);
+}
+
+/* What "Adjust" opens: a row under the header, at its right edge below
+   the button, pushing the page down. It stays until "Adjust" closes it. */
+.fin-adjust {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.fin-adjust:empty {
+    display: none;
+}
+
+.fin-adjust .rf-adjust-panel {
+    margin: 0;
+    padding: 10px 16px;
+    background: var(--c-surface);
+    box-shadow: var(--e-1);
+}
+
+.fin-head .fin-seg {
+    padding: 2px;
+}
+
+.fin-head .fin-seg .segmented-btn {
+    height: 26px;
+    padding: 0 12px;
+}
+
+.fin-seg .segmented-btn.active {
+    font-weight: 600;
+}
+
+.fin-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ---- Figures ---- */
+
+.fin-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.fin-kpi-unit {
+    margin-left: 4px;
+    font-size: var(--t-md);
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--c-ink-3);
+}
+
+.fin-kpi {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 16px 18px 18px;
+    background: var(--c-surface);
+    border: 1px solid transparent;
+    border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+}
+
+.fin-kpi-label {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fin-kpi-sub {
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-sub strong {
+    color: inherit;
+    font-weight: 600;
+}
+
+
+.fin-balance-note {
+    margin: 0 0 4px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+/* "Set buffer" / "Buffer 15.000 €": top right, on the label's line. */
+.fin-kpi-action {
+    position: absolute;
+    top: 11px;
+    right: 18px;
+}
+
+/* The year card: the result so far in its colour, then year end and balance. */
+.fin-kpi-value.is-pos { color: var(--c-success-ink); }
+.fin-kpi-value.is-neg { color: var(--c-danger-ink); }
+.fin-kpi-sub strong.is-pos { color: var(--c-success-ink); }
+
+/* The scenario the projection uses, as a label beside it. */
+.fin-kpi-scenario {
+    margin-left: 6px;
+    vertical-align: 1px;
+}
+
+
+.fin-kpi-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 10px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.fin-kpi-lines > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+}
+
+.fin-kpi-lines dt {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-lines dd {
+    margin: 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-kpi-lines dd.is-pos { color: var(--c-success-ink); }
+.fin-kpi-lines dd.is-neg { color: var(--c-danger-ink); }
+.fin-kpi-lines dd.is-warn { color: var(--c-warning-ink); }
+
+.fin-balance-link {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-kpi--year .fin-balance-note {
+    margin: 10px 0 0;
+}
+
+.fin-kpi--year .fin-balance-form {
+    margin-top: 6px;
+}
+
+/* A quarter of the page is too narrow for amount and date side by side. */
+.fin-kpi--year .fin-field-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* "3 suggestions" on the fixed costs: recurring payments from Bookkeeping. */
+.fin-suggest-pill {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 5px;
+    height: 24px;
+    margin-top: 6px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+    font: 600 var(--t-xs)/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.fin-suggest-pill:hover {
+    background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+}
+
+.fin-suggest-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+/* A cost card unfolded: its costs, to edit, below the figure. */
+.fin-kpi-panel {
+    margin-top: 14px;
+}
+
+.fin-kpi-panel .fin-group-title > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-kpi-panel .fin-cost-form .fin-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.fin-panel-empty {
+    margin: 4px 0 0;
+    font-size: var(--t-sm);
+}
+
+.fin-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 8px;
+    border-radius: var(--r-md);
+    background: var(--c-accent-softer);
+}
+
+.fin-suggestion + .fin-suggestion {
+    margin-top: 4px;
+}
+
+.fin-suggestion .fin-cost {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+}
+
+.fin-suggestion .fin-cost:hover {
+    background: var(--c-accent-soft);
+}
+
+/* The balance and buffer forms. */
+.fin-balance-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    box-shadow: var(--e-2);
+}
+
+.fin-history {
+    margin: 4px 0 0;
+    padding: 8px 0 0;
+    border-top: 1px solid var(--c-line-2);
+    list-style: none;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-history li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.fin-history li strong {
+    margin-left: auto;
+    color: var(--c-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Alerts ---- */
+
+.fin-alerts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fin-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: var(--r-lg);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+}
+
+.fin-alert svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.fin-alert.is-danger { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.fin-alert.is-warn { background: var(--c-warning-soft); color: var(--c-warning-ink); }
+.fin-alert.is-info { background: var(--c-accent-softer); color: var(--c-accent-2); }
+
+.fin-error {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--r-lg);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+/* ---- Cards ---- */
+
+.fin-card {
+    min-width: 0;
+    padding: 18px 20px 20px;
+    background: var(--c-surface);
+    border: 1px solid transparent;
+    border-radius: var(--r-xl);
+    box-shadow: var(--e-1);
+}
+
+.fin-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-bottom: 12px;
+}
+
+#financialsView .fin-card-title {
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+.fin-card-sub {
+    margin: 2px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.fin-card-sub strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+/* The forecast card opens the page; the page's gap spaces it. */
+.fin-page > .rf-card {
+    margin: 0;
+}
+
+/* ---- The chart ---- */
+
+/* A hovered month: its in, out and balance in a box above its point. */
+.fin-plot-wrap {
+    position: relative;
+}
+
+.fin-hover-tip {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    gap: 3px;
+    min-width: 150px;
+    padding: 9px 12px 10px;
+    border-radius: var(--r-md);
+    background: var(--c-raised);
+    box-shadow: var(--e-3);
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+.fin-hover-tip[hidden] {
+    display: none;
+}
+
+.fin-hover-tip > span {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.fin-hover-tip strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.fin-hover-tip .fin-hover-month {
+    margin-bottom: 2px;
+    font-size: var(--t-sm);
+}
+
+.fin-hover-tip .is-pos { color: var(--c-success-ink); }
+.fin-hover-tip .is-neg { color: var(--c-danger-ink); }
+
+.fin-plot {
+    position: relative;
+    width: 100%;
+}
+
+.fin-svg {
+    display: block;
+    overflow: visible;
+}
+
+.fin-grid {
+    stroke: var(--c-line-2);
+    stroke-width: 1;
+}
+
+.fin-grid.is-zero {
+    stroke: var(--c-line-strong);
+}
+
+.fin-below-zero {
+    fill: var(--c-danger-soft);
+}
+
+.fin-buffer {
+    stroke: var(--c-warning);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+}
+
+.fin-buffer-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    fill: var(--c-warning);
+}
+
+.fin-axis-y {
+    font-size: 10.5px;
+    fill: var(--c-ink-4);
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-axis-x {
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--c-ink-3);
+}
+
+.fin-axis-x.is-now {
+    font-weight: 700;
+    fill: var(--c-ink);
+}
+
+.fin-axis-x.is-past {
+    fill: var(--c-ink-4);
+}
+
+.fin-axis-year {
+    font-size: 9.5px;
+    fill: var(--c-ink-4);
+}
+
+/* The balance as one smooth line: accent blue above zero, red below. */
+/* A month's money in (up from zero) and out (down), under the balance line. */
+.fin-flow-bar.is-in {
+    fill: var(--c-success);
+    opacity: 0.45;
+}
+
+.fin-flow-bar.is-out {
+    fill: var(--c-danger);
+    opacity: 0.4;
+}
+
+.fin-flow-bar.is-past {
+    opacity: 0.25;
+}
+
+/* The balance from the worst to the best scenario, around the line. */
+.fin-scenario-band {
+    fill: var(--c-accent);
+    opacity: 0.12;
+}
+
+/* Worst, Realistic and Best inside the band, faint, named at their ends. */
+.fin-scenario-line {
+    fill: none;
+    stroke: var(--c-accent);
+    stroke-width: 1.25;
+    stroke-opacity: 0.45;
+    stroke-dasharray: 3 4;
+}
+
+.fin-scenario-label {
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--c-ink-3);
+}
+
+.fin-line {
+    fill: none;
+    stroke: var(--c-accent);
+    stroke-width: 3.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.fin-line.is-neg { stroke: var(--c-danger); }
+
+.fin-line.is-past {
+    stroke: var(--c-ink-4);
+    stroke-width: 2.5;
+    stroke-dasharray: 2 7;
+}
+
+.fin-grid.is-dashed { stroke-dasharray: 4 6; }
+.fin-axis-y.is-zero { font-weight: 700; fill: var(--c-ink); }
+.fin-axis-y.is-neg { fill: var(--c-danger-ink); }
+
+/* The hover dot. */
+.fin-dot {
+    fill: var(--c-surface);
+    stroke: var(--c-accent);
+    stroke-width: 2.5;
+}
+
+/* Today, where it crosses zero and where the last month ends. */
+.fin-dot-mark {
+    fill: var(--c-surface);
+    stroke: var(--c-accent);
+    stroke-width: 3.5;
+}
+
+.fin-dot-mark.is-neg { stroke: var(--c-danger); }
+
+
+.fin-today {
+    stroke: var(--c-ink-4);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+.fin-hover-band {
+    fill: var(--c-accent-softer);
+}
+
+.fin-hit {
+    fill: transparent;
+}
+
+/* ---- Month by month ---- */
+
+.fin-table-scroll {
+    overflow-x: auto;
+    margin: 0 -20px;
+}
+
+.fin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-table th,
+.fin-table td {
+    padding: 9px 12px;
+    text-align: right;
+    white-space: nowrap;
+    border-top: 1px solid var(--c-line-2);
+}
+
+.fin-table thead th {
+    border-top: 0;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.fin-table :is(th, td):first-child {
+    padding-left: 20px;
+    text-align: left;
+}
+
+.fin-table :is(th, td):last-child {
+    padding-right: 20px;
+}
+
+.fin-table td { color: var(--c-ink-2); }
+.fin-table td.is-pos { color: var(--c-success-ink); }
+.fin-table td.is-neg { color: var(--c-danger-ink); }
+
+.fin-col-balance {
+    font-weight: 700;
+    color: var(--c-ink) !important;
+}
+
+.fin-col-balance.is-low { color: var(--c-warning-ink) !important; }
+.fin-col-balance.is-neg { color: var(--c-danger-ink) !important; }
+
+.fin-month.is-now th,
+.fin-month.is-now td {
+    background: var(--c-accent-softer);
+}
+
+.fin-month-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px 2px 2px;
+    margin-left: -4px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink);
+    font: 600 var(--t-sm)/1.4 var(--font);
+    cursor: pointer;
+}
+
+.fin-month-toggle:hover {
+    background: var(--c-tint-3);
+}
+
+.fin-month-toggle svg {
+    color: var(--c-ink-4);
+    transition: transform var(--dur-2) var(--ease);
+}
+
+.fin-month-toggle[aria-expanded="true"] svg {
+    transform: rotate(90deg);
+}
+
+.fin-month-detail td {
+    padding: 0 20px 12px 44px !important;
+    border-top: 0;
+    text-align: left;
+    white-space: normal;
+}
+
+.fin-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+    list-style: none;
+}
+
+.fin-detail li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+}
+
+.fin-detail-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    min-width: 0;
+    color: var(--c-ink);
+}
+
+.fin-detail-name a {
+    color: var(--c-ink);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.fin-detail-name a:hover {
+    color: var(--c-accent-2);
+    text-decoration: underline;
+}
+
+.fin-detail-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-detail-amount {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.fin-detail .is-in .fin-detail-amount { color: var(--c-success-ink); }
+.fin-detail .is-out .fin-detail-amount { color: var(--c-ink-2); }
+.fin-detail .is-paid { opacity: 0.55; }
+.fin-detail .is-actual .fin-detail-amount { font-weight: 600; color: var(--c-ink); }
+
+/* This year's months gone by, above the plan: actual, so not unfolded. */
+.fin-month-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 20px;
+    font: 600 var(--t-sm)/1.4 var(--font);
+    color: var(--c-ink-2);
+}
+
+.fin-month.is-past td,
+.fin-month.is-past th {
+    background: var(--c-tint-3);
+}
+
+.fin-detail-empty {
+    margin: 0;
+    padding: 8px 0;
+}
+
+/* ---- Income and costs ---- */
+
+.fin-group + .fin-group {
+    margin-top: 14px;
+}
+
+.fin-group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-ink-3);
+}
+
+.fin-group-title strong {
+    font-size: var(--t-sm);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-success-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-cost-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fin-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 7px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--c-ink-3);
+    white-space: nowrap;
+}
+
+.fin-tag.is-warn {
+    background: var(--c-warning-soft);
+    color: var(--c-warning-ink);
+}
+
+.fin-cost {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    padding: 9px 10px;
+    margin-left: -10px;
+    margin-right: -10px;
+    width: calc(100% + 20px);
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.fin-cost:hover {
+    background: var(--c-tint-3);
+}
+
+.fin-cost:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+}
+
+.fin-cost.is-ended {
+    opacity: 0.5;
+}
+
+.fin-cost-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fin-cost-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.fin-chip {
+    padding: 0 7px;
+    border-radius: var(--r-full);
+    background: var(--c-tint-2);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.fin-cost-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-cost-amount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-cost-amount strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.fin-cost-amount span {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.fin-cost-list.is-past {
+    opacity: 0.6;
+}
+
+/* ---- Forms ---- */
+
+.fin-cost-form {
+    margin: 0 0 14px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--c-accent) 40%, transparent);
+    border-radius: var(--r-lg);
+    background: color-mix(in srgb, var(--c-accent) 4%, var(--c-surface));
+}
+
+.fin-form-title {
+    margin: 0 0 10px;
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.fin-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+}
+
+.fin-field-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.fin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.fin-field.is-wide {
+    grid-column: 1 / -1;
+}
+
+.fin-field :is(.form-input, .form-select) {
+    height: 34px;
+    font-size: var(--t-sm);
+}
+
+.fin-amount {
+    position: relative;
+    display: block;
+}
+
+.fin-amount .form-input {
+    width: 100%;
+    padding-right: 26px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-amount > span {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+    pointer-events: none;
+}
+
+.fin-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.fin-spacer {
+    flex: 1;
+}
+
+.fin-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-danger-ink) !important;
+}
+
+.fin-form-error {
+    margin: 10px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-danger-ink);
+}
+
+.fin-hint {
+    margin: 4px 0 0;
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.fin-empty {
+    margin: 6px 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.fin-muted {
+    color: var(--c-ink-4);
+}
+
+.fin-icon-btn {
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-4);
+    cursor: pointer;
+}
+
+.fin-icon-btn:hover {
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+:is(.fin-link, .fin-icon-btn, .fin-month-toggle):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+/* ---- Loading ---- */
+
+.fin-kpi.is-skeleton {
+    gap: 10px;
+}
+
+.fin-skel {
+    display: block;
+    height: 12px;
+    width: 60%;
+    border-radius: var(--r-sm);
+    background: var(--c-tint-2);
+    animation: rf-shimmer 1.4s ease-in-out infinite;
+}
+
+.fin-skel.is-big { height: 30px; width: 80%; }
+.fin-skel.is-chart { height: 320px; width: 100%; border-radius: var(--r-xl); }
+
+@media (prefers-reduced-motion: reduce) {
+    .fin-skel { animation: none; }
+}
+
+/* ---- Narrower screens ---- */
+
+@media (max-width: 760px) {
+    .fin-kpis {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .fin-kpis {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fin-card {
+        padding: 14px 14px 16px;
+    }
+
+    .fin-table-scroll {
+        margin: 0 -14px;
+    }
+
+    .fin-table :is(th, td):first-child { padding-left: 14px; }
+    .fin-table :is(th, td):last-child { padding-right: 14px; }
+
+    .fin-field-grid,
+    .fin-field-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fin-head-tools {
+        width: 100%;
+    }
+
+    /* Stacked, the groups need no line between them. */
+    .fin-head-tools :is(.fin-scenario, .fin-months) {
+        padding-left: 0;
+        border-left: 0;
+    }
+}
+
+/* ---- Users page --------------------------------------------------------- */
+
+/* What used to fill the users sheet, as one card on its own page. */
+.users-page {
+    max-width: 980px;
+    padding: 22px 24px 24px;
+    background: var(--c-surface);
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+}
+
+/* A permission someone has or not: a checkbox with its name, before the role. */
+.user-permission {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    margin-right: 6px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--r-full);
+    color: var(--c-ink-2);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+    background: var(--c-tint-2);
+}
+
+.user-permission:hover {
+    background: var(--c-tint);
+}
+
+.user-permission input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--c-accent);
+    cursor: pointer;
+}
+
+.user-permission:has(input:checked) {
+    background: var(--c-accent-soft);
+    border-color: color-mix(in srgb, var(--c-accent) 40%, transparent);
+    color: var(--c-accent);
+}
+
+@media (max-width: 720px) {
+    .users-page {
+        padding: 16px;
+    }
 }

@@ -210,6 +210,10 @@ class Database
             )
         ");
 
+        // Expected payments: a JSON list of {month: "YYYY-MM", amount, paid},
+        // ordered by month (see Project::normalizePayments). NULL = none.
+        self::addColumnIfMissing($db, 'projects', 'payments', 'TEXT');
+
         // Create indexes for projects
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_projects_company ON projects(company)");
@@ -306,6 +310,57 @@ class Database
             )
         ");
 
+        // Links on a to-do - mostly Google Drive documents (see
+        // includes/TodoLink.php). They hang off the master to-do, so every
+        // mirrored copy of it shows the same links.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS todo_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                todo_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                title VARCHAR(255),
+                created_by INTEGER,
+                created_by_name VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_todo_links_todo ON todo_links(todo_id, created_at)");
+
+        // Who was assigned what, and by whom - the home page's "New for you"
+        // (includes/AssignmentFeed.php). People are keyed as in assigned_to;
+        // assigned_by NULL is Claude or the system.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS assignment_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_type VARCHAR(16) NOT NULL,
+                record_id INTEGER NOT NULL,
+                assigned_to INTEGER NOT NULL,
+                assigned_by INTEGER,
+                assigned_by_name VARCHAR(255),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_assignment_events_to ON assignment_events(assigned_to, created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_assignment_events_record ON assignment_events(record_type, record_id)");
+
+        // Deleted projects, kept whole so they can be restored
+        // (includes/ProjectArchive.php). snapshot is JSON: every row the
+        // delete took with it, table by table.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS deleted_projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                company VARCHAR(255),
+                stage VARCHAR(32),
+                deleted_by INTEGER,
+                deleted_by_name VARCHAR(255),
+                deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                snapshot TEXT NOT NULL
+            )
+        ");
+
         // Lightweight migration for existing databases that don't yet have parent_todo_id
         $todoColumns = $db->query("PRAGMA table_info(todos)")->fetchAll(PDO::FETCH_ASSOC);
         $hasParentTodoColumn = false;
@@ -355,6 +410,15 @@ class Database
         // Profile picture: the stored filename inside data/avatars, or NULL.
         // The file itself lives outside anything the web server will serve.
         self::addColumnIfMissing($db, 'users', 'avatar', 'VARCHAR(255)');
+
+        // Meeting assistant (test): who may use it - granted to each person by
+        // an admin. Whoever is an admin when it arrives starts with it, so the
+        // people who set it up are not locked out of it.
+        $userColumns = array_column($db->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+        if (!in_array('can_meeting', $userColumns, true)) {
+            self::addColumnIfMissing($db, 'users', 'can_meeting', 'INTEGER NOT NULL DEFAULT 0');
+            $db->exec("UPDATE users SET can_meeting = 1 WHERE role = 'admin'");
+        }
         $db->exec("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)");
 
         // Only the SHA-256 of a token is stored. A leaked database therefore
@@ -426,6 +490,23 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_cid ON login_challenges(challenge_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_login_challenges_user ON login_challenges(user_id, created_at)");
 
+        // What the two-factor throttles count. Kept apart from login_challenges
+        // because challenges are deleted as they are replaced or spent, and from
+        // login_attempts because a correct password clears those - either way an
+        // attacker holding the password could reset the count just by signing
+        // in again. Nothing here is removed by the sign-in flow except the
+        // failures, and only by a correct code.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS two_factor_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_two_factor_events_user ON two_factor_events(user_id, event, created_at)");
+
         // ---------------------------------------------------------------
         // "Remember this device" tokens
         // ---------------------------------------------------------------
@@ -486,6 +567,13 @@ class Database
 
         self::addColumnIfMissing($db, 'project_notes', 'author_id', 'INTEGER');
         self::addColumnIfMissing($db, 'project_notes', 'author_name', 'VARCHAR(255)');
+
+        // Claude's summary of a project's description and notes
+        // (includes/ProjectSummary.php). The hash is of what it was written
+        // from, so it is only written again once that changes.
+        self::addColumnIfMissing($db, 'projects', 'claude_summary', 'TEXT');
+        self::addColumnIfMissing($db, 'projects', 'claude_summary_hash', 'VARCHAR(64)');
+        self::addColumnIfMissing($db, 'projects', 'claude_summary_at', 'DATETIME');
 
         self::addColumnIfMissing($db, 'activity_events', 'actor_id', 'INTEGER');
         self::addColumnIfMissing($db, 'activity_events', 'actor_name', 'VARCHAR(255)');

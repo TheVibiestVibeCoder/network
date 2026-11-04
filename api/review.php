@@ -43,7 +43,7 @@ if ($method === 'POST') {
 
 try {
     if ($method === 'GET' && $action === 'summary') {
-        reviewRespond(['success' => true, 'data' => ReviewQueue::summary()]);
+        reviewRespond(['success' => true, 'data' => reviewVisibleSummary()]);
     }
 
     if ($method === 'GET' && $action === 'list') {
@@ -52,7 +52,12 @@ try {
         $id = isset($_GET['entity_id']) ? (int) $_GET['entity_id'] : null;
         $limit = $status === ReviewQueue::PENDING ? 300 : 100;
 
-        reviewRespond(['success' => true, 'data' => ReviewQueue::listItems($status, $limit, $type, $id)]);
+        $items = ReviewQueue::listItems($status, $limit, $type, $id);
+        // Invoices for the bookkeeping drop zone are for administrators only.
+        if (!Auth::isAdmin()) {
+            $items = array_values(array_filter($items, fn($item) => $item['entity_type'] !== 'bookkeeping_pdf'));
+        }
+        reviewRespond(['success' => true, 'data' => $items]);
     }
 
     if ($method === 'POST' && $action === 'edit-note') {
@@ -94,6 +99,11 @@ try {
 
         $id = reviewTargetId($input, $action);
 
+        $target = ReviewQueue::get($id);
+        if ($target && $target['entity_type'] === 'bookkeeping_pdf' && !Auth::isAdmin()) {
+            reviewRespond(['error' => 'Administrator access required'], 403);
+        }
+
         switch ($action) {
             case 'accept':
                 $item = ReviewQueue::accept($id);
@@ -105,7 +115,7 @@ try {
                 $item = ReviewQueue::resolve($id);
         }
 
-        reviewRespond(['success' => true, 'data' => $item, 'summary' => ReviewQueue::summary()]);
+        reviewRespond(['success' => true, 'data' => $item, 'summary' => reviewVisibleSummary()]);
     }
 
     reviewRespond(['error' => 'Unknown action'], 400);
@@ -114,6 +124,20 @@ try {
 } catch (Throwable $e) {
     error_log('review endpoint error: ' . $e->getMessage());
     reviewRespond(['error' => 'An internal error occurred'], 500);
+}
+
+/**
+ * The open proposals the signed-in person can act on: everything for an
+ * administrator, everything but bookkeeping invoices for anyone else.
+ */
+function reviewVisibleSummary(): array
+{
+    $summary = ReviewQueue::summary();
+    if (!Auth::isAdmin() && isset($summary['by_type']['bookkeeping_pdf'])) {
+        $summary['total'] -= $summary['by_type']['bookkeeping_pdf'];
+        unset($summary['by_type']['bookkeeping_pdf']);
+    }
+    return $summary;
 }
 
 /**

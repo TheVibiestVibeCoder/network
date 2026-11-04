@@ -9,6 +9,8 @@ define('APP_ROOT', dirname(__DIR__));
 require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/TodoLink.php';
+require_once APP_ROOT . '/includes/ReviewQueue.php';
 
 // Set JSON response headers and security headers
 header('Content-Type: application/json');
@@ -38,7 +40,14 @@ try {
             break;
 
         case 'POST':
-            handlePost($db);
+            $action = $_GET['action'] ?? '';
+            if ($action === 'add-link') {
+                handleAddLink($db);
+            } elseif ($action === 'delete-link') {
+                handleDeleteLink($db);
+            } else {
+                handlePost($db);
+            }
             break;
 
         case 'PUT':
@@ -72,7 +81,10 @@ function handleGet(PDO $db, ?int $id): void
             return;
         }
 
-        echo json_encode(['success' => true, 'data' => $todo]);
+        $one = [$todo];
+        TodoLink::attach($db, $one);
+        attachPendingChanges($one);
+        echo json_encode(['success' => true, 'data' => $one[0]]);
         return;
     }
 
@@ -193,8 +205,80 @@ function handleGet(PDO $db, ?int $id): void
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    TodoLink::attach($db, $todos);
+    attachPendingChanges($todos);
 
     echo json_encode(['success' => true, 'data' => $todos]);
+}
+
+/**
+ * Put on each to-do the kinds of change Claude has proposed for it and nobody
+ * has decided yet ('pending_changes', e.g. ['assign']). Proposals are about
+ * the master to-do, so its mirrored copies carry the same list.
+ *
+ * @param array<int, array> $todos
+ */
+function attachPendingChanges(array &$todos): void
+{
+    $rootOf = static fn(array $todo): int => !empty($todo['parent_todo_id']) ? (int) $todo['parent_todo_id'] : (int) $todo['id'];
+    $byRoot = ReviewQueue::pendingChangesFor('todo', array_map($rootOf, $todos));
+
+    foreach ($todos as &$todo) {
+        $todo['pending_changes'] = $byRoot[$rootOf($todo)] ?? [];
+    }
+    unset($todo);
+}
+
+/**
+ * Add a link to a to-do: { todo_id, url, title? }.
+ * Without a title, a Google document's own name is looked up.
+ */
+function handleAddLink(PDO $db): void
+{
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON input']);
+        return;
+    }
+
+    $todoId = (int) ($input['todo_id'] ?? 0);
+    $rootId = $todoId > 0 ? TodoLink::rootTodoId($db, $todoId) : null;
+    if ($rootId === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'To-do not found']);
+        return;
+    }
+
+    $url = TodoLink::normalizeUrl(isset($input['url']) ? (string) $input['url'] : null);
+    if ($url === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Please enter a valid web address (https://...)']);
+        return;
+    }
+
+    $title = Auth::sanitizeString(isset($input['title']) ? (string) $input['title'] : null, TodoLink::MAX_TITLE_LENGTH);
+    $link = TodoLink::add($db, $rootId, $url, $title, Auth::actor());
+
+    http_response_code(201);
+    echo json_encode(['success' => true, 'data' => $link]);
+}
+
+/**
+ * Remove a link from a to-do: { id }.
+ */
+function handleDeleteLink(PDO $db): void
+{
+    $input = json_decode(file_get_contents('php://input'), true);
+    $linkId = is_array($input) ? (int) ($input['id'] ?? 0) : 0;
+
+    if ($linkId <= 0 || !TodoLink::delete($db, $linkId)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Link not found']);
+        return;
+    }
+
+    echo json_encode(['success' => true]);
 }
 
 /**

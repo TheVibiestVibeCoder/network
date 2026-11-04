@@ -2,9 +2,9 @@
  * Profile pictures
  *
  * Two jobs:
- *   1. The popover behind the header chip, where you set or clear your own
- *      picture. You can only ever change your own - the endpoint takes no
- *      "whose" parameter at all.
+ *   1. The popover behind the chip at the foot of the sidebar: your picture
+ *      (click the face for upload / remove), your name, and the menu. You can
+ *      only ever change your own - the endpoint takes no "whose" parameter.
  *   2. A small directory of everyone's name and picture, published as
  *      window.CRMPeople, so attribution lines elsewhere can show a face
  *      instead of initials.
@@ -118,6 +118,15 @@
         }
     }
 
+    const CLAUDE_AVATAR = 'assets/img/claude-avatar.svg';
+
+    /** Whether an attribution without an account id is Claude's. */
+    function isClaude(actorName) {
+        const meta = document.querySelector('meta[name="claude-actor-name"]');
+        const claudeName = meta ? meta.getAttribute('content') : 'Claude';
+        return !!actorName && !!claudeName && String(actorName).toLowerCase() === claudeName.toLowerCase();
+    }
+
     /**
      * The picture URL for an actor, or null when there is none.
      */
@@ -125,6 +134,10 @@
         if (actorId !== null && actorId !== undefined && actorId !== '') {
             const person = state.people.get(String(actorId));
             if (person && person.avatar_url) return person.avatar_url;
+        } else if (isClaude(actorName)) {
+            // Claude writes without an account, under its own name (api/mcp.php),
+            // and wears its own mark as its picture.
+            return CLAUDE_AVATAR;
         }
 
         if (actorName) {
@@ -163,8 +176,10 @@
             }
         });
 
+        // Without a picture, the face keeps showing that it can be clicked.
+        if (els.face) els.face.classList.toggle('is-empty', !url);
         if (els.removeBtn) els.removeBtn.hidden = !url;
-        if (els.photoBtnLabel) els.photoBtnLabel.textContent = url ? 'Change photo' : 'Upload photo';
+        if (els.photoBtnLabel) els.photoBtnLabel.textContent = url ? 'Upload new photo' : 'Upload photo';
     }
 
     async function uploadPhoto(file) {
@@ -178,7 +193,7 @@
         }
 
         state.busy = true;
-        if (els.photoBtn) els.photoBtn.disabled = true;
+        if (els.face) els.face.classList.add('is-busy');
 
         try {
             const form = new FormData();
@@ -195,14 +210,16 @@
             showToast(e.message, true);
         } finally {
             state.busy = false;
-            if (els.photoBtn) els.photoBtn.disabled = false;
+            if (els.face) els.face.classList.remove('is-busy');
             if (els.input) els.input.value = '';
         }
     }
 
     async function removePhoto() {
+        closePhotoMenu();
         if (state.busy) return;
         state.busy = true;
+        if (els.face) els.face.classList.add('is-busy');
 
         try {
             await api('?action=avatar', { method: 'DELETE' });
@@ -214,7 +231,66 @@
             showToast(e.message, true);
         } finally {
             state.busy = false;
+            if (els.face) els.face.classList.remove('is-busy');
         }
+    }
+
+    // ------------------------------------------------------------------
+    // My own name
+    // ------------------------------------------------------------------
+
+    function startRename() {
+        if (!els.nameForm) return;
+        closePhotoMenu();
+        els.nameInput.value = els.name.textContent.trim();
+        els.nameForm.hidden = false;
+        els.nameEdit.hidden = true;
+        els.nameInput.focus();
+        els.nameInput.select();
+    }
+
+    function stopRename() {
+        if (!els.nameForm || els.nameForm.hidden) return false;
+        els.nameForm.hidden = true;
+        els.nameEdit.hidden = false;
+        return true;
+    }
+
+    async function saveName() {
+        const name = els.nameInput.value.trim();
+        if (!name || state.busy) return;
+        if (name === els.name.textContent.trim()) {
+            stopRename();
+            return;
+        }
+
+        state.busy = true;
+        els.nameSave.disabled = true;
+        try {
+            const result = await api('?action=name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            applyMyName(result.name);
+            stopRename();
+            await loadDirectory();
+            showToast('Name updated.');
+        } catch (e) {
+            showToast(e.message, true);
+        } finally {
+            state.busy = false;
+            els.nameSave.disabled = false;
+        }
+    }
+
+    /** The new name everywhere it was printed into the page. */
+    function applyMyName(name) {
+        if (state.me) state.me.name = name;
+        els.name.textContent = name;
+        document.querySelectorAll('.user-chip-name').forEach(node => { node.textContent = name; });
+        // The initials stand in for a missing picture.
+        applyMyAvatar(state.me ? state.me.avatar_url : null);
     }
 
     /**
@@ -255,8 +331,24 @@
 
     function closePop() {
         if (!els.pop) return;
+        closePhotoMenu();
+        stopRename();
         els.pop.hidden = true;
         els.chip.setAttribute('aria-expanded', 'false');
+    }
+
+    function openPhotoMenu() {
+        if (!els.photoMenu || state.busy) return;
+        stopRename();
+        els.photoMenu.hidden = false;
+        els.face.setAttribute('aria-expanded', 'true');
+    }
+
+    function closePhotoMenu() {
+        if (!els.photoMenu || els.photoMenu.hidden) return false;
+        els.photoMenu.hidden = true;
+        els.face.setAttribute('aria-expanded', 'false');
+        return true;
     }
 
     function togglePop() {
@@ -273,10 +365,17 @@
         els.chipAvatar = $('userChipAvatar');
         els.pop = $('profilePop');
         els.popAvatar = $('profilePopAvatar');
+        els.face = $('profilePhotoToggle');
+        els.photoMenu = $('profilePhotoMenu');
         els.photoBtn = $('profilePhotoBtn');
         els.photoBtnLabel = $('profilePhotoBtnLabel');
         els.removeBtn = $('profileRemoveBtn');
         els.input = $('profilePhotoInput');
+        els.name = $('profilePopName');
+        els.nameEdit = $('profileNameEdit');       // Not there for the owner login.
+        els.nameForm = $('profileNameForm');
+        els.nameInput = $('profileNameInput');
+        els.nameSave = $('profileNameSave');
 
         if (!els.chip) return; // Not signed in.
 
@@ -285,8 +384,15 @@
             togglePop();
         });
 
+        if (els.face) {
+            els.face.addEventListener('click', () => (els.photoMenu.hidden ? openPhotoMenu() : closePhotoMenu()));
+        }
+
         if (els.photoBtn) {
-            els.photoBtn.addEventListener('click', () => els.input && els.input.click());
+            els.photoBtn.addEventListener('click', function () {
+                closePhotoMenu();
+                if (els.input) els.input.click();
+            });
         }
 
         if (els.input) {
@@ -299,14 +405,38 @@
             els.removeBtn.addEventListener('click', removePhoto);
         }
 
+        if (els.nameForm) {
+            els.nameEdit.addEventListener('click', startRename);
+            $('profileNameCancel').addEventListener('click', stopRename);
+            els.nameForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                saveName();
+            });
+        }
+
+        // Going to the Users page from the menu puts the menu away; a click
+        // anywhere else in the popover puts the picture menu away.
+        els.pop.addEventListener('click', function (event) {
+            if (event.target.closest('[data-view]')) closePop();
+            else if (!event.target.closest('#profilePhotoMenu, #profilePhotoToggle')) closePhotoMenu();
+        });
+
         // Click outside or press Escape to dismiss.
         document.addEventListener('click', function (event) {
             if (els.pop && !els.pop.hidden && !els.pop.contains(event.target)) {
                 closePop();
             }
         });
+        // Escape steps back one level: the picture menu or the name field first.
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && els.pop && !els.pop.hidden) closePop();
+            if (event.key !== 'Escape' || !els.pop || els.pop.hidden) return;
+            if (closePhotoMenu()) {
+                els.face.focus();
+            } else if (stopRename()) {
+                els.nameEdit.focus();
+            } else {
+                closePop();
+            }
         });
 
         loadDirectory();

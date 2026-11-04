@@ -19,6 +19,7 @@ define('APP_ROOT', dirname(__DIR__));
 require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/UserPrefs.php';
 
 const AVATAR_DIR = DATA_DIR . '/avatars';
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;   // 5 MB before re-encoding
@@ -60,6 +61,10 @@ try {
         uploadAvatar();
     } elseif ($method === 'DELETE' && $action === 'avatar') {
         deleteAvatar();
+    } elseif ($method === 'POST' && $action === 'name') {
+        renameSelf();
+    } elseif ($method === 'POST' && $action === 'pref') {
+        savePref();
     } else {
         profileJson(['error' => 'Unknown action'], 400);
     }
@@ -75,8 +80,10 @@ try {
 /**
  * The list the UI uses to show a face next to an attribution line.
  *
- * Names and pictures only - no email addresses, no roles, no status. Members
- * do not need to know who is an administrator to render a by-line.
+ * Names and pictures only - no email addresses, no roles. Members do not
+ * need to know who is an administrator to render a by-line. "active" says
+ * whether someone can sign in now (not invited, not disabled): the sidebar's
+ * team list shows only them.
  */
 function serveDirectory(): void
 {
@@ -88,14 +95,16 @@ function serveDirectory(): void
         'id' => null,
         'name' => OWNER_DISPLAY_NAME,
         'avatar_url' => $ownerAvatar ? avatarUrl('owner', $ownerAvatar) : null,
+        'active' => true,
     ];
 
-    $stmt = $db->query("SELECT id, name, avatar FROM users ORDER BY name COLLATE NOCASE ASC");
+    $stmt = $db->query("SELECT id, name, avatar, status FROM users ORDER BY name COLLATE NOCASE ASC");
     foreach ($stmt as $row) {
         $people[] = [
             'id' => (int) $row['id'],
             'name' => (string) $row['name'],
             'avatar_url' => $row['avatar'] ? avatarUrl((string) $row['id'], (string) $row['avatar']) : null,
+            'active' => $row['status'] === User::STATUS_ACTIVE,
         ];
     }
 
@@ -484,6 +493,49 @@ function currentAvatarUrl(): ?string
     $stored = $stmt->fetchColumn() ?: null;
 
     return $stored ? avatarUrl((string) $me['id'], (string) $stored) : null;
+}
+
+/**
+ * Change the caller's own display name - like the picture, only ever their own.
+ *
+ * The owner login has no users row; its name is OWNER_NAME in .env. Records
+ * keep the name they were written under, as when an admin renames someone.
+ */
+function renameSelf(): void
+{
+    $me = Auth::currentUser();
+    if ($me['is_owner']) {
+        profileJson(['error' => 'The owner login\'s name is set in .env (OWNER_NAME).'], 422);
+    }
+
+    $input = Auth::getJsonInput();
+    $raw = is_array($input) && is_string($input['name'] ?? null) ? $input['name'] : null;
+    $name = Auth::sanitizeString($raw, 120);
+    if ($name === null || $name === '') {
+        profileJson(['error' => 'Please enter a name.'], 422);
+    }
+
+    $stmt = Database::getInstance()->prepare("UPDATE users SET name = :name, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+    $stmt->execute(['name' => $name, 'id' => (int) $me['id']]);
+    $_SESSION['user_name'] = $name;
+
+    profileJson(['success' => true, 'name' => $name]);
+}
+
+/**
+ * One of the signed-in person's preferences (includes/UserPrefs.php):
+ * {name: "project_view", value: "list"}.
+ */
+function savePref(): void
+{
+    $input = Auth::getJsonInput();
+    $name = is_array($input) ? (string) ($input['name'] ?? '') : '';
+    $value = is_array($input) ? (string) ($input['value'] ?? '') : '';
+
+    if (!UserPrefs::set(Database::getInstance(), $name, $value)) {
+        profileJson(['error' => 'Unknown preference'], 400);
+    }
+    profileJson(['success' => true]);
 }
 
 function getSetting(PDO $db, string $key): ?string

@@ -1,0 +1,31 @@
+# Deny all direct web access to this directory.
+# It contains data / code that must only ever be reached through the
+# application entry points in the web root.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+# Belt and braces: if the deny directives above are not honoured, make sure
+# nothing in here is ever handed to the PHP interpreter or served as text.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# php_flag is a mod_php directive - an unguarded one would make the whole
+# directory return 500 on PHP-FPM / CGI hosts.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+Options -Indexes

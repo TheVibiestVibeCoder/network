@@ -32,6 +32,8 @@ if (!defined('APP_ROOT')) {
     exit;
 }
 
+require_once __DIR__ . '/AssignmentFeed.php';
+
 /** A refusal Claude should read and act on - the message is shown to it verbatim. */
 class McpError extends ReviewException
 {
@@ -54,7 +56,7 @@ final class McpFile
 
 final class McpService
 {
-    private const STAGES = ['Lead', 'Proposal', 'Negotiation', 'In Progress', 'Complete'];
+    private const STAGES = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
     private const PRIORITIES = ['low', 'medium', 'high'];
     private const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -458,6 +460,11 @@ final class McpService
         ");
         $todos->execute(['id' => $id]);
 
+        // Read-only for Claude: proposals cannot set payments (yet).
+        $payments = $this->db->prepare("SELECT payments FROM projects WHERE id = :id");
+        $payments->execute(['id' => $id]);
+        $project['expected_payments'] = Project::decodePayments($payments->fetchColumn());
+
         return [
             'project' => $project,
             'contacts' => $contacts->fetchAll(),
@@ -712,9 +719,9 @@ final class McpService
                     'message' => 'The contact is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'contact', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('contact', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('contact_id', $id, $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('contact_id', $id, $reviewIds);
     }
 
     private function contactsAddNote(array $p): array
@@ -797,9 +804,9 @@ final class McpService
                     'message' => 'The project is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'project', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('project', $id, (string) $existing['name'], $diff, $this->pick($existing, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('project_id', $id, $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('project_id', $id, $reviewIds);
     }
 
     private function projectsAddNote(array $p): array
@@ -1083,9 +1090,9 @@ final class McpService
                     'message' => 'The to-do is still a proposal, so it was changed directly. It still needs to be accepted.'];
         }
 
-        $reviewId = ReviewQueue::add('update', 'todo', (int) $todo['id'], (string) $todo['title'], $diff, $this->pick($todo, array_keys($diff)), $this->comment($p));
+        $reviewIds = ReviewQueue::addUpdates('todo', (int) $todo['id'], (string) $todo['title'], $diff, $this->pick($todo, array_keys($diff)), $this->comment($p));
 
-        return $this->proposed('todo_id', (int) $todo['id'], $reviewId, 'The change was proposed. It is applied once a person accepts it.');
+        return $this->proposedChanges('todo_id', (int) $todo['id'], $reviewIds);
     }
 
     // =========================================================================
@@ -1123,6 +1130,8 @@ final class McpService
             $table = ReviewQueue::ENTITY_TABLES[$type];
             $this->db->prepare("UPDATE " . $table . " SET assigned_to = :a, assigned_to_name = :n WHERE id = :id")
                 ->execute(['a' => $assignee['id'], 'n' => $assignee['name'], 'id' => $id]);
+            // Shows as new for the assignee once the record is accepted.
+            AssignmentFeed::record($this->db, $type, $id, $assignee['id'], null, MCP_ACTOR_NAME);
 
             return ['status' => 'assigned_pending_record', 'message' => 'Assigned directly, because the record is itself still a proposal.'];
         }
@@ -1182,7 +1191,9 @@ final class McpService
 
         $reviewId = ReviewQueue::add('delete', $type, $id, $label, [], $this->deletionSnapshot($type, $record), $this->comment($p));
 
-        return $this->proposed('id', $id, $reviewId, 'Deleting it was proposed. Nothing is deleted unless a person accepts.');
+        return $this->proposed('id', $id, $reviewId, $type === 'project'
+            ? 'Archiving it was proposed. Nothing is archived unless a person accepts.'
+            : 'Deleting it was proposed. Nothing is deleted unless a person accepts.');
     }
 
     // =========================================================================
@@ -1673,6 +1684,15 @@ final class McpService
             'message' => $message . ' It is marked in the CRM as coming from ' . MCP_ACTOR_NAME
                 . ' and waits for a person to accept, edit or reject it.',
         ];
+    }
+
+    /** A change to several fields is proposed one field at a time (ReviewQueue::addUpdates). */
+    private function proposedChanges(string $idKey, int $id, array $reviewIds): array
+    {
+        $many = count($reviewIds) > 1;
+        return $this->proposed($idKey, $id, (int) $reviewIds[0], $many
+            ? 'The change was proposed as ' . count($reviewIds) . ' proposals, one per field, so each can be accepted on its own. They are applied once a person accepts them.'
+            : 'The change was proposed. It is applied once a person accepts it.') + ['review_ids' => $reviewIds];
     }
 
     private function comment(array $p): ?string

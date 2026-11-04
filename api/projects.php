@@ -10,6 +10,8 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Project.php';
+require_once APP_ROOT . '/includes/ReviewQueue.php';
+require_once APP_ROOT . '/includes/ProjectSummary.php';
 
 // Set JSON response headers and security headers
 header('Content-Type: application/json');
@@ -67,6 +69,12 @@ try {
  */
 function handleGet(Project $model, string $action, ?int $id): void
 {
+    // Deleted projects, newest first
+    if ($action === 'deleted') {
+        echo json_encode(['success' => true, 'data' => ProjectArchive::list(Database::getInstance())]);
+        return;
+    }
+
     // Get projects for a specific contact
     if ($action === 'contact' && isset($_GET['contact_id'])) {
         $contactId = (int) $_GET['contact_id'];
@@ -97,6 +105,35 @@ function handleGet(Project $model, string $action, ?int $id): void
         return;
     }
 
+    // Projects that have never had a Claude summary written (admins only:
+    // their browser writes the first ones, see project-summary.js)
+    if ($action === 'summary-missing') {
+        if (!ProjectSummary::enabled() || !Auth::isAdmin()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Not available']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => ProjectSummary::missing(Database::getInstance())]);
+        return;
+    }
+
+    // Claude's summary of the project, and whether it is behind the notes
+    if ($action === 'summary' && $id !== null) {
+        if (!ProjectSummary::enabled()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'The Claude summary is not switched on.']);
+            return;
+        }
+        $summary = ProjectSummary::get(Database::getInstance(), $id);
+        if ($summary === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $summary]);
+        return;
+    }
+
     // Get notes for a project
     if ($action === 'notes' && $id !== null) {
         $notes = $model->getNotes($id);
@@ -124,6 +161,15 @@ function handleGet(Project $model, string $action, ?int $id): void
     $sortOrder = $_GET['order'] ?? 'ASC';
 
     $projects = $model->getAll($search, $sortBy, $sortOrder);
+
+    // The kinds of change Claude has proposed for each project and nobody has
+    // decided yet ('pending_changes', e.g. ['assign']), for the mark on its card.
+    $changes = ReviewQueue::pendingChangesFor('project', array_column($projects, 'id'));
+    foreach ($projects as &$project) {
+        $project['pending_changes'] = $changes[(int) $project['id']] ?? [];
+    }
+    unset($project);
+
     echo json_encode(['success' => true, 'data' => $projects]);
 }
 
@@ -132,6 +178,96 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // Have Claude write the project's summary again, if the description or
+    // the notes changed since it last did: POST ?action=summary-refresh&id=..
+    if ($action === 'summary-refresh') {
+        $projectId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+        if (!ProjectSummary::enabled()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'The Claude summary is not switched on.']);
+            return;
+        }
+
+        // Claude takes a few seconds: let go of the session meanwhile, so the
+        // rest of the page is not queued behind this request, and finish
+        // writing even if the browser stops waiting.
+        session_write_close();
+        ignore_user_abort(true);
+        set_time_limit(180);
+
+        try {
+            $summary = ProjectSummary::refresh(Database::getInstance(), $projectId);
+        } catch (RuntimeException $e) {
+            http_response_code(502);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+        if ($summary === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $summary]);
+        return;
+    }
+
+    // Expected payments that came in (asked after a bookkeeping import):
+    // { payments: [{ project_id, month, amount }] }.
+    if ($action === 'mark-payments-paid') {
+        $input = Auth::getJsonInput();
+        $items = is_array($input) && is_array($input['payments'] ?? null) ? $input['payments'] : null;
+        if ($items === null || count($items) === 0 || count($items) > 500) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A list of payments is required']);
+            return;
+        }
+        foreach ($items as $item) {
+            if (!is_array($item) || parsePositiveId($item['project_id'] ?? null) === null
+                || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', (string) ($item['month'] ?? ''))
+                || !is_numeric($item['amount'] ?? null)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Each payment needs project_id, month (YYYY-MM) and amount']);
+                return;
+            }
+        }
+
+        $result = $model->markPaymentsPaid($items);
+        foreach ($result['changed'] as $change) {
+            logProjectActivityEvent('updated', $change['after'], $change['before']);
+        }
+        echo json_encode(['success' => true, 'marked' => $result['marked'], 'skipped' => $result['skipped']]);
+        return;
+    }
+
+    // Bring an archived project back, or delete it for good: { id } of the
+    // deleted_projects entry.
+    if ($action === 'restore' || $action === 'purge') {
+        $input = Auth::getJsonInput();
+        $archiveId = is_array($input) ? parsePositiveId($input['id'] ?? null) : null;
+        if ($archiveId === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'An archived project id is required']);
+            return;
+        }
+
+        try {
+            $db = Database::getInstance();
+            if ($action === 'restore') {
+                $projectId = ProjectArchive::restore($db, $archiveId);
+                $project = $model->getById($projectId);
+                logProjectActivityEvent('restored', $project, null);
+                echo json_encode(['success' => true, 'data' => $project]);
+            } else {
+                ProjectArchive::purge($db, $archiveId);
+                echo json_encode(['success' => true]);
+            }
+        } catch (RuntimeException $e) {
+            http_response_code(409);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        return;
+    }
+
     // Assign contact to project
     if ($action === 'assign-contact') {
         $input = Auth::getJsonInput();
@@ -255,6 +391,7 @@ function handlePost(Project $model, string $action): void
     $budgetMin = normalizeNullableFloat($input['budget_min'] ?? null);
     $budgetMax = normalizeNullableFloat($input['budget_max'] ?? null);
     $successChance = normalizeNullableInt($input['success_chance'] ?? null);
+    $payments = Project::normalizePayments($input['payments'] ?? null);
 
     // Validate required fields
     if ($name === null || trim($name) === '') {
@@ -293,6 +430,12 @@ function handlePost(Project $model, string $action): void
         return;
     }
 
+    if (is_string($payments)) {
+        http_response_code(400);
+        echo json_encode(['error' => $payments]);
+        return;
+    }
+
     $normalizedSuccessChance = $successChance === null ? null : max(0, min(100, $successChance));
     $normalizedBudgetMin = $budgetMin === null ? null : (float) $budgetMin;
     $normalizedBudgetMax = $budgetMax === null ? null : (float) $budgetMax;
@@ -310,7 +453,8 @@ function handlePost(Project $model, string $action): void
         'budget_max' => $normalizedBudgetMax,
         'success_chance' => $normalizedSuccessChance,
         'stage' => $stage,
-        'estimated_completion' => $estimatedCompletion
+        'estimated_completion' => $estimatedCompletion,
+        'payments' => $payments
     ];
 
     // Create project
@@ -357,6 +501,8 @@ function handlePut(Project $model, ?int $id): void
     $budgetMin = normalizeNullableFloat($input['budget_min'] ?? null);
     $budgetMax = normalizeNullableFloat($input['budget_max'] ?? null);
     $successChance = normalizeNullableInt($input['success_chance'] ?? null);
+    // Payments are only replaced when sent at all.
+    $payments = array_key_exists('payments', $input) ? Project::normalizePayments($input['payments']) : null;
 
     // Validate required fields
     if ($name === null || trim($name) === '') {
@@ -414,6 +560,15 @@ function handlePut(Project $model, ?int $id): void
         'stage' => $stage,
         'estimated_completion' => $estimatedCompletion
     ];
+
+    if (is_string($payments)) {
+        http_response_code(400);
+        echo json_encode(['error' => $payments]);
+        return;
+    }
+    if ($payments !== null) {
+        $sanitized['payments'] = $payments;
+    }
 
     // Update project
     $model->update($id, $sanitized);
@@ -507,11 +662,11 @@ function handleDelete(Project $model, string $action, ?int $id): void
         return;
     }
 
-    // Delete project
+    // Archive project
     $model->delete($id);
     logProjectActivityEvent('deleted', null, $existing);
 
-    echo json_encode(['success' => true, 'message' => 'Project deleted']);
+    echo json_encode(['success' => true, 'message' => 'Project archived']);
 }
 
 /**
@@ -702,7 +857,11 @@ function buildProjectActivityContent(string $action, ?array $current, ?array $pr
     }
 
     if ($action === 'deleted') {
-        return 'Projekt gelöscht';
+        return 'Projekt archiviert';
+    }
+
+    if ($action === 'restored') {
+        return 'Projekt wiederhergestellt';
     }
 
     $changedFields = detectProjectChangedFields($previous, $current);
@@ -736,7 +895,8 @@ function detectProjectChangedFields(?array $before, ?array $after): array
         'budget_min' => 'Budget Min',
         'budget_max' => 'Budget Max',
         'estimated_completion' => 'Abschlussdatum',
-        'description' => 'Beschreibung'
+        'description' => 'Beschreibung',
+        'payments' => 'Zahlungen'
     ];
 
     $changed = [];

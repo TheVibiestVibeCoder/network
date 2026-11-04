@@ -36,7 +36,7 @@ class User
     public const PURPOSE_RESET  = 'reset';
 
     /** Columns that are safe to hand to the client. password_hash never is. */
-    private const PUBLIC_COLUMNS = 'id, email, name, role, status, last_login_at, created_at';
+    private const PUBLIC_COLUMNS = 'id, email, name, role, status, last_login_at, created_at, can_meeting';
 
     private PDO $db;
 
@@ -153,6 +153,14 @@ class User
      * Enable or disable an account. A disabled user keeps their data and their
      * attribution history but can no longer sign in.
      */
+    /** Meeting assistant (test): let someone use it, or take it away. */
+    public function setMeetingAccess(int $id, bool $allowed): bool
+    {
+        $stmt = $this->db->prepare("UPDATE users SET can_meeting = :allowed, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+
+        return $stmt->execute(['id' => $id, 'allowed' => $allowed ? 1 : 0]);
+    }
+
     public function setStatus(int $id, string $status): bool
     {
         if (!in_array($status, [self::STATUS_ACTIVE, self::STATUS_DISABLED, self::STATUS_INVITED], true)) {
@@ -419,6 +427,7 @@ class User
             'status' => (string) $row['status'],
             'last_login_at' => $row['last_login_at'] ?? null,
             'created_at' => $row['created_at'] ?? null,
+            'can_meeting' => (int) ($row['can_meeting'] ?? 0) === 1,
         ];
     }
 }

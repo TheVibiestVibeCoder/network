@@ -20,6 +20,9 @@ data/project_documents/
 # Uploaded profile pictures - personal data, same story.
 data/avatars/
 
+# PHP session files - live sign-ins. Created automatically by Auth::startSession().
+data/sessions/
+
 # Local development helpers and test credentials - never commit them.
 # dev/ holds seeded accounts whose passwords are written down in plain text;
 # they are only safe on a machine that is not reachable from anywhere else.

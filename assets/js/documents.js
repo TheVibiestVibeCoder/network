@@ -6,7 +6,9 @@
  * drop to add more.
  *
  * Self-contained module; app.js only calls window.ProjectDocuments.load() when
- * a project's detail view is drawn and .reset() when it closes.
+ * a project's detail view is drawn and .reset() when it closes. For a project
+ * being created, .startDraft() holds the files in the sheet and
+ * .commitDraft() uploads them once the project exists.
  */
 (function () {
     'use strict';
@@ -25,14 +27,18 @@
         // The label the file picker was opened for.
         pickerLabel: null,
         // Guards against a slow answer for a project that is no longer on screen.
-        token: 0
+        token: 0,
+        // A project being created: files wait here, { key, file, label }.
+        draft: false,
+        pending: [],
+        pendingKey: 0
     };
 
     const els = {};
 
-    const ICON_UPLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>';
-    const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
-    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+    const ICON_UPLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>';
+    const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>';
 
     // ------------------------------------------------------------------
     // Utilities
@@ -67,15 +73,7 @@
      * when it is not this one, as on the notes timeline.
      */
     function formatDay(value) {
-        if (!value) return '';
-        const date = new Date(String(value).replace(' ', 'T') + 'Z');
-        if (isNaN(date.getTime())) return '';
-
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-        });
+        return value ? window.CRMFormat.date(window.CRMFormat.toDate(value)) : '';
     }
 
     function extensionOf(name) {
@@ -148,13 +146,24 @@
         return refresh();
     }
 
+    /** A project being created: no documents yet, files are held until it exists. */
+    function startDraft() {
+        reset();
+        if (!els.section) return Promise.resolve();
+        state.draft = true;
+        state.projectName = 'the new project';
+        return refresh();
+    }
+
     async function refresh() {
         const projectId = state.projectId;
-        if (!projectId) return;
+        if (!projectId && !state.draft) return;
         const token = ++state.token;
 
         try {
-            const result = await request('list', { query: { project_id: projectId } });
+            const result = projectId
+                ? await request('list', { query: { project_id: projectId } })
+                : await request('meta');
             if (token !== state.token || state.projectId !== projectId) return;
 
             const data = result.data || {};
@@ -176,6 +185,8 @@
         state.projectId = null;
         state.projectName = '';
         state.documents = [];
+        state.draft = false;
+        state.pending = [];
         state.token++;
         hideDrop();
         if (els.list) els.list.innerHTML = '';
@@ -188,13 +199,28 @@
     }
 
     function renderList() {
-        const count = state.documents.length;
+        const count = state.draft ? state.pending.length : state.documents.length;
         els.count.textContent = String(count);
         els.count.hidden = count === 0;
 
         els.list.innerHTML = count === 0
-            ? '<p class="empty-hint">No documents yet</p>'
-            : `<div class="pdoc-card">${state.documents.map(rowHtml).join('')}</div>`;
+            ? ''
+            : `<div class="pdoc-card">${(state.draft ? state.pending.map(pendingRowHtml) : state.documents.map(rowHtml)).join('')}</div>`;
+    }
+
+    /** A file waiting for its project: the same row, uploaded on Create. */
+    function pendingRowHtml(item) {
+        const name = escapeHtml(item.file.name);
+        return `
+            <div class="pdoc-item" title="${escapeHtml(item.file.name + ' · ' + formatSize(item.file.size) + ' · added when the project is created')}">
+                <span class="pdoc-type" aria-hidden="true">${escapeHtml(extensionOf(item.file.name))}</span>
+                <span class="pdoc-name">${name}</span>
+                ${labelSelect({ id: 'p' + item.key, label: item.label, name: item.file.name })}
+                <span class="pdoc-date">${escapeHtml(formatSize(item.file.size))}</span>
+                <div class="pdoc-tools">
+                    <button type="button" class="pdoc-act pdoc-act--danger" data-doc-pending-remove="${item.key}" title="Remove" aria-label="Remove ${name}">${ICON_TRASH}</button>
+                </div>
+            </div>`;
     }
 
     function rowHtml(doc) {
@@ -203,22 +229,19 @@
         const review = window.CRMReview;
         const proposed = doc.review_status === 'pending' && !!review;
         const name = escapeHtml(doc.name);
-        const meta = [['size', formatSize(doc.size)], ['who', doc.uploaded_by_name], ['date', formatDay(doc.created_at)]]
-            .filter(([, text]) => text)
-            .map(([part, text]) => `<span class="pdoc-meta-part pdoc-meta-${part}">${escapeHtml(text)}</span>`)
-            .join('');
+        // One line per file: the date stays visible, size and who added it
+        // are in the tooltip.
+        const details = [doc.name, formatSize(doc.size), doc.uploaded_by_name && `added by ${doc.uploaded_by_name}`, formatDay(doc.created_at)]
+            .filter(Boolean)
+            .join(' · ');
 
         return `
-            <div class="pdoc-item${proposed ? ' is-proposed' : ''}" data-doc-id="${doc.id}">
+            <div class="pdoc-item${proposed ? ' is-proposed' : ''}" data-doc-id="${doc.id}" title="${escapeHtml(details)}">
                 <span class="pdoc-type" aria-hidden="true">${escapeHtml(extensionOf(doc.name))}</span>
-                <div class="pdoc-info">
-                    <a class="pdoc-name" href="${fileUrl(doc)}" data-doc-open="${doc.id}" title="${name}">${name}</a>
-                    <div class="pdoc-meta">
-                        ${labelSelect(doc)}
-                        ${meta}
-                        ${proposed ? review.badge(doc) : ''}
-                    </div>
-                </div>
+                <a class="pdoc-name" href="${fileUrl(doc)}" data-doc-open="${doc.id}">${name}</a>
+                ${proposed ? review.badge(doc) : ''}
+                ${labelSelect(doc)}
+                <span class="pdoc-date">${escapeHtml(formatDay(doc.created_at))}</span>
                 <div class="pdoc-tools">
                     ${proposed ? review.inlineActions('project_document', doc.id) : ''}
                     <a class="pdoc-act" href="${fileUrl(doc)}" download title="Download" aria-label="Download ${name}">${ICON_DOWNLOAD}</a>
@@ -251,12 +274,12 @@
             `<button type="button" class="pdoc-chip" data-doc-add="${escapeHtml(label)}" data-label-index="${index}">${escapeHtml(label)}</button>`
         ).join('');
 
+        // One line; what can be added is in the tooltip.
         els.add.innerHTML = `
-            <div class="pdoc-add-row">
-                <span class="pdoc-add-text">${ICON_UPLOAD}<span>Drag files in, or add as</span></span>
+            <div class="pdoc-add-row" title="PDF, Word, Excel, PowerPoint, text and images${escapeHtml(limit)}">
+                <span class="pdoc-add-text">${ICON_UPLOAD}<span>Drop files or add as</span></span>
                 <span class="pdoc-add-labels">${chips}</span>
-            </div>
-            <p class="pdoc-add-hint">PDF, Word, Excel, PowerPoint, text and images${escapeHtml(limit)}</p>`;
+            </div>`;
 
         els.input.accept = state.limits.extensions.map(extension => '.' + extension).join(',');
         setBusy(state.uploading);
@@ -288,7 +311,7 @@
     async function upload(fileList, label) {
         const projectId = state.projectId;
         const files = Array.from(fileList || []);
-        if (!projectId || !label || files.length === 0 || state.uploading) return;
+        if ((!projectId && !state.draft) || !label || files.length === 0 || state.uploading) return;
 
         const problems = [];
         const ready = [];
@@ -298,15 +321,44 @@
             else ready.push(file);
         });
 
+        // Not created yet: the files wait in the sheet.
+        if (state.draft) {
+            ready.forEach(file => state.pending.push({ key: ++state.pendingKey, file, label }));
+            renderList();
+            if (problems.length > 0) toast(problems.join(' / '), true);
+            return;
+        }
+
         state.uploading = true;
         setBusy(true);
+        const sent = await send(projectId, ready.map(file => ({ file, label })));
+        const added = sent.added;
+        problems.push(...sent.problems);
+        state.uploading = false;
+        setBusy(false);
 
-        // One request per file. Several large files in a single POST would
-        // run into post_max_size, which PHP reports by discarding all of it.
+        // The sheet may show another project by now; its list is not ours to redraw.
+        if (added > 0 && state.projectId === projectId) {
+            await refresh();
+        }
+
+        if (problems.length > 0) {
+            toast((added > 0 ? `${added} added. ` : '') + problems.join(' / '), true);
+        } else {
+            toast(`${added} document${added === 1 ? '' : 's'} added as ${label}`);
+        }
+    }
+
+    /**
+     * One request per file. Several large files in a single POST would run
+     * into post_max_size, which PHP reports by discarding all of it.
+     */
+    async function send(projectId, items) {
         let added = 0;
-        for (let i = 0; i < ready.length; i++) {
-            const file = ready[i];
-            toast(ready.length > 1 ? `Uploading ${i + 1} of ${ready.length}: ${file.name}` : `Uploading ${file.name}…`);
+        const problems = [];
+        for (let i = 0; i < items.length; i++) {
+            const { file, label } = items[i];
+            toast(items.length > 1 ? `Uploading ${i + 1} of ${items.length}: ${file.name}` : `Uploading ${file.name}…`);
 
             const form = new FormData();
             form.append('project_id', String(projectId));
@@ -321,20 +373,20 @@
                 problems.push(`${file.name}: ${error.message}`);
             }
         }
+        return { added, problems };
+    }
 
-        state.uploading = false;
-        setBusy(false);
-
-        // The sheet may show another project by now; its list is not ours to redraw.
-        if (added > 0 && state.projectId === projectId) {
-            await refresh();
-        }
-
-        if (problems.length > 0) {
-            toast((added > 0 ? `${added} added. ` : '') + problems.join(' / '), true);
-        } else {
-            toast(`${added} document${added === 1 ? '' : 's'} added as ${label}`);
-        }
+    /**
+     * The project now exists: upload the files held for it. Resolves to the
+     * problems, if any, so the caller can report them with the rest.
+     */
+    async function commitDraft(projectId) {
+        const items = state.draft ? state.pending.slice() : [];
+        state.draft = false;
+        state.pending = [];
+        if (items.length === 0) return [];
+        const { problems } = await send(projectId, items);
+        return problems;
     }
 
     // ------------------------------------------------------------------
@@ -435,7 +487,7 @@
 
     function bindDrops() {
         const onDrag = event => {
-            if (!isFileDrag(event) || !state.projectId || state.labels.length === 0) return;
+            if (!isFileDrag(event) || (!state.projectId && !state.draft) || state.labels.length === 0) return;
 
             // Always claimed while files are over the sheet: left alone, the
             // browser would open a file dropped beside a target and navigate
@@ -504,6 +556,14 @@
                 return;
             }
 
+            const pendingRemove = event.target.closest('[data-doc-pending-remove]');
+            if (pendingRemove) {
+                const key = Number(pendingRemove.dataset.docPendingRemove);
+                state.pending = state.pending.filter(item => item.key !== key);
+                renderList();
+                return;
+            }
+
             const deleteButton = event.target.closest('[data-doc-delete]');
             if (deleteButton) {
                 remove(deleteButton.dataset.docDelete);
@@ -517,7 +577,15 @@
 
         els.section.addEventListener('change', event => {
             const select = event.target.closest('[data-doc-label]');
-            if (select) setLabel(select);
+            if (!select) return;
+            // A held file: its label is only remembered.
+            if (select.dataset.docLabel.startsWith('p')) {
+                const key = Number(select.dataset.docLabel.slice(1));
+                const item = state.pending.find(entry => entry.key === key);
+                if (item) item.label = select.value;
+                return;
+            }
+            setLabel(select);
         });
 
         els.input.addEventListener('change', () => {
@@ -531,7 +599,7 @@
         bindDrops();
     }
 
-    window.ProjectDocuments = { load, reset };
+    window.ProjectDocuments = { load, reset, startDraft, commitDraft };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', bind);

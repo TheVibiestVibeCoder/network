@@ -54,12 +54,24 @@
         projects: [],
         allProjects: [],
         projectSortField: 'stage',
+        // 'cards' or 'list', as this person last chose it (index.php reads
+        // it from includes/UserPrefs.php into data-project-view).
+        projectView: (document.getElementById('projectsView') || { dataset: {} }).dataset.projectView === 'list' ? 'list' : 'cards',
         projectSortOrder: 'ASC',
         projectSearchQuery: '',
         hideCompletedProjects: true,
         editingProjectId: null,
         viewingProjectId: null,
         viewingProject: null,
+        // Project to-dos opened in the detail sheet, kept across redraws
+        expandedProjectTodos: new Set(),
+        // Whether the project sheet shows all notes or only the latest
+        showAllProjectNotes: false,
+        // Whether the project sheet lists completed to-dos too
+        showCompletedProjectTodos: false,
+        // The to-do shown in the to-do detail sheet
+        viewingTodoId: null,
+        viewingTodo: null,
         // To-do state
         todos: [],
         todoSearchQuery: '',
@@ -70,8 +82,15 @@
         todoAssignedFilter: '',
         todoSortBy: 'default',
         todoFilterOptionsInitialized: false,
-        editingTodoId: null,
-        todoModalContext: null
+        // A project being created: what is added to its sheet before it
+        // exists, applied right after (saveProjectEdit). null otherwise.
+        projectDraft: null,
+        // How the to-do sheet was opened for a new to-do (openNewTodo).
+        todoSheetContext: null,
+        // The project sheet was opened just to edit, and closes after it.
+        projectCloseAfterEdit: false,
+        // Links added to a new to-do, saved once it is created: [{ key, url, title }].
+        newTodoLinks: []
     };
 
     // ============================================
@@ -83,7 +102,10 @@
         workloadView: document.getElementById('workloadView'),
         mapView: document.getElementById('mapView'),
         bookkeepingView: document.getElementById('bookkeepingView'),
+        financialsView: document.getElementById('financialsView'),
         reviewView: document.getElementById('reviewView'),
+        composeView: document.getElementById('composeView'),
+        usersView: document.getElementById('usersView'),
         listView: document.getElementById('listView'),
         calendarView: document.getElementById('calendarView'),
         todoView: document.getElementById('todoView'),
@@ -151,7 +173,6 @@
 
         // Overview modal
         overviewModal: document.getElementById('overviewModal'),
-        overviewAvatar: document.getElementById('overviewAvatar'),
         overviewName: document.getElementById('overviewName'),
         overviewCompany: document.getElementById('overviewCompany'),
         overviewEdited: document.getElementById('overviewEdited'),
@@ -164,7 +185,6 @@
         newNoteContent: document.getElementById('newNoteContent'),
         addNoteBtn: document.getElementById('addNoteBtn'),
         closeOverviewModal: document.getElementById('closeOverviewModal'),
-        closeOverviewBtn: document.getElementById('closeOverviewBtn'),
         editContactBtn: document.getElementById('editContactBtn'),
 
         // Company notes modal
@@ -205,18 +225,6 @@
         projectSortOrderIcon: document.getElementById('projectSortOrderIcon'),
         addProjectBtn: document.getElementById('addProjectBtn'),
 
-        // Project modal
-        projectModal: document.getElementById('projectModal'),
-        projectModalTitle: document.getElementById('projectModalTitle'),
-        projectForm: document.getElementById('projectForm'),
-        projectId: document.getElementById('projectId'),
-        projectCompany: document.getElementById('projectCompany'),
-        projectCompanySuggestions: document.getElementById('projectCompanySuggestions'),
-        closeProjectModal: document.getElementById('closeProjectModal'),
-        cancelProjectBtn: document.getElementById('cancelProjectBtn'),
-        deleteProjectBtn: document.getElementById('deleteProjectBtn'),
-        saveProjectBtn: document.getElementById('saveProjectBtn'),
-
         // Delete project modal
         deleteProjectModal: document.getElementById('deleteProjectModal'),
         deleteProjectName: document.getElementById('deleteProjectName'),
@@ -233,6 +241,9 @@
         projectOverviewStartDate: document.getElementById('projectOverviewStartDate'),
         projectOverviewStage: document.getElementById('projectOverviewStage'),
         projectOverviewBudget: document.getElementById('projectOverviewBudget'),
+        projectOverviewPayments: document.getElementById('projectOverviewPayments'),
+        projectOverviewPaymentsList: document.getElementById('projectOverviewPaymentsList'),
+        projectPaymentsEditor: document.getElementById('projectPaymentsEditor'),
         projectOverviewSuccessChance: document.getElementById('projectOverviewSuccessChance'),
         projectOverviewEstCompletion: document.getElementById('projectOverviewEstCompletion'),
         projectOverviewDescription: document.getElementById('projectOverviewDescription'),
@@ -249,27 +260,56 @@
         newProjectContactInput: document.getElementById('newProjectContactInput'),
         projectContactSuggestions: document.getElementById('projectContactSuggestions'),
         addProjectContactBtn: document.getElementById('addProjectContactBtn'),
+        projectTagPicker: document.getElementById('projectTagPicker'),
+        projectContactPicker: document.getElementById('projectContactPicker'),
+        projectNoteForm: document.getElementById('projectNoteForm'),
+        openProjectNoteFormBtn: document.getElementById('openProjectNoteFormBtn'),
+        cancelProjectNoteBtn: document.getElementById('cancelProjectNoteBtn'),
         closeProjectOverviewModal: document.getElementById('closeProjectOverviewModal'),
-        closeProjectOverviewBtn: document.getElementById('closeProjectOverviewBtn'),
         deleteProjectOverviewBtn: document.getElementById('deleteProjectOverviewBtn'),
         editProjectBtn: document.getElementById('editProjectBtn'),
+        cancelProjectEditBtn: document.getElementById('cancelProjectEditBtn'),
+        saveProjectEditBtn: document.getElementById('saveProjectEditBtn'),
+        projectEditName: document.getElementById('projectEditName'),
+        projectEditCompany: document.getElementById('projectEditCompany'),
+        projectEditCompanySuggestions: document.getElementById('projectEditCompanySuggestions'),
+        projectEditStartDate: document.getElementById('projectEditStartDate'),
+        projectEditStage: document.getElementById('projectEditStage'),
+        projectEditBudgetMin: document.getElementById('projectEditBudgetMin'),
+        projectEditBudgetMax: document.getElementById('projectEditBudgetMax'),
+        projectEditSuccessChance: document.getElementById('projectEditSuccessChance'),
+        projectEditEstCompletion: document.getElementById('projectEditEstCompletion'),
+        projectEditDescription: document.getElementById('projectEditDescription'),
 
-        // To-do modal
-        todoModal: document.getElementById('todoModal'),
-        todoModalTitle: document.getElementById('todoModalTitle'),
-        todoEdited: document.getElementById('todoEdited'),
-        todoAssignee: document.getElementById('todoAssignee'),
-        todoAssigneeGroup: document.getElementById('todoAssigneeGroup'),
-        todoForm: document.getElementById('todoForm'),
-        todoTitle: document.getElementById('todoTitle'),
-        todoDescription: document.getElementById('todoDescription'),
-        todoDueDate: document.getElementById('todoDueDate'),
-        todoPriority: document.getElementById('todoPriority'),
-        todoAssignType: document.getElementById('todoAssignType'),
-        todoAssigneeId: document.getElementById('todoAssigneeId'),
-        closeTodoModal: document.getElementById('closeTodoModal'),
-        cancelTodoBtn: document.getElementById('cancelTodoBtn'),
-        saveTodoBtn: document.getElementById('saveTodoBtn')
+        // To-do detail sheet
+        todoDetailModal: document.getElementById('todoDetailModal'),
+        todoDetailTitle: document.getElementById('todoDetailTitle'),
+        todoDetailContext: document.getElementById('todoDetailContext'),
+        todoDetailEdited: document.getElementById('todoDetailEdited'),
+        todoDetailAssignee: document.getElementById('todoDetailAssignee'),
+        todoDetailStatus: document.getElementById('todoDetailStatus'),
+        todoDetailDue: document.getElementById('todoDetailDue'),
+        todoDetailPriority: document.getElementById('todoDetailPriority'),
+        todoDetailDescription: document.getElementById('todoDetailDescription'),
+        todoLinksList: document.getElementById('todoLinksList'),
+        todoLinkForm: document.getElementById('todoLinkForm'),
+        todoLinkUrl: document.getElementById('todoLinkUrl'),
+        todoLinkTitle: document.getElementById('todoLinkTitle'),
+        addTodoLinkBtn: document.getElementById('addTodoLinkBtn'),
+        cancelTodoLinkBtn: document.getElementById('cancelTodoLinkBtn'),
+        saveTodoLinkBtn: document.getElementById('saveTodoLinkBtn'),
+        closeTodoDetail: document.getElementById('closeTodoDetail'),
+        deleteTodoDetailBtn: document.getElementById('deleteTodoDetailBtn'),
+        toggleTodoDetailDoneBtn: document.getElementById('toggleTodoDetailDoneBtn'),
+        editTodoDetailBtn: document.getElementById('editTodoDetailBtn'),
+        cancelTodoEditBtn: document.getElementById('cancelTodoEditBtn'),
+        saveTodoEditBtn: document.getElementById('saveTodoEditBtn'),
+        todoEditTitle: document.getElementById('todoEditTitle'),
+        todoEditDescription: document.getElementById('todoEditDescription'),
+        todoEditDueDate: document.getElementById('todoEditDueDate'),
+        todoEditPriority: document.getElementById('todoEditPriority'),
+        todoEditAssignType: document.getElementById('todoEditAssignType'),
+        todoEditAssigneeId: document.getElementById('todoEditAssigneeId')
     };
 
     // ============================================
@@ -610,6 +650,29 @@
             });
             return response.json();
         },
+        async getDeletedProjects() {
+            const response = await fetch('api/projects.php?action=deleted');
+            return response.json();
+        },
+
+        async restoreProject(archiveId) {
+            const response = await fetch('api/projects.php?action=restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: archiveId })
+            });
+            return response.json();
+        },
+
+        async purgeProject(archiveId) {
+            const response = await fetch('api/projects.php?action=purge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: archiveId })
+            });
+            return response.json();
+        },
+
         async createProject(data) {
             const response = await fetch('api/projects.php', {
                 method: 'POST',
@@ -714,6 +777,24 @@
             const response = await fetch(`api/todos.php?id=${id}`, {
                 method: 'DELETE',
                 headers: { 'X-CSRF-Token': getCsrfToken() }
+            });
+            return response.json();
+        },
+
+        async addTodoLink(todoId, url, title) {
+            const response = await fetch('api/todos.php?action=add-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ todo_id: todoId, url, title })
+            });
+            return response.json();
+        },
+
+        async deleteTodoLink(linkId) {
+            const response = await fetch('api/todos.php?action=delete-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: linkId })
             });
             return response.json();
         }
@@ -932,9 +1013,7 @@
     function renderPinnedSection(contacts) {
         let html = `<div class="pinned-section">`;
         html += `<div class="pinned-header">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-            </svg>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
             <span>Pinned</span>
             <span class="pinned-count">${contacts.length}</span>
         </div>`;
@@ -947,11 +1026,9 @@
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <h3>Keine Kontakte gefunden</h3>
-                    <p>${state.searchQuery ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+                    <h3>No contacts found</h3>
+                    <p>${state.searchQuery ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
             `;
             return;
@@ -974,9 +1051,7 @@
                 // Company group with header
                 html += `<div class="company-group">`;
                 html += `<div class="company-header" data-company="${escapeHtml(group.company)}" title="Klicken für Firmen-Notizen">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
                     <span>${escapeHtml(group.company)}</span>
                     <span class="company-count">${group.contacts.length}</span>
                 </div>`;
@@ -986,9 +1061,7 @@
                 // Contacts without company get their own section for cleaner visual rhythm
                 html += `<div class="company-group company-group--ungrouped">`;
                 html += `<div class="company-header company-header--muted">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
                     <span>No Company</span>
                     <span class="company-count">${group.contacts.length}</span>
                 </div>`;
@@ -1050,11 +1123,9 @@
         if (totalContacts === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                    <h3>Keine Kontakte gefunden</h3>
-                    <p>${query ? 'Versuche einen anderen Suchbegriff' : 'Füge deinen ersten Kontakt hinzu'}</p>
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+                    <h3>No contacts found</h3>
+                    <p>${query ? 'Try a different search' : 'Add your first contact'}</p>
                 </div>
             `;
             return;
@@ -1090,10 +1161,10 @@
                     <span class="tag-count">${unpinned.length}</span>
                     <span class="tag-actions">
                         <button class="tag-action-btn tag-edit-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" data-tag-color="${tag.color}" title="Tag bearbeiten">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.33a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z"/></svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
                         </button>
                         <button class="tag-action-btn tag-delete-btn" data-tag-id="${tag.id}" data-tag-name="${escapeHtml(tag.name)}" title="Tag l&ouml;schen">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </span>
                 </div>`;
@@ -1107,9 +1178,7 @@
         if (unpinnedUntagged.length > 0) {
             html += `<div class="tag-group untagged-group">`;
             html += `<div class="tag-header tag-header-untagged">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
-                </svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.6 6.6a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8" cy="8" r="1.3"/></svg>
                 <span>Ohne Tag</span>
                 <span class="tag-count">${unpinnedUntagged.length}</span>
             </div>`;
@@ -1285,9 +1354,6 @@
         return `
             <div class="contact-card${inGroup ? ' in-group' : ''}${isPinned ? ' contact-card--pinned' : ''}${isProposed ? ' is-proposed' : ''}" data-id="${contact.id}">
                 <div class="contact-card-main">
-                    <div class="contact-avatar">
-                        ${escapeHtml(getInitials(contact.name))}
-                    </div>
                     <div class="contact-card-content">
                         <h3 class="contact-card-name">${escapeHtml(contact.name)} ${reviewBadge(contact)}</h3>
                         <p class="contact-card-subtitle">${escapeHtml(subtitleText)}</p>
@@ -1295,15 +1361,8 @@
                 </div>
                 ${assigneeChip(contact)}
                 <button class="pin-btn${isPinned ? ' pin-btn--active' : ''}" data-id="${contact.id}" title="${isPinned ? 'Unpin contact' : 'Pin contact'}">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
                 </button>
-                <div class="contact-card-chevron" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
-                    </svg>
-                </div>
             </div>
         `;
     }
@@ -1315,7 +1374,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'list', 'calendar', 'bookkeeping', 'review'];
+    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'bookkeeping', 'financials', 'review', 'users'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1332,6 +1391,10 @@
 
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
+
+        // Bookkeeping, Financials and Users are only on the page for admins,
+        // Quick add only while it is switched on.
+        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1361,6 +1424,12 @@
             btn.classList.toggle('active', btn.dataset.view === view);
         });
 
+        // On Home, the sidebar lights the teammate whose work is shown
+        // instead of Home itself (workload.js).
+        if (window.CRMWorkload && window.CRMWorkload.syncNav) {
+            window.CRMWorkload.syncNav(view);
+        }
+
         // Update view panels
         if (elements.workloadView) {
             elements.workloadView.classList.toggle('active', view === 'workload');
@@ -1372,8 +1441,19 @@
         if (elements.bookkeepingView) {
             elements.bookkeepingView.classList.toggle('active', view === 'bookkeeping');
         }
+        if (elements.financialsView) {
+            // "Financials (new)" is the same page in its new layout, side by
+            // side with the current one until it replaces it.
+            elements.financialsView.classList.toggle('active', view === 'financials');
+        }
         if (elements.reviewView) {
             elements.reviewView.classList.toggle('active', view === 'review');
+        }
+        if (elements.composeView) {
+            elements.composeView.classList.toggle('active', view === 'compose');
+        }
+        if (elements.usersView) {
+            elements.usersView.classList.toggle('active', view === 'users');
         }
 
         // Refresh data for the active view
@@ -1396,9 +1476,21 @@
             if (window.Bookkeeping) {
                 window.Bookkeeping.load();
             }
+        } else if (view === 'financials') {
+            if (window.Financials) {
+                window.Financials.load();
+            }
         } else if (view === 'review') {
             if (window.CRMReview) {
                 window.CRMReview.load();
+            }
+        } else if (view === 'compose') {
+            if (window.CRMCompose) {
+                window.CRMCompose.open();
+            }
+        } else if (view === 'users') {
+            if (window.CRMUsers) {
+                window.CRMUsers.open();
             }
         } else {
             // Contacts always opens as the list; the map is one tap away.
@@ -1545,6 +1637,8 @@
      * first and then letting that view find the row.
      */
     function openBookkeepingRow(rowId) {
+        // Admins only: for anyone else the tab is not on the page.
+        if (!elements.bookkeepingView) return;
         switchView('bookkeeping');
 
         if (window.Bookkeeping && window.Bookkeeping.focusRow) {
@@ -1617,12 +1711,12 @@
             if (result.success) {
                 renderTodoCollection(elements.contactTodosList, result.data || [], {
                     showContext: false,
-                    emptyMessage: 'No to-dos yet for this contact'
+                    emptyMessage: 'No to-dos yet'
                 });
             } else {
                 renderTodoCollection(elements.contactTodosList, [], {
                     showContext: false,
-                    emptyMessage: 'No to-dos yet for this contact'
+                    emptyMessage: 'No to-dos yet'
                 });
             }
         } catch (error) {
@@ -1637,17 +1731,7 @@
 
         try {
             const result = await api.getTodos({ project_id: projectId, status: 'all' });
-            if (result.success) {
-                renderTodoCollection(elements.projectTodosList, result.data || [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet for this project'
-                });
-            } else {
-                renderTodoCollection(elements.projectTodosList, [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet for this project'
-                });
-            }
+            renderProjectTodos(result.success ? (result.data || []) : []);
         } catch (error) {
             console.error('Error loading project to-dos:', error);
         }
@@ -1731,14 +1815,7 @@
         const emptyMessage = options.emptyMessage || 'No to-dos yet';
 
         if (!todos || todos.length === 0) {
-            container.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-                    </svg>
-                    <p>${escapeHtml(emptyMessage)}</p>
-                </div>
-            `;
+            container.innerHTML = `<p class="empty-hint">${escapeHtml(emptyMessage)}</p>`;
             return;
         }
 
@@ -1813,35 +1890,29 @@
 
         const groups = Array.from(groupMap.values());
 
+        // A group's name opens its project or contact; with both, the
+        // contact's name beside it opens the contact.
         const html = groups.map(group => {
             const { meta, items } = group;
 
-            const typeLabel = meta.kind === 'project-contact'
-                ? 'Project + Contact'
-                : (meta.kind === 'project' ? 'Project' : 'Contact');
-
-            const headerActions = `
-                <div class="todo-group-actions">
-                    ${meta.projectId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-project="${meta.projectId}">Open Project</button>` : ''}
-                    ${meta.contactId ? `<button type="button" class="btn btn-secondary btn-small" data-todo-open-contact="${meta.contactId}">Open Contact</button>` : ''}
-                </div>
-            `;
+            const opens = meta.projectId
+                ? `data-todo-open-project="${meta.projectId}" title="Open project"`
+                : `data-todo-open-contact="${meta.contactId}" title="Open contact"`;
+            const subtitle = meta.kind === 'project-contact'
+                ? `<button type="button" class="todo-group-subtitle todo-group-link" data-todo-open-contact="${meta.contactId}" title="Open contact">${escapeHtml(meta.subtitle)}</button>`
+                : `<span class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</span>`;
 
             return `
                 <div class="todo-group">
                     <div class="todo-group-header">
                         <div class="todo-group-title-wrap">
-                            <h3 class="todo-group-title">${escapeHtml(meta.title)}</h3>
-                            <p class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</p>
+                            <button type="button" class="todo-group-title todo-group-link" ${opens}>${escapeHtml(meta.title)}</button>
+                            ${subtitle}
                         </div>
-                        <div class="todo-group-meta">
-                            <span class="todo-group-type">${escapeHtml(typeLabel)}</span>
-                            <span class="todo-group-count">${items.length}</span>
-                        </div>
+                        <span class="todo-group-count">${items.length}</span>
                     </div>
-                    ${headerActions}
                     <div class="todo-group-items">
-                        ${items.map(todo => createTodoItemMarkup(todo, { showContext: false })).join('')}
+                        ${items.map(todo => createProjectTodoMarkup(todo, { opensSheet: true })).join('')}
                     </div>
                 </div>
             `;
@@ -1887,11 +1958,7 @@
 
         let dueText = 'No due date';
         if (dueDate) {
-            dueText = `Due ${dueDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            })}`;
+            dueText = `Due ${window.CRMFormat.date(dueDate)}`;
         }
 
         let contextLabel = '';
@@ -1926,25 +1993,126 @@
                     <div class="todo-content">
                         <div class="todo-title-row">
                             <h4 class="todo-title">${escapeHtml(todo.title || '')}</h4>
-                            ${isProposed ? reviewBadge(todo) + reviewInline('todo', proposalId) : ''}
+                            ${isProposed ? reviewPill(todo, 'todo', proposalId) : reviewChangeBadge(todo)}
                             ${showContext && contextLabel ? `<span class="todo-context ${contextClass}">${escapeHtml(contextLabel)}</span>` : ''}
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
                         <div class="todo-meta">
-                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label)}</span>` : ''}
+                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
                             ${assigneeChip(todo)}
+                            ${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
                         </div>
                         ${openButtons}
                     </div>
                     <div class="todo-actions">
                         <button type="button" class="btn btn-secondary btn-small todo-edit-btn" data-todo-edit="${todo.id}">
-                            Bearbeiten
+                            Edit
                         </button>
                         <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * The to-dos in a project's detail sheet: open ones only, one line each
+     * (title, priority, due date, assignee). A row opens in place to show the
+     * description and the edit and delete buttons. The To-dos page uses the
+     * same line (opensSheet), but a click there opens the to-do's sheet.
+     */
+    function renderProjectTodos(todos) {
+        const container = elements.projectTodosList;
+        if (!container) {
+            return;
+        }
+
+        const all = todos || [];
+        const open = all.filter(todo => Number(todo.is_completed) !== 1);
+        const done = all.filter(todo => Number(todo.is_completed) === 1);
+        const showDone = state.showCompletedProjectTodos;
+        const noun = done.length === 1 ? 'to-do' : 'to-dos';
+        const doneHint = done.length === 0 ? '' : `
+            <p class="ptodo-done-hint">
+                ${done.length} completed ${noun} ${showDone ? 'shown' : 'hidden'}.
+                <button type="button" class="ov-link-btn" data-ptodo-show-done>${showDone ? 'Hide' : 'Show'}</button>
+            </p>`;
+
+        // Open ones first; completed ones after them, when asked for.
+        const shown = showDone ? open.concat(done) : open;
+        if (shown.length === 0) {
+            container.innerHTML = `<p class="empty-hint">No open to-dos</p>${doneHint}`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="ptodo-card">${shown.map(createProjectTodoMarkup).join('')}</div>
+            ${doneHint}
+        `;
+    }
+
+    function createProjectTodoMarkup(todo, { opensSheet = false } = {}) {
+        const isCompleted = Number(todo.is_completed) === 1;
+        const dueDate = parseTodoDueDate(todo.due_date);
+        const priorityMeta = getTodoPriorityMeta(todo.priority);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
+        const dueText = dueDate ? window.CRMFormat.date(dueDate) : '';
+
+        const isProposed = todo.review_status === 'pending';
+        const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
+        const expanded = !opensSheet && state.expandedProjectTodos.has(Number(todo.id));
+        const priorityWord = priorityMeta ? priorityMeta.label.replace(/ Priority$/, '') : '';
+
+        if (opensSheet) {
+            return `
+            <div class="todo-item ptodo${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
+                <div class="ptodo-row">
+                    <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
+                        <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
+                        <span class="todo-check-indicator"></span>
+                    </label>
+                    <span class="ptodo-title" title="${escapeHtml(todo.title || '')}">${escapeHtml(todo.title || '')}</span>
+                    ${isProposed ? reviewPill(todo, 'todo', proposalId) : reviewChangeBadge(todo)}
+                    <span class="ptodo-meta">
+                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
+                        ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
+                        ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
+                    </span>
+                </div>
+            </div>
+        `;
+        }
+
+        return `
+            <div class="todo-item ptodo${expanded ? ' is-expanded' : ''}${isCompleted ? ' todo-completed' : ''}${isProposed ? ' is-proposed' : ''}" data-todo-id="${todo.id}">
+                <div class="ptodo-row" data-todo-expand>
+                    <label class="todo-check" title="${isCompleted ? 'Mark as open' : 'Mark as completed'}">
+                        <input type="checkbox" data-todo-toggle="${todo.id}" ${isCompleted ? 'checked' : ''}>
+                        <span class="todo-check-indicator"></span>
+                    </label>
+                    <button type="button" class="ptodo-title" data-todo-expand-btn aria-expanded="${expanded}">${escapeHtml(todo.title || '')}</button>
+                    ${isProposed ? reviewBadge(todo) : reviewChangeBadge(todo)}
+                    <span class="ptodo-meta">
+                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
+                        ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
+                        ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
+                    </span>
+                    <svg class="ptodo-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+                </div>
+                <div class="ptodo-detail">
+                    ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
+                    <div class="ptodo-actions">
+                        ${isProposed ? reviewInline('todo', proposalId) : ''}
+                        <button type="button" class="btn btn-secondary btn-small" data-todo-edit="${todo.id}">Edit</button>
+                        <button type="button" class="btn btn-icon btn-small todo-delete-btn" data-todo-delete="${todo.id}" title="Delete to-do">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                 </div>
@@ -2003,7 +2171,7 @@
     }
 
     function populateTodoAssigneeOptions(assignType, selectedId = null) {
-        if (!elements.todoAssigneeId) {
+        if (!elements.todoEditAssigneeId) {
             return;
         }
 
@@ -2023,207 +2191,8 @@
             html += `<option value="${selectedId}">Selected item not found</option>`;
         }
 
-        elements.todoAssigneeId.innerHTML = html;
-        elements.todoAssigneeId.value = selectedId ? String(selectedId) : '';
-    }
-
-    function updateTodoModalForMode(isEditMode) {
-        if (!elements.todoModalTitle || !elements.saveTodoBtn) {
-            return;
-        }
-
-        if (isEditMode) {
-            elements.todoModalTitle.textContent = 'To-Do Bearbeiten';
-            elements.saveTodoBtn.textContent = 'Speichern';
-        } else {
-            elements.todoModalTitle.textContent = 'New To-Do';
-            elements.saveTodoBtn.textContent = 'Create To-Do';
-        }
-    }
-
-    async function openTodoModal(context = null, todoData = null) {
-        if (!elements.todoModal || !elements.todoForm) {
-            return;
-        }
-
-        const isEditMode = !!(todoData && todoData.id);
-
-        state.todoModalContext = context;
-        state.editingTodoId = isEditMode ? Number(todoData.id) : null;
-        elements.todoForm.reset();
-        elements.todoAssignType.disabled = false;
-        elements.todoAssigneeId.disabled = false;
-        updateTodoModalForMode(isEditMode);
-
-        await ensureTodoAssignmentData(true);
-
-        let assignType = 'contact';
-        let assigneeId = null;
-
-        if (isEditMode) {
-            if (todoData.project_id) {
-                assignType = 'project';
-                assigneeId = todoData.project_id;
-            } else if (todoData.contact_id) {
-                assignType = 'contact';
-                assigneeId = todoData.contact_id;
-            }
-        } else if (context && context.type === 'project') {
-            assignType = 'project';
-            assigneeId = context.id || null;
-            elements.todoModalTitle.textContent = 'New To-Do for Project';
-        } else if (context && context.type === 'contact') {
-            assignType = 'contact';
-            assigneeId = context.id || null;
-            elements.todoModalTitle.textContent = 'New To-Do for Contact';
-        }
-
-        elements.todoAssignType.value = assignType;
-        populateTodoAssigneeOptions(assignType, assigneeId);
-
-        if (!isEditMode && context && context.locked) {
-            elements.todoAssignType.disabled = true;
-            elements.todoAssigneeId.disabled = true;
-        }
-
-        if (isEditMode) {
-            elements.todoTitle.value = todoData.title || '';
-            elements.todoDescription.value = todoData.description || '';
-            elements.todoDueDate.value = todoData.due_date || '';
-            if (elements.todoPriority) {
-                elements.todoPriority.value = todoData.priority || '';
-            }
-            setEditedLine(elements.todoEdited, todoData);
-            setAssigneeControl(elements.todoAssignee, 'todo', todoData);
-            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
-        } else {
-            // A to-do being created has nobody to attribute yet. The assignee
-            // control has no record id, so choosing someone only marks the
-            // form; saveTodo() applies it once the to-do exists.
-            setEditedLine(elements.todoEdited, null);
-            if (elements.todoAssignee) {
-                elements.todoAssignee.innerHTML = assigneeControl('todo', null);
-                elements.todoAssignee.style.display = '';
-            }
-            if (elements.todoAssigneeGroup) elements.todoAssigneeGroup.hidden = false;
-        }
-
-        elements.todoModal.classList.add('active');
-        elements.todoTitle.focus();
-    }
-
-    async function openTodoEditModal(todoId) {
-        if (!Number.isInteger(todoId) || todoId <= 0) {
-            return;
-        }
-
-        try {
-            const result = await api.getTodo(todoId);
-            if (!result.success) {
-                alert(result.error || 'Error loading to-do');
-                return;
-            }
-
-            await openTodoModal(null, result.data);
-        } catch (error) {
-            console.error('Error loading to-do for editing:', error);
-            alert('Error loading to-do');
-        }
-    }
-
-    function closeTodoModal() {
-        if (!elements.todoModal) {
-            return;
-        }
-
-        elements.todoModal.classList.remove('active');
-        state.todoModalContext = null;
-        state.editingTodoId = null;
-        if (elements.todoForm) {
-            elements.todoForm.reset();
-        }
-        updateTodoModalForMode(false);
-    }
-
-    async function saveTodo(e) {
-        e.preventDefault();
-
-        const title = elements.todoTitle ? elements.todoTitle.value.trim() : '';
-        const description = elements.todoDescription ? elements.todoDescription.value.trim() : '';
-        const dueDate = elements.todoDueDate ? elements.todoDueDate.value : '';
-        const priority = elements.todoPriority ? elements.todoPriority.value : '';
-        const assignType = elements.todoAssignType ? elements.todoAssignType.value : 'contact';
-        const assigneeIdRaw = elements.todoAssigneeId ? elements.todoAssigneeId.value : '';
-        const assigneeId = parseInt(assigneeIdRaw, 10);
-
-        if (!title) {
-            alert('Please provide a title for the to-do.');
-            return;
-        }
-
-        if (!Number.isInteger(assigneeId) || assigneeId <= 0) {
-            alert('Please choose a valid contact or project assignment.');
-            return;
-        }
-
-        const payload = {
-            title,
-            description: description || null,
-            due_date: dueDate || null,
-            priority: priority || null,
-            contact_id: null,
-            project_id: null
-        };
-
-        if (assignType === 'project') {
-            payload.project_id = assigneeId;
-        } else {
-            payload.contact_id = assigneeId;
-        }
-
-        if (elements.saveTodoBtn) {
-            elements.saveTodoBtn.disabled = true;
-            elements.saveTodoBtn.textContent = state.editingTodoId ? 'Saving...' : 'Creating...';
-        }
-
-        try {
-            const result = state.editingTodoId
-                ? await api.updateTodo(state.editingTodoId, payload)
-                : await api.createTodo(payload);
-
-            if (result.success) {
-                // New to-do: apply the assignee chosen in the form now that
-                // there is a record. Through api/assign.php, like any later
-                // reassignment, so it gets the same account checks and log entry.
-                const assignSelect = elements.todoAssignee
-                    ? elements.todoAssignee.querySelector('select.assignee-select')
-                    : null;
-                const assignTo = assignSelect ? assignSelect.value : '';
-                if (!state.editingTodoId && assignTo && result.data && result.data.id) {
-                    try {
-                        const saved = await saveAssignment('todo', result.data.id, assignTo);
-                        showAssignmentToast(saved.assigned_to_name);
-                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
-                    } catch (error) {
-                        // The to-do itself was created; only the assignment failed.
-                        alert('The to-do was created, but it could not be assigned: ' + error.message);
-                    }
-                }
-
-                closeTodoModal();
-                await refreshVisibleTodoLists();
-            } else {
-                alert(result.error || (state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do'));
-            }
-        } catch (error) {
-            console.error(state.editingTodoId ? 'Error updating to-do:' : 'Error creating to-do:', error);
-            alert(state.editingTodoId ? 'Error updating to-do' : 'Error creating to-do');
-        } finally {
-            if (elements.saveTodoBtn) {
-                elements.saveTodoBtn.disabled = false;
-                updateTodoModalForMode(!!state.editingTodoId);
-            }
-        }
+        elements.todoEditAssigneeId.innerHTML = html;
+        elements.todoEditAssigneeId.value = selectedId ? String(selectedId) : '';
     }
 
     async function setTodoCompletion(todoId, completed) {
@@ -2264,6 +2233,559 @@
         }
     }
 
+    // ---- To-do detail sheet --------------------------------------------------
+
+    /**
+     * A to-do's own sheet: facts, description and links. Edit turns the same
+     * sheet into its form, as on the project sheet; { edit: true } opens it
+     * that way.
+     */
+    async function openTodoDetail(todoId, { edit = false } = {}) {
+        if (!Number.isInteger(todoId) || todoId <= 0 || !elements.todoDetailModal) {
+            return;
+        }
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (!result.success) {
+                alert(result.error || 'Error loading to-do');
+                return;
+            }
+
+            if (state.viewingTodoId !== todoId) {
+                closeTodoLinkForm();
+            }
+            exitTodoEdit();
+            elements.todoDetailModal.classList.remove('is-new');
+            state.viewingTodoId = todoId;
+            state.viewingTodo = result.data;
+            renderTodoDetail(result.data);
+            elements.todoDetailModal.classList.add('active');
+            if (edit) {
+                await enterTodoEdit();
+            }
+        } catch (error) {
+            console.error('Error opening to-do:', error);
+            alert('Error loading to-do');
+        }
+    }
+
+    async function refreshTodoDetail() {
+        const todoId = state.viewingTodoId;
+        if (!todoId) return;
+
+        try {
+            const result = await api.getTodo(todoId);
+            if (state.viewingTodoId !== todoId) return;
+            if (result.success) {
+                state.viewingTodo = result.data;
+                renderTodoDetail(result.data);
+            } else {
+                // Gone (deleted elsewhere): nothing left to show.
+                closeTodoDetail();
+            }
+        } catch (error) {
+            console.error('Error refreshing to-do:', error);
+        }
+    }
+
+    function renderTodoDetail(todo) {
+        const isCompleted = Number(todo.is_completed) === 1;
+
+        elements.todoDetailTitle.textContent = todo.title || 'To-do';
+
+        // What the to-do belongs to, one click away.
+        const parts = [];
+        if (todo.project_id) {
+            parts.push(`<button type="button" class="tdetail-context-link" data-todo-detail-project="${todo.project_id}">${escapeHtml(todo.project_name || `Project #${todo.project_id}`)}</button>`);
+        }
+        if (todo.contact_id) {
+            parts.push(`<button type="button" class="tdetail-context-link" data-todo-detail-contact="${todo.contact_id}">${escapeHtml(todo.contact_name || `Contact #${todo.contact_id}`)}</button>`);
+        }
+        elements.todoDetailContext.innerHTML = parts.join('<span class="tdetail-context-sep">·</span>');
+
+        setEditedLine(elements.todoDetailEdited, todo);
+        setAssigneeControl(elements.todoDetailAssignee, 'todo', todo);
+
+        elements.todoDetailStatus.innerHTML = isCompleted
+            ? '<span class="tdetail-status is-done">Done</span>'
+            : '<span class="tdetail-status">Open</span>';
+
+        const dueDate = parseTodoDueDate(todo.due_date);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isOverdue = dueDate && !isCompleted && dueDate < startOfToday;
+        elements.todoDetailDue.innerHTML = dueDate
+            ? `<span class="${isOverdue ? 'todo-due-overdue' : ''}">${escapeHtml(window.CRMFormat.date(dueDate))}${isOverdue ? ' (overdue)' : ''}</span>`
+            : '<span class="detail-empty">—</span>';
+
+        const priorityMeta = getTodoPriorityMeta(todo.priority);
+        elements.todoDetailPriority.innerHTML = priorityMeta
+            ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>`
+            : '<span class="detail-empty">—</span>';
+
+        elements.todoDetailDescription.innerHTML = todo.description
+            ? escapeHtml(todo.description)
+            : '<span class="detail-empty">—</span>';
+
+        renderTodoDetailLinks(todo.links || []);
+
+        // What Claude proposes about this to-do, if anything; proposals are
+        // about the to-do itself, which a mirrored copy points to.
+        if (window.CRMReview) {
+            window.CRMReview.renderRecordPanel('todo', todo.parent_todo_id || todo.id, document.getElementById('todoDetailReview'));
+        }
+
+        elements.toggleTodoDetailDoneBtn.textContent = isCompleted ? 'Reopen' : 'Mark as done';
+    }
+
+    function renderTodoDetailLinks(links) {
+        if (!elements.todoLinksList) return;
+
+        elements.todoLinksList.innerHTML = links.length === 0
+            ? '<p class="empty-hint">No links yet</p>'
+            : `<div class="tlink-card">${links.map(link => window.TodoLinks.row(link)).join('')}</div>`;
+    }
+
+    function closeTodoDetail() {
+        if (!elements.todoDetailModal) return;
+        elements.todoDetailModal.classList.remove('active', 'is-editing', 'is-new');
+        closeTodoLinkForm();
+        state.todoSheetContext = null;
+        state.viewingTodoId = null;
+        state.viewingTodo = null;
+        state.newTodoLinks = [];
+    }
+
+    // ---- Editing and creating a to-do in its sheet ---------------------------
+
+    function isEditingTodo() {
+        return elements.todoDetailModal.classList.contains('is-editing');
+    }
+
+    function isNewTodo() {
+        return elements.todoDetailModal.classList.contains('is-new');
+    }
+
+    /**
+     * Fill the sheet's fields from a to-do, or empty for a new one (with
+     * what it belongs to taken from the context), and show them.
+     */
+    async function showTodoEditFields(todo, context = null) {
+        elements.todoDetailModal.classList.add('is-editing');
+        await ensureTodoAssignmentData(true);
+        if (!elements.todoDetailModal.classList.contains('active') || !isEditingTodo()) return;
+
+        let assignType = 'contact';
+        let assigneeId = null;
+        if (todo) {
+            if (todo.project_id) {
+                assignType = 'project';
+                assigneeId = todo.project_id;
+            } else if (todo.contact_id) {
+                assigneeId = todo.contact_id;
+            }
+        } else if (context && (context.type === 'project' || context.type === 'contact')) {
+            assignType = context.type;
+            assigneeId = context.id || null;
+        }
+
+        elements.todoEditTitle.value = todo ? (todo.title || '') : '';
+        elements.todoEditDescription.value = todo ? (todo.description || '') : '';
+        elements.todoEditDueDate.value = todo ? (todo.due_date || '') : '';
+        elements.todoEditPriority.value = todo ? (todo.priority || '') : '';
+        elements.todoEditAssignType.value = assignType;
+        populateTodoAssigneeOptions(assignType, assigneeId);
+        if (!todo && context && context.draft) {
+            // For a project still being created: it has no id to choose yet.
+            elements.todoEditAssigneeId.innerHTML = `<option value="draft">${escapeHtml(elements.projectEditName.value.trim() || 'New project')}</option>`;
+        }
+
+        // Created from a contact or project sheet: it belongs there.
+        const locked = !todo && !!(context && context.locked);
+        elements.todoEditAssignType.disabled = locked;
+        elements.todoEditAssigneeId.disabled = locked;
+
+        elements.todoDetailModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveTodoEditBtn.textContent = todo ? 'Save' : 'Create';
+        elements.todoEditTitle.focus();
+    }
+
+    async function enterTodoEdit() {
+        if (!state.viewingTodo) return;
+        closeTodoLinkForm();
+        await showTodoEditFields(state.viewingTodo);
+    }
+
+    /**
+     * A new to-do: the sheet in edit mode with empty fields. Links added now
+     * are held (state.newTodoLinks) and saved right after the to-do is created.
+     */
+    async function openNewTodo(context = null) {
+        if (!elements.todoDetailModal) return;
+        if (elements.todoDetailModal.classList.contains('active')) {
+            closeTodoDetail();
+        }
+
+        state.viewingTodoId = null;
+        state.viewingTodo = null;
+        state.todoSheetContext = context;
+        state.newTodoLinks = [];
+        renderTodoDetailLinks([]);
+
+        elements.todoDetailTitle.textContent = 'New To-Do';
+        elements.todoDetailContext.innerHTML = '';
+        setEditedLine(elements.todoDetailEdited, null);
+        // No record id yet: choosing someone only marks the sheet;
+        // saveTodoEdit() applies it once the to-do exists.
+        elements.todoDetailAssignee.innerHTML = assigneeControl('todo', null);
+        elements.todoDetailAssignee.style.display = '';
+
+        elements.todoDetailModal.classList.add('active', 'is-new');
+        elements.todoDetailModal.querySelector('.modal-body').scrollTop = 0;
+        await showTodoEditFields(null, context);
+    }
+
+    /** Cancel leaves edit mode; for a to-do not yet created, it closes the sheet. */
+    function cancelTodoEdit() {
+        if (isNewTodo()) {
+            closeTodoDetail();
+        } else {
+            exitTodoEdit();
+        }
+    }
+
+    function exitTodoEdit() {
+        if (!elements.todoDetailModal) return;
+        elements.todoDetailModal.classList.remove('is-editing');
+    }
+
+    async function saveTodoEdit() {
+        const creating = isNewTodo();
+        const todoId = state.viewingTodoId;
+        if (!isEditingTodo() || (!creating && !todoId)) return;
+
+        const title = elements.todoEditTitle.value.trim();
+        const assignType = elements.todoEditAssignType.value === 'project' ? 'project' : 'contact';
+        const assigneeId = parseInt(elements.todoEditAssigneeId.value, 10);
+        const forDraftProject = creating && !!(state.todoSheetContext && state.todoSheetContext.draft);
+
+        const missing = [];
+        if (!title) missing.push(elements.todoEditTitle);
+        if (!forDraftProject && (!Number.isInteger(assigneeId) || assigneeId <= 0)) missing.push(elements.todoEditAssigneeId);
+        [elements.todoEditTitle, elements.todoEditAssigneeId].forEach(input => input.classList.toggle('is-invalid', missing.includes(input)));
+        if (missing.length > 0) {
+            missing[0].focus();
+            return;
+        }
+
+        const payload = {
+            title,
+            description: elements.todoEditDescription.value.trim() || null,
+            due_date: elements.todoEditDueDate.value || null,
+            priority: elements.todoEditPriority.value || null,
+            contact_id: assignType === 'contact' ? assigneeId : null,
+            project_id: assignType === 'project' ? assigneeId : null
+        };
+
+        // For a project still being created: held with the project and
+        // created right after it (applyProjectDraft).
+        if (forDraftProject) {
+            const assignSelect = elements.todoDetailAssignee.querySelector('select.assignee-select');
+            const assignOption = assignSelect && assignSelect.value ? assignSelect.options[assignSelect.selectedIndex] : null;
+            stageProjectTodo({
+                ...payload,
+                assign_to: assignOption ? assignSelect.value : '',
+                assigned_to_name: assignOption ? assignOption.textContent : '',
+                links: state.newTodoLinks.slice()
+            });
+            closeTodoDetail();
+            return;
+        }
+
+        elements.saveTodoEditBtn.disabled = true;
+        try {
+            const result = creating
+                ? await api.createTodo(payload)
+                : await api.updateTodo(todoId, payload);
+            if (!result.success) {
+                alert(result.error || (creating ? 'Error creating to-do' : 'Error updating to-do'));
+                return;
+            }
+
+            if (creating) {
+                const newId = Number(result.data && result.data.id);
+
+                // Apply the assignee chosen in the sheet now that there is a
+                // record. Through api/assign.php, like any later reassignment,
+                // so it gets the same account checks and log entry.
+                const assignSelect = elements.todoDetailAssignee.querySelector('select.assignee-select');
+                const assignTo = assignSelect ? assignSelect.value : '';
+                if (assignTo && newId) {
+                    try {
+                        const saved = await saveAssignment('todo', newId, assignTo);
+                        showAssignmentToast(saved.assigned_to_name);
+                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+                    } catch (error) {
+                        // The to-do itself was created; only the assignment failed.
+                        alert('The to-do was created, but it could not be assigned: ' + error.message);
+                    }
+                }
+
+                // The links added while creating it, now that it exists. The
+                // server reads a document's name where none was given.
+                const links = state.newTodoLinks.slice();
+                const failedLinks = [];
+                for (const link of newId ? links : []) {
+                    try {
+                        const added = await api.addTodoLink(newId, link.url, link.title);
+                        if (!added.success) failedLinks.push(link.url);
+                    } catch (error) {
+                        failedLinks.push(link.url);
+                    }
+                }
+                state.newTodoLinks = [];
+                if (failedLinks.length > 0) {
+                    alert('The to-do was created, but these links could not be added:\n' + failedLinks.join('\n'));
+                }
+
+                // A created to-do opens as itself, with its links.
+                exitTodoEdit();
+                elements.todoDetailModal.classList.remove('is-new');
+                if (newId) await openTodoDetail(newId);
+            } else {
+                exitTodoEdit();
+            }
+
+            await refreshVisibleTodoLists();
+        } catch (error) {
+            console.error(creating ? 'Error creating to-do:' : 'Error updating to-do:', error);
+            alert(creating ? 'Error creating to-do' : 'Error updating to-do');
+        } finally {
+            elements.saveTodoEditBtn.disabled = false;
+        }
+    }
+
+    function openTodoLinkForm() {
+        elements.todoLinkForm.hidden = false;
+        elements.addTodoLinkBtn.setAttribute('aria-expanded', 'true');
+        elements.todoLinkUrl.focus();
+    }
+
+    function closeTodoLinkForm() {
+        if (!elements.todoLinkForm) return;
+        elements.todoLinkForm.hidden = true;
+        elements.addTodoLinkBtn.setAttribute('aria-expanded', 'false');
+        elements.todoLinkForm.reset();
+        elements.todoLinkUrl.classList.remove('is-invalid');
+    }
+
+    async function saveTodoLink(e) {
+        e.preventDefault();
+        const todoId = state.viewingTodoId;
+        const url = elements.todoLinkUrl.value.trim();
+        if (!url) {
+            elements.todoLinkUrl.classList.add('is-invalid');
+            elements.todoLinkUrl.focus();
+            return;
+        }
+
+        if (isNewTodo()) {
+            holdNewTodoLink(url, elements.todoLinkTitle.value.trim());
+            return;
+        }
+        if (!todoId) return;
+
+        // Reading a document's name from Google can take a moment.
+        elements.saveTodoLinkBtn.disabled = true;
+        elements.saveTodoLinkBtn.textContent = 'Adding…';
+        try {
+            const result = await api.addTodoLink(todoId, url, elements.todoLinkTitle.value.trim());
+            if (result.success) {
+                closeTodoLinkForm();
+                await refreshVisibleTodoLists();
+            } else {
+                elements.todoLinkUrl.classList.add('is-invalid');
+                alert(result.error || 'Error adding link');
+            }
+        } catch (error) {
+            console.error('Error adding link:', error);
+            alert('Error adding link');
+        } finally {
+            elements.saveTodoLinkBtn.disabled = false;
+            elements.saveTodoLinkBtn.textContent = 'Add link';
+        }
+    }
+
+    /**
+     * A link for a to-do not created yet: checked like the server does
+     * (TodoLink::normalizeUrl - http(s), an address without a scheme taken as
+     * https) and listed until the to-do is created.
+     */
+    function holdNewTodoLink(rawUrl, title) {
+        const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawUrl) ? rawUrl : 'https://' + rawUrl;
+        let valid = false;
+        try {
+            const parsed = new URL(url);
+            // The browser would quietly encode a space in the host ("a%20b");
+            // the server refuses such an address, so it is refused here too.
+            valid = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !!parsed.hostname
+                && !/\s/.test(url) && !parsed.hostname.includes('%') && url.length <= 2000;
+        } catch (error) {
+            valid = false;
+        }
+        if (!valid) {
+            elements.todoLinkUrl.classList.add('is-invalid');
+            elements.todoLinkUrl.focus();
+            return;
+        }
+
+        state.newTodoLinks.push({ key: 'new-' + (++newTodoLinkSeq), url, title });
+        closeTodoLinkForm();
+        renderNewTodoLinks();
+    }
+
+    let newTodoLinkSeq = 0;
+
+    /** The held links, as the sheet's ordinary link rows. */
+    function renderNewTodoLinks() {
+        renderTodoDetailLinks(state.newTodoLinks.map(link => {
+            const kind = window.TodoLinks.kindOf(link.url);
+            return {
+                id: link.key,
+                url: link.url,
+                kind,
+                // Without a name of its own, the kind stands in until the
+                // server reads the document's name on creation.
+                title: link.title || window.TodoLinks.kindLabel({ kind, url: link.url })
+            };
+        }));
+    }
+
+    async function deleteTodoLink(linkId) {
+        if (!confirm('Remove this link?')) return;
+
+        try {
+            const result = await api.deleteTodoLink(linkId);
+            if (result.success) {
+                await refreshVisibleTodoLists();
+            } else {
+                alert(result.error || 'Error removing link');
+            }
+        } catch (error) {
+            console.error('Error removing link:', error);
+            alert('Error removing link');
+        }
+    }
+
+    function bindTodoDetail() {
+        if (!elements.todoDetailModal) return;
+
+        elements.closeTodoDetail.addEventListener('click', closeTodoDetail);
+        elements.todoDetailModal.querySelector('.modal-backdrop').addEventListener('click', closeTodoDetail);
+
+        elements.editTodoDetailBtn.addEventListener('click', enterTodoEdit);
+        bindClickToEdit(elements.todoDetailModal, elements.editTodoDetailBtn, isEditingTodo, enterTodoEdit);
+        elements.cancelTodoEditBtn.addEventListener('click', cancelTodoEdit);
+        elements.saveTodoEditBtn.addEventListener('click', saveTodoEdit);
+        elements.todoEditAssignType.addEventListener('change', () => {
+            populateTodoAssigneeOptions(elements.todoEditAssignType.value);
+        });
+
+        // Enter in a one-line field saves; Cmd/Ctrl+Enter in the description
+        elements.todoDetailModal.querySelector('.modal-content').addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' || !isEditingTodo()) return;
+            const field = e.target.closest('[data-ov="edit"], [data-ov="edit"] *');
+            if (!field || !e.target.matches('input, textarea')) return;
+            if (e.target.tagName === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            saveTodoEdit();
+        });
+        elements.todoDetailModal.addEventListener('input', (e) => {
+            if (e.target.classList.contains('is-invalid') && e.target.value.trim()) {
+                e.target.classList.remove('is-invalid');
+            }
+        });
+        elements.todoDetailModal.addEventListener('change', (e) => {
+            if (e.target === elements.todoEditAssigneeId && e.target.value) {
+                e.target.classList.remove('is-invalid');
+            }
+        });
+
+        elements.toggleTodoDetailDoneBtn.addEventListener('click', async () => {
+            const todo = state.viewingTodo;
+            if (!todo) return;
+            elements.toggleTodoDetailDoneBtn.disabled = true;
+            await setTodoCompletion(Number(todo.id), Number(todo.is_completed) !== 1);
+            elements.toggleTodoDetailDoneBtn.disabled = false;
+        });
+
+        elements.deleteTodoDetailBtn.addEventListener('click', async () => {
+            const todoId = state.viewingTodoId;
+            if (!todoId) return;
+            // Closed first, so the lists redrawn after the delete do not try
+            // to reload a to-do that is gone.
+            if (await removeTodo(todoId)) {
+                closeTodoDetail();
+            }
+        });
+
+        elements.todoDetailContext.addEventListener('click', (e) => {
+            const project = e.target.closest('[data-todo-detail-project]');
+            const contact = e.target.closest('[data-todo-detail-contact]');
+            if (project) {
+                closeTodoDetail();
+                openProjectOverview(Number(project.dataset.todoDetailProject));
+            } else if (contact) {
+                closeTodoDetail();
+                openOverviewModal(Number(contact.dataset.todoDetailContact));
+            }
+        });
+
+        elements.addTodoLinkBtn.addEventListener('click', () => {
+            if (elements.todoLinkForm.hidden) {
+                openTodoLinkForm();
+            } else {
+                closeTodoLinkForm();
+            }
+        });
+        elements.cancelTodoLinkBtn.addEventListener('click', closeTodoLinkForm);
+        elements.todoLinkForm.addEventListener('submit', saveTodoLink);
+        elements.todoLinkForm.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                // Close the form, not the whole sheet
+                e.stopPropagation();
+                closeTodoLinkForm();
+                elements.addTodoLinkBtn.focus();
+            }
+        });
+        elements.todoLinkUrl.addEventListener('input', () => {
+            elements.todoLinkUrl.classList.remove('is-invalid');
+        });
+
+        elements.todoLinksList.addEventListener('click', (e) => {
+            const remove = e.target.closest('[data-link-delete]');
+            if (!remove) return;
+            if (isNewTodo()) {
+                state.newTodoLinks = state.newTodoLinks.filter(link => link.key !== remove.dataset.linkDelete);
+                renderNewTodoLinks();
+            } else {
+                deleteTodoLink(Number(remove.dataset.linkDelete));
+            }
+        });
+    }
+
+    /**
+     * The home page lists to-dos and projects; redrawn in place, without a
+     * loading state, so a change made in a sheet shows up behind it.
+     */
+    function refreshHome() {
+        if (state.currentView === 'workload' && window.CRMWorkload && window.CRMWorkload.refresh) {
+            return window.CRMWorkload.refresh();
+        }
+        return null;
+    }
+
     async function refreshVisibleTodoLists() {
         const tasks = [];
 
@@ -2278,6 +2800,14 @@
         if (state.viewingProjectId) {
             tasks.push(loadProjectTodos(state.viewingProjectId));
         }
+
+        if (state.viewingTodoId) {
+            tasks.push(refreshTodoDetail());
+        }
+
+        // The home page lists to-dos too.
+        const home = refreshHome();
+        if (home) tasks.push(home);
 
         if (tasks.length > 0) {
             await Promise.all(tasks);
@@ -2308,11 +2838,31 @@
         });
 
         container.addEventListener('click', async (e) => {
+            // A compact row (project sheet) opens in place; its check and
+            // review buttons keep their own meaning.
+            const expandRow = e.target.closest('[data-todo-expand]');
+            if (expandRow) {
+                const control = e.target.closest('button, a, input, label, select, textarea');
+                if (!control || control.hasAttribute('data-todo-expand-btn')) {
+                    const item = expandRow.closest('.todo-item[data-todo-id]');
+                    const todoId = Number(item.dataset.todoId);
+                    const expanded = item.classList.toggle('is-expanded');
+                    if (expanded) {
+                        state.expandedProjectTodos.add(todoId);
+                    } else {
+                        state.expandedProjectTodos.delete(todoId);
+                    }
+                    const btn = item.querySelector('[data-todo-expand-btn]');
+                    if (btn) btn.setAttribute('aria-expanded', String(expanded));
+                    return;
+                }
+            }
+
             const editBtn = e.target.closest('[data-todo-edit]');
             if (editBtn) {
                 const todoId = parseInt(editBtn.dataset.todoEdit, 10);
                 if (Number.isInteger(todoId)) {
-                    await openTodoEditModal(todoId);
+                    await openTodoDetail(todoId, { edit: true });
                 }
                 return;
             }
@@ -2354,7 +2904,7 @@
             if (row) {
                 const todoId = parseInt(row.dataset.todoId, 10);
                 if (Number.isInteger(todoId)) {
-                    await openTodoEditModal(todoId);
+                    await openTodoDetail(todoId);
                 }
             }
         });
@@ -2442,7 +2992,6 @@
             state.viewingContact = contact;
 
             // Populate header
-            elements.overviewAvatar.textContent = getInitials(contact.name);
             elements.overviewName.textContent = contact.name;
             elements.overviewCompany.textContent = contact.company || '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
@@ -2483,14 +3032,9 @@
 
         if (contact.location) {
             const hasCoords = contact.latitude && contact.longitude;
-            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
+            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Location ${geoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.location)}</span>
@@ -2502,11 +3046,6 @@
         if (contact.email) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Email</span>
                         <a href="mailto:${escapeHtml(contact.email)}" class="detail-value detail-link">${escapeHtml(contact.email)}</a>
@@ -2518,11 +3057,6 @@
         if (contact.phone) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Phone</span>
                         <a href="tel:${escapeHtml(contact.phone)}" class="detail-value detail-link">${escapeHtml(contact.phone)}</a>
@@ -2534,11 +3068,6 @@
         if (contact.website) {
             html += `
                 <div class="detail-item">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Website</span>
                         <a href="${escapeHtml(normalizeUrl(contact.website))}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
@@ -2549,14 +3078,9 @@
 
         if (contact.address) {
             const hasCoords = contact.latitude && contact.longitude;
-            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="Adresse konnte nicht auf der Karte gefunden werden">(!)</span>` : '';
+            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
             html += `
                 <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Address ${addressGeoWarning}</span>
                         <span class="detail-value">${escapeHtml(contact.address).replace(/\n/g, '<br>')}</span>
@@ -2568,11 +3092,6 @@
         if (contact.note) {
             html += `
                 <div class="detail-item detail-item-full">
-                    <span class="detail-icon">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                        </svg>
-                    </span>
                     <div class="detail-content">
                         <span class="detail-label">Note</span>
                         <span class="detail-value">${escapeHtml(contact.note)}</span>
@@ -2585,7 +3104,7 @@
 
         // Show empty state if no details
         if (!contact.location && !contact.email && !contact.phone && !contact.website && !contact.address && !contact.note) {
-            html = '<p class="no-details">No contact details available</p>';
+            html = '<p class="empty-hint">No contact details yet</p>';
         }
 
         elements.overviewDetails.innerHTML = html;
@@ -2605,22 +3124,14 @@
 
     function renderNotesTimeline(notes) {
         if (!notes || notes.length === 0) {
-            elements.notesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet</p>
-                </div>
-            `;
+            elements.notesTimeline.innerHTML = '<p class="empty-hint">No notes yet</p>';
             return;
         }
 
         let html = '';
 
         notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
             const isCompanyNote = note.source === 'company';
             const contactName = note.contact_name || '';
 
@@ -2632,11 +3143,9 @@
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
                         ${isCompanyNote ? `<span class="note-source">von ${escapeHtml(contactName)}</span>` : ''}
-                        ${isProposed ? reviewBadge(note) + reviewInline('contact_note', note.id) : ''}
+                        ${isProposed ? reviewPill(note, 'contact_note', note.id) : ''}
                         <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
@@ -2656,29 +3165,9 @@
         });
     }
 
+    /** "Just now", "5 minutes ago", "Yesterday", then the date (format.js). */
     function formatDate(date) {
-        const now = new Date();
-        const diff = now - date;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 7) {
-            return date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-            });
-        } else if (days > 0) {
-            return days === 1 ? 'Yesterday' : `${days} days ago`;
-        } else if (hours > 0) {
-            return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-        } else if (minutes > 0) {
-            return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
-        } else {
-            return 'Just now';
-        }
+        return window.CRMFormat.ago(date);
     }
 
     async function addNote() {
@@ -2710,9 +3199,7 @@
         } finally {
             elements.addNoteBtn.disabled = false;
             elements.addNoteBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                 Add Note
             `;
         }
@@ -2751,7 +3238,7 @@
 
     function renderContactProjects(projects) {
         if (!projects || projects.length === 0) {
-            elements.contactProjects.innerHTML = '<p class="empty-hint">No related projects</p>';
+            elements.contactProjects.innerHTML = '<p class="empty-hint">No projects yet</p>';
             return;
         }
 
@@ -2815,7 +3302,7 @@
 
     function renderContactTags(tags) {
         if (!tags || tags.length === 0) {
-            elements.contactTags.innerHTML = '<span class="no-tags">Keine Tags</span>';
+            elements.contactTags.innerHTML = '<p class="empty-hint">No tags yet</p>';
             return;
         }
 
@@ -2824,10 +3311,8 @@
             html += `
                 <span class="tag" style="--tag-color: ${escapeHtml(tag.color)}">
                     ${escapeHtml(tag.name)}
-                    <button class="tag-remove" data-tag-id="${tag.id}" title="Tag entfernen">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
+                    <button class="tag-remove" data-tag-id="${tag.id}" title="Remove tag">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
                     </button>
                 </span>
             `;
@@ -2879,10 +3364,8 @@
         if (query && !state.allTags.some(t => t.name.toLowerCase() === query.toLowerCase())) {
             html += `
                 <div class="tag-suggestion tag-create" data-create="true">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                    </svg>
-                    Neuer Tag: "${escapeHtml(query)}"
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    New tag: "${escapeHtml(query)}"
                 </div>
             `;
         }
@@ -2952,13 +3435,13 @@
 
         headerEl.innerHTML = `
             <form class="tag-edit-form" data-tag-id="${tagId}">
-                <input type="color" class="tag-edit-color" value="${tagColor}" title="Farbe">
-                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag-Name">
-                <button type="submit" class="tag-edit-save" title="Speichern">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <input type="color" class="tag-edit-color" value="${tagColor}" title="Colour">
+                <input type="text" class="tag-edit-name" value="${escapeHtml(tagName)}" maxlength="100" required placeholder="Tag name">
+                <button type="submit" class="tag-edit-save" title="Save">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
                 </button>
-                <button type="button" class="tag-edit-cancel" title="Abbrechen">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                <button type="button" class="tag-edit-cancel" title="Cancel">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
                 </button>
             </form>
         `;
@@ -2994,7 +3477,7 @@
     }
 
     async function confirmDeleteTag(tagId, tagName) {
-        if (!confirm(`Tag "${tagName}" wirklich l\u00f6schen?\n\nDer Tag wird von allen Kontakten entfernt.`)) {
+        if (!confirm(`Delete the tag "${tagName}"?\n\nIt is removed from every contact.`)) {
             return;
         }
 
@@ -3019,11 +3502,7 @@
             elements.companyNotesTitle.textContent = company;
 
             // Show loading state
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <p>Loading notes...</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Loading notes...</p>';
 
             // Show modal
             elements.companyNotesModal.classList.add('active');
@@ -3034,40 +3513,24 @@
             if (result.success) {
                 renderCompanyNotesTimeline(result.data);
             } else {
-                elements.companyNotesTimeline.innerHTML = `
-                    <div class="notes-empty">
-                        <p>Error loading notes</p>
-                    </div>
-                `;
+                elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
             }
         } catch (error) {
             console.error('Error loading company notes:', error);
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <p>Error loading notes</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
         }
     }
 
     function renderCompanyNotesTimeline(notes) {
         if (!notes || notes.length === 0) {
-            elements.companyNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet for this company</p>
-                </div>
-            `;
+            elements.companyNotesTimeline.innerHTML = '<p class="empty-hint">No notes yet for this company</p>';
             return;
         }
 
         let html = '';
 
         notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
             const contactName = note.contact_name || 'Unknown';
 
             html += `
@@ -3164,9 +3627,7 @@
             setTimeout(() => {
                 elements.exportBtn.disabled = false;
                 elements.exportBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
                     Export All Contacts
                 `;
             }, 1000);
@@ -3514,9 +3975,9 @@
 
     function updateCalendarTitle() {
         const d = state.calendarDate;
-        const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-                        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-        const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+        const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
         if (state.calendarMode === 'month') {
             elements.calTitle.textContent = `${months[d.getMonth()]} ${d.getFullYear()}`;
@@ -3524,11 +3985,11 @@
             const range = getCalendarDateRange();
             const s = range.startDate;
             const e = range.endDate;
-            const sStr = `${s.getDate()}. ${months[s.getMonth()].substring(0, 3)}`;
-            const eStr = `${e.getDate()}. ${months[e.getMonth()].substring(0, 3)} ${e.getFullYear()}`;
+            const sStr = `${months[s.getMonth()].substring(0, 3)} ${s.getDate()}`;
+            const eStr = `${months[e.getMonth()].substring(0, 3)} ${e.getDate()}, ${e.getFullYear()}`;
             elements.calTitle.textContent = `${sStr} – ${eStr}`;
         } else {
-            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`;
+            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
         }
     }
 
@@ -3575,12 +4036,12 @@
 
     function getCalendarEntryTypeLabel(entry) {
         const type = getCalendarEntryType(entry);
-        if (type === 'project_note') return 'Projekt-Notiz';
+        if (type === 'project_note') return 'Project note';
         if (type === 'todo') return 'To-do';
-        if (type === 'contact_activity') return 'Kontakt-Update';
-        if (type === 'project_activity') return 'Projekt-Update';
-        if (type === 'account_activity') return 'Konto';
-        return 'Kontakt-Notiz';
+        if (type === 'contact_activity') return 'Contact update';
+        if (type === 'project_activity') return 'Project update';
+        if (type === 'account_activity') return 'Account';
+        return 'Contact note';
     }
 
     function getCalendarEntryTags(entry) {
@@ -3594,14 +4055,14 @@
         // team itself, so the actor is the whole context.
         if (type === 'account_activity') {
             return {
-                primary: entry.actor_name || 'Konto',
-                secondary: 'Benutzerverwaltung'
+                primary: entry.actor_name || 'Account',
+                secondary: 'User management'
             };
         }
 
         if (type === 'project_note' || type === 'project_activity') {
             return {
-                primary: entry.project_name || 'Projekt',
+                primary: entry.project_name || 'Project',
                 secondary: entry.project_company || ''
             };
         }
@@ -3618,13 +4079,13 @@
             }
 
             return {
-                primary: entry.contact_name || 'Kontakt',
+                primary: entry.contact_name || 'Contact',
                 secondary: entry.contact_company || ''
             };
         }
 
         return {
-            primary: entry.contact_name || 'Kontakt',
+            primary: entry.contact_name || 'Contact',
             secondary: entry.contact_company || ''
         };
     }
@@ -3650,9 +4111,9 @@
             if (type === 'todo') {
                 text = 'To-do';
             } else if (type === 'contact_activity' || type === 'project_activity') {
-                text = 'Aktivität';
+                text = 'Activity';
             } else {
-                text = 'Notiz';
+                text = 'Note';
             }
         }
 
@@ -3724,7 +4185,7 @@
         const range = getCalendarDateRange();
         const notesByDate = groupNotesByDate(state.calendarNotes);
 
-        const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         let html = '<div class="cal-month-grid">';
 
         // Header row
@@ -3755,16 +4216,18 @@
                     const typeClass = getCalendarEntryTypeClass(entry);
                     const navAttrs = getCalendarEntryNavigationAttrs(entry);
                     const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+                    // One dot per entry: its first tag's colour, or without
+                    // tags the colour of its kind (design.css, Calendar).
                     const tagDot = tags.length > 0
                         ? `<span class="cal-tag-dot-sm" style="background:${tags[0].color}"></span>`
-                        : '';
+                        : '<span class="cal-tag-dot-sm cal-kind-dot"></span>';
 
                     html += `<div class="cal-month-note-dot cal-month-note-dot--${typeClass}${completedClass}" ${navAttrs} title="${preview}">
                         ${tagDot}<span class="cal-month-note-label">${label}</span>
                     </div>`;
                 });
                 if (dayNotes.length > maxShow) {
-                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} weitere</div>`;
+                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} more</div>`;
                 }
                 html += '</div>';
             }
@@ -3781,8 +4244,8 @@
         const range = getCalendarDateRange();
         const today = new Date();
         const notesByDate = groupNotesByDate(state.calendarNotes);
-        const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-        const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
         let html = '<div class="cal-week-grid">';
 
@@ -3795,7 +4258,7 @@
             html += `<div class="cal-week-day${isToday ? ' cal-today' : ''}" data-date="${dateKey}">`;
             html += `<div class="cal-week-day-header">
                 <span class="cal-week-day-name">${dayNames[i]}</span>
-                <span class="cal-week-day-date">${cursor.getDate()}. ${months[cursor.getMonth()]}</span>
+                <span class="cal-week-day-date">${months[cursor.getMonth()]} ${cursor.getDate()}</span>
                 ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
             </div>`;
             html += '<div class="cal-week-day-body">';
@@ -3803,7 +4266,7 @@
                 html += renderNoteChip(entry);
             });
             if (dayNotes.length === 0) {
-                html += '<div class="cal-week-empty">Keine Aktivitaeten</div>';
+                html += '<div class="cal-week-empty">Nothing this day</div>';
             }
             html += '</div></div>';
             cursor.setDate(cursor.getDate() + 1);
@@ -3824,10 +4287,8 @@
 
         if (dayNotes.length === 0) {
             html += `<div class="cal-day-empty">
-                <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor">
-                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-                </svg>
-                <p>Keine Aktivitaeten an diesem Tag</p>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+                <p>Nothing on this day</p>
             </div>`;
         } else {
             dayNotes.forEach(entry => {
@@ -3845,7 +4306,7 @@
                     `<span class="cal-day-tag" style="--tag-color: ${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`
                 ).join('');
                 const todoMeta = getCalendarEntryType(entry) === 'todo'
-                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Erledigt' : 'Offen'}${entry.due_date ? ` - Faellig ${escapeHtml(entry.due_date)}` : ''}</span>`
+                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Done' : 'Open'}${entry.due_date ? ` · Due ${escapeHtml(window.CRMFormat.date(entry.due_date))}` : ''}</span>`
                     : '';
 
                 html += `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
@@ -3969,456 +4430,6 @@
     // Project Functions
     // ============================================
 
-    function updateProjectsDashboard(projects) {
-        const total = projects.length;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const STAGE_MODEL = {
-            'Lead':        { base: 0.12, blend: 0.45, spread: 0.28 },
-            'Proposal':    { base: 0.32, blend: 0.35, spread: 0.22 },
-            'Negotiation': { base: 0.58, blend: 0.25, spread: 0.16 },
-            'In Progress': { base: 0.82, blend: 0.12, spread: 0.10 },
-            'Complete':    { base: 1.00, blend: 0.00, spread: 0.00 }
-        };
-
-        function clamp(value, min, max) {
-            return Math.max(min, Math.min(max, value));
-        }
-
-        function parseNumber(v) {
-            if (v === null || v === '' || v === undefined) {
-                return null;
-            }
-            const num = parseFloat(v);
-            return Number.isFinite(num) ? num : null;
-        }
-
-        function parseDate(dateValue) {
-            if (!dateValue) {
-                return null;
-            }
-            const date = new Date(`${dateValue}T00:00:00`);
-            if (Number.isNaN(date.getTime())) {
-                return null;
-            }
-            date.setHours(0, 0, 0, 0);
-            return date;
-        }
-
-        function parseProjectBudget(project) {
-            const minRaw = parseNumber(project.budget_min);
-            const maxRaw = parseNumber(project.budget_max);
-
-            if (minRaw === null && maxRaw === null) {
-                return null;
-            }
-
-            let low = minRaw !== null ? minRaw : maxRaw;
-            let high = maxRaw !== null ? maxRaw : minRaw;
-
-            low = Math.max(0, low);
-            high = Math.max(0, high);
-
-            if (high < low) {
-                const tmp = low;
-                low = high;
-                high = tmp;
-            }
-
-            return {
-                low: low,
-                high: high,
-                mid: (low + high) / 2,
-                isUndetermined: low === 0 && high === 0
-            };
-        }
-
-        function getChanceModel(project) {
-            const stageCfg = STAGE_MODEL[project.stage] || STAGE_MODEL.Lead;
-            const chanceRaw = parseNumber(project.success_chance);
-            const userP = chanceRaw === null ? null : clamp(chanceRaw / 100, 0, 1);
-
-            let blendedP = userP === null
-                ? stageCfg.base
-                : (userP * (1 - stageCfg.blend)) + (stageCfg.base * stageCfg.blend);
-
-            let timelineFactor = 1;
-            let timelineSpread = 0;
-
-            const completionDate = parseDate(project.estimated_completion);
-            const startDate = parseDate(project.start_date);
-
-            if (completionDate !== null) {
-                const daysToCompletion = Math.round((completionDate - today) / 86400000);
-
-                if (daysToCompletion > 365) {
-                    timelineFactor = 0.91;
-                    timelineSpread += 0.07;
-                } else if (daysToCompletion > 180) {
-                    timelineFactor = 0.95;
-                    timelineSpread += 0.04;
-                } else if (daysToCompletion > 90) {
-                    timelineFactor = 0.98;
-                    timelineSpread += 0.02;
-                } else if (daysToCompletion < -30) {
-                    timelineFactor = 0.94;
-                    timelineSpread += 0.05;
-                }
-            } else {
-                timelineFactor = 0.96;
-                timelineSpread += 0.05;
-
-                if (startDate !== null) {
-                    const daysToStart = Math.round((startDate - today) / 86400000);
-                    if (daysToStart > 90) {
-                        timelineFactor *= 0.95;
-                        timelineSpread += 0.03;
-                    }
-                }
-            }
-
-            let prob = clamp(blendedP * timelineFactor, 0, 1);
-
-            if (project.stage === 'Complete' || userP === 1) {
-                prob = 1;
-            } else if (userP === 0) {
-                prob = 0;
-            }
-
-            const spread = (project.stage === 'Complete' || userP === 1)
-                ? 0
-                : clamp(stageCfg.spread + timelineSpread + (userP === null ? 0.03 : 0), 0.05, 0.40);
-
-            return {
-                prob: prob,
-                spread: spread,
-                userP: userP
-            };
-        }
-
-        function formatBudget(n) {
-            if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
-            return n.toFixed(0);
-        }
-
-        let sumMinPotential = 0;
-        let sumMaxPotential = 0;
-        let projectsWithBudget = 0;
-        let guaranteedAtMax = 0;
-
-        let weightedChanceSum = 0;
-        let weightedChanceWeight = 0;
-
-        let projConservative = 0;
-        let projRealistic = 0;
-        let projOptimistic = 0;
-        let projIncluded = 0;
-        let projExcluded = 0;
-        const openProjects = projects.filter(p => p.stage !== 'Complete').length;
-
-        // For the charts: the same sums, split by stage and by the month a
-        // project is expected to finish. They add up to the totals above.
-        const byStage = {};
-        PIPELINE_STAGES.forEach(([name]) => {
-            byStage[name] = { count: 0, low: 0, high: 0, noBudget: 0 };
-        });
-        const byMonth = new Array(PROJECTION_MONTHS).fill(0);
-        let projectedLater = 0;
-        let openPipelineMax = 0;
-
-        function addToMonth(dateValue, amount) {
-            const date = parseDate(dateValue);
-            if (date === null) {
-                projectedLater += amount;
-                return;
-            }
-            const offset = (date.getFullYear() - today.getFullYear()) * 12
-                + (date.getMonth() - today.getMonth());
-            if (offset >= PROJECTION_MONTHS) {
-                projectedLater += amount;
-            } else {
-                // Past its date but still open: it is due now.
-                byMonth[Math.max(0, offset)] += amount;
-            }
-        }
-
-        projects.forEach((project) => {
-            const budget = parseProjectBudget(project);
-            const isOpen = project.stage !== 'Complete';
-            const stageRow = byStage[project.stage] || byStage.Other;
-            stageRow.count++;
-
-            if (!budget || budget.isUndetermined) {
-                stageRow.noBudget++;
-                if (isOpen) {
-                    projExcluded++;
-                }
-                return;
-            }
-
-            const chance = getChanceModel(project);
-            const isGuaranteedMax = chance.userP === 1;
-
-            projectsWithBudget++;
-            if (isGuaranteedMax) {
-                sumMinPotential += budget.high;
-                sumMaxPotential += budget.high;
-                stageRow.low += budget.high;
-                stageRow.high += budget.high;
-                guaranteedAtMax++;
-            } else {
-                sumMinPotential += budget.low;
-                sumMaxPotential += budget.high;
-                stageRow.low += budget.low;
-                stageRow.high += budget.high;
-            }
-
-            if (!isOpen) {
-                return;
-            }
-
-            openPipelineMax += budget.high;
-
-            const mode = budget.low + ((budget.high - budget.low) * chance.prob);
-            const expectedBudget = (budget.low + budget.high + mode) / 3;
-            const weight = expectedBudget > 0 ? expectedBudget : 1;
-
-            weightedChanceSum += (chance.prob * 100) * weight;
-            weightedChanceWeight += weight;
-
-            if (isGuaranteedMax || chance.prob === 1) {
-                projConservative += budget.high;
-                projRealistic += budget.high;
-                projOptimistic += budget.high;
-                addToMonth(project.estimated_completion, budget.high);
-            } else {
-                const pLow = clamp(chance.prob - chance.spread, 0, 1);
-                const pHigh = clamp(chance.prob + chance.spread, 0, 1);
-
-                projConservative += budget.low * pLow;
-                projRealistic += expectedBudget * chance.prob;
-                projOptimistic += budget.high * pHigh;
-                addToMonth(project.estimated_completion, expectedBudget * chance.prob);
-            }
-
-            projIncluded++;
-        });
-
-        const avgChance = weightedChanceWeight > 0
-            ? Math.round(weightedChanceSum / weightedChanceWeight)
-            : null;
-
-        renderProjectsSummary({
-            total,
-            today,
-            byStage,
-            byMonth,
-            projectedLater,
-            sumMinPotential,
-            sumMaxPotential,
-            projectsWithBudget,
-            guaranteedAtMax,
-            avgChance,
-            projConservative,
-            projRealistic,
-            projOptimistic,
-            projIncluded,
-            projExcluded,
-            openProjects,
-            openPipelineMax,
-            money: (n) => formatBudget(Math.round(n))
-        });
-    }
-
-    // Stage order and chart tone, shared by the band and the breakdown.
-    const PIPELINE_STAGES = [
-        ['In Progress', 'progress'],
-        ['Proposal', 'proposal'],
-        ['Negotiation', 'negotiation'],
-        ['Lead', 'lead'],
-        ['Complete', 'complete'],
-        ['Other', 'none']
-    ];
-
-    // The projection chart looks this many months ahead, this month included.
-    const PROJECTION_MONTHS = 6;
-
-    /**
-     * The pipeline band: what it is worth and where that value sits, what
-     * is likely to land and when, and how sure the pipeline is. The
-     * breakdown behind the chevron has the per-stage figures and the
-     * projection range. Everything is computed by updateProjectsDashboard()
-     * from the projects on screen, so the band always agrees with the list.
-     */
-    function renderProjectsSummary(s) {
-        const band = document.getElementById('projectsSummary');
-        const grid = document.getElementById('projectsKpis');
-        const detail = document.getElementById('projectsBreakdown');
-        const C = window.CRMCharts;
-
-        if (!band || !grid || !detail || !C) {
-            return;
-        }
-
-        // Nothing to sum up: no band rather than a band of zeros.
-        if (s.total === 0) {
-            band.hidden = true;
-            return;
-        }
-        band.hidden = false;
-
-        const money = s.money;
-        const range = (low, high) => (low === high ? money(high) : `${money(low)}–${money(high)}`);
-
-        const stages = PIPELINE_STAGES
-            .map(([name, tone]) => ({ name, tone, ...s.byStage[name] }))
-            .filter(row => row.count > 0);
-        stages.forEach(row => { row.mid = (row.low + row.high) / 2; });
-
-        const valued = stages.filter(row => row.mid > 0);
-        const midTotal = valued.reduce((sum, row) => sum + row.mid, 0);
-        const hasBudget = s.projectsWithBudget > 0 && s.sumMaxPotential > 0;
-        const hasProjection = s.projIncluded > 0 && s.projOptimistic > 0;
-
-        // 1 - Pipeline value, split by stage
-        const low = money(s.sumMinPotential);
-        const high = money(s.sumMaxPotential);
-        const sameSuffix = low.slice(-1) === high.slice(-1) && /[KM]$/.test(high);
-        const pipelineValue = !hasBudget ? '—'
-            : (low === high ? high : {
-                long: `${low} – ${high}`,
-                short: `${sameSuffix ? low.slice(0, -1) : low}–${high}`
-            });
-
-        const pipeline = C.tile({
-            label: { long: 'Pipeline value', short: 'Pipeline' },
-            meta: `${s.total} ${s.total === 1 ? 'project' : 'projects'}`,
-            value: pipelineValue,
-            unit: hasBudget ? 'EUR' : '',
-            key: valued.length
-                ? C.legend(valued.map(row => ({ tone: row.tone, label: row.name, text: C.percent(row.mid, midTotal) })))
-                : C.note({ long: 'No budgets entered yet', short: 'No budgets' }),
-            chart: C.stack(
-                valued.map(row => ({
-                    tone: row.tone,
-                    value: row.mid,
-                    title: `${row.name}: ${range(row.low, row.high)} EUR`
-                })),
-                'Pipeline value by stage: ' + (valued.length
-                    ? valued.map(row => `${row.name} ${C.percent(row.mid, midTotal)}`).join(', ')
-                    : 'no budgets yet')
-            )
-        });
-
-        // 2 - Projected revenue, by the month it should land
-        const months = s.byMonth.map((amount, i) => {
-            const date = new Date(s.today.getFullYear(), s.today.getMonth() + i, 1);
-            return {
-                letter: date.toLocaleDateString('en-US', { month: 'narrow' }),
-                value: amount,
-                title: `${date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}: ~${money(amount)} EUR`
-            };
-        });
-        if (s.projectedLater > 0) {
-            months.push({
-                letter: '+',
-                value: s.projectedLater,
-                title: `Later, or no completion date: ~${money(s.projectedLater)} EUR`
-            });
-        }
-        const monthChart = C.columns(months, 'Projected revenue by expected completion: '
-            + months.map(col => col.title).join(', '));
-
-        const projected = C.tile({
-            label: 'Projected',
-            value: hasProjection ? `~${money(s.projRealistic)}` : '—',
-            unit: hasProjection ? 'EUR' : '',
-            key: hasProjection ? monthChart.axis : C.note({ long: 'No open projects with a budget', short: 'No budgets' }),
-            chart: hasProjection ? monthChart.bars : C.stack([], 'No projection yet')
-        });
-
-        // 3 - How sure the open pipeline is, weighted by value
-        const chance = C.tile({
-            label: { long: 'Avg. chance', short: 'Chance' },
-            value: s.avgChance !== null ? `${s.avgChance}%` : '—',
-            key: C.note(s.avgChance !== null
-                ? { long: 'Weighted by value', short: 'By value' }
-                : { long: 'No open projects with a budget', short: 'No budgets' }),
-            chart: C.meter(s.avgChance !== null ? s.avgChance / 100 : 0,
-                s.avgChance !== null ? `Average chance ${s.avgChance} percent` : 'No average chance yet')
-        });
-
-        grid.innerHTML = pipeline + projected + chance;
-
-        // ---- Breakdown ----------------------------------------------------
-        const maxHigh = Math.max(0, ...stages.map(row => row.high));
-        const esc = C.esc;
-
-        const stageRows = stages.map(row => `
-            <tr>
-                <th scope="row"><span class="kc-dot kc-tone-${row.tone}" aria-hidden="true"></span>${esc(row.name)}</th>
-                <td class="kb-bar-cell">
-                    <span class="kb-bar kc-tone-${row.tone}" aria-hidden="true">
-                        <span class="kb-bar-high" style="--f:${C.fixed(C.fraction(row.high, maxHigh))}"></span>
-                        <span class="kb-bar-low" style="--f:${C.fixed(C.fraction(row.low, maxHigh))}"></span>
-                    </span>
-                </td>
-                <td class="kb-num">${row.count}</td>
-                <td class="kb-num">${row.high > 0 ? esc(range(row.low, row.high)) : '—'}</td>
-            </tr>`).join('');
-
-        const undetermined = s.total - s.projectsWithBudget;
-        const budgetNote = [`${s.projectsWithBudget} of ${s.total} projects with a budget`];
-        if (undetermined > 0) budgetNote.push(`${undetermined} without`);
-        if (s.guaranteedAtMax > 0) budgetNote.push(`${s.guaranteedAtMax} at 100% counted at their maximum`);
-
-        let projection;
-        if (hasProjection) {
-            const scale = Math.max(s.openPipelineMax, s.projOptimistic, 1);
-            const a = C.fraction(s.projConservative, scale);
-            const b = C.fraction(s.projOptimistic, scale);
-            const m = C.fraction(s.projRealistic, scale);
-
-            const projectionNote = [`${s.projIncluded} of ${s.openProjects} open projects included`];
-            if (s.projExcluded > 0) projectionNote.push(`${s.projExcluded} missing a budget`);
-
-            projection = `
-                <div class="kb-scenarios">
-                    <div class="kb-scenario"><span>Conservative</span><b>${esc(money(s.projConservative))}</b></div>
-                    <div class="kb-scenario is-main"><span>Realistic</span><b>~${esc(money(s.projRealistic))}</b></div>
-                    <div class="kb-scenario"><span>Optimistic</span><b>${esc(money(s.projOptimistic))}</b></div>
-                </div>
-                <div class="kb-range" role="img"
-                     aria-label="${esc(`Likely between ${money(s.projConservative)} and ${money(s.projOptimistic)} EUR, most likely about ${money(s.projRealistic)} EUR, of ${money(s.openPipelineMax)} EUR open pipeline`)}">
-                    <span class="kb-range-band" style="--a:${C.fixed(a)};--b:${C.fixed(b)}"></span>
-                    <span class="kb-range-mark" style="--m:${C.fixed(m)}"></span>
-                </div>
-                <div class="kb-axis"><span>0</span><span>${esc(money(s.openPipelineMax))} EUR open pipeline</span></div>
-                <p class="kb-note">${esc(projectionNote.join(' · '))}</p>
-                <p class="kb-note">Stage-aware probability bands, adjusted for timeline. Open projects only.</p>`;
-        } else {
-            projection = `<p class="kb-note">No open projects with usable budget data.</p>`;
-        }
-
-        detail.innerHTML = `
-            <div class="kb-block">
-                <h3 class="kb-title">By stage</h3>
-                <table class="kb-table">
-                    <thead>
-                        <tr><th scope="col">Stage</th><th scope="col"><span class="kb-sr">Value range</span></th><th scope="col" class="kb-num">Projects</th><th scope="col" class="kb-num">EUR</th></tr>
-                    </thead>
-                    <tbody>${stageRows}</tbody>
-                </table>
-                <p class="kb-note">${esc(budgetNote.join(' · '))}</p>
-            </div>
-            <div class="kb-block">
-                <h3 class="kb-title">Projection</h3>
-                ${projection}
-            </div>`;
-    }
-
     async function loadProjects() {
         try {
             const result = await api.getProjects(
@@ -4430,13 +4441,96 @@
             if (result.success) {
                 state.projects = result.data;
                 renderProjects(state.projects);
-                updateProjectsDashboard(state.projects);
+                loadDeletedProjects();
             } else {
                 console.error('Failed to load projects:', result.error);
             }
         } catch (error) {
             console.error('Error loading projects:', error);
         }
+    }
+
+    // ---- Deleted projects ----------------------------------------------------
+
+    async function loadDeletedProjects() {
+        const section = document.getElementById('deletedProjects');
+        if (!section) return;
+
+        try {
+            const result = await api.getDeletedProjects();
+            renderDeletedProjects(result.success ? (result.data || []) : []);
+        } catch (error) {
+            console.error('Error loading deleted projects:', error);
+        }
+    }
+
+    function renderDeletedProjects(entries) {
+        const section = document.getElementById('deletedProjects');
+        const list = document.getElementById('deletedProjectsList');
+        const count = document.getElementById('deletedProjectsCount');
+
+        section.hidden = entries.length === 0;
+        count.textContent = String(entries.length);
+
+        const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+        list.innerHTML = entries.map(entry => {
+            // "Just now" / "Yesterday" read mid-sentence in lower case.
+            const when = (entry.deleted_at ? formatDate(new Date(entry.deleted_at.replace(' ', 'T') + 'Z')) : '')
+                .replace(/^(Just|Yesterday|Today)/, word => word.toLowerCase());
+            const holds = [
+                entry.counts.todos ? plural(entry.counts.todos, 'to-do', 'to-dos') : '',
+                entry.counts.notes ? plural(entry.counts.notes, 'note', 'notes') : '',
+                entry.counts.documents ? plural(entry.counts.documents, 'document', 'documents') : ''
+            ].filter(Boolean).join(' · ');
+            const meta = [entry.company, `Archived ${when}${entry.deleted_by_name ? ` by ${entry.deleted_by_name}` : ''}`, holds]
+                .filter(Boolean).map(escapeHtml).join(' · ');
+
+            return `
+                <div class="deleted-project">
+                    <div class="deleted-project-body">
+                        <span class="deleted-project-name">${escapeHtml(entry.name)}</span>
+                        <span class="deleted-project-meta">${meta}</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-small" data-deleted-restore="${entry.id}">Restore</button>
+                    <button type="button" class="btn btn-small deleted-project-purge" data-deleted-purge="${entry.id}" data-name="${escapeHtml(entry.name)}">Delete permanently</button>
+                </div>`;
+        }).join('');
+    }
+
+    function bindDeletedProjects() {
+        const list = document.getElementById('deletedProjectsList');
+        if (!list) return;
+
+        list.addEventListener('click', async (e) => {
+            const restore = e.target.closest('[data-deleted-restore]');
+            const purge = e.target.closest('[data-deleted-purge]');
+            if (!restore && !purge) return;
+
+            const button = restore || purge;
+            if (purge && !confirm(`Delete "${purge.dataset.name}" permanently? Its to-dos, notes and documents are gone for good.`)) {
+                return;
+            }
+
+            button.disabled = true;
+            try {
+                const result = restore
+                    ? await api.restoreProject(Number(restore.dataset.deletedRestore))
+                    : await api.purgeProject(Number(purge.dataset.deletedPurge));
+                if (!result.success) {
+                    alert(result.error || 'Something went wrong');
+                    button.disabled = false;
+                    return;
+                }
+                await loadProjects();
+                if (restore && result.data && result.data.id) {
+                    openProjectOverview(Number(result.data.id));
+                }
+            } catch (error) {
+                console.error('Error with archived project:', error);
+                alert('Something went wrong');
+                button.disabled = false;
+            }
+        });
     }
 
     /**
@@ -4473,10 +4567,10 @@
 
         elements.projectsList.innerHTML = state.projectSortField === 'stage'
             ? renderProjectsByStage(visible)
-            : `<div class="project-grid">${visible.map(createProjectCard).join('')}</div>`;
+            : projectCollection(visible);
 
-        // Cards open on click, and on Enter / Space for keyboard users.
-        elements.projectsList.querySelectorAll('.project-card').forEach(card => {
+        // Cards and rows open on click, and on Enter / Space for keyboard users.
+        elements.projectsList.querySelectorAll('.project-card, .project-row').forEach(card => {
             const open = () => openProjectOverview(parseInt(card.dataset.id, 10));
             card.addEventListener('click', open);
             card.addEventListener('keydown', (event) => {
@@ -4514,14 +4608,46 @@
             return `
                 <section class="project-group">
                     <header class="project-group-head">
-                        <span class="stage-dot stage-${escapeHtml(stageClass)}" aria-hidden="true"></span>
-                        <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
-                        <span class="project-group-count">${group.items.length}</span>
+                        <div class="project-group-pill stage-${escapeHtml(stageClass)}">
+                            <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
+                            <span class="project-group-count" title="${group.items.length === 1 ? '1 project' : group.items.length + ' projects'}">${group.items.length}</span>
+                        </div>
                     </header>
-                    <div class="project-grid">${group.items.map(createProjectCard).join('')}</div>
+                    ${projectCollection(group.items)}
                 </section>
             `;
         }).join('');
+    }
+
+    /** Projects as cards in a grid, or as rows of one list - per state.projectView. */
+    function projectCollection(projects) {
+        return state.projectView === 'list'
+            ? `<div class="project-rows">${projects.map(createProjectRow).join('')}</div>`
+            : `<div class="project-grid">${projects.map(createProjectCard).join('')}</div>`;
+    }
+
+    /** Switch between cards and the list, and keep the choice for this account. */
+    function setProjectView(view) {
+        const next = view === 'list' ? 'list' : 'cards';
+        if (next === state.projectView) {
+            return;
+        }
+        state.projectView = next;
+        document.querySelectorAll('[data-project-view-btn]').forEach(btn => {
+            const on = btn.dataset.projectViewBtn === next;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', String(on));
+        });
+        if (elements.projectsView) {
+            elements.projectsView.dataset.projectView = next;
+        }
+        renderProjects(state.projects);
+
+        fetch('api/profile.php?action=pref', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ name: 'project_view', value: next })
+        }).catch(error => console.error('Could not save the project view:', error));
     }
 
     function triggerProjectDeckAnimation() {
@@ -4562,25 +4688,17 @@
         const min = toNumber(project.budget_min);
         const max = toNumber(project.budget_max);
 
-        // "18.000" and "18.450,50": dots for thousands (de-AT would use a thin
-        // space), and both decimals whenever there are cents at all.
-        const exact = (n) => {
-            const cents = Math.round(n * 100) % 100 !== 0;
-            return n.toLocaleString('de-DE', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
-        };
-
         if (min === null && max === null) return '';
         if ((min || 0) === 0 && (max || 0) === 0) return '';
-        if (min !== null && max !== null && min !== max) return `${exact(min)} – ${exact(max)} €`;
-
-        return `${exact(max !== null ? max : min)} €`;
+        return window.CRMFormat.amountRange(min, max);
     }
 
     /**
-     * When a project runs, as one quiet line: "Start Aug 17, 2026 → End
-     * Sep 26, 2026 · 5 days overdue". Either half reads "Not set" when
-     * missing, so a lone date is never ambiguous. Kept below the budget in
-     * weight - it is reference, not the headline. The status only takes a
+     * When a project runs, as one quiet line: the span on the left, how it
+     * stands on the right - "Aug 17 – Sep 26     5 days overdue". Dates as
+     * everywhere (format.js): the year only when it is not this one; a lone
+     * date says which it is ("From Nov 13", "Until Nov 27"). Kept below the budget
+     * in weight - it is reference, not the headline. The status only takes a
      * colour when it needs attention: overdue, or a week or less to go.
      */
     function projectTimelineMarkup(project, isComplete) {
@@ -4589,7 +4707,6 @@
             const date = new Date(value + 'T00:00:00');
             return isNaN(date.getTime()) ? null : date;
         };
-        const label = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const DAY = 86400000;
         const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -4599,6 +4716,18 @@
         today.setHours(0, 0, 0, 0);
 
         const late = !isComplete && end && end < today;
+
+        // "Sep 1 – Nov 13", "From Nov 13", "Until Nov 27" (format.js).
+        let span;
+        if (start && end) {
+            span = start.getTime() === end.getTime()
+                ? window.CRMFormat.date(end)
+                : window.CRMFormat.dateRange(start, end);
+        } else if (start || end) {
+            span = window.CRMFormat.dateRange(start, end);
+        } else {
+            span = 'No dates yet';
+        }
 
         let status = '';
         if (isComplete) {
@@ -4614,22 +4743,18 @@
                 : `<span class="project-when-status${left <= 7 ? ' is-soon' : ''}">${plural(left, 'day')} left</span>`;
         }
 
-        const part = (name, date, extra = '') =>
-            `<span class="project-when-part${extra}"><span class="project-when-label">${name}</span> ${date ? escapeHtml(label(date)) : '<span class="project-when-empty">Not set</span>'}</span>`;
-
         return `
             <p class="project-when">
-                ${part('Start', start)}
-                <span class="project-when-arrow" aria-hidden="true">→</span>
-                ${part('End', end, late ? ' is-late' : '')}
-                ${status ? `<span class="project-when-sep" aria-hidden="true">·</span>${status}` : ''}
+                <span class="project-when-span${start || end ? '' : ' is-empty'}">${escapeHtml(span)}</span>
+                ${status}
             </p>`;
     }
 
     /**
      * One project, as a card: what it is, for whom and who has it on top;
-     * when it runs in the timeline panel; budget and chance at the foot.
-     * Notes, contacts and the rest live in the detail view.
+     * when it runs; budget and chance at the foot, and with expected
+     * payments, a thin bar of what is paid under them. The description,
+     * notes, contacts and the rest live in the detail view.
      */
     function createProjectCard(project) {
         const stageLabel = project.stage || 'Lead';
@@ -4643,22 +4768,16 @@
             : null;
         const chance = Number.isFinite(chanceRaw) ? Math.round(Math.max(0, Math.min(100, chanceRaw))) : null;
 
-        // The full text is escaped and handed to CSS, which clamps it to two
-        // lines. Truncating in JS after escaping could cut an entity in half.
-        const description = (project.description || '').trim();
-
         const isProposed = project.review_status === 'pending';
 
         const budgetStat = `
             <div class="project-stat project-stat--budget">
-                <span class="project-meta-label">Budget</span>
-                <span class="project-stat-value${value ? '' : ' is-empty'}" title="${escapeHtml(value || 'No budget set')}">${escapeHtml(value || 'Not set')}</span>
+                <span class="project-stat-value${value ? '' : ' is-empty'}" title="${escapeHtml(value ? 'Budget ' + value : 'No budget set')}">${escapeHtml(value || 'No budget')}</span>
             </div>`;
         // A finished project has no chance left to estimate.
         const chanceStat = chance !== null && !isComplete ? `
             <div class="project-stat project-stat--chance">
-                <span class="project-meta-label">Chance</span>
-                <span class="project-stat-value"><span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%</span>
+                <span class="project-stat-value" title="${chance}% chance"><span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%</span>
             </div>` : '';
 
         return `
@@ -4669,10 +4788,10 @@
                         <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
                         ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                         ${isProposed ? `<div class="project-card-review">${reviewBadge(project)}</div>` : ''}
+                        ${!isProposed && reviewChangeBadge(project, 'project') ? `<div class="project-card-review">${reviewChangeBadge(project, 'project')}</div>` : ''}
                     </div>
-                    ${assigneeChip(project)}
+                    ${claudeSlot(project)}
                 </div>
-                ${description ? `<p class="project-card-description">${escapeHtml(description)}</p>` : ''}
                 <div class="project-card-bottom">
                     ${projectTimelineMarkup(project, isComplete)}
                     <div class="project-card-foot">
@@ -4680,88 +4799,57 @@
                         ${budgetStat}
                         ${chanceStat}
                     </div>
+                    ${window.ProjectPayments ? window.ProjectPayments.cardSummary(project) : ''}
                 </div>
             </article>
         `;
     }
 
-    function openProjectModal(project = null) {
-        state.editingProjectId = project && project.id ? project.id : null;
+    /**
+     * One project as a row of the list view: name and company, when it
+     * ends, budget, what is still open, chance, and who has it - the same
+     * facts as the card, side by side. The row opens the project sheet.
+     */
+    function createProjectRow(project) {
+        const stageClass = (project.stage || 'Lead').toLowerCase().replace(/ /g, '-');
+        const isComplete = stageClass === 'complete';
+        const value = formatProjectValue(project);
+        const chanceRaw = project.success_chance !== null && project.success_chance !== ''
+            ? parseFloat(project.success_chance)
+            : null;
+        const chance = Number.isFinite(chanceRaw) ? Math.round(Math.max(0, Math.min(100, chanceRaw))) : null;
+        const isProposed = project.review_status === 'pending';
+        const badge = isProposed ? reviewBadge(project) : reviewChangeBadge(project, 'project');
 
-        // Reset form
-        elements.projectForm.reset();
-
-        if (project && project.id) {
-            // Editing existing project
-            elements.projectModalTitle.textContent = 'Edit Project';
-            elements.deleteProjectBtn.style.display = 'block';
-
-            // Fill form fields
-            elements.projectId.value = project.id;
-            document.getElementById('projectName').value = project.name || '';
-            document.getElementById('projectStartDate').value = project.start_date || '';
-            document.getElementById('projectDescription').value = project.description || '';
-            document.getElementById('projectCompany').value = project.company || '';
-            document.getElementById('projectBudgetMin').value = project.budget_min || '';
-            document.getElementById('projectBudgetMax').value = project.budget_max || '';
-            document.getElementById('projectSuccessChance').value = project.success_chance || '';
-            document.getElementById('projectStage').value = project.stage || 'Lead';
-            document.getElementById('projectEstimatedCompletion').value = project.estimated_completion || '';
-        } else {
-            // Adding new project
-            elements.projectModalTitle.textContent = 'Add Project';
-            elements.deleteProjectBtn.style.display = 'none';
-            // Set default start date to today
-            document.getElementById('projectStartDate').value = new Date().toISOString().split('T')[0];
-        }
-
-        elements.projectModal.classList.add('active');
+        return `
+            <article class="project-row${isProposed ? ' is-proposed' : ''}" data-id="${project.id}" tabindex="0" role="button"
+                     aria-label="${escapeHtml(project.name)}">
+                <div class="project-row-main">
+                    <span class="project-row-title">${escapeHtml(project.name)}</span>
+                    ${project.company ? `<span class="project-row-company">${escapeHtml(project.company)}</span>` : ''}
+                    ${badge}
+                </div>
+                <div class="project-row-when">${projectTimelineMarkup(project, isComplete)}</div>
+                <span class="project-row-budget${value ? '' : ' is-empty'}">${escapeHtml(value || 'No budget')}</span>
+                <div class="project-row-pay">${window.ProjectPayments ? window.ProjectPayments.cardSummary(project) : ''}</div>
+                <span class="project-row-chance">${chance !== null && !isComplete
+                    ? `<span class="project-chance-ring" style="--chance:${chance}" aria-hidden="true"></span>${chance}%`
+                    : ''}</span>
+                <span class="project-row-assignee">${claudeSlot(project)}</span>
+            </article>
+        `;
     }
 
-    function closeProjectModal() {
-        elements.projectModal.classList.remove('active');
-        state.editingProjectId = null;
-    }
-
-    async function saveProject(e) {
-        e.preventDefault();
-
-        const formData = {
-            name: document.getElementById('projectName').value.trim(),
-            start_date: document.getElementById('projectStartDate').value,
-            description: document.getElementById('projectDescription').value.trim(),
-            company: document.getElementById('projectCompany').value.trim() || null,
-            budget_min: document.getElementById('projectBudgetMin').value || null,
-            budget_max: document.getElementById('projectBudgetMax').value || null,
-            success_chance: document.getElementById('projectSuccessChance').value || null,
-            stage: document.getElementById('projectStage').value,
-            estimated_completion: document.getElementById('projectEstimatedCompletion').value || null
-        };
-
-        try {
-            let result;
-            if (state.editingProjectId) {
-                result = await api.updateProject(state.editingProjectId, formData);
-            } else {
-                result = await api.createProject(formData);
-            }
-
-            if (result.success) {
-                closeProjectModal();
-                loadProjects();
-            } else {
-                alert('Error: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error saving project:', error);
-            alert('An error occurred while saving the project');
-        }
-    }
-
-    function openDeleteProjectModal() {
-        const projectName = document.getElementById('projectName').value;
-        elements.deleteProjectName.textContent = projectName;
-        elements.deleteProjectModal.classList.add('active');
+    /**
+     * The assignee in a card's corner. With the meeting assistant on, a
+     * Claude button lies over it and shows on hover (meeting.js), to tell
+     * Claude what to change on just this project.
+     */
+    function claudeSlot(project) {
+        const chip = assigneeChip(project);
+        const button = window.CRMMeeting ? window.CRMMeeting.cardButton(project) : '';
+        if (!button) return chip;
+        return `<span class="project-card-assignee${chip ? '' : ' is-empty'}">${chip}${button}</span>`;
     }
 
     function closeDeleteProjectModal() {
@@ -4774,24 +4862,28 @@
 
             if (result.success) {
                 closeDeleteProjectModal();
-                // Only close project modal if it's currently open
-                if (elements.projectModal.classList.contains('active')) {
-                    closeProjectModal();
-                }
                 state.editingProjectId = null;
                 loadProjects();
+                refreshHome();
             } else {
                 alert('Error: ' + result.error);
             }
         } catch (error) {
-            console.error('Error deleting project:', error);
-            alert('An error occurred while deleting the project');
+            console.error('Error archiving project:', error);
+            alert('An error occurred while archiving the project');
         }
     }
 
-    async function openProjectOverview(projectId) {
+    /**
+     * Open a project's sheet. { edit: true } opens it straight in edit mode;
+     * with { closeAfterEdit: true } saving or cancelling then closes it again,
+     * for callers that only open it to change something (the meeting).
+     */
+    async function openProjectOverview(projectId, { edit = false, closeAfterEdit = false } = {}) {
         try {
+            state.projectDraft = null;
             state.viewingProjectId = projectId;
+            state.projectCloseAfterEdit = closeAfterEdit;
 
             // Ensure contacts are loaded for autocomplete
             if (!state.contacts || state.contacts.length === 0) {
@@ -4816,6 +4908,7 @@
                     todosResult.success ? (todosResult.data || []) : []
                 );
                 elements.projectOverviewModal.classList.add('active');
+                if (edit) enterProjectEdit();
             } else {
                 alert('Error: ' + projectResult.error);
             }
@@ -4832,23 +4925,32 @@
         setAssigneeControl(elements.projectOverviewAssignee, 'project', project);
 
         // Format dates as absolute dates
-        elements.projectOverviewStartDate.textContent = project.start_date
-            ? new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'N/A';
-        elements.projectOverviewStage.textContent = project.stage || 'N/A';
+        setDetailValue(elements.projectOverviewStartDate, project.start_date
+            ? window.CRMFormat.date(project.start_date)
+            : '');
+        setDetailValue(elements.projectOverviewStage, project.stage);
 
         // Same exact figures as the card. Both zero means "not decided yet".
         const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
         const ovBMax = (project.budget_max !== null && project.budget_max !== '' && project.budget_max !== undefined) ? parseFloat(project.budget_max) : null;
-        elements.projectOverviewBudget.textContent = (ovBMin === null && ovBMax === null)
-            ? 'N/A'
-            : (formatProjectValue(project) || 'Undetermined');
+        setDetailValue(elements.projectOverviewBudget, (ovBMin === null && ovBMax === null)
+            ? ''
+            : (formatProjectValue(project) || 'Undetermined'));
+        if (window.ProjectPayments) {
+            window.ProjectPayments.renderView(project, elements.projectOverviewPayments, elements.projectOverviewPaymentsList);
+        }
 
-        elements.projectOverviewSuccessChance.textContent = project.success_chance ? `${project.success_chance}%` : 'N/A';
-        elements.projectOverviewEstCompletion.textContent = project.estimated_completion
-            ? new Date(project.estimated_completion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'N/A';
-        elements.projectOverviewDescription.textContent = project.description || 'No description';
+        setDetailValue(elements.projectOverviewSuccessChance, project.success_chance ? `${project.success_chance}%` : '');
+        setDetailValue(elements.projectOverviewEstCompletion, project.estimated_completion
+            ? window.CRMFormat.date(project.estimated_completion)
+            : '');
+        setDetailValue(elements.projectOverviewDescription, project.description);
+
+        // Claude's summary of the description and notes, written again when
+        // either changed since (project-summary.js)
+        if (window.CRMProjectSummary) {
+            window.CRMProjectSummary.show(project.id);
+        }
 
         // What Claude proposes about this project, if anything
         if (window.CRMReview) {
@@ -4862,10 +4964,7 @@
         renderProjectContacts(contacts);
 
         // Render to-dos
-        renderTodoCollection(elements.projectTodosList, todos, {
-            showContext: false,
-            emptyMessage: 'No to-dos yet for this project'
-        });
+        renderProjectTodos(todos);
 
         // The files attached to this project (documents.js)
         if (window.ProjectDocuments) {
@@ -4877,8 +4976,11 @@
     }
 
     function renderProjectTags(tags) {
+        // What is already on the project is not suggested again.
+        state.viewingProjectTagIds = new Set((tags || []).map(tag => Number(tag.id)));
+
         if (!tags || tags.length === 0) {
-            elements.projectTags.innerHTML = '<p class="empty-hint">No tags assigned</p>';
+            elements.projectTags.innerHTML = '<p class="empty-hint">No tags yet</p>';
             return;
         }
 
@@ -4893,27 +4995,48 @@
     }
 
     function renderProjectContacts(contacts) {
+        state.viewingProjectContactIds = new Set((contacts || []).map(contact => Number(contact.id)));
+
         if (!contacts || contacts.length === 0) {
-            elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts assigned</p>';
+            elements.projectContacts.innerHTML = '<p class="empty-hint">No contacts yet</p>';
             return;
         }
 
+        // Small chips side by side; the company is in the tooltip.
         const html = contacts.map(contact => `
-            <div class="project-contact-item">
-                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
-                <div class="contact-info">
-                    <div class="contact-name">${escapeHtml(contact.name)}</div>
-                    ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
-                </div>
-                <button class="btn btn-icon btn-small" data-remove-contact="${contact.id}" title="Remove contact">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                    </svg>
-                </button>
-            </div>
+            <span class="pcontact-chip" data-open-contact="${contact.id}" title="${escapeHtml(contact.company ? `${contact.name} · ${contact.company}` : contact.name)}">
+                <button type="button" class="pcontact-name" data-open-contact="${contact.id}">${escapeHtml(contact.name)}</button>
+                <button type="button" class="pcontact-remove" data-remove-contact="${contact.id}" title="Remove contact" aria-label="Remove ${escapeHtml(contact.name)}">&times;</button>
+            </span>
         `).join('');
 
         elements.projectContacts.innerHTML = html;
+    }
+
+    /**
+     * The "Add" button of a section head opens a search field under it; the
+     * field is the whole add form - pick a suggestion or press Enter.
+     */
+    function openProjectPicker(picker, button, input) {
+        if (!picker) return;
+        picker.hidden = false;
+        if (button) button.setAttribute('aria-expanded', 'true');
+        if (input) input.focus();
+    }
+
+    function closeProjectPicker(picker, button, input, suggestions) {
+        if (!picker) return;
+        picker.hidden = true;
+        if (button) button.setAttribute('aria-expanded', 'false');
+        if (input) input.value = '';
+        if (suggestions) suggestions.style.display = 'none';
+    }
+
+    function closeProjectPickers() {
+        closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+            elements.newProjectTagInput, elements.projectTagSuggestions);
+        closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+            elements.newProjectContactInput, elements.projectContactSuggestions);
     }
 
     async function loadProjectNotes(projectId) {
@@ -4933,48 +5056,68 @@
         }
     }
 
+    /** How many notes the project sheet shows before "Show older notes". */
+    const PROJECT_NOTES_SHOWN = 3;
+
     function renderProjectNotesTimeline(notes) {
         if (!elements.projectNotesTimeline) {
             return;
         }
 
         if (!notes || notes.length === 0) {
-            elements.projectNotesTimeline.innerHTML = `
-                <div class="notes-empty">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-                    </svg>
-                    <p>No notes yet for this project</p>
-                </div>
-            `;
+            elements.projectNotesTimeline.innerHTML = '<p class="empty-hint">No notes yet</p>';
             return;
         }
 
+        // Newest first. Proposed notes always show, so their decision is
+        // never hidden behind "Show older notes".
+        let hiddenCount = 0;
         let html = '';
-        notes.forEach(note => {
-            const date = new Date(note.created_at);
-            const formattedDate = formatDate(date);
+        notes.forEach((note, index) => {
+            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
 
             const isProposed = note.review_status === 'pending';
+            const isHidden = !state.showAllProjectNotes && index >= PROJECT_NOTES_SHOWN && !isProposed;
+            if (isHidden) {
+                hiddenCount++;
+                return;
+            }
 
             html += `
                 <div class="note-item${isProposed ? ' is-proposed' : ''}">
                     <div class="note-header">
                         <span class="note-date">${formattedDate}</span>
                         ${byLine(note.author_name, note.author_id)}
-                        ${isProposed ? reviewBadge(note) + reviewInline('project_note', note.id) : ''}
+                        ${isProposed ? reviewPill(note, 'project_note', note.id) : ''}
                         <button class="note-delete-btn project-note-delete-btn" data-note-id="${note.id}" title="Delete note">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
                         </button>
                     </div>
                     <div class="note-content">${escapeHtml(note.content)}</div>
+                    <button type="button" class="ov-link-btn note-more-btn" hidden>Show more</button>
                 </div>
             `;
         });
 
+        if (hiddenCount > 0) {
+            html += `<button type="button" class="ov-link-btn notes-older-btn" data-notes-show-all>Show ${hiddenCount} older ${hiddenCount === 1 ? 'note' : 'notes'}</button>`;
+        } else if (state.showAllProjectNotes && notes.length > PROJECT_NOTES_SHOWN) {
+            html += '<button type="button" class="ov-link-btn notes-older-btn" data-notes-show-less>Show fewer notes</button>';
+        }
+
         elements.projectNotesTimeline.innerHTML = html;
+
+        // Long notes are clamped to a few lines; "Show more" only where the
+        // clamp actually cut something off. Measured after layout.
+        requestAnimationFrame(() => {
+            elements.projectNotesTimeline.querySelectorAll('.note-item').forEach(item => {
+                const content = item.querySelector('.note-content');
+                const more = item.querySelector('.note-more-btn');
+                if (content && more && content.scrollHeight > content.clientHeight + 1) {
+                    more.hidden = false;
+                }
+            });
+        });
 
         elements.projectNotesTimeline.querySelectorAll('.project-note-delete-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
@@ -4985,13 +5128,42 @@
         });
     }
 
+    function openProjectNoteForm() {
+        if (!elements.projectNoteForm) return;
+        elements.projectNoteForm.hidden = false;
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.setAttribute('aria-expanded', 'true');
+        }
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.focus();
+        }
+    }
+
+    function closeProjectNoteForm() {
+        if (!elements.projectNoteForm) return;
+        elements.projectNoteForm.hidden = true;
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.setAttribute('aria-expanded', 'false');
+        }
+        if (elements.newProjectNoteContent) {
+            elements.newProjectNoteContent.value = '';
+        }
+    }
+
     async function addProjectNote() {
-        if (!elements.newProjectNoteContent || !state.viewingProjectId) {
+        if (!elements.newProjectNoteContent || (!state.viewingProjectId && !state.projectDraft)) {
             return;
         }
 
         const content = elements.newProjectNoteContent.value.trim();
         if (!content) {
+            return;
+        }
+
+        if (state.projectDraft) {
+            state.projectDraft.notes.unshift({ id: draftId(), content, created_at: new Date().toISOString() });
+            closeProjectNoteForm();
+            renderProjectNotesTimeline(state.projectDraft.notes);
             return;
         }
 
@@ -5003,8 +5175,9 @@
         try {
             const result = await api.createProjectNote(state.viewingProjectId, content);
             if (result.success) {
-                elements.newProjectNoteContent.value = '';
+                closeProjectNoteForm();
                 await loadProjectNotes(state.viewingProjectId);
+                if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
             } else {
                 alert(result.error || 'Error adding note');
             }
@@ -5014,17 +5187,18 @@
         } finally {
             if (elements.addProjectNoteBtn) {
                 elements.addProjectNoteBtn.disabled = false;
-                elements.addProjectNoteBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                    Add Note
-                `;
+                elements.addProjectNoteBtn.innerHTML = 'Add Note';
             }
         }
     }
 
     async function deleteProjectNote(noteId) {
+        if (state.projectDraft) {
+            state.projectDraft.notes = state.projectDraft.notes.filter(note => note.id !== noteId);
+            renderProjectNotesTimeline(state.projectDraft.notes);
+            return;
+        }
+
         if (!confirm('Delete this note?')) {
             return;
         }
@@ -5034,6 +5208,7 @@
             if (result.success) {
                 if (state.viewingProjectId) {
                     await loadProjectNotes(state.viewingProjectId);
+                    if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
                 }
             } else {
                 alert(result.error || 'Error deleting note');
@@ -5045,13 +5220,19 @@
     }
 
     function closeProjectOverview() {
+        if (window.CRMProjectSummary) window.CRMProjectSummary.show(null);
+        state.projectDraft = null;
+        state.projectCloseAfterEdit = false;
         elements.projectOverviewModal.classList.remove('active');
+        exitProjectEdit();
+        elements.projectOverviewModal.classList.remove('is-new');
+        closeProjectPickers();
+        closeProjectNoteForm();
         state.viewingProjectId = null;
         state.viewingProject = null;
-
-        if (elements.newProjectNoteContent) {
-            elements.newProjectNoteContent.value = '';
-        }
+        state.expandedProjectTodos.clear();
+        state.showAllProjectNotes = false;
+        state.showCompletedProjectTodos = false;
 
         if (elements.projectNotesTimeline) {
             elements.projectNotesTimeline.innerHTML = '';
@@ -5066,7 +5247,404 @@
         }
     }
 
+    /**
+     * A contact chip in the project sheet opens that contact. The contact
+     * sheet takes the project sheet's place; its related projects lead back.
+     */
+    function openContactFromProject(contactId) {
+        if (!Number.isInteger(contactId)) return;
+        closeProjectOverview();
+        openOverviewModal(contactId);
+    }
+
+    // ---- Editing a project in place ----------------------------------------
+
+    function isEditingProject() {
+        return elements.projectOverviewModal.classList.contains('is-editing');
+    }
+
+    function enterProjectEdit() {
+        const project = state.viewingProject;
+        if (!project) return;
+
+        elements.projectEditName.value = project.name || '';
+        elements.projectEditCompany.value = project.company || '';
+        elements.projectEditStartDate.value = project.start_date || '';
+        elements.projectEditStage.value = project.stage || 'Lead';
+        elements.projectEditBudgetMin.value = window.CRMAmount ? window.CRMAmount.format(project.budget_min) : (project.budget_min ?? '');
+        elements.projectEditBudgetMax.value = window.CRMAmount ? window.CRMAmount.format(project.budget_max) : (project.budget_max ?? '');
+        elements.projectEditSuccessChance.value = project.success_chance ?? '';
+        elements.projectEditEstCompletion.value = project.estimated_completion || '';
+        elements.projectEditDescription.value = project.description || '';
+        if (window.ProjectPayments) {
+            window.ProjectPayments.edit(project);
+        }
+
+        elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveProjectEditBtn.textContent = 'Save';
+        elements.projectOverviewModal.classList.add('is-editing');
+        elements.projectEditName.focus();
+    }
+
+    function isNewProject() {
+        return elements.projectOverviewModal.classList.contains('is-new');
+    }
+
+    /**
+     * Click a value in a sheet to change it: the sheet turns to editing with
+     * that value's field in focus - no trip to the Edit button first. Links
+     * and buttons inside a value keep doing what they do, and selecting text
+     * to copy it does not count as a click.
+     */
+    function bindClickToEdit(modal, editButton, isEditing, enter) {
+        const content = modal && modal.querySelector('.modal-content');
+        if (!content || !editButton) return;
+
+        content.addEventListener('click', async (e) => {
+            if (isEditing() || modal.classList.contains('is-new')) return;
+            if (editButton.disabled || editButton.offsetParent === null) return;
+            if (e.target.closest('a, button, input, select, textarea, label')) return;
+            if (String(window.getSelection ? window.getSelection() : '').trim()) return;
+
+            const value = e.target.closest('[data-ov="view"]');
+            if (!value || !content.contains(value)) return;
+
+            // The value's field is the next sibling meant for editing.
+            let field = value.nextElementSibling;
+            while (field && field.getAttribute('data-ov') !== 'edit') {
+                field = field.nextElementSibling;
+            }
+            if (!field) return;
+            const input = field.matches('input, select, textarea')
+                ? field
+                : field.querySelector('input, select, textarea');
+            if (!input) return;
+
+            await enter();
+            if (!isEditing()) return;
+            input.focus();
+            if (input.matches('input[type="text"], input:not([type]), textarea')) {
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
+    }
+
+    /**
+     * A new project: the sheet in edit mode with empty fields. Tags, contacts,
+     * to-dos, documents and notes belong to a saved project, so they appear
+     * once it has been created.
+     */
+    function openNewProject() {
+        if (elements.projectOverviewModal.classList.contains('active')) {
+            closeProjectOverview();
+        }
+
+        state.viewingProjectId = null;
+        state.viewingProject = null;
+        if (window.CRMProjectSummary) window.CRMProjectSummary.show(null);
+        state.projectDraft = { tags: [], contacts: [], notes: [], todos: [] };
+        state.expandedProjectTodos.clear();
+        if (window.ProjectDocuments) {
+            window.ProjectDocuments.startDraft();
+        }
+        if (!state.contacts || state.contacts.length === 0) {
+            loadAllContacts();
+        }
+
+        elements.projectOverviewName.textContent = 'New Project';
+        setEditedLine(elements.projectOverviewEdited, null);
+        // No record id yet: choosing someone only marks the sheet;
+        // saveProjectEdit() applies it once the project exists.
+        elements.projectOverviewAssignee.innerHTML = assigneeControl('project', null);
+        elements.projectOverviewAssignee.style.display = '';
+        closeProjectPickers();
+        closeProjectNoteForm();
+        renderProjectTags([]);
+        renderProjectContacts([]);
+        renderDraftProjectTodos();
+        renderProjectNotesTimeline([]);
+        const review = document.getElementById('projectOverviewReview');
+        if (review) review.hidden = true;
+
+        [elements.projectEditName, elements.projectEditCompany, elements.projectEditBudgetMin,
+         elements.projectEditBudgetMax, elements.projectEditSuccessChance,
+         elements.projectEditEstCompletion, elements.projectEditDescription].forEach(input => { input.value = ''; });
+        elements.projectEditStartDate.value = new Date().toISOString().split('T')[0];
+        elements.projectEditStage.value = 'Lead';
+        if (window.ProjectPayments) {
+            window.ProjectPayments.edit(null);
+        }
+
+        elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
+        elements.saveProjectEditBtn.textContent = 'Create';
+        elements.projectOverviewModal.classList.add('active', 'is-editing', 'is-new');
+        elements.projectOverviewModal.querySelector('.modal-body').scrollTop = 0;
+        elements.projectEditName.focus();
+    }
+
+    /** Cancel leaves edit mode; for a project not yet created, it closes the sheet. */
+    function cancelProjectEdit() {
+        if (isNewProject() || state.projectCloseAfterEdit) {
+            closeProjectOverview();
+        } else {
+            exitProjectEdit();
+        }
+    }
+
+    function exitProjectEdit() {
+        elements.projectOverviewModal.classList.remove('is-editing');
+        if (elements.projectEditCompanySuggestions) {
+            elements.projectEditCompanySuggestions.classList.remove('visible');
+        }
+    }
+
+    async function saveProjectEdit() {
+        const creating = isNewProject();
+        const projectId = state.viewingProjectId;
+        if (!isEditingProject() || (!creating && !projectId)) return;
+
+        // The same three fields the server insists on.
+        const required = [elements.projectEditName, elements.projectEditStartDate, elements.projectEditDescription];
+        const missing = required.filter(input => !input.value.trim());
+        required.forEach(input => input.classList.toggle('is-invalid', missing.includes(input)));
+        if (missing.length > 0) {
+            missing[0].focus();
+            return;
+        }
+
+        // Budgets as typed or pasted: "18.000", "18,000.00" and "18000" are all 18000.
+        const budget = [elements.projectEditBudgetMin, elements.projectEditBudgetMax].map(input => {
+            const n = window.CRMAmount ? window.CRMAmount.read(input) : (input.value === '' ? null : Number(input.value));
+            input.classList.toggle('is-invalid', Number.isNaN(n) || (n !== null && n < 0));
+            return n;
+        });
+        const badBudget = [elements.projectEditBudgetMin, elements.projectEditBudgetMax].find(input => input.classList.contains('is-invalid'));
+        if (badBudget) {
+            badBudget.focus();
+            return;
+        }
+
+        const payments = window.ProjectPayments ? window.ProjectPayments.read() : { payments: undefined };
+        if (payments.error) {
+            return;
+        }
+
+        const data = {
+            name: elements.projectEditName.value.trim(),
+            start_date: elements.projectEditStartDate.value,
+            description: elements.projectEditDescription.value.trim(),
+            company: elements.projectEditCompany.value.trim() || null,
+            budget_min: budget[0],
+            budget_max: budget[1],
+            success_chance: elements.projectEditSuccessChance.value || null,
+            stage: elements.projectEditStage.value,
+            estimated_completion: elements.projectEditEstCompletion.value || null,
+            payments: payments.payments
+        };
+
+        elements.saveProjectEditBtn.disabled = true;
+        try {
+            const result = creating
+                ? await api.createProject(data)
+                : await api.updateProject(projectId, data);
+            if (result.success) {
+                // A created project opens as itself, with everything added
+                // to its sheet before it existed.
+                const savedId = creating ? result.data.id : projectId;
+                if (creating) {
+                    const problems = await applyProjectDraft(Number(savedId));
+                    if (problems.length > 0) {
+                        alert('The project was created, but not everything could be added:\n\n' + problems.join('\n'));
+                    }
+                }
+                exitProjectEdit();
+                elements.projectOverviewModal.classList.remove('is-new');
+                loadProjects();
+                refreshHome();
+                // Opened only to change something: done once it is saved.
+                if (!creating && state.projectCloseAfterEdit) {
+                    closeProjectOverview();
+                    return;
+                }
+                await openProjectOverview(savedId);
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('An error occurred while saving the project');
+        } finally {
+            elements.saveProjectEditBtn.disabled = false;
+        }
+    }
+
+    // ---- A project being created --------------------------------------------
+    // Its sheet offers everything an existing project's does. What is added
+    // before it exists is held in state.projectDraft and applied right after
+    // it is created, in the order the sections appear.
+
+    let draftSeq = 0;
+    /** A temporary id for something held in a draft: negative, never a real row. */
+    function draftId() {
+        return -(++draftSeq);
+    }
+
+    function stageProjectTag(tagName) {
+        const draft = state.projectDraft;
+        const name = tagName.trim();
+        if (!name || draft.tags.some(tag => tag.name.toLowerCase() === name.toLowerCase())) return;
+
+        const existing = (state.allTags || []).find(tag => tag.name.toLowerCase() === name.toLowerCase());
+        draft.tags.push(existing
+            ? { id: Number(existing.id), name: existing.name, color: existing.color }
+            : { id: draftId(), name, color: '#3b82f6', isNew: true });
+        renderProjectTags(draft.tags);
+        elements.newProjectTagInput.value = '';
+        elements.projectTagSuggestions.style.display = 'none';
+        elements.newProjectTagInput.focus();
+    }
+
+    function stageProjectContact(contactId) {
+        const draft = state.projectDraft;
+        const contact = (state.contacts || []).find(c => Number(c.id) === Number(contactId));
+        if (!contact || draft.contacts.some(c => Number(c.id) === Number(contactId))) return;
+
+        draft.contacts.push(contact);
+        renderProjectContacts(draft.contacts);
+        elements.newProjectContactInput.value = '';
+        elements.projectContactSuggestions.style.display = 'none';
+        elements.newProjectContactInput.focus();
+    }
+
+    /** A to-do made in the to-do sheet for a project not yet created. */
+    function stageProjectTodo(todo) {
+        if (!state.projectDraft) return;
+        state.projectDraft.todos.push({ ...todo, id: draftId() });
+        renderDraftProjectTodos();
+    }
+
+    /** The draft's to-dos: the project sheet's rows, minus what needs a saved to-do. */
+    function renderDraftProjectTodos() {
+        const container = elements.projectTodosList;
+        const todos = state.projectDraft ? state.projectDraft.todos : [];
+        if (!container) return;
+
+        if (todos.length === 0) {
+            container.innerHTML = '<p class="empty-hint">No open to-dos</p>';
+            return;
+        }
+
+        const now = new Date();
+        container.innerHTML = `<div class="ptodo-card">${todos.map(todo => {
+            const dueDate = parseTodoDueDate(todo.due_date);
+            const dueText = dueDate
+                ? window.CRMFormat.date(dueDate)
+                : '';
+            const priorityMeta = getTodoPriorityMeta(todo.priority);
+            return `
+                <div class="ptodo ptodo-draft">
+                    <div class="ptodo-row">
+                        <span class="ptodo-title">${escapeHtml(todo.title)}</span>
+                        <span class="ptodo-meta">
+                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
+                            ${dueText ? `<span class="todo-due">${escapeHtml(dueText)}</span>` : ''}
+                            ${todo.assigned_to_name ? `<span class="ptodo-draft-assignee">${escapeHtml(todo.assigned_to_name)}</span>` : ''}
+                        </span>
+                        <button type="button" class="pcontact-remove" data-draft-todo-remove="${todo.id}" title="Remove to-do" aria-label="Remove ${escapeHtml(todo.title)}">&times;</button>
+                    </div>
+                </div>`;
+        }).join('')}</div>`;
+    }
+
+    /**
+     * Apply everything held for a project just created. Each part is tried
+     * on its own, so one failure does not lose the rest; returns what failed.
+     */
+    async function applyProjectDraft(projectId) {
+        const draft = state.projectDraft;
+        state.projectDraft = null;
+        const problems = [];
+        if (!draft || !projectId) return problems;
+
+        const attempt = async (what, fn) => {
+            try {
+                const result = await fn();
+                if (result && result.success === false) problems.push(`${what}: ${result.error || 'failed'}`);
+                return result;
+            } catch (error) {
+                problems.push(`${what}: ${error.message}`);
+                return null;
+            }
+        };
+
+        const assignSelect = elements.projectOverviewAssignee.querySelector('select.assignee-select');
+        const assignTo = assignSelect ? assignSelect.value : '';
+        if (assignTo) {
+            await attempt('Assignment', async () => {
+                const saved = await saveAssignment('project', projectId, assignTo);
+                showAssignmentToast(saved.assigned_to_name);
+                if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+            });
+        }
+
+        for (const tag of draft.tags) {
+            await attempt(`Tag "${tag.name}"`, async () => {
+                let tagId = tag.id;
+                if (tag.isNew) {
+                    const created = await api.createTag(tag.name);
+                    if (!created.success) return created;
+                    tagId = created.data.id;
+                }
+                return api.assignProjectTag(projectId, tagId);
+            });
+        }
+        if (draft.tags.some(tag => tag.isNew)) {
+            loadAllTags();
+        }
+
+        for (const contact of draft.contacts) {
+            await attempt(`Contact "${contact.name}"`, () => api.assignProjectContact(projectId, Number(contact.id)));
+        }
+
+        for (const todo of draft.todos) {
+            await attempt(`To-do "${todo.title}"`, async () => {
+                const created = await api.createTodo({
+                    title: todo.title,
+                    description: todo.description,
+                    due_date: todo.due_date,
+                    priority: todo.priority,
+                    contact_id: null,
+                    project_id: projectId
+                });
+                if (created.success && todo.assign_to && created.data && created.data.id) {
+                    await saveAssignment('todo', created.data.id, todo.assign_to);
+                }
+                if (created.success && created.data && created.data.id) {
+                    for (const link of todo.links || []) {
+                        await attempt(`Link on "${todo.title}"`, () => api.addTodoLink(created.data.id, link.url, link.title));
+                    }
+                }
+                return created;
+            });
+        }
+
+        if (window.ProjectDocuments) {
+            problems.push(...await window.ProjectDocuments.commitDraft(projectId));
+        }
+
+        // Oldest first, so they keep the order they were written in.
+        for (const note of draft.notes.slice().reverse()) {
+            await attempt('Note', () => api.createProjectNote(projectId, note.content));
+        }
+
+        return problems;
+    }
+
     async function addProjectTag(tagName) {
+        if (tagName && state.projectDraft) {
+            stageProjectTag(tagName);
+            return;
+        }
         if (!tagName || !state.viewingProjectId) return;
 
         try {
@@ -5088,6 +5666,7 @@
                 }
                 elements.newProjectTagInput.value = '';
                 elements.projectTagSuggestions.style.display = 'none';
+                elements.newProjectTagInput.focus();
             } else {
                 alert('Error: ' + assignResult.error);
             }
@@ -5097,6 +5676,11 @@
     }
 
     async function removeProjectTag(tagId) {
+        if (state.projectDraft) {
+            state.projectDraft.tags = state.projectDraft.tags.filter(tag => Number(tag.id) !== tagId);
+            renderProjectTags(state.projectDraft.tags);
+            return;
+        }
         if (!state.viewingProjectId) return;
 
         try {
@@ -5115,6 +5699,10 @@
     }
 
     async function addProjectContact(contactId) {
+        if (contactId && state.projectDraft) {
+            stageProjectContact(contactId);
+            return;
+        }
         if (!contactId || !state.viewingProjectId) return;
 
         try {
@@ -5126,6 +5714,7 @@
                 }
                 elements.newProjectContactInput.value = '';
                 elements.projectContactSuggestions.style.display = 'none';
+                elements.newProjectContactInput.focus();
             } else {
                 alert('Error: ' + result.error);
             }
@@ -5135,6 +5724,11 @@
     }
 
     async function removeProjectContact(contactId) {
+        if (state.projectDraft) {
+            state.projectDraft.contacts = state.projectDraft.contacts.filter(contact => Number(contact.id) !== contactId);
+            renderProjectContacts(state.projectDraft.contacts);
+            return;
+        }
         if (!state.viewingProjectId) return;
 
         try {
@@ -5154,8 +5748,9 @@
 
     function showProjectTagSuggestions(query) {
         const lowerQuery = query.toLowerCase();
+        const assigned = state.viewingProjectTagIds || new Set();
         const filtered = (state.allTags || []).filter(tag =>
-            tag.name.toLowerCase().includes(lowerQuery)
+            tag.name.toLowerCase().includes(lowerQuery) && !assigned.has(Number(tag.id))
         ).slice(0, 10);
 
         if (filtered.length === 0) {
@@ -5187,9 +5782,12 @@
         }
 
         const lowerQuery = query.toLowerCase();
+        const assigned = state.viewingProjectContactIds || new Set();
         const filtered = state.contacts.filter(contact =>
-            contact.name.toLowerCase().includes(lowerQuery) ||
-            (contact.company && contact.company.toLowerCase().includes(lowerQuery))
+            !assigned.has(Number(contact.id)) && (
+                contact.name.toLowerCase().includes(lowerQuery) ||
+                (contact.company && contact.company.toLowerCase().includes(lowerQuery))
+            )
         ).slice(0, 10);
 
         if (filtered.length === 0) {
@@ -5200,7 +5798,6 @@
         // Use data-contact-id attributes instead of inline onclick (avoids pointer-event issues)
         const html = filtered.map(contact => `
             <div class="contact-suggestion" data-contact-id="${contact.id}">
-                <div class="contact-avatar">${escapeHtml(getInitials(contact.name))}</div>
                 <div class="contact-info">
                     <div class="contact-name">${escapeHtml(contact.name)}</div>
                     ${contact.company ? `<div class="contact-company">${escapeHtml(contact.company)}</div>` : ''}
@@ -5212,48 +5809,66 @@
         elements.projectContactSuggestions.style.display = 'block';
     }
 
-    function showCompanySuggestions(query) {
-        if (!state.contacts || state.contacts.length === 0) {
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+    /** Company suggestions under a company field. */
+    function showCompanySuggestions(query, box) {
+        if (!box) {
             return;
         }
 
         const lowerQuery = query.toLowerCase();
         // Get unique companies from contacts
-        const companies = [...new Set(state.contacts
+        const companies = [...new Set((state.contacts || [])
             .filter(c => c.company && c.company.toLowerCase().includes(lowerQuery))
             .map(c => c.company)
         )].slice(0, 10);
 
         if (companies.length === 0) {
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+            box.classList.remove('visible');
             return;
         }
 
         // Use data-company attributes instead of inline onclick
-        const html = companies.map(company => `
+        box.innerHTML = companies.map(company => `
             <div class="autocomplete-suggestion" data-company="${escapeHtml(company)}">
                 ${escapeHtml(company)}
             </div>
         `).join('');
-
-        if (elements.projectCompanySuggestions) {
-            elements.projectCompanySuggestions.innerHTML = html;
-            elements.projectCompanySuggestions.classList.add('visible');
-        }
+        box.classList.add('visible');
     }
 
-    function selectCompany(company) {
-        if (elements.projectCompany) {
-            elements.projectCompany.value = company;
-            if (elements.projectCompanySuggestions) {
-                elements.projectCompanySuggestions.classList.remove('visible');
-            }
+    function bindCompanyAutocomplete(input, box) {
+        if (!input || !box) {
+            return;
         }
+
+        input.addEventListener('input', () => {
+            const query = input.value.trim();
+            if (query.length > 0) {
+                // Ensure contacts are loaded for company suggestions
+                if (!state.contacts || state.contacts.length === 0) {
+                    loadAllContacts().then(() => showCompanySuggestions(query, box));
+                } else {
+                    showCompanySuggestions(query, box);
+                }
+            } else {
+                box.classList.remove('visible');
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            // Small delay so mousedown on a suggestion can fire first
+            setTimeout(() => box.classList.remove('visible'), 150);
+        });
+
+        // Mousedown fires before blur and bypasses overflow clipping
+        box.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // prevent input blur
+            const item = e.target.closest('[data-company]');
+            if (item) {
+                input.value = item.dataset.company;
+                box.classList.remove('visible');
+            }
+        });
     }
 
     // ============================================
@@ -5292,9 +5907,19 @@
         return window.CRMReview ? window.CRMReview.badge(record) : '';
     }
 
+    /** The quieter mark on a record Claude proposes to change (review.js). */
+    function reviewChangeBadge(record, entityType) {
+        return window.CRMReview ? window.CRMReview.changeBadge(record, entityType) : '';
+    }
+
     /** Accept / reject buttons on a proposed note or to-do (review.js). */
     function reviewInline(entityType, id) {
         return window.CRMReview ? window.CRMReview.inlineActions(entityType, id) : '';
+    }
+
+    /** "Awaiting review" with its reject / accept buttons, as one pill (review.js). */
+    function reviewPill(record, entityType, id) {
+        return window.CRMReview ? window.CRMReview.pill(record, entityType, id) : '';
     }
 
     /**
@@ -5311,14 +5936,19 @@
                 if (window.CRMWorkload) window.CRMWorkload.load();
             } else if (state.currentView === 'bookkeeping') {
                 if (window.Bookkeeping) window.Bookkeeping.load();
+            } else if (state.currentView === 'financials') {
+                if (window.Financials) window.Financials.load();
             } else if (state.currentView !== 'review') {
                 refreshData();
             }
             updateContactCount();
 
-            // A rejected proposal for the record on screen means that record
-            // is gone; everything else just needs a fresh look.
-            const gone = detail.action === 'reject';
+            // The record on screen is gone when its proposal as a new record
+            // was rejected, or a proposal to delete it accepted; everything
+            // else just needs a fresh look. (No kind: a proposed record's own
+            // buttons, which decide on it as new.)
+            const kind = detail.kind || 'create';
+            const gone = (detail.action === 'reject' && kind === 'create') || (detail.action === 'accept' && kind === 'delete');
             if (elements.overviewModal.classList.contains('active') && state.viewingContactId) {
                 if (gone && detail.entity_type === 'contact' && Number(detail.entity_id) === Number(state.viewingContactId)) {
                     closeOverviewModal();
@@ -5333,7 +5963,22 @@
                     openProjectOverview(state.viewingProjectId);
                 }
             }
+            // A to-do that is gone closes by itself when it fails to reload.
+            if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active') && state.viewingTodoId && !isNewTodo()) {
+                refreshTodoDetail();
+            }
         });
+    }
+
+    /**
+     * One value in a sheet's details, or a quiet dash when there is none -
+     * the same "empty" everywhere instead of "N/A", "None" or "No …".
+     */
+    function setDetailValue(node, value) {
+        if (!node) return;
+        const empty = value === null || value === undefined || String(value).trim() === '';
+        node.textContent = empty ? '—' : String(value);
+        node.classList.toggle('detail-empty', empty);
     }
 
     function escapeHtml(text) {
@@ -5450,7 +6095,7 @@
         `;
     }
 
-    const ASSIGN_EMPTY_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+    const ASSIGN_EMPTY_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
 
     /**
      * Write the assignment control into a slot, or clear it.
@@ -5534,6 +6179,11 @@
                 select.setAttribute('data-previous', select.value);
                 applyAssignmentLocally(type, Number(id), saved);
                 showAssignmentToast(saved.assigned_to_name);
+
+                // Reassigned from the to-do sheet: the lists behind it move too.
+                if (type === 'todo' && state.viewingTodoId === Number(id)) {
+                    refreshVisibleTodoLists();
+                }
 
                 // The nav badge counts open to-dos assigned to me, so it can
                 // change whether or not I was the one reassigned.
@@ -5669,13 +6319,17 @@
         return `<span class="edited-by">${label} ${byLine(name, actorId)}${stamp ? `<span class="edited-by-when">${escapeHtml(stamp)}</span>` : ''}</span>`;
     }
 
+    /**
+     * Two letters wherever a face has no photo: first and last initial, or the
+     * first two letters of a one-word name. profile.js, users.js, workload.js,
+     * bookkeeping.js, review.js and userInitials() in index.php do the same.
+     */
     function getInitials(name) {
         if (!name) return '?';
-        const parts = name.trim().split(/\s+/);
-        if (parts.length === 1) {
-            return parts[0].charAt(0).toUpperCase();
-        }
-        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
     function debounce(func, wait) {
@@ -5780,7 +6434,7 @@
         }
 
         if (elements.addTodoBtn) {
-            elements.addTodoBtn.addEventListener('click', () => openTodoModal());
+            elements.addTodoBtn.addEventListener('click', () => openNewTodo());
         }
 
         // Tag input - show suggestions
@@ -5892,16 +6546,21 @@
 
         // Overview modal
         elements.closeOverviewModal.addEventListener('click', closeOverviewModal);
-        elements.closeOverviewBtn.addEventListener('click', closeOverviewModal);
         elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', closeOverviewModal);
         elements.editContactBtn.addEventListener('click', openEditFromOverview);
+        // Click a detail (not its mail, phone or web link) to change it.
+        elements.overviewDetails.addEventListener('click', (e) => {
+            if (e.target.closest('a, button')) return;
+            if (String(window.getSelection ? window.getSelection() : '').trim()) return;
+            if (e.target.closest('.detail-item, .empty-hint')) openEditFromOverview();
+        });
         elements.addNoteBtn.addEventListener('click', addNote);
         if (elements.addContactTodoBtn) {
             elements.addContactTodoBtn.addEventListener('click', () => {
                 if (!state.viewingContactId) {
                     return;
                 }
-                openTodoModal({ type: 'contact', id: state.viewingContactId, locked: true });
+                openNewTodo({ type: 'contact', id: state.viewingContactId, locked: true });
             });
         }
 
@@ -5976,43 +6635,38 @@
 
         // Add project button
         if (elements.addProjectBtn) {
-            elements.addProjectBtn.addEventListener('click', () => openProjectModal());
+            elements.addProjectBtn.addEventListener('click', openNewProject);
         }
 
-        // Project modal close buttons
-        if (elements.closeProjectModal) {
-            elements.closeProjectModal.addEventListener('click', closeProjectModal);
-        }
-        if (elements.cancelProjectBtn) {
-            elements.cancelProjectBtn.addEventListener('click', closeProjectModal);
-        }
-        if (elements.projectModal) {
-            elements.projectModal.querySelector('.modal-backdrop').addEventListener('click', closeProjectModal);
-        }
+        // Cards or list
+        document.querySelectorAll('[data-project-view-btn]').forEach(btn => {
+            btn.addEventListener('click', () => setProjectView(btn.dataset.projectViewBtn));
+        });
 
-        // Project form submission
-        if (elements.projectForm) {
-            elements.projectForm.addEventListener('submit', saveProject);
-        }
+        // Payments marked paid elsewhere (after a bookkeeping import): the
+        // project cards, the forecast and an open sheet catch up.
+        document.addEventListener('crm:projects-changed', () => {
+            loadProjects();
+            refreshHome();
+            if (state.currentView === 'financials' && window.Financials) {
+                window.Financials.load();
+            }
+            if (state.viewingProjectId && !isEditingProject()) {
+                openProjectOverview(state.viewingProjectId);
+            }
+        });
 
-        // Pipeline band: the chevron opens and closes the breakdown
-        const breakdownToggle = document.getElementById('projectsBreakdownToggle');
-        const breakdown = document.getElementById('projectsBreakdown');
-        if (breakdownToggle && breakdown) {
-            breakdownToggle.addEventListener('click', () => {
-                const opening = breakdown.hidden;
-                breakdown.hidden = !opening;
-
-                const label = opening ? 'Hide breakdown' : 'Show breakdown';
-                breakdownToggle.setAttribute('aria-expanded', String(opening));
-                breakdownToggle.setAttribute('aria-label', label);
-                breakdownToggle.title = label;
+        // Expected payments in the project sheet
+        if (window.ProjectPayments) {
+            window.ProjectPayments.init({
+                editor: elements.projectPaymentsEditor,
+                fields: {
+                    start: elements.projectEditStartDate,
+                    end: elements.projectEditEstCompletion,
+                    min: elements.projectEditBudgetMin,
+                    max: elements.projectEditBudgetMax
+                }
             });
-        }
-
-        // Delete project button
-        if (elements.deleteProjectBtn) {
-            elements.deleteProjectBtn.addEventListener('click', openDeleteProjectModal);
         }
 
         // Delete project modal
@@ -6033,9 +6687,6 @@
         if (elements.closeProjectOverviewModal) {
             elements.closeProjectOverviewModal.addEventListener('click', closeProjectOverview);
         }
-        if (elements.closeProjectOverviewBtn) {
-            elements.closeProjectOverviewBtn.addEventListener('click', closeProjectOverview);
-        }
         if (elements.projectOverviewModal) {
             const backdrop = elements.projectOverviewModal.querySelector('.modal-backdrop');
             if (backdrop) {
@@ -6049,10 +6700,15 @@
 
         if (elements.addProjectTodoBtn) {
             elements.addProjectTodoBtn.addEventListener('click', () => {
-                if (!state.viewingProjectId) {
+                if (!state.viewingProjectId && !state.projectDraft) {
                     return;
                 }
-                openTodoModal({ type: 'project', id: state.viewingProjectId, locked: true });
+                if (state.projectDraft) {
+                    // The project does not exist yet: the to-do is held with it.
+                    openNewTodo({ type: 'project', draft: true, locked: true });
+                } else {
+                    openNewTodo({ type: 'project', id: state.viewingProjectId, locked: true });
+                }
             });
         }
 
@@ -6061,6 +6717,41 @@
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     e.preventDefault();
                     addProjectNote();
+                } else if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    closeProjectNoteForm();
+                }
+            });
+        }
+
+        if (elements.openProjectNoteFormBtn) {
+            elements.openProjectNoteFormBtn.addEventListener('click', () => {
+                if (elements.projectNoteForm.hidden) {
+                    openProjectNoteForm();
+                } else {
+                    closeProjectNoteForm();
+                }
+            });
+        }
+        if (elements.cancelProjectNoteBtn) {
+            elements.cancelProjectNoteBtn.addEventListener('click', closeProjectNoteForm);
+        }
+
+        // Long notes open in place; older notes come in on request
+        if (elements.projectNotesTimeline) {
+            elements.projectNotesTimeline.addEventListener('click', (e) => {
+                const more = e.target.closest('.note-more-btn');
+                if (more) {
+                    const item = more.closest('.note-item');
+                    const open = item.classList.toggle('is-open');
+                    more.textContent = open ? 'Show less' : 'Show more';
+                    return;
+                }
+                if (e.target.closest('[data-notes-show-all], [data-notes-show-less]')) {
+                    state.showAllProjectNotes = !!e.target.closest('[data-notes-show-all]');
+                    if (state.viewingProjectId) {
+                        loadProjectNotes(state.viewingProjectId);
+                    }
                 }
             });
         }
@@ -6079,91 +6770,60 @@
             });
         }
 
+        // Editing happens in the sheet itself
         if (elements.editProjectBtn) {
-            elements.editProjectBtn.addEventListener('click', () => {
-                // Save project BEFORE closeProjectOverview() nulls it
-                const projectToEdit = state.viewingProject;
-                closeProjectOverview();
-                openProjectModal(projectToEdit);
+            elements.editProjectBtn.addEventListener('click', enterProjectEdit);
+            bindClickToEdit(elements.projectOverviewModal, elements.editProjectBtn,
+                () => elements.projectOverviewModal.classList.contains('is-editing'), enterProjectEdit);
+        }
+        if (elements.cancelProjectEditBtn) {
+            elements.cancelProjectEditBtn.addEventListener('click', cancelProjectEdit);
+        }
+        if (elements.saveProjectEditBtn) {
+            elements.saveProjectEditBtn.addEventListener('click', saveProjectEdit);
+        }
+        if (elements.projectOverviewModal) {
+            // Enter in a one-line field saves; Cmd/Ctrl+Enter in the description
+            elements.projectOverviewModal.querySelector('.modal-content').addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' || !isEditingProject()) return;
+                const field = e.target.closest('[data-ov="edit"], [data-ov="edit"] *');
+                if (!field || !e.target.matches('input, textarea')) return;
+                if (e.target.tagName === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+                e.preventDefault();
+                saveProjectEdit();
+            });
+            elements.projectOverviewModal.addEventListener('input', (e) => {
+                if (e.target.classList.contains('is-invalid') && e.target.value.trim()) {
+                    e.target.classList.remove('is-invalid');
+                }
             });
         }
 
-        // Project tag add button
+        // Section-head "Add" buttons open a search field that is the whole form
         if (elements.addProjectTagBtn) {
             elements.addProjectTagBtn.addEventListener('click', () => {
-                const tagName = elements.newProjectTagInput.value.trim();
-                if (tagName) {
-                    addProjectTag(tagName);
+                if (elements.projectTagPicker.hidden) {
+                    openProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn, elements.newProjectTagInput);
+                } else {
+                    closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                        elements.newProjectTagInput, elements.projectTagSuggestions);
                 }
             });
         }
 
-        // Project contact add button — match first suggestion if any
         if (elements.addProjectContactBtn) {
             elements.addProjectContactBtn.addEventListener('click', () => {
-                const query = elements.newProjectContactInput.value.trim();
-                if (!query) return;
-
-                if (!state.contacts || state.contacts.length === 0) {
-                    alert('No contacts loaded. Please wait and try again.');
-                    return;
-                }
-
-                // First try exact match, then partial match
-                const exactMatch = state.contacts.find(c =>
-                    c.name.toLowerCase() === query.toLowerCase()
-                );
-                const partialMatch = state.contacts.find(c =>
-                    c.name.toLowerCase().includes(query.toLowerCase())
-                );
-                const contact = exactMatch || partialMatch;
-
-                if (contact) {
-                    addProjectContact(contact.id);
+                if (elements.projectContactPicker.hidden) {
+                    openProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn, elements.newProjectContactInput);
                 } else {
-                    alert('Contact not found. Please select from the suggestions dropdown.');
+                    closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                        elements.newProjectContactInput, elements.projectContactSuggestions);
                 }
             });
         }
 
-        // Company autocomplete
-        if (elements.projectCompany) {
-            elements.projectCompany.addEventListener('input', () => {
-                const query = elements.projectCompany.value.trim();
-                if (query.length > 0) {
-                    // Ensure contacts are loaded for company suggestions
-                    if (!state.contacts || state.contacts.length === 0) {
-                        loadAllContacts().then(() => showCompanySuggestions(query));
-                    } else {
-                        showCompanySuggestions(query);
-                    }
-                } else {
-                    if (elements.projectCompanySuggestions) {
-                        elements.projectCompanySuggestions.classList.remove('visible');
-                    }
-                }
-            });
-
-            elements.projectCompany.addEventListener('blur', () => {
-                // Small delay so mousedown on a suggestion can fire first
-                setTimeout(() => {
-                    if (elements.projectCompanySuggestions) {
-                        elements.projectCompanySuggestions.classList.remove('visible');
-                    }
-                }, 150);
-            });
-        }
-
-        // Mousedown on company suggestions (fires before blur, bypasses overflow clipping)
-        if (elements.projectCompanySuggestions) {
-            elements.projectCompanySuggestions.addEventListener('mousedown', (e) => {
-                e.preventDefault(); // prevent input blur
-                const item = e.target.closest('[data-company]');
-                if (item) {
-                    selectCompany(item.dataset.company);
-                }
-            });
-        }
+        // Company autocomplete in the sheet's edit mode
+        bindCompanyAutocomplete(elements.projectEditCompany, elements.projectEditCompanySuggestions);
 
         // Project tag input
         if (elements.newProjectTagInput) {
@@ -6180,7 +6840,21 @@
                 // Delay so mousedown on a suggestion fires first
                 setTimeout(() => {
                     elements.projectTagSuggestions.style.display = 'none';
+                    if (document.activeElement !== elements.newProjectTagInput && !elements.newProjectTagInput.value.trim()) {
+                        closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                            elements.newProjectTagInput, elements.projectTagSuggestions);
+                    }
                 }, 150);
+            });
+
+            elements.newProjectTagInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    // Close the field, not the whole sheet
+                    e.stopPropagation();
+                    closeProjectPicker(elements.projectTagPicker, elements.addProjectTagBtn,
+                        elements.newProjectTagInput, elements.projectTagSuggestions);
+                    elements.addProjectTagBtn.focus();
+                }
             });
 
             elements.newProjectTagInput.addEventListener('keypress', (e) => {
@@ -6205,7 +6879,24 @@
                 }
             });
 
+            elements.newProjectContactInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    elements.projectContactSuggestions.style.display = 'none';
+                    if (document.activeElement !== elements.newProjectContactInput && !elements.newProjectContactInput.value.trim()) {
+                        closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                            elements.newProjectContactInput, elements.projectContactSuggestions);
+                    }
+                }, 150);
+            });
+
             elements.newProjectContactInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    closeProjectPicker(elements.projectContactPicker, elements.addProjectContactBtn,
+                        elements.newProjectContactInput, elements.projectContactSuggestions);
+                    elements.addProjectContactBtn.focus();
+                    return;
+                }
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     const first = elements.projectContactSuggestions.querySelector('[data-contact-id]');
@@ -6238,12 +6929,38 @@
             });
         }
 
-        // Delegation for contact remove buttons (rendered dynamically)
+        // Delegation for contact chips (rendered dynamically): the x removes,
+        // anywhere else on the chip opens the contact
         if (elements.projectContacts) {
             elements.projectContacts.addEventListener('click', (e) => {
                 const btn = e.target.closest('[data-remove-contact]');
                 if (btn) {
                     removeProjectContact(parseInt(btn.dataset.removeContact, 10));
+                    return;
+                }
+                const chip = e.target.closest('[data-open-contact]');
+                // Not while creating: leaving the sheet would lose what is in it.
+                if (chip && !state.projectDraft) {
+                    openContactFromProject(parseInt(chip.dataset.openContact, 10));
+                }
+            });
+        }
+
+        // "Show" / "Hide" for completed to-dos in the project sheet
+        if (elements.projectTodosList) {
+            elements.projectTodosList.addEventListener('click', (e) => {
+                const removeDraft = e.target.closest('[data-draft-todo-remove]');
+                if (removeDraft && state.projectDraft) {
+                    const id = Number(removeDraft.dataset.draftTodoRemove);
+                    state.projectDraft.todos = state.projectDraft.todos.filter(todo => todo.id !== id);
+                    renderDraftProjectTodos();
+                    return;
+                }
+                if (e.target.closest('[data-ptodo-show-done]')) {
+                    state.showCompletedProjectTodos = !state.showCompletedProjectTodos;
+                    if (state.viewingProjectId) {
+                        loadProjectTodos(state.viewingProjectId);
+                    }
                 }
             });
         }
@@ -6262,28 +6979,8 @@
         bindTodoListInteractions(elements.todosList);
         bindTodoListInteractions(elements.contactTodosList);
         bindTodoListInteractions(elements.projectTodosList);
-
-        // To-do modal
-        if (elements.closeTodoModal) {
-            elements.closeTodoModal.addEventListener('click', closeTodoModal);
-        }
-        if (elements.cancelTodoBtn) {
-            elements.cancelTodoBtn.addEventListener('click', closeTodoModal);
-        }
-        if (elements.todoModal) {
-            const todoBackdrop = elements.todoModal.querySelector('.modal-backdrop');
-            if (todoBackdrop) {
-                todoBackdrop.addEventListener('click', closeTodoModal);
-            }
-        }
-        if (elements.todoForm) {
-            elements.todoForm.addEventListener('submit', saveTodo);
-        }
-        if (elements.todoAssignType) {
-            elements.todoAssignType.addEventListener('change', () => {
-                populateTodoAssigneeOptions(elements.todoAssignType.value);
-            });
-        }
+        bindTodoDetail();
+        bindDeletedProjects();
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -6293,12 +6990,19 @@
                     closeDeleteModal();
                 } else if (elements.deleteProjectModal.classList.contains('active')) {
                     closeDeleteProjectModal();
+                } else if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
+                    // The to-do sheet opens on top of the project and contact sheets.
+                    if (isEditingTodo()) {
+                        cancelTodoEdit();
+                    } else {
+                        closeTodoDetail();
+                    }
                 } else if (elements.projectOverviewModal.classList.contains('active')) {
-                    closeProjectOverview();
-                } else if (elements.projectModal.classList.contains('active')) {
-                    closeProjectModal();
-                } else if (elements.todoModal.classList.contains('active')) {
-                    closeTodoModal();
+                    if (isEditingProject()) {
+                        cancelProjectEdit();
+                    } else {
+                        closeProjectOverview();
+                    }
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
                 } else if (elements.companyNotesModal.classList.contains('active')) {
@@ -6377,18 +7081,46 @@
         switchView(readStoredView());
     }
 
+    /**
+     * Open the To-dos tab on one person's open or completed to-dos - the
+     * home page's "Completed" link. Other filters are
+     * cleared, so the list is the whole of what was asked for.
+     *
+     * @param {{status?: string, assigned?: string}} options  status: open,
+     *        completed or all; assigned: 'me', a user key, 'owner' or 'unassigned'.
+     */
+    function openTodos(options) {
+        const opts = options || {};
+
+        state.todoStatusFilter = opts.status || 'open';
+        state.todoAssignedFilter = opts.assigned || '';
+        state.todoContactFilterId = '';
+        state.todoProjectFilterId = '';
+        state.todoSearchQuery = '';
+
+        if (elements.todoStatusFilter) elements.todoStatusFilter.value = state.todoStatusFilter;
+        if (elements.searchTodosInput) elements.searchTodosInput.value = '';
+        // The assigned, contact and project selects are refilled from state
+        // when the list loads.
+
+        switchView('todos');
+    }
+
     // Expose functions globally for map popup buttons and onclick handlers
     window.CRM = {
         editContact: editContact,
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,
+        openTodoDetail: openTodoDetail,
+        openNewTodo: openNewTodo,
+        openNewProject: openNewProject,
         openBookkeepingRow: openBookkeepingRow,
         switchView: switchView,
+        openTodos: openTodos,
         addProjectTag: addProjectTag,
         removeProjectTag: removeProjectTag,
         addProjectContact: addProjectContact,
-        removeProjectContact: removeProjectContact,
-        selectCompany: selectCompany
+        removeProjectContact: removeProjectContact
     };
 
     // Initialize when DOM is ready

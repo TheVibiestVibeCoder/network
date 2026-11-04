@@ -5,6 +5,7 @@
  * What the Documents section of a project's detail view talks to.
  *
  *   GET  ?action=list&project_id=N           the project's documents, the labels and the upload limits
+ *   GET  ?action=meta                        the labels and the upload limits alone (a project being created)
  *   GET  ?action=download&id=N[&inline=1]    the file itself; inline only shows PDFs and images in place
  *   POST ?action=upload                      multipart: project_id, label, document
  *   POST ?action=set-label   {id, label}
@@ -52,6 +53,9 @@ try {
     if ($method === 'GET' && $action === 'list') {
         docList((int) ($_GET['project_id'] ?? 0));
     }
+    if ($method === 'GET' && $action === 'meta') {
+        docJson(['success' => true, 'data' => docMeta()]);
+    }
     if ($method === 'GET' && $action === 'download') {
         docDownload((int) ($_GET['id'] ?? 0), !empty($_GET['inline']));
     }
@@ -87,16 +91,21 @@ function docList(int $projectId): void
 
     docJson([
         'success' => true,
-        'data' => [
-            'documents' => array_map([ProjectDocument::class, 'present'], ProjectDocument::forProject($projectId)),
-            'labels' => ProjectDocument::LABELS,
-            'limits' => [
-                'max_upload_bytes' => ProjectDocument::maxUploadBytes(),
-                'max_upload_label' => ProjectDocument::formatBytes(ProjectDocument::maxUploadBytes()),
-                'extensions' => ProjectDocument::extensions(),
-            ],
-        ],
+        'data' => ['documents' => array_map([ProjectDocument::class, 'present'], ProjectDocument::forProject($projectId))] + docMeta(),
     ]);
+}
+
+/** The labels and upload limits, decided in ProjectDocument. */
+function docMeta(): array
+{
+    return [
+        'labels' => ProjectDocument::LABELS,
+        'limits' => [
+            'max_upload_bytes' => ProjectDocument::maxUploadBytes(),
+            'max_upload_label' => ProjectDocument::formatBytes(ProjectDocument::maxUploadBytes()),
+            'extensions' => ProjectDocument::extensions(),
+        ],
+    ];
 }
 
 function docDownload(int $id, bool $inline): void

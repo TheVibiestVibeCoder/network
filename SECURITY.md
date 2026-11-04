@@ -210,6 +210,16 @@ the registered address and has to come back before a session exists. The code
 is stored as a bcrypt hash, is single-use, lasts 10 minutes, and dies after 5
 wrong guesses. Requesting a new one immediately invalidates the previous one.
 
+Those per-code limits do not bound guessing on their own: whoever has the
+password can keep signing in for fresh codes and fresh guesses. So an account
+is also capped at 10 codes an hour and 20 wrong codes a day
+(`LOGIN_CODE_MAX_PER_HOUR`, `LOGIN_CODE_MAX_FAILURES_PER_DAY`), which puts a
+full search of the code space at decades instead of hours. Both are counted in
+`two_factor_events`, which signing in with the password neither resets nor
+deletes from. Only a correct code clears the failures. A password change also
+lifts the cap, because whoever caused those failures no longer has the
+password; until then the owner can still get in through a reset link.
+
 Nothing the client holds names the account being signed in - the session
 carries only an opaque challenge id, and the row behind it is the authority on
 whose sign-in it is.
@@ -231,7 +241,10 @@ Opt-in, off by default. The cookie is `<selector>:<validator>`; the selector is
 the lookup key, and only a SHA-256 of the validator is stored, so a dump of the
 table yields nothing presentable. It restores a session with neither password
 nor code, which makes it a second key to the account - `REMEMBER_ME_LIFETIME`
-(30 days by default) is effectively how long a stolen laptop stays useful.
+(7 days by default) is effectively how long a stolen laptop stays useful.
+The lifetime runs from the sign-in that issued the cookie and is not extended
+by using it, so no device stays signed in for longer than that without
+entering a fresh code.
 
 It is retired by: signing out, changing the password (the token is pinned to
 the `password_changed_at` it was issued under), disabling the account, and

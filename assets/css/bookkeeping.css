@@ -4,11 +4,11 @@
  */
 
 :root {
-    --bk-drop-blue: #2563eb;
+    --bk-drop-blue: var(--c-accent);
 }
 
 :root[data-theme="dark"] {
-    --bk-drop-blue: #60a5fa;
+    --bk-drop-blue: var(--c-accent);
 }
 
 #bookkeepingView {
@@ -19,8 +19,7 @@
     --bk-control-height: 30px;
     /* Status tints. Deliberately faint: a row's state should be scannable in
        peripheral vision without the table turning into a traffic light. */
-    --bk-tint-missing: color-mix(in srgb, var(--color-danger) 5%, transparent);
-    --bk-edge-missing: color-mix(in srgb, var(--color-danger) 55%, transparent);
+    --bk-edge-missing: var(--color-danger);
     --bk-tint-excluded: color-mix(in srgb, var(--color-warning) 8%, transparent);
 }
 
@@ -393,8 +392,8 @@ body.bk-col-resizing * {
 .bk-menu-title {
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
     margin: 0 0 var(--spacing-3);
 }
@@ -555,8 +554,8 @@ body.bk-col-resizing * {
     color: var(--color-text-muted);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -599,19 +598,11 @@ body.bk-col-resizing * {
     background: var(--color-surface-hover);
 }
 
-/* Only the actionable state is tinted, and barely. A row that is finished
-   needs no colour; a row still missing its invoice gets a faint wash and a
-   hairline down its leading edge, which is enough to find while scrolling. */
-.bk-row-missing td {
-    background: var(--bk-tint-missing);
-}
-
+/* A row still missing its invoice gets a red bar down its leading edge -
+   no wash over the row, so the table stays calm and the bar is what the
+   eye finds while scrolling. A finished row needs no colour at all. */
 .bk-row-missing td:first-child {
-    box-shadow: inset 2px 0 0 var(--bk-edge-missing);
-}
-
-.bk-row-missing:hover td {
-    background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+    box-shadow: inset 3px 0 0 var(--bk-edge-missing);
 }
 
 /* Excluded rows: still listed, visibly not counted. Struck-through amounts and
@@ -644,9 +635,8 @@ body.bk-col-resizing * {
     color: var(--color-text-muted);
 }
 
-.bk-row-excluded .bk-badge-missing::before {
-    background: var(--color-text-muted);
-    opacity: 0.55;
+.bk-row-excluded .bk-badge-missing {
+    background: var(--c-tint-2);
 }
 
 
@@ -667,7 +657,7 @@ body.bk-col-resizing * {
 }
 
 .bk-row.bk-drop-target > td {
-    background: rgba(37, 99, 235, 0.08);
+    background: var(--c-accent-soft);
 }
 
 /* Floating pill shown above the row currently being dragged over. */
@@ -748,8 +738,8 @@ body.bk-col-resizing * {
     font-size: var(--font-size-xs);
     font-weight: 500;
     color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 /* The month's one figure, and the button that opens its workings. */
@@ -793,6 +783,14 @@ body.bk-col-resizing * {
     transform: rotate(180deg);
 }
 
+/* "3 open": entries still without an invoice, so the figure is gross. */
+.bk-month-open {
+    align-self: center;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
 /* A month with entries left out says so on the line itself, so a total can
    never look like it simply disagrees with the rows above it. */
 .bk-month-excluded-dot {
@@ -829,8 +827,8 @@ body.bk-col-resizing * {
     margin: 0 0 var(--spacing-3);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
 }
 
@@ -859,36 +857,17 @@ body.bk-col-resizing * {
     margin: var(--spacing-2) 0;
 }
 
-/* The tax box. It lives in the breakdown popover now, so it is styled on its
-   own class rather than inheriting anything from the table. */
-.bk-month-tax-input {
-    width: 104px;
-    height: 26px;
-    padding: 0 8px;
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.bk-month-tax-input:hover {
-    border-color: var(--color-text-muted);
-}
-
-.bk-month-tax-input:focus {
-    outline: none;
-    border-color: var(--color-text-tertiary);
-    box-shadow: 0 0 0 3px var(--color-primary-subtle);
-}
-
-.bk-month-tax-input::placeholder {
-    color: var(--color-text-muted);
+/* "so far" after Net while entries still lack their invoice */
+.bk-breakdown-provisional {
     font-weight: 400;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.bk-breakdown-note + .bk-breakdown-note {
+    margin-top: var(--spacing-1);
+    padding-top: 0;
+    border-top: none;
 }
 
 .bk-breakdown-note {
@@ -958,39 +937,25 @@ body.bk-col-resizing * {
     color: var(--color-danger);
 }
 
-/* Status as a dot plus a word, rather than a saturated pill repeated down
-   the whole page. */
+/* Status as a pill in its colour, as every coloured value in the CRM. */
 .bk-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--font-size-sm);
+    height: 22px;
+    padding: 0 9px;
+    border-radius: var(--r-full);
+    font: 600 var(--t-xs)/1 var(--font);
     white-space: nowrap;
 }
 
-.bk-badge::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-full);
-    flex-shrink: 0;
-}
-
 .bk-badge-missing {
-    color: var(--color-danger);
-}
-
-.bk-badge-missing::before {
-    background: var(--color-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
 }
 
 .bk-badge-nopdf {
-    color: var(--color-text-muted);
-}
-
-.bk-badge-nopdf::before {
-    background: var(--color-text-muted);
-    opacity: 0.55;
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
 }
 
 /* ==========================================================================
@@ -1196,8 +1161,8 @@ body.bk-col-resizing * {
     padding: var(--spacing-2) var(--spacing-2) 6px;
     font-size: var(--font-size-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
     color: var(--color-text-muted);
 }
 
@@ -1390,6 +1355,20 @@ body.bk-col-resizing * {
     color: var(--color-text);
 }
 
+/* "Waiting on" while its people list is open above it. */
+.bk-sel-btn.is-open {
+    background: var(--color-accent-subtle);
+    color: var(--color-text);
+}
+
+.bk-sel-btn:disabled,
+.bk-sel-btn:disabled:hover {
+    background: transparent;
+    color: var(--color-text-muted);
+    opacity: 0.5;
+    cursor: default;
+}
+
 .bk-sel-btn-danger:hover {
     background: var(--color-danger-subtle);
     color: var(--color-danger);
@@ -1484,11 +1463,60 @@ body.bk-col-resizing * {
     font-variant-numeric: tabular-nums;
 }
 
-.bk-dropzone-hint {
-    margin: 0 0 var(--spacing-3);
-    font-size: var(--font-size-xs);
-    line-height: 1.5;
+/* Upload first, the fold button at the very end. */
+.bk-dropzone-header .bk-btn-small {
+    margin-left: auto;
+}
+
+/* ---- Folded: a narrow rail with the file count ---- */
+
+.bk-dropzone-rail {
+    display: none;
+}
+
+#bookkeepingView .bk-dropzone.is-folded {
+    width: 48px;
+    flex-basis: 48px;
+    padding: var(--spacing-2) 0;
+    align-items: center;
+}
+
+.bk-dropzone.is-folded > :not(.bk-dropzone-rail):not(input) {
+    display: none;
+}
+
+.bk-dropzone.is-folded .bk-dropzone-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 36px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
     color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.bk-dropzone.is-folded .bk-dropzone-rail:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+.bk-dropzone-rail-count {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.bk-dropzone-rail-count:empty {
+    display: none;
+}
+
+/* Too narrow for the words while something is dragged over it. */
+#bookkeepingView .bk-dropzone.is-folded.bk-dropzone-hover::after {
+    content: "";
 }
 
 .bk-pool-list {
@@ -1640,7 +1668,7 @@ body.bk-col-resizing * {
     display: flex;
     gap: var(--spacing-2);
     align-items: flex-start;
-    background: var(--color-warning-subtle, rgba(217, 119, 6, 0.12));
+    background: var(--color-warning-subtle);
     border: 1px solid var(--color-warning);
     color: var(--color-warning);
     border-radius: var(--radius-md);
@@ -1703,7 +1731,7 @@ body.bk-col-resizing * {
 }
 
 .bk-preview-row-dup td {
-    background: rgba(217, 119, 6, 0.12);
+    background: var(--c-warning-soft);
 }
 
 .bk-preview-dup-badge {
@@ -1712,7 +1740,7 @@ body.bk-col-resizing * {
     border-radius: var(--radius-full);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    background: rgba(217, 119, 6, 0.16);
+    background: color-mix(in srgb, var(--c-warning) 16%, transparent);
     color: var(--color-warning);
     border: 1px solid var(--color-warning);
     white-space: nowrap;
@@ -1741,8 +1769,8 @@ body.bk-col-resizing * {
 .bk-row-card-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .bk-row-card-value {
@@ -1936,5 +1964,202 @@ body.bk-col-resizing * {
     .bk-pdf-remove,
     .bk-pool-item .bk-icon-btn {
         opacity: 1;
+    }
+}
+
+/* ==========================================================================
+   Claude reading the invoices
+   What Claude read or suggests carries its mark and colour, as everything
+   Claude does in the CRM; the decision itself (Assign) is a company button.
+   ========================================================================== */
+
+.bk-claude-mark {
+    flex-shrink: 0;
+    color: var(--c-claude);
+}
+
+.bk-reading-spinner {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 5px;
+    vertical-align: -1px;
+    border: 1.5px solid var(--c-claude-soft);
+    border-top-color: var(--c-claude);
+    border-radius: var(--r-full);
+    animation: bkReadingSpin 0.8s linear infinite;
+}
+
+@keyframes bkReadingSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* "Claude is reading 12 invoices…" under the drop zone's title */
+.bk-pool-reading {
+    margin: 0 0 6px;
+    padding: 0 8px;
+    font-size: var(--font-size-xs);
+    color: var(--c-claude-2);
+}
+
+.bk-pool-reading[hidden] {
+    display: none;
+}
+
+.bk-read-failed {
+    color: var(--c-danger-ink);
+}
+
+.bk-read-again {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--c-accent);
+    cursor: pointer;
+}
+
+.bk-read-again:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* The VAT column: a figure for our own overview, so quieter than the amount. */
+.bk-table td.bk-col-vat {
+    color: var(--color-text-secondary);
+}
+
+/* A suggested invoice in a row's PDF cell, in place of "PDF missing" */
+.bk-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 3px 0 8px;
+    border-radius: var(--r-full);
+    background: var(--c-claude-softer);
+    box-shadow: inset 0 0 0 1px var(--c-claude-soft);
+}
+
+.bk-match a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-sm);
+    color: var(--c-ink-2);
+    text-decoration: none;
+}
+
+.bk-match a:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.bk-match-accept {
+    flex-shrink: 0;
+    height: 18px;
+    padding: 0 8px;
+    border: none;
+    border-radius: var(--r-full);
+    background: var(--c-accent);
+    color: #FFFFFF;
+    font: 600 11px/1 var(--font);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.bk-match-accept:hover {
+    background: var(--c-accent-2);
+}
+
+.bk-match-accept:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.bk-match-dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.bk-match-dismiss:hover {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+}
+
+/* "3 invoice matches" next to the title */
+.bk-match-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: center;
+    height: 24px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--r-full);
+    background: var(--c-claude-soft);
+    color: var(--c-claude-2);
+    font: 600 var(--t-xs)/1 var(--font);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.bk-match-pill:hover {
+    background: var(--c-claude-soft);
+    box-shadow: inset 0 0 0 1px var(--c-claude);
+}
+
+.bk-match-pill[hidden] {
+    display: none;
+}
+
+/* The list behind it */
+.bk-match-list {
+    margin: var(--spacing-3) 0 0;
+    padding: 0;
+    list-style: none;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.bk-match-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--spacing-2) 0;
+    border-top: 1px solid var(--color-border);
+}
+
+.bk-match-list-row {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.bk-match-list-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bk-reading-spinner {
+        animation: none;
     }
 }

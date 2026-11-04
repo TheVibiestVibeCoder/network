@@ -20,6 +20,8 @@ require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/database.php';
 require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/Project.php';
+require_once APP_ROOT . '/includes/TodoLink.php';
+require_once APP_ROOT . '/includes/AssignmentFeed.php';
 
 header('Content-Type: application/json');
 Auth::sendSecurityHeaders();
@@ -61,6 +63,13 @@ if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
 try {
     if ($method === 'GET' && $action === 'workload') {
         handleWorkload($_GET['user'] ?? 'me');
+    } elseif ($method === 'GET' && $action === 'news') {
+        $me = resolveWorkloadTarget('me');
+        respond(['success' => true, 'data' => AssignmentFeed::news(Database::getInstance(), (int) $me['id'])]);
+    } elseif ($method === 'POST' && $action === 'news-seen') {
+        $me = resolveWorkloadTarget('me');
+        AssignmentFeed::markSeen(Database::getInstance(), (int) $me['id']);
+        respond(['success' => true]);
     } elseif ($method === 'GET' && $action === 'summary') {
         handleSummary();
     } elseif ($method === 'POST') {
@@ -80,7 +89,7 @@ try {
 // -----------------------------------------------------------------------------
 
 /**
- * Set or clear the assignee on one record.
+ * Set or clear the assignee on one record, or on several ({ids: [...]}).
  */
 function handleAssign(): void
 {
@@ -93,10 +102,9 @@ function handleAssign(): void
     if (!isset(ASSIGNABLE[$type])) {
         respond(['error' => 'Unknown record type.'], 422);
     }
-
-    $id = isset($input['id']) ? (int) $input['id'] : 0;
-    if ($id <= 0) {
-        respond(['error' => 'A record id is required.'], 422);
+    // Bookkeeping is for administrators only.
+    if ($type === 'bookkeeping' && !Auth::isAdmin()) {
+        respond(['error' => 'Administrator access required'], 403);
     }
 
     // resolveAssignee refuses anything that is not a real, active account.
@@ -105,11 +113,72 @@ function handleAssign(): void
         respond(['error' => 'That person cannot be assigned work.'], 422);
     }
 
+    $db = Database::getInstance();
+
+    // Several records at once, from the bookkeeping selection bar. Records that
+    // are gone or cannot take the assignee are skipped rather than failing the
+    // lot, and the caller is told how many.
+    if (array_key_exists('ids', $input)) {
+        $ids = is_array($input['ids'])
+            ? array_values(array_unique(array_filter(array_map('intval', $input['ids']), fn($id) => $id > 0)))
+            : [];
+        if (!$ids || count($ids) > 1000) {
+            respond(['error' => 'A list of record ids is required.'], 422);
+        }
+
+        $assigned = [];
+        foreach ($ids as $id) {
+            if (assignRecord($db, $type, $id, $assignee) === 'ok') {
+                $assigned[] = $id;
+            }
+        }
+
+        respond([
+            'success' => true,
+            'data' => [
+                'ids' => $assigned,
+                'skipped' => count($ids) - count($assigned),
+                'type' => $type,
+                'assigned_to' => $assignee['id'],
+                'assigned_to_name' => $assignee['name'],
+            ],
+        ]);
+    }
+
+    $id = isset($input['id']) ? (int) $input['id'] : 0;
+    if ($id <= 0) {
+        respond(['error' => 'A record id is required.'], 422);
+    }
+
+    $result = assignRecord($db, $type, $id, $assignee);
+    if ($result === 'missing') {
+        respond(['error' => ucfirst($type) . ' not found.'], 404);
+    }
+    if ($result === 'has_pdf') {
+        respond(['error' => 'That row already has its invoice, so there is nothing to hand over.'], 409);
+    }
+
+    respond([
+        'success' => true,
+        'data' => [
+            'id' => $id,
+            'type' => $type,
+            'assigned_to' => $assignee['id'],
+            'assigned_to_name' => $assignee['name'],
+        ],
+    ]);
+}
+
+/**
+ * Put one record on somebody's plate (or nobody's), log it and tell the
+ * assignee. Says 'missing' when there is no such record and 'has_pdf' for a
+ * bookkeeping row whose invoice is already filed.
+ */
+function assignRecord(PDO $db, string $type, int $id, array $assignee): string
+{
     $spec = ASSIGNABLE[$type];
     $table = $spec['table'];
     $titleColumn = $spec['title'];
-
-    $db = Database::getInstance();
 
     $stmt = $db->prepare(
         "SELECT id, " . $titleColumn . " AS title, assigned_to, assigned_to_name FROM " . $table . " WHERE id = :id"
@@ -118,14 +187,14 @@ function handleAssign(): void
     $record = $stmt->fetch();
 
     if (!$record) {
-        respond(['error' => ucfirst($type) . ' not found.'], 404);
+        return 'missing';
     }
 
     // A bookkeeping row whose invoice is already filed is finished work. It
     // would be accepted here and then never show up on the home page, which
     // reads as the assignment having silently failed - so say so instead.
     if ($type === 'bookkeeping' && $assignee['id'] !== null && bookkeepingRowHasPdf($db, $id)) {
-        respond(['error' => 'That row already has its invoice, so there is nothing to hand over.'], 409);
+        return 'has_pdf';
     }
 
     $update = $db->prepare(
@@ -141,15 +210,14 @@ function handleAssign(): void
 
     logAssignment($type, $spec['label'], (string) ($record['title'] ?? ''), $record, $assignee);
 
-    respond([
-        'success' => true,
-        'data' => [
-            'id' => $id,
-            'type' => $type,
-            'assigned_to' => $assignee['id'],
-            'assigned_to_name' => $assignee['name'],
-        ],
-    ]);
+    // For the assignee's "New for you" on the home page.
+    $before = $record['assigned_to'] === null ? null : (int) $record['assigned_to'];
+    if ($before !== $assignee['id']) {
+        $me = resolveWorkloadTarget('me');
+        AssignmentFeed::record($db, $type, $id, $assignee['id'], (int) $me['id'], $me['name']);
+    }
+
+    return 'ok';
 }
 
 /**
@@ -222,7 +290,7 @@ function handleWorkload(string $who): void
     $todos = fetchAssigned(
         $db,
         "SELECT t.id, t.title, t.description, t.due_date, t.priority, t.is_completed,
-                t.contact_id, t.project_id, t.assigned_to, t.assigned_to_name,
+                t.contact_id, t.project_id, t.assigned_to, t.assigned_to_name, t.review_status,
                 c.name AS contact_name, p.name AS project_name
          FROM todos t
          LEFT JOIN contacts c ON c.id = t.contact_id
@@ -238,22 +306,27 @@ function handleWorkload(string $who): void
 
     $projects = fetchAssigned(
         $db,
+        // open_todos counts every open to-do on the project, whoever it is
+        // assigned to: the home page shows how much is left on it.
         "SELECT id, name, company, stage, start_date, estimated_completion,
-                success_chance, assigned_to, assigned_to_name
+                success_chance, assigned_to, assigned_to_name, review_status,
+                (SELECT COUNT(*) FROM todos ot
+                 WHERE ot.project_id = projects.id AND ot.parent_todo_id IS NULL
+                   AND ot.is_completed = 0) AS open_todos
          FROM projects
-         WHERE IFNULL(stage, '') <> 'Complete' AND ",
+         WHERE " . Project::activeStageSql() . " AND ",
         'assigned_to',
         $isUnassigned,
         $target['id'],
-        // Finished projects are left out: they are not work any more. The rest
-        // keep the Projects view's pipeline order - what is running first,
-        // then what is being won, then leads.
+        // Only live work: leads are not work yet, finished projects no longer
+        // are. The rest keep the Projects view's pipeline order - what is
+        // running first, then what is being won.
         "ORDER BY " . Project::stageRankSql() . " ASC, name COLLATE NOCASE ASC"
     );
 
     $contacts = fetchAssigned(
         $db,
-        "SELECT id, name, company, location, email, phone, assigned_to, assigned_to_name
+        "SELECT id, name, company, location, email, phone, assigned_to, assigned_to_name, review_status
          FROM contacts
          WHERE ",
         'assigned_to',
@@ -265,9 +338,12 @@ function handleWorkload(string $who): void
     // "Unassigned" deliberately does not list bookkeeping rows: almost every
     // row ever imported is unassigned, and burying three real contacts under a
     // thousand bank lines would make that view useless.
-    $bookkeeping = ($isUnassigned || !bookkeepingAssignable($db))
+    // Bookkeeping is for administrators only; nobody else sees its rows here.
+    $bookkeeping = ($isUnassigned || !Auth::isAdmin() || !bookkeepingAssignable($db))
         ? []
         : fetchBookkeeping($db, $target['id']);
+
+    TodoLink::attach($db, $todos);
 
     $openTodos = 0;
     foreach ($todos as $todo) {
@@ -368,7 +444,7 @@ function fetchBookkeeping(PDO $db, ?int $assignee): array
         foreach ($columns as $column) {
             $value = trim((string) ($data[$column] ?? ''));
             if ($value !== '' && count($parts) < 3) {
-                $parts[] = $value;
+                $parts[] = assignDisplayValue($value);
             }
         }
 
@@ -409,7 +485,7 @@ function handleSummary(): void
     $counts = [];
 
     $tables = ['todos' => 'todos', 'projects' => 'projects', 'contacts' => 'contacts'];
-    if (bookkeepingAssignable($db)) {
+    if (Auth::isAdmin() && bookkeepingAssignable($db)) {
         $tables['bookkeeping'] = 'bookkeeping_rows';
     }
 
@@ -418,8 +494,8 @@ function handleSummary(): void
         if ($table === 'todos') {
             $extra = ' AND parent_todo_id IS NULL AND is_completed = 0';
         } elseif ($table === 'projects') {
-            // Same rule as the workload list: a finished project is not work.
-            $extra = " AND IFNULL(stage, '') <> 'Complete'";
+            // Same rule as the workload list: only projects in an active stage.
+            $extra = ' AND ' . Project::activeStageSql();
         } elseif ($table === 'bookkeeping_rows') {
             // Same rule as the workload list: a row with its invoice attached
             // is no longer work, whatever its assignee column still says.
@@ -562,3 +638,27 @@ function respond(array $payload, int $status = 200): void
     echo json_encode($payload);
     exit;
 }
+
+/**
+ * A bank statement's value the way the CRM writes it everywhere
+ * (assets/js/format.js): "19.09.2026" -> "Sep 19", "-1950,00" ->
+ * "−1.950,00 €". Anything else as imported.
+ */
+function assignDisplayValue(string $value): string
+{
+    if (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/', $value, $m) || preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+        [$day, $month, $year] = strlen($m[1]) === 4 ? [(int) $m[3], (int) $m[2], (int) $m[1]] : [(int) $m[1], (int) $m[2], (int) $m[3]];
+        if (checkdate($month, $day, $year)) {
+            $label = date('M', mktime(0, 0, 0, $month, 1, $year)) . ' ' . $day;
+            return $year === (int) date('Y') ? $label : $label . ', ' . $year;
+        }
+    }
+
+    if (preg_match('/^([+-]?)(\d{1,3}(?:\.?\d{3})*),(\d{2})$/', $value, $m)) {
+        $amount = number_format((float) (str_replace('.', '', $m[2]) . '.' . $m[3]), 2, ',', '.');
+        return ($m[1] === '-' ? "\u{2212}" : '') . $amount . ' €';
+    }
+
+    return $value;
+}
+

@@ -5,8 +5,9 @@
  * Passwords never pass through here: an invite produces a one-time link and the
  * person on the other end chooses their own.
  *
- * Self-contained module; the panel is opened from the header button, which
- * index.php only renders for administrators.
+ * Self-contained module drawing the Users page (#usersView), which index.php
+ * only renders for administrators; app.js switches to it like any other view
+ * and calls CRMUsers.open() to fill it.
  */
 (function () {
     'use strict';
@@ -16,7 +17,9 @@
     const state = {
         users: [],
         me: null,
-        busy: false
+        busy: false,
+        // Meeting assistant (test): whether its permission is offered at all.
+        meetingAvailable: false
     };
 
     const els = {};
@@ -70,10 +73,7 @@
     }
 
     function formatDate(value) {
-        if (!value) return null;
-        const date = new Date(String(value).replace(' ', 'T') + 'Z');
-        if (isNaN(date.getTime())) return null;
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return value ? (window.CRMFormat.date(value) || null) : null;
     }
 
     /**
@@ -152,6 +152,15 @@
 
         const resendTitle = isPending ? 'Resend invite link' : 'Send a password reset link';
 
+        // Meeting assistant (test): who may use Claude in the CRM - the
+        // project meeting and the Claude button on the project cards.
+        const meetingControl = state.meetingAvailable
+            ? `<label class="user-permission" title="${user.can_meeting ? 'Can use Claude: project meetings and Claude on project cards - click to take it away' : 'Let them use Claude: project meetings and Claude on project cards'}">
+                   <input type="checkbox" data-user-action="meeting" data-user-id="${user.id}" ${user.can_meeting ? 'checked' : ''}>
+                   <span>Claude</span>
+               </label>`
+            : '';
+
         const toggleBtn = isSelf
             ? ''
             : `<button type="button" class="user-action-btn" data-user-action="${isDisabled ? 'enable' : 'disable'}" data-user-id="${user.id}" title="${isDisabled ? 'Enable account' : 'Disable account'}">
@@ -183,6 +192,7 @@
                 </div>
                 <div class="user-row-meta">${meta}</div>
                 <div class="user-row-actions">
+                    ${meetingControl}
                     ${roleControl}
                     <button type="button" class="user-action-btn" data-user-action="resend" data-user-id="${user.id}" title="${resendTitle}">
                         ${ICON_LINK}
@@ -194,10 +204,10 @@
         `;
     }
 
-    const ICON_LINK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>';
-    const ICON_DISABLE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>';
-    const ICON_ENABLE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
-    const ICON_DELETE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+    const ICON_LINK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/></svg>';
+    const ICON_DISABLE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>';
+    const ICON_ENABLE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg>';
+    const ICON_DELETE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>';
 
     // ------------------------------------------------------------------
     // The one-time link callout
@@ -217,7 +227,7 @@
         els.linkTitle.textContent = isReset ? 'Password reset link' : 'Invite link';
 
         const expires = result.invite_expires_at
-            ? new Date(result.invite_expires_at * 1000).toLocaleString()
+            ? window.CRMFormat.dateTime(new Date(result.invite_expires_at * 1000))
             : null;
 
         let note = result.mail_sent
@@ -259,6 +269,7 @@
             const result = await api('');
             state.users = result.data || [];
             state.me = result.me || null;
+            state.meetingAvailable = !!result.meeting_available;
             render();
         } catch (e) {
             els.list.innerHTML =
@@ -314,6 +325,21 @@
         }
     }
 
+    /** Meeting assistant (test): give or take away the Claude permission. */
+    async function setMeetingAccess(userId, allowed) {
+        try {
+            await api('?id=' + encodeURIComponent(userId), {
+                method: 'PATCH',
+                body: JSON.stringify({ can_meeting: allowed })
+            });
+            showToast(allowed ? 'Can now use Claude.' : 'Claude permission removed.');
+            await load();
+        } catch (e) {
+            showToast(e.message, true);
+            await load();
+        }
+    }
+
     async function setStatus(userId, status) {
         try {
             await api('?id=' + encodeURIComponent(userId), {
@@ -362,9 +388,12 @@
     // Wiring
     // ------------------------------------------------------------------
 
+    /** Fill the Users page; app.js calls this whenever it is switched to. */
     async function openPanel() {
-        if (!els.modal) return;
-        els.modal.classList.add('active');
+        // app.js may switch to the page on load before this script's own
+        // DOMContentLoaded handler has run.
+        init();
+        if (!els.page) return;
         hideLink();
 
         // Refresh faces first so the list paints with current pictures.
@@ -379,14 +408,13 @@
         load();
     }
 
-    function closePanel() {
-        if (!els.modal) return;
-        els.modal.classList.remove('active');
-    }
+    let initialised = false;
 
     function init() {
-        els.modal = $('usersModal');
-        if (!els.modal) return; // Not an admin - the panel is not in the DOM.
+        if (initialised) return;
+        initialised = true;
+        els.page = $('usersView');
+        if (!els.page) return; // Not an admin - the page is not in the DOM.
 
         els.list = $('usersList');
         els.inviteForm = $('inviteUserForm');
@@ -398,15 +426,6 @@
         els.linkTitle = $('usersLinkTitle');
         els.linkNote = $('usersLinkNote');
         els.linkInput = $('usersLinkInput');
-
-        const openBtn = $('manageUsersBtn');
-        if (openBtn) openBtn.addEventListener('click', openPanel);
-
-        const closeBtn = $('closeUsersModal');
-        if (closeBtn) closeBtn.addEventListener('click', closePanel);
-
-        const backdrop = els.modal.querySelector('.modal-backdrop');
-        if (backdrop) backdrop.addEventListener('click', closePanel);
 
         els.inviteForm.addEventListener('submit', invite);
 
@@ -432,15 +451,14 @@
         });
 
         els.list.addEventListener('change', function (event) {
+            const meeting = event.target.closest('input[data-user-action="meeting"]');
+            if (meeting) {
+                setMeetingAccess(meeting.getAttribute('data-user-id'), meeting.checked);
+                return;
+            }
             const select = event.target.closest('select[data-user-action="role"]');
             if (!select) return;
             changeRole(select.getAttribute('data-user-id'), select.value);
-        });
-
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && els.modal.classList.contains('active')) {
-                closePanel();
-            }
         });
     }
 

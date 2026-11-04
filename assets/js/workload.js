@@ -1,9 +1,12 @@
 /**
  * My Work
  *
- * One screen answering one question: what is on my plate? To-dos first, because
- * they are the things with deadlines, then bookkeeping rows still waiting on an
- * invoice, then the projects and contacts somebody made you responsible for.
+ * One screen answering one question: what is on my plate? A slim "New for you"
+ * line; the bookkeeping entries still waiting on an invoice, across the full
+ * width so they are not missed; then two cards: the to-dos - by priority, by
+ * day, and as a list - and the projects, by stage. The contacts somebody made
+ * you responsible for sit under the projects. The numbers come from
+ * home-dashboard.js; this file draws and wires them.
  *
  * It defaults to the signed-in user and can be pointed at any colleague, or at
  * "Unassigned" to see what nobody has picked up. It is a different arrangement
@@ -21,11 +24,28 @@
         nextWho: null,
         data: null,
         person: null,
-        counts: {},   // assignee key -> { todos, projects, contacts, bookkeeping }
         loaded: false,
-        doneOpen: false,  // whether the "Completed" fold is expanded
-        busy: new Set()   // to-do ids with a check-off request in flight
+        news: null,       // "New for you": { items, total }, only on your own home
+        busy: new Set(),  // to-do ids with a check-off request in flight
+        // To-dos ticked off since the last load: they stay in the list, struck
+        // through, until the next refresh, so a slip of the mouse is undone
+        // where it happened. Every count already treats them as done.
+        lingering: new Set(),
+        // The dashboard's filters and folds. Local to the page; the filters
+        // are mirrored into the address bar (writeUrl) so a reload keeps them.
+        ui: {
+            prio: null,      // 'high' | 'medium' | 'low' | 'none'
+            day: null,       // 'YYYY-MM-DD', one of the seven days in the strip
+            stage: null,     // 'In Progress' | 'Proposal' | 'Negotiation'
+            allTodos: false,
+            allProjects: false,
+            allNews: false
+        }
     };
+
+    // Rows shown before "Show N more", per card; news rows before "+N more".
+    const LIST_LIMIT = 8;
+    const NEWS_LIMIT = 3;
 
     const els = {};
     let initialized = false;
@@ -85,217 +105,375 @@
         return payload;
     }
 
-    /**
-     * Due dates, phrased the way a person would say them.
-     */
-    function describeDue(value) {
-        if (!value) return { text: '', overdue: false };
-
-        const due = new Date(value + 'T00:00:00');
-        if (isNaN(due.getTime())) return { text: '', overdue: false };
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const days = Math.round((due - today) / 86400000);
-
-        if (days < 0) return { text: days === -1 ? 'Yesterday' : `${Math.abs(days)} days overdue`, overdue: true };
-        if (days === 0) return { text: 'Today', overdue: false };
-        if (days === 1) return { text: 'Tomorrow', overdue: false };
-        if (days <= 7) return { text: `In ${days} days`, overdue: false };
-
-        return {
-            text: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            overdue: false
-        };
-    }
-
-    /**
-     * A plain date, for things that have one without having a deadline.
-     */
-    function formatDate(value) {
-        if (!value) return '';
-
-        const date = new Date(value + 'T00:00:00');
-        if (isNaN(date.getTime())) return String(value);
-
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    }
-
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
+
+    const HD = window.HomeDashboard;
+
+    /**
+     * Draw the page, then put keyboard focus back where it was: every control
+     * that can survive a redraw carries a data-fk key. `fallback` is the key
+     * to focus when the focused control is gone (a "Clear filter" that just
+     * cleared itself away).
+     */
+    function paint(fallback) {
+        const active = document.activeElement;
+        const key = active && els.body && els.body.contains(active)
+            ? active.getAttribute('data-fk')
+            : null;
+
+        render();
+
+        const target = (key && focusable(key)) || (key && fallback && focusable(fallback));
+        if (target) target.focus();
+    }
+
+    function focusable(key) {
+        const escaped = window.CSS && CSS.escape ? CSS.escape(key) : key;
+        const el = els.body.querySelector('[data-fk="' + escaped + '"]');
+        return el && !el.disabled ? el : null;
+    }
 
     function render() {
         if (!els.body || !state.data) return;
 
         const { todos, projects, contacts } = state.data;
         const bookkeeping = state.data.bookkeeping || [];
-        const openTodos = todos.filter(t => Number(t.is_completed) === 0);
-        const doneTodos = todos.filter(t => Number(t.is_completed) === 1);
+        const openTodos = todos.filter(HD.isOpen);
+        const today = HD.viennaToday();
 
         renderHead(openTodos.length, projects.length, contacts.length, bookkeeping.length);
-        renderStats(openTodos, projects);
 
-        if (openTodos.length === 0 && doneTodos.length === 0
-            && projects.length === 0 && contacts.length === 0 && bookkeeping.length === 0) {
-            els.body.innerHTML = emptyState();
-            return;
-        }
-
-        let html = '';
-
-        html += section('To-dos', openTodos.length, openTodos.map(todoRow).join(''),
-            'Nothing open right now.');
-
-        if (bookkeeping.length) {
-            html += section('Bookkeeping', bookkeeping.length,
-                bookkeeping.map(bookkeepingRow).join(''), '');
-        }
-
-        if (projects.length) {
-            html += section('Projects', projects.length, projects.map(projectRow).join(''), '');
-        }
-
+        // The narrow column: projects, then the contacts to look after.
+        let side = projectsCard(projects, todos);
         if (contacts.length) {
-            html += section('Contacts', contacts.length, contacts.map(contactRow).join(''), '');
+            side += listCard('contact', 'Contacts', contacts.map(contactRow).join(''));
         }
 
-        // Completed work is kept, but folded away - it is reference, not a task.
-        if (doneTodos.length) {
-            html += `
-                <details class="workload-section workload-done"${state.doneOpen ? ' open' : ''}>
-                    <summary class="workload-section-head">
-                        <span class="workload-section-title">Completed</span>
-                        <span class="workload-count">${doneTodos.length}</span>
-                    </summary>
-                    <div class="workload-list">${doneTodos.map(todoRow).join('')}</div>
-                </details>
-            `;
-        }
+        els.body.innerHTML = newsBox()
+            + bookkeepingBand(bookkeeping)
+            + `<section class="home-dash" aria-label="Dashboard">
+                   ${todosCard(todos, openTodos, today)}
+                   <div class="home-side">${side}</div>
+               </section>`;
 
-        els.body.innerHTML = html;
+        writeUrl();
     }
 
-    // Chart order and tone for stages and priorities - the same colours the
-    // lists below use for their dots.
-    const STAGE_TONES = [
-        ['In Progress', 'progress'],
-        ['Proposal', 'proposal'],
-        ['Negotiation', 'negotiation'],
-        ['Lead', 'lead'],
-        ['Complete', 'complete']
-    ];
+    /** The day filter as an offset into the week strip, or null. */
+    function dayFilter(today) {
+        if (!state.ui.day) return null;
+        const offset = HD.dayOffset(state.ui.day, today);
+        // A day that has slipped out of the strip (the page was left open
+        // overnight) is no longer a filter anyone can see or clear.
+        if (offset === null || offset < 0 || offset >= HD.WINDOW_DAYS) {
+            state.ui.day = null;
+            return null;
+        }
+        return offset;
+    }
 
-    const PRIORITY_TONES = [
-        ['high', 'High'],
-        ['medium', 'Medium'],
-        ['low', 'Low'],
-        ['none', 'No priority']
-    ];
+    // ---- Shared pieces ------------------------------------------------
 
     /**
-     * The band across the top, as three small charts: what is due over the
-     * next seven days (and what is already late), how the open to-dos split
-     * by priority, and where this person's projects stand.
-     *
-     * Computed from the rows already loaded, so the band can never disagree
-     * with the list underneath it.
+     * "My to-dos" on your own page; "Anna's to-dos" on a teammate's, and
+     * "Unassigned to-dos" for the work nobody has picked up.
      */
-    function renderStats(openTodos, projects) {
-        const stats = $('workloadStats');
-        const C = window.CRMCharts;
-        if (!stats || !C) return;
+    function cardTitle(what) {
+        const person = state.person || {};
+        if (person.unassigned) return 'Unassigned ' + what;
+        if (state.who === 'me') return 'My ' + what;
+        const first = String(person.name || '').trim().split(/\s+/)[0];
+        if (!first) return what.charAt(0).toUpperCase() + what.slice(1);
+        return first + (/s$/i.test(first) ? '\u2019 ' : '\u2019s ') + what;
+    }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    /** A card's title, with "Create new" opening the same sheet as everywhere else. */
+    function cardHead(title, create, sub) {
+        return `
+            <div class="home-card-head">
+                <h2 class="home-card-title">${escapeHtml(title)}${sub ? ` <span class="home-card-sub">· ${escapeHtml(sub)}</span>` : ''}</h2>
+                ${create ? `<button type="button" class="home-link" data-home-create="${create}">${ICON_PLUS}New</button>` : ''}
+            </div>`;
+    }
 
-        // Today and the six days after it; anything earlier is late.
-        const days = new Array(7).fill(0);
-        let overdue = 0;
-        const priorities = { high: 0, medium: 0, low: 0, none: 0 };
-
-        openTodos.forEach(todo => {
-            const priority = (todo.priority || '').toLowerCase();
-            priorities[priority === 'high' || priority === 'medium' || priority === 'low' ? priority : 'none']++;
-
-            if (!todo.due_date) return;
-            const due = new Date(todo.due_date + 'T00:00:00');
-            if (isNaN(due.getTime())) return;
-
-            // Rounded, so a daylight-saving day still counts as one day.
-            const offset = Math.round((due - today) / 86400000);
-            if (offset < 0) overdue++;
-            else if (offset < 7) days[offset]++;
-        });
-
-        const dueThisWeek = days.reduce((sum, n) => sum + n, 0);
-
-        // 1 - Due this week, day by day from today. What is already late is
-        //     not a day of the week: it is the red flag beside the number.
-        const cols = [];
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() + i);
-            const day = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-            cols.push({
-                letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }),
-                value: days[i],
-                current: i === 0,
-                title: `${i === 0 ? 'Today, ' : ''}${day}: ${days[i]} due`
-            });
+    /**
+     * The band across the top of a card: one colour block per priority or
+     * stage, as wide as its share, with its count in it and its name below -
+     * and each block the filter for it. Empty values are left out; when nothing is open,
+     * one quiet block says so.
+     */
+    function meter(kind, items, selected, emptyLabel, groupLabel) {
+        const shown = items.filter(item => item.count > 0 || item.key === selected);
+        if (!shown.length) {
+            return `<div class="home-meter is-empty"><span class="home-meter-seg" data-tone="empty">
+                <span class="home-meter-fill"><span class="home-meter-count">0</span></span>
+                <span class="home-meter-label">${escapeHtml(emptyLabel)}</span>
+            </span></div>`;
         }
-        const week = C.columns(cols, 'To-dos due per day, from today: '
-            + cols.map(col => col.title).join(', '), { min: 2 });
 
-        const due = C.tile({
-            label: { long: 'Due this week', short: 'This week' },
-            value: String(dueThisWeek),
-            flag: overdue > 0 ? { long: `${overdue} overdue`, short: `${overdue} late` } : '',
-            key: week.axis,
-            chart: week.bars
-        });
+        return `<div class="home-meter" role="group" aria-label="${escapeHtml(groupLabel)}">${shown.map(item => {
+            const pressed = selected === item.key;
+            const dim = !!selected && !pressed;
+            return `
+                <button type="button" class="home-meter-seg${pressed ? ' is-active' : ''}${dim ? ' is-dim' : ''}"
+                        data-home-${kind}="${escapeHtml(item.key)}" data-fk="${kind}-${escapeHtml(item.key)}" data-tone="${item.tone}"
+                        aria-pressed="${pressed}" style="flex-grow: ${Math.max(item.count, 1)}">
+                    <span class="home-meter-fill"><span class="home-meter-count">${item.count}</span></span>
+                    <span class="home-meter-label">${escapeHtml(item.label)}</span>
+                </button>`;
+        }).join('')}</div>`;
+    }
 
-        // 2 - Open to-dos by priority
-        const byPriority = PRIORITY_TONES.filter(([key]) => priorities[key] > 0);
-        const open = C.tile({
-            label: { long: openTodos.length === 1 ? 'Open to-do' : 'Open to-dos', short: 'Open' },
-            value: String(openTodos.length),
-            key: byPriority.length
-                ? C.legend(byPriority.map(([key, name]) => ({ tone: key, label: name, text: String(priorities[key]) })))
-                : C.note('Nothing open'),
-            chart: C.stack(
-                byPriority.map(([key, name]) => ({ tone: key, value: priorities[key], title: `${name}: ${priorities[key]}` })),
-                'Open to-dos by priority: ' + (byPriority.length
-                    ? byPriority.map(([key, name]) => `${name} ${priorities[key]}`).join(', ')
-                    : 'none')
-            )
-        });
+    function filterBar(label, clearKey, active) {
+        return `
+            <div class="home-filterbar">
+                <span class="home-filterbar-label">${escapeHtml(label)}</span>
+                ${active ? `<button type="button" class="home-clear" data-home-clear="${clearKey}" data-fk="clear-${clearKey}">Clear filter</button>` : ''}
+            </div>`;
+    }
 
-        // 3 - Projects by stage
-        const stageCounts = {};
-        projects.forEach(project => {
-            const stage = STAGE_TONES.some(([name]) => name === project.stage) ? project.stage : 'Lead';
-            stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-        });
-        const byStage = STAGE_TONES.filter(([name]) => stageCounts[name] > 0);
+    function emptyLine(text) {
+        return `<p class="home-empty">${ICON_DONE}<span>${escapeHtml(text)}</span></p>`;
+    }
 
-        const work = C.tile({
-            label: projects.length === 1 ? 'Project' : 'Projects',
-            value: String(projects.length),
-            key: byStage.length
-                ? C.legend(byStage.map(([name, tone]) => ({ tone, label: name, text: String(stageCounts[name]) })))
-                : C.note('None assigned'),
-            chart: C.stack(
-                byStage.map(([name, tone]) => ({ tone, value: stageCounts[name], title: `${name}: ${stageCounts[name]}` })),
-                'Projects by stage: ' + (byStage.length
-                    ? byStage.map(([name]) => `${name} ${stageCounts[name]}`).join(', ')
-                    : 'none')
-            )
-        });
+    function moreButton(key, expanded, hidden) {
+        return `<button type="button" class="home-more" data-home-more="${key}" data-fk="more-${key}" aria-expanded="${expanded}">
+                    ${expanded ? 'Show less' : `Show ${hidden} more`}
+                </button>`;
+    }
 
-        stats.innerHTML = `<div class="kpi-grid">${due}${open}${work}</div>`;
-        stats.hidden = false;
+    // ---- To-dos -------------------------------------------------------
+
+    /**
+     * The To-dos card: priorities and the week on top, the list under them.
+     * Every number comes from the same open to-dos (HomeDashboard), so a
+     * tick moves the count, the legend, the badges and the list together.
+     */
+    function todosCard(todos, openTodos, today) {
+        const ui = state.ui;
+        const filters = { prio: ui.prio, day: dayFilter(today) };
+        const summary = HD.todoSummary(openTodos, ui.prio, today);
+
+        // The band: one block per priority that has open to-dos.
+        const band = meter('prio', HD.PRIORITIES.map(p => ({
+            key: p.key, label: p.label, tone: p.key, count: summary.priorities[p.key]
+        })), ui.prio, 'Nothing open', 'Filter by priority');
+
+        // The week strip: each day a filter, its badge counting the to-dos
+        // due that day at the selected priority.
+        const days = HD.week(today).map(day => {
+            const count = summary.days[day.offset];
+            const pressed = filters.day === day.offset;
+            const dim = filters.day !== null && !pressed;
+            const classes = ['home-day-btn'];
+            if (day.offset === 0) classes.push('is-today');
+            if (pressed) classes.push('is-active');
+            if (dim) classes.push('is-dim');
+
+            return `
+                <button type="button" class="${classes.join(' ')}" data-home-day="${day.date}" data-fk="day-${day.offset}"
+                        aria-pressed="${pressed}" aria-label="${escapeHtml(day.longLabel)}, ${count} due">
+                    <span class="home-day-initial">${day.initial}</span>
+                    <span class="home-day-num">${day.dayOfMonth}</span>
+                    <span class="home-day-badge${count ? ' has-due' : ''}">${count || ''}</span>
+                </button>`;
+        }).join('');
+
+        const overdue = summary.overdue
+            ? ` <span class="home-week-overdue">· ${summary.overdue} overdue</span>`
+            : '';
+
+        // A week with nothing due is only empty dots: left out then, unless
+        // one of its days is the filter in use.
+        const weekShown = summary.due > 0 || filters.day !== null;
+
+        // The list: open to-dos plus the ones just ticked off here.
+        const listed = todos.filter(t => HD.isOpen(t) || state.lingering.has(Number(t.id)));
+        const filtered = HD.filterTodos(listed, filters, today);
+        const shown = ui.allTodos ? filtered : filtered.slice(0, LIST_LIMIT);
+        const filtering = !!filters.prio || filters.day !== null;
+
+        const list = filtered.length
+            ? HD.groupTodos(shown, today).map(group => `
+                <div class="home-group-head${group.urgent ? ' is-urgent' : ''}">
+                    <span class="home-group-name">${escapeHtml(group.head)}</span>
+                    ${group.sub ? `<span class="home-group-date">${escapeHtml(group.sub)}</span>` : ''}
+                </div>
+                <ul class="home-list">${group.items.map(todoRow).join('')}</ul>`).join('')
+            : emptyLine(filtering ? 'Nothing here' : 'Nothing open right now.');
+
+        const doneCount = todos.length - openTodos.length;
+
+        return `
+            <article class="home-card home-todos" aria-label="${escapeHtml(cardTitle('to-dos'))}">
+                ${band}
+                <div class="home-card-top">
+                    ${cardHead(cardTitle('to-dos'), 'todo')}
+                    ${weekShown ? `<div class="home-week">
+                        <div class="home-week-head">
+                            <span class="home-week-title">Next 7 days</span>
+                            <span class="home-week-due"><strong>${summary.due}</strong> due${overdue}</span>
+                        </div>
+                        <div class="home-week-days">${days}</div>
+                    </div>` : ''}
+                </div>
+                ${filtering ? filterBar(HD.todoListLabel(filters, filtered.length, today), 'todos', true) : ''}
+                <div class="home-list-wrap">${list}</div>
+                <div class="home-card-foot">
+                    ${filtered.length > LIST_LIMIT ? moreButton('todos', ui.allTodos, filtered.length - LIST_LIMIT) : ''}
+                    <button type="button" class="home-foot-link" data-home-go="completed">Completed ${doneCount}</button>
+                </div>
+            </article>`;
+    }
+
+    /**
+     * Claude's proposal, marked as on the other pages (review.js): the badge,
+     * and for a to-do the accept / reject buttons beside it.
+     */
+    function isProposed(record) {
+        return !!record && record.review_status === 'pending';
+    }
+
+    function reviewMarks(type, record) {
+        const review = window.CRMReview;
+        if (!review || !isProposed(record)) return '';
+        return type === 'todo' ? review.pill(record, 'todo', Number(record.id)) : review.badge(record);
+    }
+
+    function todoRow(entry) {
+        const todo = entry.todo;
+        const id = Number(todo.id);
+        const done = !HD.isOpen(todo);
+        const proposed = isProposed(todo);
+        const busy = state.busy.has(id);
+        const title = escapeHtml(todo.title || '');
+
+        const context = [todo.project_name || todo.contact_name || '', entry.dueNote]
+            .filter(Boolean).map(escapeHtml).join(' · ');
+
+        const priority = HD.priorityOf(todo);
+        const priorityLabel = priority === 'none' ? '' : priority.charAt(0).toUpperCase() + priority.slice(1);
+
+        // Three controls: the circle checks the to-do off, the title opens the
+        // to-do, and its first link (mostly a Drive document), right after the
+        // title, opens directly. A link cannot sit inside a button, so the
+        // title is the button; the rest of the row opens the to-do too, for
+        // the mouse (the row carries data-workload-open as well).
+        return `
+            <li class="home-todo${done ? ' is-done' : ''}${proposed ? ' is-proposed' : ''}" data-workload-open="todo" data-id="${id}">
+                <button type="button" class="home-check${done ? ' is-done' : ''}"
+                        data-workload-toggle="${id}" data-done="${done ? 1 : 0}" data-fk="check-${id}"
+                        aria-label="${done ? 'Mark as open' : 'Mark as done'}: ${title || 'To-do'}"
+                        title="${done ? 'Mark as open' : 'Mark as done'}"${busy ? ' disabled' : ''}>
+                    ${ICON_CHECK}
+                </button>
+                <span class="home-todo-main">
+                    <span class="home-row-body">
+                        <span class="home-todo-titleline">
+                            <button type="button" class="home-todo-open" data-workload-open="todo" data-id="${id}">
+                                <span class="home-row-title">${title}</span>
+                            </button>${newTag('todo', id)}${proposed ? reviewMarks('todo', todo) : ''}${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
+                        </span>
+                        ${context ? `<span class="home-row-context">${context}</span>` : ''}
+                    </span>
+                    ${priorityLabel ? `<span class="home-prio-pill" data-tone="${priority}">${priorityLabel}</span>` : ''}
+                </span>
+            </li>`;
+    }
+
+    // ---- Projects -----------------------------------------------------
+
+    function projectsCard(projects, todos) {
+        const ui = state.ui;
+        const counts = HD.stageCounts(projects);
+        const band = meter('stage', HD.STAGES.map(s => ({
+            key: s.key, label: s.label, tone: s.tone, count: counts[s.key]
+        })), ui.stage, 'No active projects', 'Filter by stage');
+
+        const filtered = HD.filterProjects(projects, ui.stage);
+        const shown = ui.allProjects ? filtered : filtered.slice(0, LIST_LIMIT);
+        const stage = HD.STAGES.find(s => s.key === ui.stage);
+        const label = stage ? `${stage.label} · ${filtered.length}` : '';
+
+        const list = filtered.length
+            ? `<ul class="home-list">${shown.map(p => projectRow(p, todos)).join('')}</ul>`
+            : emptyLine(stage ? 'Nothing here' : 'No active projects.');
+
+        return `
+            <article class="home-card home-projects" aria-label="${escapeHtml(cardTitle('projects'))}">
+                ${band}
+                <div class="home-card-top">
+                    ${cardHead(cardTitle('projects'), 'project')}
+                </div>
+                ${stage ? filterBar(label, 'projects', true) : ''}
+                <div class="home-list-wrap">${list}</div>
+                ${filtered.length > LIST_LIMIT
+                    ? `<div class="home-card-foot">${moreButton('projects', ui.allProjects, filtered.length - LIST_LIMIT)}</div>`
+                    : ''}
+            </article>`;
+    }
+
+    function projectRow(project, todos) {
+        const stage = HD.stageOf(project);
+        const open = HD.projectOpenTodos(project, todos);
+        // The stage is the bar's colour; in words only for screen readers.
+        const context = escapeHtml(project.company || '');
+
+        return `
+            <li>
+                <button type="button" class="home-project${isProposed(project) ? ' is-proposed' : ''}" data-workload-open="project" data-id="${project.id}">
+                    <span class="home-project-bar" data-tone="${stage.tone}" title="${escapeHtml(stage.label)}"></span>
+                    <span class="home-row-body">
+                        <span class="home-row-title">${escapeHtml(project.name || '')}${newTag('project', project.id)}${reviewMarks('project', project)}</span>
+                        ${context ? `<span class="home-row-context">${context}</span>` : ''}<span class="sr-only"> · ${escapeHtml(stage.label)}</span>
+                    </span>
+                    ${open ? `<span class="home-pill has-todos">${open + (open === 1 ? ' to-do' : ' to-dos')}</span>` : ''}
+                </button>
+            </li>`;
+    }
+
+    // ---- Bookkeeping and contacts -------------------------------------
+
+    /**
+     * Bank entries still missing their invoice, above the to-dos and projects
+     * and across the full width: each one is money that cannot be booked
+     * until somebody finds the PDF, and in the side column they went unseen.
+     * Built like the other small cards (listCard), its rows side by side.
+     * Every entry is a drop target for its PDF (bindPdfDrops).
+     */
+    function bookkeepingBand(entries) {
+        if (!entries.length) return '';
+        const missing = entries.filter(e => !e.no_pdf_needed).length;
+
+        return `
+            <section class="home-card home-mini is-bookkeeping home-bk" aria-labelledby="homeBkHeading">
+                <div class="home-card-head">
+                    <h2 class="home-card-title" id="homeBkHeading">
+                        <span class="home-mini-icon" aria-hidden="true">${ICON_RECEIPT}</span>
+                        Bookkeeping${missing ? ` <span class="home-card-sub">· ${missing} ${missing === 1 ? 'PDF' : 'PDFs'} missing</span>` : ''}
+                    </h2>
+                </div>
+                <div class="workload-list home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
+            </section>`;
+    }
+
+    /**
+     * A compact card for the other things a person can be handed. Each kind
+     * keeps its colour and icon (--wl-type in design.css).
+     */
+    function listCard(type, title, rows) {
+        return `
+            <article class="home-card home-mini is-${type}" aria-label="${escapeHtml(title)}">
+                <div class="home-card-head">
+                    <h2 class="home-card-title">
+                        <span class="home-mini-icon" aria-hidden="true">${TYPE_ICONS[type] || ''}</span>
+                        ${escapeHtml(title)}
+                    </h2>
+                </div>
+                <div class="workload-list">${rows}</div>
+            </article>`;
     }
 
     function renderHead(openCount, projectCount, contactCount, bookkeepingCount) {
@@ -303,9 +481,16 @@
         const isMe = state.who === 'me';
         const name = person.unassigned ? 'Unassigned' : (person.name || '');
 
+        // Your own page greets you; anyone else's is titled with their name.
+        const hour = HD.viennaHour();
+        const greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+        const firstName = String(name).trim().split(/\s+/)[0] || '';
         els.title.textContent = person.unassigned
             ? 'Unassigned'
-            : (isMe ? 'My Work' : name);
+            : (isMe ? (firstName ? `${greeting}, ${firstName}` : greeting) : name);
+
+        const head = els.face ? els.face.closest('.workload-head') : null;
+        if (head) head.classList.toggle('is-me', isMe && !person.unassigned);
 
         // The face is meaningless for the unassigned bucket.
         if (person.unassigned) {
@@ -336,72 +521,106 @@
         if (projectCount) bits.push(projectCount + (projectCount === 1 ? ' project' : ' projects'));
         if (contactCount) bits.push(contactCount + (contactCount === 1 ? ' contact' : ' contacts'));
 
-        // The tiles below carry the counts now, so the line under the name
+        // The cards below carry the counts, so the line above the name
         // orients instead: which day it is, or whose plate you are looking at.
-        const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+        const today = new Date().toLocaleDateString('en-US', {
+            timeZone: HD.TIME_ZONE, weekday: 'long', day: 'numeric', month: 'long'
+        });
         els.summary.textContent = person.unassigned
             ? 'Work nobody has picked up yet'
             : (isMe ? today : (bits.length ? bits.join(' · ') : 'Nothing assigned yet'));
     }
 
-    function section(title, count, rows, emptyText) {
-        const body = rows || `<p class="workload-empty-line">${escapeHtml(emptyText)}</p>`;
+    // ------------------------------------------------------------------
+    // New for you
+    // ------------------------------------------------------------------
 
-        return `
-            <section class="workload-section">
-                <div class="workload-section-head">
-                    <span class="workload-section-title">${escapeHtml(title)}</span>
-                    <span class="workload-count">${count}</span>
-                </div>
-                <div class="workload-list">${body}</div>
-            </section>
-        `;
+    const NEWS_LABELS = { todo: 'To-do', project: 'Project', contact: 'Contact', bookkeeping: 'Bookkeeping' };
+
+    function isNew(type, id) {
+        const items = state.news && state.news.items;
+        return !!items && items.some(item => item.type === type && item.id === Number(id));
     }
 
-    function todoRow(todo) {
-        const done = Number(todo.is_completed) === 1;
-        const due = describeDue(todo.due_date);
+    function newTag(type, id) {
+        return isNew(type, id) ? '<span class="workload-new">New</span>' : '';
+    }
 
-        const context = todo.project_name
-            ? escapeHtml(todo.project_name)
-            : (todo.contact_name ? escapeHtml(todo.contact_name) : '');
+    /**
+     * What has been assigned to you since you last looked. A small card: a
+     * head with the count and "Mark as seen", then one row per item - its
+     * kind, its title and what it belongs to, and who handed it over when -
+     * each one click from its record. The first few show; "+N more" opens
+     * the rest.
+     */
+    function newsBox() {
+        const news = state.news;
+        if (!news || !news.items || news.items.length === 0) return '';
 
-        const priority = (todo.priority || '').toLowerCase();
-        const priorityChip = ['high', 'medium', 'low'].includes(priority)
-            ? `<span class="workload-chip workload-chip--${priority}">${priority}</span>`
-            : '';
+        const items = state.ui.allNews ? news.items : news.items.slice(0, NEWS_LIMIT);
 
-        const title = escapeHtml(todo.title || '');
-        // The control is a checkbox, so it is named after the to-do; the
-        // tooltip is where the action goes.
-        const checkName = title || 'To-do';
-        const checkHint = done ? 'Mark as open' : 'Mark as done';
-        const busy = state.busy.has(Number(todo.id));
+        const rows = items.map(item => {
+            const type = NEWS_LABELS[item.type] ? item.type : 'todo';
+            const by = item.assigned_by_name ? 'from ' + item.assigned_by_name : '';
+            const meta = [by, describeWhen(item.assigned_at)].filter(Boolean).join(' · ');
 
-        // Two controls, not one: the mark checks the to-do off, the rest of the
-        // row still opens whatever the to-do hangs off.
+            return `
+                <li>
+                    <button type="button" class="home-news-row" data-workload-open="${type}" data-id="${item.id}">
+                        <span class="home-news-type" data-type="${type}">${NEWS_LABELS[type]}</span>
+                        <span class="home-news-main">
+                            <span class="home-news-title">${escapeHtml(item.title)}</span>
+                            ${item.context ? `<span class="home-news-context">${escapeHtml(item.context)}</span>` : ''}
+                        </span>
+                        ${meta ? `<span class="home-news-meta">${escapeHtml(meta)}</span>` : ''}
+                    </button>
+                </li>`;
+        }).join('');
+
+        // Up to twenty arrive; beyond that the feed only knows how many.
+        const hidden = news.total - items.length;
+        let more = '';
+        if (news.items.length > NEWS_LIMIT) {
+            more = `<button type="button" class="home-news-more" data-home-more="news" data-fk="more-news" aria-expanded="${state.ui.allNews}">
+                        ${state.ui.allNews ? 'Show less' : `Show ${hidden} more`}
+                    </button>`;
+        } else if (hidden > 0) {
+            more = `<span class="home-news-rest">and ${hidden} more</span>`;
+        }
+
         return `
-            <div class="workload-row${done ? ' is-done' : ''}">
-                <button type="button" class="workload-row-mark workload-check${done ? ' is-done' : ''}"
-                        data-workload-toggle="${todo.id}" role="checkbox"
-                        aria-checked="${done ? 'true' : 'false'}"
-                        aria-label="${checkName}" title="${checkHint}"${busy ? ' disabled' : ''}>
-                    ${done ? ICON_CHECK : `<span class="workload-check-hint">${ICON_CHECK}</span>`}
-                </button>
-                <button type="button" class="workload-row-main"
-                        data-workload-open="todo" data-id="${todo.id}"
-                        data-contact-id="${todo.contact_id || ''}" data-project-id="${todo.project_id || ''}">
-                    <span class="workload-row-body">
-                        <span class="workload-row-title">${title}</span>
-                        ${context ? `<span class="workload-row-context">${context}</span>` : ''}
-                    </span>
-                    <span class="workload-row-meta">
-                        ${priorityChip}
-                        ${due.text ? `<span class="workload-due${due.overdue ? ' is-overdue' : ''}">${escapeHtml(due.text)}</span>` : ''}
-                    </span>
-                </button>
-            </div>
-        `;
+            <section class="home-news" aria-labelledby="homeNewsHeading">
+                <div class="home-news-head">
+                    <span class="home-news-icon" aria-hidden="true">${ICON_NEW}</span>
+                    <h2 class="home-news-heading" id="homeNewsHeading">New for you</h2>
+                    <span class="home-news-count" title="Assigned to you since you last looked">${news.total}</span>
+                    <button type="button" class="home-news-dismiss" data-workload-news-seen>Mark as seen</button>
+                </div>
+                <ul class="home-news-list">${rows}</ul>
+                ${more ? `<div class="home-news-foot">${more}</div>` : ''}
+            </section>`;
+    }
+
+    /** "5 minutes ago", "Yesterday", "Oct 3" - for when something was assigned. */
+    function describeWhen(value) {
+        return value ? window.CRMFormat.ago(value) : '';
+    }
+
+    async function markNewsSeen(button) {
+        if (button) button.disabled = true;
+        try {
+            const response = await fetch(API + '?action=news-seen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: '{}'
+            });
+            if (!response.ok) throw new Error('failed');
+            state.news = null;
+            state.ui.allNews = false;
+            render();
+        } catch (e) {
+            if (button) button.disabled = false;
+        }
     }
 
     /**
@@ -411,39 +630,14 @@
      * (bindPdfDrops), or click through to the Bookkeeping tab.
      */
     function bookkeepingRow(entry) {
-        // A bank entry's date is when the money moved, not a deadline, so it
-        // is printed plainly rather than run through the "3 days overdue"
-        // phrasing the to-dos use.
-        const date = formatDate(entry.row_date);
-
+        // The date leads the summary ("Sep 19 · Partner · 120,00 €"), and that
+        // the PDF is missing the card's heading says once for all of them.
         return `
             <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}"
                     data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
-                <span class="workload-row-mark is-icon">${ICON_RECEIPT}</span>
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}</span>
-                    <span class="workload-row-context">${entry.no_pdf_needed ? 'Marked as needing no PDF' : 'PDF missing'}</span>
-                </span>
-                <span class="workload-row-meta">
-                    ${date ? `<span class="workload-due">${escapeHtml(date)}</span>` : ''}
-                </span>
-            </button>
-        `;
-    }
-
-    function projectRow(project) {
-        const stage = project.stage || 'Lead';
-        const stageClass = String(stage).toLowerCase().replace(/ /g, '-');
-
-        return `
-            <button type="button" class="workload-row" data-workload-open="project" data-id="${project.id}">
-                <span class="workload-row-mark is-icon">${ICON_PROJECT}</span>
-                <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(project.name || '')}</span>
-                    ${project.company ? `<span class="workload-row-context">${escapeHtml(project.company)}</span>` : ''}
-                </span>
-                <span class="workload-row-meta">
-                    <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stage)}</span>
+                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}${newTag('bookkeeping', entry.id)}</span>
+                    ${entry.no_pdf_needed ? '<span class="workload-row-context">Marked as needing no PDF</span>' : ''}
                 </span>
             </button>
         `;
@@ -453,10 +647,9 @@
         const sub = contact.company || contact.location || contact.email || '';
 
         return `
-            <button type="button" class="workload-row" data-workload-open="contact" data-id="${contact.id}">
-                <span class="workload-row-mark is-initials">${escapeHtml(getInitials(contact.name))}</span>
+            <button type="button" class="workload-row${isProposed(contact) ? ' is-proposed' : ''}" data-workload-open="contact" data-id="${contact.id}">
                 <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(contact.name || '')}</span>
+                    <span class="workload-row-title">${escapeHtml(contact.name || '')}${newTag('contact', contact.id)}${reviewMarks('contact', contact)}</span>
                     ${sub ? `<span class="workload-row-context">${escapeHtml(sub)}</span>` : ''}
                 </span>
                 <span class="workload-row-meta"></span>
@@ -464,82 +657,168 @@
         `;
     }
 
-    function emptyState() {
-        const person = state.person || {};
-        const who = person.unassigned
-            ? 'Nothing is waiting to be picked up.'
-            : (state.who === 'me'
-                ? 'Nothing is assigned to you yet.'
-                : 'Nothing is assigned to ' + escapeHtml(person.name || 'them') + ' yet.');
+    /**
+     * Placeholders in the shape of the two cards, shown while a person's work
+     * loads, so nothing jumps when it arrives.
+     */
+    function skeleton() {
+        const bar = (width, extra) => `<span class="home-skel${extra ? ' ' + extra : ''}" style="width:${width}"></span>`;
+        const rows = n => Array.from({ length: n }, (_, i) => `
+            <div class="home-skel-row">
+                ${bar('22px', 'is-round')}
+                <span class="home-skel-lines">${bar(['70%', '55%', '62%', '48%', '66%'][i % 5])}${bar('38%', 'is-small')}</span>
+            </div>`).join('');
+        const band = '<span class="home-skel is-meter"></span>';
 
         return `
-            <div class="workload-empty">
-                <div class="workload-empty-icon">${ICON_INBOX}</div>
-                <p class="workload-empty-title">All clear</p>
-                <p class="workload-empty-text">${who}</p>
-                <p class="workload-empty-hint">
-                    Open any contact, project or to-do and pick someone under &ldquo;Assigned to&rdquo;.
-                </p>
-            </div>
-        `;
+            <section class="home-dash is-loading" aria-label="Loading" aria-busy="true">
+                <div class="home-card home-todos">
+                    ${band}
+                    <div class="home-card-top">
+                        <div class="home-card-head">${bar('120px', 'is-title')}</div>
+                        <div class="home-week">
+                            <div class="home-week-head">${bar('80px', 'is-small')}</div>
+                            <div class="home-week-days">${Array.from({ length: 7 }, () => bar('100%', 'is-day')).join('')}</div>
+                        </div>
+                    </div>
+                    <div class="home-filterbar">${bar('160px', 'is-small')}</div>
+                    <div class="home-list-wrap">${rows(5)}</div>
+                </div>
+                <div class="home-side">
+                    <div class="home-card home-projects">
+                        ${band}
+                        <div class="home-card-top">
+                            <div class="home-card-head">${bar('120px', 'is-title')}</div>
+                        </div>
+                        <div class="home-filterbar">${bar('100px', 'is-small')}</div>
+                        <div class="home-list-wrap">${rows(4)}</div>
+                    </div>
+                </div>
+            </section>`;
     }
 
-    const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-    const ICON_PROJECT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>';
-    const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v20l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5V2l-1.5 1.5zM17 19H7V5h10v14zM8 13h8v2H8v-2zm0-4h8v2H8V9z"/></svg>';
-    const ICON_INBOX = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H4.99V5H19v10z"/></svg>';
-
     // ------------------------------------------------------------------
-    // The person switcher
+    // Filters, folds and the address bar
     // ------------------------------------------------------------------
 
-    function populateSwitcher() {
-        if (!els.who) return;
-
-        const people = window.CRMPeople ? window.CRMPeople.list() : [];
-        const meKey = window.CRMPeople ? window.CRMPeople.meKey() : null;
-
-        let html = `<option value="me">Me${countSuffix(meKey)}</option>`;
-
-        people.forEach(person => {
-            const key = person.id === null ? 'owner' : String(person.id);
-            // "Me" already covers the signed-in identity; listing it twice
-            // would just be a way to pick the same thing by another name.
-            if (meKey && key === meKey) return;
-            html += `<option value="${escapeHtml(key)}">${escapeHtml(person.name)}${countSuffix(key)}</option>`;
-        });
-
-        html += '<option value="unassigned">Unassigned</option>';
-
-        els.who.innerHTML = html;
-        els.who.value = state.who;
+    function setUi(changes, fallback) {
+        Object.assign(state.ui, changes);
+        paint(fallback);
     }
 
     /**
-     * " (3)" for somebody carrying three open items, or nothing at all.
-     *
-     * The owner is keyed 0 in the database but addressed as 'owner' here, so
-     * the lookup translates before reading the bucket.
+     * Mirror the filters into the query string (?prio=high&day=2026-10-09),
+     * so a reload or a shared link opens the same view. Only while Home is
+     * on screen; leaving it takes them off again.
      */
-    function countSuffix(key) {
-        if (!key) return '';
+    function writeUrl() {
+        if (!window.history || !window.history.replaceState) return;
 
-        const bucket = state.counts[key === 'owner' ? '0' : key];
-        if (!bucket) return '';
+        const url = new URL(window.location.href);
+        ['prio', 'day', 'stage'].forEach(key => url.searchParams.delete(key));
 
-        const total = (bucket.todos || 0) + (bucket.projects || 0)
-            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
-        return total ? ` (${total})` : '';
-    }
+        if (shownView === 'workload') {
+            if (state.ui.prio) url.searchParams.set('prio', state.ui.prio);
+            if (state.ui.day) url.searchParams.set('day', state.ui.day);
+            if (state.ui.stage) url.searchParams.set('stage', state.ui.stage);
+        }
 
-    async function loadCounts() {
-        try {
-            const result = await api('?action=summary');
-            state.counts = result.counts || {};
-        } catch (e) {
-            state.counts = {};
+        if (url.href !== window.location.href) {
+            window.history.replaceState(window.history.state, '', url.href);
         }
     }
+
+    function readUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const prio = params.get('prio');
+        const day = params.get('day');
+        const stage = params.get('stage');
+
+        if (HD.PRIORITIES.some(p => p.key === prio)) state.ui.prio = prio;
+        if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) state.ui.day = day;  // range-checked in dayFilter()
+        if (HD.STAGES.some(s => s.key === stage)) state.ui.stage = stage;
+    }
+
+    /**
+     * The dashboard's own controls: the legend and day filters, "Clear
+     * filter", "Show more", and the links to the full lists.
+     */
+    function handleDashboardClick(event) {
+        const t = event.target;
+        const ui = state.ui;
+        let el;
+
+        if ((el = t.closest('[data-home-prio]'))) {
+            const key = el.getAttribute('data-home-prio');
+            setUi({ prio: ui.prio === key ? null : key, allTodos: false });
+        } else if ((el = t.closest('[data-home-day]'))) {
+            const date = el.getAttribute('data-home-day');
+            setUi({ day: ui.day === date ? null : date, allTodos: false });
+        } else if ((el = t.closest('[data-home-stage]'))) {
+            const key = el.getAttribute('data-home-stage');
+            setUi({ stage: ui.stage === key ? null : key, allProjects: false });
+        } else if ((el = t.closest('[data-home-clear]'))) {
+            if (el.getAttribute('data-home-clear') === 'projects') {
+                setUi({ stage: null, allProjects: false }, 'stage-' + HD.STAGES[0].key);
+            } else {
+                setUi({ prio: null, day: null, allTodos: false }, 'prio-high');
+            }
+        } else if ((el = t.closest('[data-home-more]'))) {
+            const key = el.getAttribute('data-home-more');
+            const prop = key === 'news' ? 'allNews' : (key === 'projects' ? 'allProjects' : 'allTodos');
+            setUi({ [prop]: !ui[prop] });
+        } else if ((el = t.closest('[data-home-create]'))) {
+            create(el.getAttribute('data-home-create'));
+        } else if ((el = t.closest('[data-home-go]'))) {
+            goTo(el.getAttribute('data-home-go'));
+        } else {
+            return;
+        }
+
+        event.stopPropagation();
+    }
+
+    /** "Create new": the project or to-do sheet, ready to fill in. */
+    function create(what) {
+        const crm = window.CRM;
+        if (!crm) return;
+
+        if (what === 'project' && crm.openNewProject) {
+            crm.openNewProject();
+        } else if (what === 'todo' && crm.openNewTodo) {
+            crm.openNewTodo();
+        }
+    }
+
+    /** "Completed": the full list, for the person shown. */
+    function goTo(where) {
+        const crm = window.CRM;
+        if (!crm) return;
+
+        if (where === 'bookkeeping') {
+            crm.switchView('bookkeeping');
+        } else if (crm.openTodos) {
+            crm.openTodos({ status: where === 'completed' ? 'completed' : 'open', assigned: state.who });
+        } else {
+            crm.switchView('todos');
+        }
+    }
+
+    // "New for you": a bell.
+    const ICON_NEW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
+
+    // The small cards' icons: one per kind of thing.
+    const TYPE_ICONS = {
+        contact: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>',
+        bookkeeping: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>'
+    };
+
+    const ICON_PLUS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+    const ICON_RECEIPT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/></svg>';
+    // The empty list: a check in a circle.
+    const ICON_DONE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5 5-5.5"/></svg>';
+    const ICON_INBOX = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5"/><path d="M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z"/></svg>';
 
     // ------------------------------------------------------------------
     // Checking to-dos off
@@ -559,10 +838,11 @@
     /**
      * Check a to-do off, or put it back.
      *
-     * The row is moved the moment it is clicked, because waiting on the network
-     * to see a tick appear feels broken; if the write fails the row moves back
-     * and says so. Only master rows reach this view, so the id stays valid even
-     * though the server rebuilds a project to-do's per-contact copies.
+     * The tick shows the moment it is clicked, and every count on the page
+     * moves with it, because waiting on the network to see a tick appear
+     * feels broken; if the write fails the row goes back and says so. Only
+     * master rows reach this view, so the id stays valid even though the
+     * server rebuilds a project to-do's per-contact copies.
      */
     async function setCompletion(todoId, completed) {
         if (!state.data || state.busy.has(todoId)) return;
@@ -587,9 +867,10 @@
         };
 
         todo.is_completed = completed ? 1 : 0;
-        // A to-do checked off disappears into the fold, so open it: the row
-        // should still be somewhere the person can see, and undo.
-        if (completed) state.doneOpen = true;
+        // A to-do checked off stays in the list, struck through, until the
+        // next load: the row should still be where the person can see it,
+        // and undo it.
+        if (completed) state.lingering.add(todoId);
         state.busy.add(todoId);
         repaint();
 
@@ -627,16 +908,15 @@
 
         repaint();
 
-        // The nav badge and the per-person counts both count open to-dos.
+        // The nav badge counts open to-dos.
         refreshBadge();
-        loadCounts().then(populateSwitcher);
     }
 
     // ------------------------------------------------------------------
     // Loading
     // ------------------------------------------------------------------
 
-    async function load(who) {
+    async function load(who, quiet = false) {
         if (who) state.who = who;
 
         // No-op once it has run; here for the case where this is the first
@@ -644,23 +924,39 @@
         init();
         if (!els.body) return;
 
-        els.body.innerHTML = '<div class="workload-loading">Loading...</div>';
+        // A quiet reload (after a change made in a sheet) keeps what is on
+        // screen until the new list is ready, instead of flashing placeholders.
+        if (!quiet || !state.loaded) {
+            els.body.innerHTML = skeleton();
+        }
 
         try {
-            // The directory drives both the switcher and the faces, so make
-            // sure it has arrived before drawing either.
+            // The directory drives the faces, so make sure it has arrived
+            // before drawing them.
             if (window.CRMPeople && !window.CRMPeople.ready()) {
                 await window.CRMPeople.reload();
             }
-            await loadCounts();
-            populateSwitcher();
+
+            // What was assigned to you since you last looked - only on your
+            // own home; a missing feed never stops the page from loading.
+            const newsRequest = state.who === 'me'
+                ? api('?action=news').then(r => r.data).catch(() => null)
+                : Promise.resolve(null);
 
             const result = await api('?action=workload&user=' + encodeURIComponent(state.who));
+            state.news = await newsRequest;
             state.data = result.data;
             state.person = result.person;
             state.loaded = true;
 
-            render();
+            // What was open in this load: the project pills count from it
+            // (HomeDashboard.projectOpenTodos). A fresh load also lets the
+            // to-dos ticked off since the last one leave the list.
+            state.data.todos.forEach(todo => { todo.loaded_open = HD.isOpen(todo); });
+            state.lingering.clear();
+
+            paint();
+            syncNav();
         } catch (error) {
             els.body.innerHTML = `<div class="workload-empty"><p class="workload-empty-text">${escapeHtml(error.message)}</p></div>`;
         }
@@ -698,9 +994,9 @@
     /**
      * List everyone in the sidebar, each one click from their workload.
      *
-     * The same people the "Showing" switch offers, surfaced where they are
-     * always visible - so "what is Anna working on?" is one click, not a
-     * dropdown hunt. Hidden entirely until there is somebody besides you.
+     * The way to anyone else's plate: "what is Anna working on?" is one
+     * click. Only people who can sign in now: invited and disabled
+     * accounts stay out. Hidden entirely until there is somebody besides you.
      */
     function renderTeam() {
         const wrap = $('sidebarTeamWrap');
@@ -711,7 +1007,7 @@
         const meKey = window.CRMPeople.meKey();
         const others = people.filter(person => {
             const key = person.id === null ? 'owner' : String(person.id);
-            return key !== meKey;
+            return key !== meKey && person.active !== false;
         });
 
         if (!others.length) {
@@ -729,7 +1025,6 @@
                 <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="Open ${escapeHtml(person.name)}'s work">
                     ${face}
                     <span class="team-name">${escapeHtml(person.name)}</span>
-                    ${countBadge(key)}
                 </button>
             `;
         }).join('');
@@ -737,22 +1032,41 @@
         wrap.hidden = false;
     }
 
-    /**
-     * A small count of open items for one person, or nothing.
-     */
-    function countBadge(key) {
-        const bucket = state.counts[key === 'owner' ? '0' : key];
-        if (!bucket) return '';
-
-        const total = (bucket.todos || 0) + (bucket.projects || 0)
-            + (bucket.contacts || 0) + (bucket.bookkeeping || 0);
-
-        return total ? `<span class="team-count">${total}</span>` : '';
+    function refreshTeam() {
+        renderTeam();
+        syncNav();
     }
 
-    async function refreshTeam() {
-        await loadCounts();
-        renderTeam();
+    /**
+     * Which sidebar entry is lit: Home on your own page, the teammate when
+     * you are looking at theirs. app.js calls this on every view change.
+     */
+    let shownView = 'workload';
+    function syncNav(view) {
+        if (view) {
+            shownView = view;
+            // The filters in the address bar belong to Home alone.
+            writeUrl();
+        }
+
+        const onHome = shownView === 'workload';
+        const meKey = window.CRMPeople && window.CRMPeople.meKey ? window.CRMPeople.meKey() : null;
+        const who = String(state.who);
+        const teammate = onHome && who !== 'me' && who !== meKey
+            ? document.querySelector('[data-team-person="' + (window.CSS && CSS.escape ? CSS.escape(who) : who) + '"]')
+            : null;
+
+        document.querySelectorAll('[data-team-person]').forEach(item => {
+            item.classList.toggle('active', item === teammate);
+            if (item === teammate) item.setAttribute('aria-current', 'page');
+            else item.removeAttribute('aria-current');
+        });
+
+        // Home stays lit for your own page and for "Unassigned", which has
+        // no entry of its own in the sidebar.
+        document.querySelectorAll('.toggle-btn[data-view="workload"]').forEach(btn => {
+            btn.classList.toggle('active', onHome && !teammate);
+        });
     }
 
     /**
@@ -900,9 +1214,6 @@
         els.title = $('workloadTitle');
         els.summary = $('workloadSummary');
         els.face = $('workloadFace');
-        els.who = $('workloadWho');
-
-        els.who.addEventListener('change', () => load(els.who.value));
 
         const team = $('sidebarTeam');
         if (team) {
@@ -927,21 +1238,23 @@
 
             event.stopPropagation();
             const todoId = Number(check.getAttribute('data-workload-toggle'));
-            if (todoId) setCompletion(todoId, check.getAttribute('aria-checked') !== 'true');
+            if (todoId) setCompletion(todoId, check.getAttribute('data-done') !== '1');
         });
 
-        // Remember whether "Completed" is folded open, so a re-render does not
-        // slam it shut under someone reading it. Toggle does not bubble.
-        els.body.addEventListener('toggle', function (event) {
-            const details = event.target;
-            if (details && details.classList && details.classList.contains('workload-done')) {
-                state.doneOpen = details.open;
-            }
-        }, true);
+        // The dashboard's filters, folds and "Create new" / "Completed" links.
+        els.body.addEventListener('click', handleDashboardClick);
 
         // Rows open the record they stand for, using the handles app.js exposes.
         els.body.addEventListener('click', function (event) {
             if (event.target.closest('[data-workload-toggle]')) return;
+            // A link inside a to-do row (its Drive document) opens itself only.
+            if (event.target.closest('a[href]')) return;
+
+            const seen = event.target.closest('[data-workload-news-seen]');
+            if (seen) {
+                markNewsSeen(seen);
+                return;
+            }
 
             const row = event.target.closest('[data-workload-open]');
             if (!row) return;
@@ -957,20 +1270,19 @@
             } else if (kind === 'bookkeeping') {
                 window.CRM.openBookkeepingRow(id);
             } else if (kind === 'todo') {
-                // A to-do has no page of its own, so open whatever it hangs off.
-                const projectId = Number(row.getAttribute('data-project-id'));
-                const contactId = Number(row.getAttribute('data-contact-id'));
-                if (projectId) {
-                    window.CRM.openProjectOverview(projectId);
-                } else if (contactId) {
-                    window.CRM.openOverview(contactId);
-                }
+                // The to-do's own sheet: its details, description and links.
+                window.CRM.openTodoDetail(id);
             }
         });
 
         bindPdfDrops();
         refreshBadge();
     }
+
+    // Filters from the address bar, so a reload opens the same view. Read
+    // now, before app.js switches to the starting tab and syncNav() rewrites
+    // the address from state.
+    readUrl();
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
@@ -981,6 +1293,8 @@
     window.CRMWorkload = {
         open: open,
         load: load,
+        refresh: () => load(null, true),
+        syncNav: syncNav,
         refreshBadge: refreshBadge
     };
 })();
