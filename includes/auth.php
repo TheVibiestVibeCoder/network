@@ -81,17 +81,39 @@ class Auth
             ini_set('session.use_strict_mode', '1');
             ini_set('session.use_only_cookies', '1');
             ini_set('session.cookie_httponly', '1');
-            ini_set('session.cookie_samesite', 'Strict');
+            // Lax, not Strict. With Strict, opening the CRM from a link in a
+            // mail or another site arrives without the cookie, session_start()
+            // answers with a fresh id, and that overwrites the live session in
+            // the browser - one click from outside signed you out. Lax still
+            // withholds the cookie from cross-site POSTs and subrequests, and
+            // every state-changing request needs the CSRF token on top.
+            ini_set('session.cookie_samesite', 'Lax');
             ini_set('session.gc_maxlifetime', (string) SESSION_LIFETIME);
             // Do not let the session id travel in URLs even if the host enables it.
             ini_set('session.use_trans_sid', '0');
+
+            // Keep session files in our own directory. In the host's shared
+            // one, garbage collection runs with whatever lifetime the other
+            // sites (or a system cron reading php.ini, typically 24 minutes)
+            // use, not ours - so sessions died long before SESSION_LIFETIME.
+            // Our own directory is only ever collected with our lifetime, and
+            // GC is switched on explicitly because hosts that clean by cron
+            // ship with gc_probability = 0.
+            $sessionDir = APP_ROOT . '/data/sessions';
+            if (is_dir($sessionDir) || @mkdir($sessionDir, 0700, true)) {
+                if (is_writable($sessionDir)) {
+                    session_save_path($sessionDir);
+                    ini_set('session.gc_probability', '1');
+                    ini_set('session.gc_divisor', '100');
+                }
+            }
 
             session_name(SESSION_NAME);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path' => '/',
                 'httponly' => true,
-                'samesite' => 'Strict',
+                'samesite' => 'Lax',
                 'secure' => $isHttps,
             ]);
             session_start();
@@ -390,11 +412,10 @@ class Auth
             // single-factor by design; every account with an inbox does not.
             if (self::twoFactorRequiredFor($authenticated)) {
                 // This browser may already have passed two-factor for this
-                // account: a live session, or a remembered device. Both are
-                // common here, because the cookies are SameSite=Strict - a link
-                // from mail or another site arrives without them and shows the
-                // form, but the form's own POST carries them again. A code
-                // mailed then would never be asked for.
+                // account: a live session, or a remembered device - e.g. the
+                // form was opened in a second tab, or a session aged out while
+                // the remember cookie is still good. A code mailed then would
+                // never be asked for.
                 if (self::alreadySignedInAs((int) $authenticated['id'])) {
                     return ['success' => true];
                 }
@@ -1114,7 +1135,9 @@ class Auth
             'expires' => $expiresAt,
             'path' => '/',
             'httponly' => true,
-            'samesite' => 'Strict',
+            // Lax for the same reason as the session cookie: with Strict, a
+            // link from mail landed on the sign-in form despite a valid token.
+            'samesite' => 'Lax',
             'secure' => self::isHttps(),
         ]);
     }
