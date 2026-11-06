@@ -11394,7 +11394,7 @@ details.import-instructions p {
 .fin-band.is-warn { background: var(--c-warning-soft); }
 .fin-band.is-warn .fin-band-value { color: var(--c-warning-ink); }
 
-/* Unfolded: what the projected result is made of, inside its band. */
+/* Unfolded: the year's total revenue and costs behind it, inside its band. */
 .fin-band-lines {
     display: flex;
     flex-direction: column;

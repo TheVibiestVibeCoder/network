@@ -478,8 +478,8 @@
                     </div>
                     ${open ? `
                     <dl class="fin-band-lines">
-                        <div><dt>Open revenue</dt><dd>${esc(signed(y.incomeRest))}</dd></div>
-                        <div><dt>Open costs</dt><dd>${esc(signed(-y.costsRest))}</dd></div>
+                        <div title="Jan – Dec ${y.year}: ${esc(euro(y.income))} so far + ${esc(euro(y.incomeRest))} open"><dt>Total revenue</dt><dd>${esc(signed(y.revenue))}</dd></div>
+                        <div title="Jan – Dec ${y.year}: ${esc(euro(y.costs))} so far + ${esc(euro(y.costsRest))} open"><dt>Total costs</dt><dd>${esc(signed(-y.costsYear))}</dd></div>
                     </dl>` : ''}
                 </div>
                 ${foldToggle('year')}
