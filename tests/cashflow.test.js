@@ -395,21 +395,53 @@
         near(p.kpis.debtTotal, 40150, 'no other loan in the plan');
     });
 
-    test('a fixed cost paid this month counts once: from Bookkeeping, or on its own when not booked yet', () => {
+    test('a cost of this month is paid only once Bookkeeping has it; until then it is open', () => {
         const costs = [
             { id: 1, name: 'Office rent', kind: 'recurring', amount: 1000, interval_months: 1, start_month: '2026-01', day: 1 },
-            { id: 2, name: 'Adobe', kind: 'recurring', amount: 60, interval_months: 1, start_month: '2026-01', day: 2 }
+            { id: 2, name: 'Adobe', kind: 'recurring', amount: 60, interval_months: 1, start_month: '2026-01', day: 2 },
+            { id: 3, name: 'Insurance', kind: 'recurring', amount: 300, interval_months: 1, start_month: '2026-01', day: 28 }
         ];
-        const p = run({ costs, transactions: [{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }] });
-        near(p.rows[0].paidUnbooked, 1000, 'the rent is not in Bookkeeping yet');
-        near(p.rows[0].out, 0, 'and not taken off the balance again');
-        eq(p.rows[0].items.costs.find(c => c.cost.id === 2).booked, true, 'Adobe is booked');
-        const y = CF.yearResult([{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }], run({ costs, months: 3,
-            transactions: [{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }] }), NOW);
-        near(y.costs, 60 + 1000, 'paid so far: booked Adobe + the rent paid but not booked');
-        near(y.actual, -1060, 'and the result so far with it');
-        near(y.costsRest, 2 * 1060, 'still to pay: Nov and Dec');
-        near(y.costsYear, 60 + 1000 + 2 * 1060, 'booked + unbooked rent + Nov and Dec');
+        const tx = [
+            { date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' },
+            { date: '2026-10-05', amount: -300, vat: 0, party: 'Muster Versicherung AG' }
+        ];
+        const p = run({ costs, transactions: tx });
+        const item = id => p.rows[0].items.costs.find(c => c.cost.id === id);
+        eq([item(1).paid, item(1).due], [false, true], 'the rent: due since the 1st, not booked - open');
+        eq(item(2).paid, true, 'Adobe: booked by name');
+        eq(item(3).paid, true, 'insurance: booked by amount, before its day');
+        near(p.rows[0].out, 1000, 'only the open rent still goes out of the balance');
+
+        const y = CF.yearResult(tx, run({ costs, months: 3, transactions: tx }), NOW);
+        near(y.costs, 60 + 300, 'so far: only what Bookkeeping has');
+        near(y.actual, -360, 'and the result so far with it');
+        near(y.costsRest, 1000 + 2 * 1360, 'still to pay: the rent this month, then Nov and Dec');
+        near(y.costsYear, 360 + 1000 + 2 * 1360);
+    });
+
+    test('a bank row pays one cost only', () => {
+        const costs = [
+            { id: 1, name: 'Tool A', kind: 'recurring', amount: 100, interval_months: 1, start_month: '2026-01', day: 1 },
+            { id: 2, name: 'Tool B', kind: 'recurring', amount: 100, interval_months: 1, start_month: '2026-01', day: 1 }
+        ];
+        const p = run({ costs, transactions: [{ date: '2026-10-01', amount: -100, vat: 0, party: 'Someone' }] });
+        eq(p.rows[0].items.costs.filter(c => c.paid).length, 1, 'one of the two');
+        near(p.rows[0].out, 100);
+    });
+
+    test('a cost on the 31st falls on the month\'s last day: salaries at the month\'s end', () => {
+        const costs = [{ id: 1, name: 'Salaries', kind: 'recurring', amount: 9000, interval_months: 1, start_month: '2026-01', day: 31 }];
+        const before = run({ costs });
+        eq(before.rows[0].items.costs[0].due, false, 'not due on the 9th');
+        near(before.rows[0].out, 9000, 'so it still goes out this month');
+        const nov = CF.plan({ projects: [], costs, transactions: [], balances: [], settings: CF.DEFAULT_SETTINGS,
+            months: 3, now: { year: 2026, month: 10 }, today: '2026-11-30' });
+        eq(nov.rows[0].items.costs[0].due, true, 'due on 30 November, the last day of the month');
+        eq(CF.recurringSuggestions([
+            { date: '2026-07-31', amount: -900, party: 'Payroll' },
+            { date: '2026-08-31', amount: -900, party: 'Payroll' },
+            { date: '2026-09-30', amount: -900, party: 'Payroll' }
+        ], [], [], TODAY).map(x => x.day), [31], 'paid on the last day: suggested at month end');
     });
 
     test('the year in full: revenue, costs and result', () => {

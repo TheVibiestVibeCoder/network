@@ -23,9 +23,11 @@
  * shown.
  *
  * Money out: our costs, net. A recurring cost every 1, 3, 6 or 12 months
- * from its first month to its last; one already due this month (its day has
- * passed) is taken to be in the balance already. A planned cost once, in its
- * month.
+ * from its first month to its last, on its day of the month - 31 meaning
+ * the last day, whatever the month's length (salaries at the month's end).
+ * A planned cost once, in its month. A cost counts as paid only once
+ * Bookkeeping has it - then it is in the balance and in the year so far;
+ * until then it is open, whatever its day.
  *
  * The year's result: this year's months in Bookkeeping as profit or loss,
  * without the VAT in them, and where the year ends if the plan holds
@@ -34,11 +36,6 @@
  * Debts: interest accrued on each loan day by day, to today and to its
  * repayment (debtInterest, debtSummary). A loan with a repayment date goes
  * out of the account in that month, with all its interest.
- *
- * This month's costs in full: a fixed cost whose day has passed is taken
- * to be in the balance already. When Bookkeeping has no row for it yet, it
- * still counts as a cost of this month (paidUnbooked) - only not again
- * against the balance.
  *
  * Recurring payments in Bookkeeping that no fixed cost covers yet are
  * offered as suggestions (recurringSuggestions).
@@ -94,6 +91,12 @@
         return c.year + '-' + String(c.month + 1).padStart(2, '0') + '-' + String(last).padStart(2, '0');
     }
 
+    /** Whether "YYYY-MM-DD" is the last day of its month. */
+    function isMonthEnd(iso) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        return !!m && new Date(Date.UTC(Number(m[1]), Number(m[2]), 0)).getUTCDate() === Number(m[3]);
+    }
+
     // ------------------------------------------------------------------
     // Money in
     // ------------------------------------------------------------------
@@ -147,10 +150,13 @@
     /**
      * Where a cost falls in the next `months` months:
      *   [{ offset, amount, paid }] - paid: a recurring cost whose
-     * day this month has already come, so it is in the balance already.
+     * day this month has already come (due; plan() asks Bookkeeping whether
+     * it really is paid).
      */
     function costOccurrences(cost, months, now, todayDay) {
         const start = RF.offsetOf(cost.start_month, now);
+        // A day past the month's end (31 in November) is its last day.
+        const monthEnd = dayOf(lastDayOf(0, now));
         if (start === null) return [];
         const amount = number(cost.amount) || 0;
         const make = (offset, paid) => ({ offset, amount, paid: !!paid });
@@ -165,7 +171,7 @@
         // The first occurrence at or after this month, on the cost's rhythm.
         let i = start >= 0 ? start : start + Math.ceil(-start / interval) * interval;
         for (; i < months && i <= end; i += interval) {
-            const day = number(cost.day) || 1;
+            const day = Math.min(number(cost.day) || 1, monthEnd);
             out.push(make(i, i === 0 && todayDay !== null && day <= todayDay));
         }
         return out;
@@ -301,11 +307,10 @@
     function yearResult(transactions, plan, now) {
         const months = yearMonths(transactions, now, plan.balance);
         const rest = plan.rows.filter(r => RF.calendarMonth(r.offset, now).year === now.year);
-        // Fixed costs already paid this month but not in Bookkeeping yet
-        // are money out already: they count with the year so far.
-        const paidUnbooked = round2(sum(rest, r => r.paidUnbooked || 0));
+        // So far: what Bookkeeping has, nothing else - so it matches the
+        // balance. A cost not booked yet is still to pay.
         const income = round2(sum(months, m => m.income));
-        const costs = round2(sum(months, m => m.costs) + paidUnbooked);
+        const costs = round2(sum(months, m => m.costs));
         const actual = round2(income - costs);
         const incomeRest = round2(sum(rest, r => r.in));
         // Still to pay until December. A loan's repayment is not a cost;
@@ -320,7 +325,6 @@
             projected: round2(actual + planned),
             income,
             costs,
-            paidUnbooked,
             incomeRest,
             costsRest,
             revenue: round2(income + incomeRest),
@@ -501,7 +505,8 @@
                 // False when no invoice told the VAT: then it is the amount paid.
                 net: withVat.length > 0,
                 interval: rhythm.interval,
-                day: dayOf(last.date) || 1,
+                // Paid on a month's last day: the last day each month (31).
+                day: isMonthEnd(last.date) ? 31 : (dayOf(last.date) || 1),
                 start_month: last.date.slice(0, 7),
                 count: rows.length,
                 first: rows[0].date,
@@ -518,18 +523,29 @@
     // ------------------------------------------------------------------
 
     /**
-     * Whether a fixed cost paid this month is among the month's bank rows:
-     * a word of its name in the party, or about the same amount (within
-     * 10%, net of the VAT the row gives back).
+     * Which of this month's costs Bookkeeping already has: each bank row
+     * going out pays at most one cost - first by name (a word of the cost's
+     * name in the party), then by amount (net within 10%).
+     *   items: [{ cost, amount }] -> Set of the items paid
      */
-    function isBooked(cost, amount, rows) {
-        const words = nameWords(cost.name);
-        return rows.some(t => {
-            const party = nameWords(t.party);
-            if (words.some(w => party.indexOf(w) >= 0)) return true;
-            const net = -(t.amount + (number(t.vat) || 0));
-            return Math.abs(net - amount) <= Math.max(1, amount * 0.1);
+    function bookedCosts(items, rows) {
+        const used = new Set();
+        const paid = new Set();
+        const net = t => -(t.amount + (number(t.vat) || 0));
+        const take = (item, test) => {
+            const i = rows.findIndex((t, j) => !used.has(j) && test(t));
+            if (i < 0) return;
+            used.add(i);
+            paid.add(item);
+        };
+        items.forEach(item => {
+            const words = nameWords(item.cost.name);
+            take(item, t => { const party = nameWords(t.party); return words.some(w => party.indexOf(w) >= 0); });
         });
+        items.filter(item => !paid.has(item)).forEach(item => {
+            take(item, t => Math.abs(net(t) - item.amount) <= Math.max(1, item.amount * 0.1));
+        });
+        return paid;
     }
 
     /**
@@ -552,7 +568,7 @@
         for (let i = 0; i < months; i++) {
             rows.push({
                 offset: i, label: RF.monthName(i, now),
-                income: 0, fixed: 0, planned: 0, debt: 0, debtInterest: 0, paidUnbooked: 0,
+                income: 0, fixed: 0, planned: 0, debt: 0, debtInterest: 0,
                 items: { income: [], costs: [], debts: [] }
             });
         }
@@ -565,23 +581,25 @@
         });
 
         const costs = (input.costs || []).map(c => Object.assign({}, c, { occurrences: costOccurrences(c, months, now, todayDay) }));
-        // This month's bank rows going out, to tell which paid fixed costs
-        // Bookkeeping already has.
+        // This month's bank rows going out: a cost of this month is paid -
+        // in the balance and in the year so far - once Bookkeeping has it,
+        // and open until then (due: its day has passed).
         const thisMonth = RF.calendarMonth(0, now);
         const monthPrefix = thisMonth.year + '-' + String(thisMonth.month + 1).padStart(2, '0');
         const bookedOut = (input.transactions || []).filter(t => !t.excluded && t.amount < 0 && String(t.date).slice(0, 7) === monthPrefix);
 
+        const items = [];
         costs.forEach(c => c.occurrences.forEach(o => {
-            const r = rows[o.offset];
-            const item = { cost: c, amount: o.amount, paid: o.paid };
-            r.items.costs.push(item);
-            if (o.paid) {
-                item.booked = isBooked(c, o.amount, bookedOut);
-                if (!item.booked) r.paidUnbooked += o.amount;
-                return;
-            }
-            if (c.kind === 'once') r.planned += o.amount; else r.fixed += o.amount;
+            const item = { cost: c, amount: o.amount, offset: o.offset, due: o.paid, paid: false };
+            rows[o.offset].items.costs.push(item);
+            items.push(item);
         }));
+        const booked = bookedCosts(items.filter(x => x.offset === 0), bookedOut);
+        items.forEach(item => {
+            if (booked.has(item)) { item.paid = true; return; }
+            const r = rows[item.offset];
+            if (item.cost.kind === 'once') r.planned += item.amount; else r.fixed += item.amount;
+        });
 
         // Loans with a repayment date still to come: out in that month,
         // with every day's interest until then.
@@ -606,7 +624,7 @@
             r.net = r.in - r.out;
             running += r.net;
             r.closing = round2(running);
-            ['income', 'fixed', 'planned', 'debt', 'debtInterest', 'paidUnbooked', 'out', 'in', 'net']
+            ['income', 'fixed', 'planned', 'debt', 'debtInterest', 'out', 'in', 'net']
                 .forEach(k => { r[k] = round2(r[k]); });
         });
 

@@ -452,21 +452,20 @@
 
     /**
      * The first card: this year's result so far - profit or loss without the
-     * VAT, from Bookkeeping plus fixed costs paid but not booked yet - and
+     * VAT, from Bookkeeping (so it matches the balance) - and
      * the year's result as the scenario projects it. Folded it shows just
      * those two; unfolded, the revenue and costs behind each.
      */
     function yearCard() {
         const y = state.year;
         const open = state.folds.year;
-        const unbooked = y.paidUnbooked > 0.005 ? ` - includes ${euro(y.paidUnbooked)} fixed costs paid but not booked yet` : '';
         return `
             <article class="fin-kpi fin-kpi--year${open ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Net result YTD</span>
                 <span class="fin-kpi-value ${tone(y.actual)}" title="Jan 1 – ${esc(dayName(todayIso()))}, without VAT">${esc(signed(y.actual))}</span>
                 ${open ? tiles([
                     { label: 'Revenue', icon: ICON.up, cls: 'is-up', value: signed(y.income) },
-                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), title: 'Paid so far' + unbooked }
+                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), title: 'Paid so far, from Bookkeeping' }
                 ]) : ''}
                 <div class="fin-band ${tone(y.projected)}">
                     <div class="fin-band-head">
@@ -873,9 +872,9 @@
             // plus what the plan still expects - not only what is left.
             const now = r.offset === 0 && sofar;
             const inV = r.in + (now ? sofar.income : 0);
-            // Every cost of the month, paid ones too: a fixed cost already
-            // paid but not in Bookkeeping yet counts here (not again in the balance).
-            const outV = r.fixed + r.planned + r.debt + r.paidUnbooked + (now ? sofar.costs : 0);
+            // Every cost of the month: what Bookkeeping has paid plus what is
+            // still open.
+            const outV = r.fixed + r.planned + r.debt + (now ? sofar.costs : 0);
             const net = inV - outV;
             return `
                 <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}"${now ? ' title="Already in Bookkeeping this month plus what is still planned"' : ''}>
@@ -991,19 +990,18 @@
             esc(signed(x.expected)))).join(''), 'is-open');
         const inTotal = sumOf(booked.in, t => t.amount) + sumOf(expected, x => x.expected);
 
-        // Costs: everything paid this month - the bank rows, and fixed costs
-        // whose day has passed that Bookkeeping does not have yet - then
-        // what is still open.
+        // Costs: what Bookkeeping has paid this month, then what is still
+        // open - a cost whose day has passed but that is not booked yet is
+        // open, marked due.
         const costs = r ? r.items.costs : [];
-        const unbooked = costs.filter(c => c.paid && !c.booked);
         const toCome = costs.filter(c => !c.paid);
         const debts = r ? r.items.debts : [];
-        const paidTotal = sumOf(booked.out, t => t.amount) + sumOf(unbooked, c => c.amount);
-        const paid = group('Paid', paidTotal, -1, bookedList(booked.out, -1)
-            + unbooked.map(c => line(esc(c.cost.name), esc(rhythm(c.cost)), esc(signed(-c.amount)))).join(''));
+        const paidTotal = sumOf(booked.out, t => t.amount);
+        const paid = group('Paid', paidTotal, -1, bookedList(booked.out, -1));
         const openTotal = sumOf(toCome, c => c.amount) + sumOf(debts, d => d.amount);
         const openOut = group('Open', openTotal, -1, toCome.map(c => line(esc(c.cost.name),
-            esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost)].filter(Boolean).join(' · ')),
+            esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost)].filter(Boolean).join(' · '))
+                + (c.due ? '<span class="fin-flow-late">due</span>' : ''),
             esc(signed(-c.amount)))).join('')
             + debts.map(d => line(esc(d.debt.name), esc(`repayment ${euro(d.principal)} + ${euro(d.interest)} interest`),
                 esc(signed(-d.amount)))).join(''), 'is-open');
@@ -1194,7 +1192,8 @@
 
     function rhythm(c) {
         const iv = INTERVALS.find(x => x.value === Number(c.interval_months)) || INTERVALS[0];
-        return iv.short + (Number(c.day) > 1 ? ` on the ${ordinal(Number(c.day))}` : '');
+        const day = Number(c.day);
+        return iv.short + (day >= 31 ? ' at month end' : day > 1 ? ` on the ${ordinal(day)}` : '');
     }
 
     function monthLabelOf(key) {
@@ -1269,7 +1268,7 @@
                     title="Adjust it before adding">
                     <span class="fin-cost-main">
                         <span class="fin-cost-name">${esc(s.name)}</span>
-                        <span class="fin-cost-meta">${esc(iv.short)} on the ${esc(ordinal(s.day))} · paid ${s.count}× since ${esc(dayName(s.first))}</span>
+                        <span class="fin-cost-meta">${esc(iv.short)} ${s.day >= 31 ? 'at month end' : `on the ${esc(ordinal(s.day))}`} · paid ${s.count}× since ${esc(dayName(s.first))}</span>
                     </span>
                     <span class="fin-cost-amount"><strong>${esc(euro(s.amount))}</strong><span>${s.net ? 'excl. VAT' : 'as paid'}</span></span>
                 </button>
@@ -1320,6 +1319,16 @@
                 </section>`;
     }
 
+    /** The day of the month a fixed cost is paid: the 1st to the 30th, or the last day (31). */
+    function dayOptions(selected) {
+        const out = [];
+        for (let day = 1; day <= 30; day++) {
+            out.push(`<option value="${day}"${day === selected ? ' selected' : ''}>the ${ordinal(day)}</option>`);
+        }
+        out.push(`<option value="31"${selected >= 31 ? ' selected' : ''}>the last day</option>`);
+        return out.join('');
+    }
+
     function monthOptions(selected, from, to, now) {
         const out = [];
         for (let o = from; o <= to; o++) {
@@ -1349,8 +1358,8 @@
                         <select class="form-select" name="start_month">${monthOptions(d.start_month, from, 36, now)}</select></label>` : `
                     <label class="fin-field"><span>Repeats</span>
                         <select class="form-select" name="interval_months">${INTERVALS.map(iv => `<option value="${iv.value}"${Number(d.interval_months) === iv.value ? ' selected' : ''}>${iv.label}</option>`).join('')}</select></label>
-                    <label class="fin-field"><span>On day</span>
-                        <input type="number" class="form-input" name="day" value="${esc(d.day)}" min="1" max="31" step="1"></label>
+                    <label class="fin-field"><span>Paid on</span>
+                        <select class="form-select" name="day">${dayOptions(Number(d.day) || 1)}</select></label>
                     <label class="fin-field"><span>First month</span>
                         <select class="form-select" name="start_month">${monthOptions(d.start_month, from, 36, now)}</select></label>
                     <label class="fin-field"><span>Last month</span>
