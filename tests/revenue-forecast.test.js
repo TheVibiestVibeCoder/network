@@ -534,7 +534,76 @@
         eq(PP.parse('not json'), []);
         eq(PP.parse(null), []);
         eq(PP.parse([{ month: '2026-13', amount: 5 }, { month: '2026-11', amount: '1500.5', paid: 1 }, { month: '2026-12', amount: 0 }]),
-            [{ month: '2026-11', amount: 1500.5, paid: true }]);
+            [{ month: '2026-11', amount: 1500.5, paid: true, full: false }]);
+    });
+
+    // ------------------------------------------------------------------
+    // Payment in full, and complete projects still owed money
+    // ------------------------------------------------------------------
+
+    test('a payment in full is the whole value: no budget is left beside it', () => {
+        nextId = 1;
+        const rows = [project('In Progress', 10000, 20000, 100, '2026-08-01', '2026-11-30',
+            { payments: [{ month: '2027-01', amount: 15000, paid: false, full: true }] })];
+        const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('best'), 12);
+        near(f.current.total, 15000, 'best case does not add the high end of the budget');
+        near(f.current.totals[3], 15000, 'in January, two months after the end');
+        eq(f.hasUndated, false);
+    });
+
+    test('a complete project still owed its payment in full counts in its month - this month once overdue - in every scenario', () => {
+        nextId = 1;
+        const rows = [
+            project('Complete', 12000, 12000, null, '2026-05-01', '2026-08-31',
+                { payments: [{ month: '2026-12', amount: 12000, paid: false, full: true }] }),
+            project('Complete', 8000, 8000, null, '2026-03-01', '2026-06-30',
+                { payments: [{ month: '2026-07', amount: 8000, paid: false, full: true }] }),
+            project('Complete', 5000, 5000, null, '2026-03-01', '2026-06-30',
+                { payments: [{ month: '2026-07', amount: 5000, paid: true, full: true }] })
+        ];
+        const { items, missing } = RF.prepare(rows, NOW);
+        eq(items.length, 2, 'the paid one is not forecast');
+        eq(missing.length, 0, 'no chance needed');
+        ['worst', 'realistic', 'best'].forEach(key => {
+            const f = RF.forecast(items, RF.settingsFor(key), 12);
+            near(f.current.totals[0], 8000, key + ': the overdue one in this month');
+            near(f.current.totals[2], 12000, key + ': the other in December, as expected');
+            near(f.current.byStage.Complete[0], 8000, key + ': drawn as complete');
+            near(f.current.byStage.Complete[2], 12000, key + ': drawn as complete');
+        });
+        const f = RF.forecast(items, RF.settingsFor('realistic'), 12);
+        eq(f.current.parts[0].map(x => x.o), [-3], 'overdue since July');
+    });
+
+    test('a complete project can still be switched off by hand', () => {
+        nextId = 1;
+        const rows = [project('Complete', 12000, 12000, null, '2026-05-01', '2026-08-31',
+            { payments: [{ month: '2026-09', amount: 12000, paid: false, full: true }] })];
+        const items = RF.prepare(rows, NOW).items;
+        const s = RF.settingsFor('realistic');
+        s.excluded[items[0].id] = true;
+        near(RF.forecast(items, s, 12).current.total, 0);
+    });
+
+    test('the months and the undated bar add up to the total', () => {
+        const rows = examples().concat([project('Proposal', 10000, 10000, 50, '2026-10-01', null)]);
+        const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('realistic'), 12);
+        near(f.current.dated + f.current.undated, f.current.total);
+        near(f.current.undated, 5000, 'the undated proposal');
+    });
+
+    test('payment mode and the check when a project is completed', () => {
+        eq(PP.isFull(PP.parse([{ month: '2026-12', amount: 100, full: true }])), true);
+        eq(PP.isFull(PP.parse([{ month: '2026-12', amount: 100 }])), false);
+        const p = { budget_min: 10000, budget_max: 10000 };
+        eq(PP.needsCompleteCheck(p, []), true, 'no payments: ask');
+        eq(PP.needsCompleteCheck(p, [{ month: '2026-10', amount: 10000, paid: true }]), false, 'all paid and covered');
+        eq(PP.needsCompleteCheck(p, [{ month: '2026-10', amount: 4000, paid: true }]), true, 'budget not covered');
+        eq(PP.needsCompleteCheck(p, [{ month: '2026-10', amount: 10000, paid: false, full: true }]), true, 'payment in full open');
+        const sum = PP.summarize(p, PP.parse([{ month: '2026-10', amount: 9000, paid: false, full: true }]));
+        eq(sum.full, true);
+        eq(sum.budget, null, 'a payment in full leaves nothing unplanned');
+        near(sum.open.max, 9000);
     });
 
     test('euro formats as in the project sheet', () => {

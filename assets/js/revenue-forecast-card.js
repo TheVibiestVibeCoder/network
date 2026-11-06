@@ -44,11 +44,11 @@
     const UNDATED_LABEL = 'No end date';
 
     // The project list, top to bottom, as everywhere in the CRM. Complete
-    // projects are not forecast, so they never show here.
+    // projects only show while they are still owed money.
     const STAGE_ORDER = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
 
-    const toneOf = key => (RF.STAGES.find(s => s.key === key) || {}).tone || 'lead';
-    const labelOf = key => (RF.STAGES.find(s => s.key === key) || {}).label || key;
+    const toneOf = key => (RF.STAGE_INFO.find(s => s.key === key) || {}).tone || 'lead';
+    const labelOf = key => (RF.STAGE_INFO.find(s => s.key === key) || {}).label || key;
 
     function esc(value) {
         return String(value == null ? '' : value)
@@ -71,6 +71,8 @@
         projects: [],
         // A fixed number of months on the axis, or null to run to the last end month.
         months: null,
+        // How the months are named under the total, e.g. "until Dec"; null: "in next 12 months".
+        periodLabel: null,
         settings: RF.settingsFor(RF.DEFAULT_PRESET),
         cards: [],
         listeners: []
@@ -229,8 +231,9 @@
             const s = state.settings;
             const counts = stageCounts(ctx);
             return `<div class="rf-legend">${RF.STACK.filter(key => counts[key]).map(key => {
-                const st = RF.STAGES.find(x => x.key === key);
-                const on = s.stages.indexOf(key) >= 0;
+                const st = RF.STAGE_INFO.find(x => x.key === key);
+                // Finished work still owed is always counted.
+                const on = key === RF.COMPLETE || s.stages.indexOf(key) >= 0;
                 return `<span class="rf-key${on ? ' is-on' : ''}" data-tone="${st.tone}">
                     <span class="rf-stage-dot" aria-hidden="true"></span>${esc(st.label)}${on ? '' : '<span class="rf-sr"> (not counted)</span>'}
                 </span>`;
@@ -244,9 +247,19 @@
                 <span class="rf-compare-item${f.active === p.key ? ' is-active' : ''}">${esc(p.label)}
                     <strong>${esc(RF.money(f.presets[p.key].total))}</strong></span>`).join('');
 
+            // What the total is made of: the months on the axis, and what has
+            // no month. The two always add up to the big number.
+            const period = shared.periodLabel || (f.months === 1 ? 'this month' : 'in next ' + f.months + ' months');
+            const split = `
+                <span class="rf-split">
+                    <span class="rf-split-line"><strong>${esc(RF.money(f.current.dated))}</strong> ${esc(period)}</span>
+                    <span class="rf-split-line"><strong>${esc(RF.money(f.current.undated))}</strong> no date</span>
+                </span>`;
+
             return `
                 <div class="rf-summary">
                     <span class="rf-hero" aria-label="${esc(RF.moneyFull(f.current.total))}">${esc(RF.money(f.current.total))}</span>
+                    ${split}
                     <span class="rf-compare">${compare}</span>
                 </div>`;
         }
@@ -284,10 +297,12 @@
 
         /** One payment or budget share, the way the table's Counted column puts it. */
         function partLine(ctx, g, part) {
-            const pct = ' × ' + Math.round(ctx.f.current.perProject[g.p.id].factor * 100) + '%';
+            const pct = g.p.complete ? '' : ' × ' + Math.round(ctx.f.current.perProject[g.p.id].factor * 100) + '%';
             if (part.kind === 'payment') {
-                return 'Payment ' + RF.money(part.raw) + pct
-                    + (part.o < 0 ? ' · due ' + RF.monthName(part.o, ctx.now) : '');
+                const what = part.full ? 'Payment in full ' : 'Payment ';
+                const when = part.o < 0 ? ' · due ' + RF.monthName(part.o, ctx.now)
+                    : part.o > 0 && g.p.complete ? ' · expected ' + RF.monthName(part.o, ctx.now) : '';
+                return what + RF.money(part.raw) + pct + when;
             }
             return 'Budget left ' + RF.money(part.raw) + pct + (part.months === 0 ? ' · no end date' : ' · at the end');
         }
@@ -311,7 +326,7 @@
                 <li class="rf-tip-project" data-tone="${toneOf(g.p.stage)}">
                     <span class="rf-tip-dot" aria-hidden="true"></span>
                     <span class="rf-tip-main">
-                        <a href="#" class="rf-tip-name" data-crm-action="open-project-overview" data-project-id="${esc(g.p.id)}">${esc(g.p.name)}</a>
+                        <a href="#" class="rf-tip-name" data-crm-action="open-project-overview" data-project-id="${esc(g.p.id)}">${esc(g.p.name)}</a>${g.p.complete ? (g.parts.some(x => x.o < 0) ? '<span class="rf-overdue">Overdue</span>' : '<span class="rf-overdue is-open">Not paid yet</span>') : ''}
                         ${g.parts.map(part => `<span class="rf-tip-part">${esc(partLine(ctx, g, part))}</span>`).join('')}
                     </span>
                     <span class="rf-tip-amount">${esc(RF.money(g.amount))}</span>
@@ -419,6 +434,19 @@
                 return { short: text, long: text };
             }
 
+            // Finished work still owed: counted in full, in the month it is
+            // expected - this month once that has passed.
+            if (p.complete) {
+                const overdue = p.due.some(x => x.o < 0);
+                const what = p.full ? 'Payment in full' : (c.openCount === 1 ? '1 open payment' : c.openCount + ' open payments');
+                const state = overdue ? 'overdue' : 'not paid yet';
+                return {
+                    short: what + ' ' + RF.money(c.open) + ' · ' + state,
+                    long: 'Complete, but not paid yet: ' + what.toLowerCase() + ' of ' + RF.moneyFull(c.open)
+                        + (overdue ? ', overdue - counted in full in this month until it is marked paid.' : ', counted in full.')
+                };
+            }
+
             const s = state.settings;
             const pct = Math.round(c.factor * 100) + '%';
             const budgetWord = p.min === p.max ? 'budget'
@@ -447,8 +475,9 @@
                 return { short: text, long: text + ' - nothing is forecast for this project.' };
             }
 
-            // Brackets when there are two parts: the chance applies to both.
-            let shortText = (short.length > 1 ? '(' + short.join(' + ') + ')' : short[0]) + ' × ' + pct;
+            // Two parts (open payments and budget left) as one sum: what is
+            // still open; the tooltip says what it is made of.
+            let shortText = (short.length > 1 ? RF.money(c.open + c.rest) + ' open' : short[0]) + ' × ' + pct;
             let longText = long.join(' and ') + (s.chance === 'all'
                 ? ', counted in full (every project won).'
                 : ', × its ' + pct + ' chance of success.');
@@ -501,7 +530,7 @@
                             </span>
                         </td>
                         <td>${p.max > 0 ? esc(RF.budgetLabel(p.min, p.max)) : '<span class="rf-muted">–</span>'}</td>
-                        <td><span class="rf-chance"><span class="project-chance-ring" style="--chance:${p.chance}" aria-hidden="true"></span>${p.chance}%</span></td>
+                        <td>${p.complete ? '<span class="rf-muted">Done</span>' : `<span class="rf-chance"><span class="project-chance-ring" style="--chance:${p.chance}" aria-hidden="true"></span>${p.chance}%</span>`}</td>
                         <td class="rf-cell-runs">${esc(RF.periodLabel(p.s, p.e, now))}</td>
                         <td class="rf-cell-value" title="${esc(how.long)}">
                             <span class="rf-value">${c.counted ? esc(RF.money(c.value)) : '–'}</span>
@@ -532,12 +561,6 @@
                         </table>
                     </div>` : ''}
                     ${missingNote(ctx)}
-                    <p class="rf-foot">The full budget counts, in the project's end month, as the final invoice; one past its end date counts in this month,
-                        one without an end date in the “No date” bar after the months.
-                        Expected payments count in their own month instead; only the part of the budget they leave open comes at the end, and paid ones are left out.
-                        <strong>Worst</strong>: only projects in progress, low end of the budget.
-                        <strong>Realistic</strong>: all projects, middle of the budget × chance.
-                        <strong>Best</strong>: every project won, high end of the budget.</p>
                 </div>`;
         }
 
@@ -611,8 +634,8 @@
             if (state.selected !== null && (!ctx.items.length || state.selected >= columnCount(ctx.f))) {
                 state.selected = null;
             }
-            const expandBtn = `<button type="button" class="btn btn-secondary btn-small rf-expand" data-rf-expand data-rf-focus="expand"
-                aria-expanded="${state.expanded}" aria-controls="${uid}-detail">${state.expanded ? 'Collapse' : 'Expand'}${CHEVRON}</button>`;
+            const expandBtn = `<button type="button" class="rf-expand" data-rf-expand data-rf-focus="expand"
+                aria-expanded="${state.expanded}" aria-controls="${uid}-detail">${state.expanded ? 'Hide details' : 'Show details'}${CHEVRON}</button>`;
 
             if (!ctx.items.length) {
                 clearOutside();
@@ -759,7 +782,7 @@
                     const id = t.getAttribute('data-rf-project');
                     const project = current && current.items.find(p => String(p.id) === id);
                     update(() => {
-                        if (project && s.stages.indexOf(project.stage) < 0) {
+                        if (project && !project.complete && s.stages.indexOf(project.stage) < 0) {
                             // Its stage is left out: count this project only. The
                             // stage's other projects stay off, as they were shown.
                             s.stages = RF.STAGE_KEYS.filter(k => k === project.stage || s.stages.indexOf(k) >= 0);
@@ -884,9 +907,13 @@
         return { chance: s.chance, budget: s.budget, stages: s.stages.slice(), excluded: Object.assign({}, s.excluded) };
     }
 
-    /** Fixes the axis to `n` months (Financials' "months ahead"); null lets it run to the last end month. */
-    function setMonths(n) {
+    /**
+     * Fixes the axis to `n` months (Financials' "months ahead"); null lets it
+     * run to the last end month. `label` names them under the total.
+     */
+    function setMonths(n, label) {
         shared.months = n > 0 ? n : null;
+        shared.periodLabel = label || null;
         renderAll();
     }
 

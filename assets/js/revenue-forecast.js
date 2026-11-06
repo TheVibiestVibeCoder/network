@@ -22,6 +22,12 @@
  * its end month - or a payment past its month - is due now, so it lands in
  * this month. One without an end date has no month for its rest: it goes
  * into a separate "undated" sum next to the months.
+ *
+ * A payment in full (one payment for the whole project) is the project's
+ * whole value: no budget is left beside it. Complete projects are forecast
+ * only while money is still owed: their unpaid payments, certain (factor 1),
+ * in every scenario. Like any payment, each counts in its own month - or,
+ * once that has passed and it is still unpaid, in this month, overdue.
  * Months are carried as an offset from the current month: 0 is this month,
  * -3 three months ago, 12 a year from now.
  */
@@ -30,8 +36,9 @@
 
     const PP = root.ProjectPayments;
 
-    // The open pipeline, in the order a project moves through it. Complete
-    // projects are not forecast; archived ones are no longer in the table.
+    // The open pipeline, in the order a project moves through it - the
+    // stages a scenario switches on and off. Archived projects are no longer
+    // in the table.
     const STAGES = [
         { key: 'Lead', label: 'Lead', tone: 'lead' },
         { key: 'Negotiation', label: 'Negotiation', tone: 'negotiation' },
@@ -40,8 +47,13 @@
     ];
     const STAGE_KEYS = STAGES.map(s => s.key);
 
+    // Complete projects are forecast only while they are still owed money,
+    // and then always: no scenario switches finished work off.
+    const COMPLETE = 'Complete';
+    const STAGE_INFO = [{ key: COMPLETE, label: 'Complete', tone: 'complete' }].concat(STAGES);
+
     // Bottom to top in a monthly bar: the surest money carries the rest.
-    const STACK = ['In Progress', 'Proposal', 'Negotiation', 'Lead'];
+    const STACK = [COMPLETE, 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
 
     // A preset is only a named combination of the controls below it.
     const PRESETS = [
@@ -111,7 +123,8 @@
         const missing = [];
 
         (projects || []).forEach(p => {
-            if (STAGE_KEYS.indexOf(p.stage) < 0) return;
+            const complete = p.stage === COMPLETE;
+            if (STAGE_KEYS.indexOf(p.stage) < 0 && !complete) return;
             // A project Claude proposed and nobody accepted yet is not ours.
             if (p.review_status === 'pending') return;
 
@@ -128,8 +141,29 @@
 
             const payments = PP.parse(p.payments);
             const planned = payments.reduce((sum, x) => sum + x.amount, 0);
-            // Only payments still to come are forecast, each at its month.
-            const due = payments.filter(x => !x.paid).map(x => ({ o: offsetOf(x.month, now), amount: x.amount }));
+            const full = PP.isFull(payments);
+            // Only payments still to come are forecast, each at its month -
+            // or this month once that has passed (`at`).
+            const due = payments.filter(x => !x.paid).map(x => {
+                const o = offsetOf(x.month, now);
+                return { o, at: Math.max(o, 0), amount: x.amount, full: !!x.full };
+            });
+
+            const base = { id: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: p.stage };
+
+            if (complete) {
+                // Paid in full, or never planned: nothing left to forecast.
+                if (!due.length) return;
+                items.push(Object.assign(base, {
+                    chance: 100,
+                    min: min === null ? 0 : min, max: max === null ? 0 : max, s, e,
+                    undated: false, complete: true, full,
+                    payments: payments.length,
+                    planned,
+                    due
+                }));
+                return;
+            }
 
             const gaps = [];
             if ((min === null || max === 0) && !payments.length) gaps.push('budget');
@@ -138,7 +172,6 @@
             // Payments without a budget: the payments are all there is.
             if (min === null) { min = 0; max = 0; }
 
-            const base = { id: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: p.stage };
             if (gaps.length) {
                 missing.push(Object.assign(base, { gaps }));
                 return;
@@ -147,7 +180,9 @@
             items.push(Object.assign(base, {
                 chance: Math.max(0, Math.min(100, chanceRaw)),
                 min, max, s, e,
-                undated: e === null,
+                // A payment in full leaves no budget for an end month.
+                undated: e === null && !full,
+                complete: false, full,
                 payments: payments.length,
                 planned,
                 due
@@ -159,8 +194,8 @@
 
     /** Months on the axis: this month to the last end month or payment, at least a year. */
     function horizon(items) {
-        return items.reduce((n, p) => p.due.reduce((m, x) => Math.max(m, x.o + 1),
-            p.undated ? n : Math.max(n, p.e + 1)), MIN_MONTHS);
+        return items.reduce((n, p) => p.due.reduce((m, x) => Math.max(m, x.at + 1),
+            p.undated || p.complete || p.e === null ? n : Math.max(n, p.e + 1)), MIN_MONTHS);
     }
 
     // ------------------------------------------------------------------
@@ -210,10 +245,28 @@
     // The sums
     // ------------------------------------------------------------------
 
+    /**
+     * The budget a setting counts with. A payment in full, and a complete
+     * project, are what their payments say: nothing of the budget is left
+     * to come beside them.
+     */
     function budgetFor(p, budget) {
+        if (p.full || p.complete) return p.planned;
         if (budget === 'low') return p.min;
         if (budget === 'high') return p.max;
         return (p.min + p.max) / 2;
+    }
+
+    /** Whether a setting counts a project: its stage is on (complete always is) and it is not switched off. */
+    function isCounted(p, settings, respectExcluded) {
+        const switchedOff = respectExcluded !== false && settings.excluded && settings.excluded[p.id];
+        if (switchedOff) return false;
+        return p.complete || settings.stages.indexOf(p.stage) >= 0;
+    }
+
+    /** What a project's amounts are multiplied by: its chance, or 1 - always 1 when complete. */
+    function factorFor(p, settings) {
+        return p.complete || settings.chance === 'all' ? 1 : p.chance / 100;
     }
 
     /**
@@ -235,9 +288,10 @@
      * `parts[i]` lists what makes up month i, and `undatedParts` the "No
      * date" bar - one entry per payment or budget share, so a hovered bar can
      * say which projects it comes from:
-     *     { id, kind: 'payment', amount, raw, o }   a payment (raw before the
-     *                                               factor; o its own month,
-     *                                               earlier when it is overdue)
+     *     { id, kind: 'payment', amount, raw, o, full }   a payment (raw
+     *                                               before the factor; o its
+     *                                               own month, earlier when it
+     *                                               is overdue)
      *     { id, kind: 'budget', amount, raw, of, months }   the budget left
      *                                               (`of`, here all of `raw`),
      *                                               in the end month (`months`
@@ -246,18 +300,17 @@
     function compute(items, settings, months, respectExcluded) {
         const byStage = {};
         const undatedByStage = {};
-        STAGE_KEYS.forEach(k => { byStage[k] = new Array(months).fill(0); undatedByStage[k] = 0; });
+        STACK.forEach(k => { byStage[k] = new Array(months).fill(0); undatedByStage[k] = 0; });
         const perProject = {};
         const parts = Array.from({ length: months }, () => []);
         const undatedParts = [];
 
         items.forEach(p => {
-            const switchedOff = respectExcluded && settings.excluded && settings.excluded[p.id];
-            const counted = settings.stages.indexOf(p.stage) >= 0 && !switchedOff;
+            const counted = isCounted(p, settings, respectExcluded);
             let value = 0;
             let after = 0;
             let undated = 0;
-            const factor = settings.chance === 'all' ? 1 : p.chance / 100;
+            const factor = factorFor(p, settings);
             const budget = budgetFor(p, settings.budget);
             const restRaw = Math.max(0, budget - p.planned);
             if (counted) {
@@ -270,7 +323,7 @@
                         after += v;
                     }
                 };
-                p.due.forEach(x => add(Math.max(x.o, 0), x.amount * factor, { kind: 'payment', raw: x.amount, o: x.o }));
+                p.due.forEach(x => add(x.at, x.amount * factor, { kind: 'payment', raw: x.amount, o: x.o, full: x.full }));
 
                 const rest = restRaw * factor;
                 if (rest > 0 && p.undated) {
@@ -292,11 +345,14 @@
         });
 
         const totals = new Array(months).fill(0)
-            .map((_, i) => STAGE_KEYS.reduce((sum, k) => sum + byStage[k][i], 0));
-        const undated = STAGE_KEYS.reduce((sum, k) => sum + undatedByStage[k], 0);
+            .map((_, i) => STACK.reduce((sum, k) => sum + byStage[k][i], 0));
+        const undated = STACK.reduce((sum, k) => sum + undatedByStage[k], 0);
+        const dated = totals.reduce((a, b) => a + b, 0);
         return {
             byStage, totals, undatedByStage, undated, perProject, parts, undatedParts,
-            total: totals.reduce((a, b) => a + b, 0) + undated
+            // The total is always what the months hold plus the "No date" bar.
+            dated,
+            total: dated + undated
         };
     }
 
@@ -331,7 +387,7 @@
             scale: scale(Math.max(0, ceiling.undated, ...ceiling.totals)),
             busiest,
             // Only when an undated project has budget its payments leave open.
-            hasUndated: items.some(p => p.undated && p.max > p.planned),
+            hasUndated: items.some(p => p.undated && !p.full && p.max > p.planned),
             active: activePreset(settings),
             counted: items.filter(p => current.perProject[p.id].counted).length
         };
@@ -382,9 +438,9 @@
     }
 
     root.RevenueForecast = {
-        STAGES, STAGE_KEYS, STACK, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
+        STAGES, STAGE_KEYS, STAGE_INFO, COMPLETE, STACK, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
         monthOf, offsetOf, calendarMonth, monthName,
-        prepare, horizon,
+        prepare, horizon, budgetFor, isCounted, factorFor,
         presetByKey, settingsFor, normalizeSettings, excludedCount, activePreset,
         compute, scale, forecast,
         money, moneyFull, moneyShort, budgetLabel, periodLabel

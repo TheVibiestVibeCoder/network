@@ -2,8 +2,8 @@
  * Financials (admins only): cash, costs and what is coming in.
  *
  * Draws the tab from four sources: the projects (budgets, expected
- * payments), our costs, balance and settings (api/financials.php), and the
- * bank movements in Bookkeeping. The numbers all come from cashflow.js; this
+ * payments), our costs, balance, debts and settings (api/financials.php),
+ * and the bank movements in Bookkeeping. The numbers all come from cashflow.js; this
  * file only turns them into HTML and saves what is edited here.
  *
  * The scenario is the revenue forecast's (revenue-forecast-card.js): its
@@ -23,6 +23,8 @@
 
     const API = 'api/financials.php';
     const HORIZON_KEY = 'crm.financials.months';
+    // Folded or unfolded, per card: 'year', 'liquidity'.
+    const FOLD_KEY = 'crm.financials.open.';
     const CATEGORIES = ['Salaries', 'Rent', 'Software', 'Insurance', 'Taxes', 'Freelancers', 'Travel', 'Marketing', 'Bank', 'Other'];
     const INTERVALS = [
         { value: 1, label: 'Monthly', short: 'monthly' },
@@ -56,7 +58,14 @@
         suggestions: [],
         // This year's result so far and where it ends (cashflow.js yearResult).
         year: null,
+        // Unfolded to their details: the year card (revenue and costs behind
+        // the two results), the liquidity card (low point, buffer), and the
+        // months gone by in the table (one summary row when folded).
+        folds: { year: false, liquidity: false, past: false },
         openMonths: new Set(),
+        // A debt being added or edited (its detail view): a draft, id null for new.
+        debtDraft: null,
+        debtError: '',
         showPastPlanned: false,
         hover: null,
         token: 0
@@ -135,6 +144,8 @@
     const ICON = {
         plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         warn: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
+        up: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>',
+        down: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7l10 10M17 9v8H9"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
         repeat: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5 20.5 6 17 9.5"/><path d="M3.5 11.5V10a4 4 0 0 1 4-4h13"/><path d="M7 21.5 3.5 18 7 14.5"/><path d="M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>',
         trash: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>',
@@ -149,18 +160,19 @@
         if (state.inited) return;
         state.inited = true;
         ['financialsView', 'finHeadTools', 'finPage', 'finKpis', 'finAlerts', 'finChart', 'finMonths',
-            'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
+            'finDebts', 'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
             const stored = localStorage.getItem(HORIZON_KEY);
             if (stored === 'year') state.horizon = 'year';
             else if (CF.HORIZONS.indexOf(Number(stored)) >= 0) state.horizon = Number(stored);
         } catch (e) { /* no storage: a year */ }
+        try { Object.keys(state.folds).forEach(k => { state.folds[k] = localStorage.getItem(FOLD_KEY + k) === '1'; }); } catch (e) { /* folded */ }
 
         Card.init(els.finForecast, { name: 'financials', controls: els.finScenario, adjust: els.finAdjust });
         // The forecast looks as far ahead as the rest of the page.
         state.months = monthsFor(state.horizon);
-        Card.setMonths(state.months);
+        Card.setMonths(state.months, periodText());
         Card.onChange(() => {
             if (!state.loaded) return;
             compute();
@@ -219,6 +231,11 @@
         return horizon === 'year' ? 12 - RF.monthOf(new Date()).month : horizon;
     }
 
+    /** "in next 12 months", or "until Dec" for the year - under the forecast's total. */
+    function periodText() {
+        return state.horizon === 'year' ? 'until Dec' : `in next ${plural(state.months, 'month')}`;
+    }
+
     /** "over the next 12 months", or "until Dec 2026" for the year. */
     function horizonText() {
         return state.horizon === 'year'
@@ -233,6 +250,7 @@
             costs: state.overview.costs,
             balances: state.overview.balances,
             transactions: state.tx.rows,
+            debts: state.overview.debts || [],
             settings: state.overview.settings,
             scenario: Card.getSettings(),
             months: state.months,
@@ -283,6 +301,7 @@
         renderAlerts();
         renderChart();
         renderMonths();
+        renderDebts();
 
         if (focusKey) {
             const again = els.financialsView.querySelector(`[data-fin-focus="${focusKey}"]`);
@@ -341,7 +360,11 @@
             const o = c.kind === 'once' ? RF.offsetOf(c.start_month, now) : null;
             return o !== null && o >= 0 && o < p.months;
         }).length;
-        const total = k.fixedTotal + k.plannedTotal;
+        // Loan repayments in these months count as planned costs.
+        const repayments = repaymentsAhead();
+        const plannedNote = [plannedCount ? plural(plannedCount, 'cost') : '', repayments.length ? plural(repayments.length, 'repayment') : '']
+            .filter(Boolean).join(' · ') || '0 costs';
+        const total = k.fixedTotal + k.plannedTotal + k.debtTotal;
 
         // The costs card unfolds downwards to edit what is in it, as the
         // balance and the buffer do on the liquidity card.
@@ -350,10 +373,10 @@
             <article class="fin-kpi fin-kpi--costs${state.costsOpen ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Costs</span>
                 <span class="fin-kpi-value">${esc(euro(total))}</span>
-                <span class="fin-kpi-sub">${esc(span)} · <strong>Ø ${esc(euro(total / Math.max(1, p.months)))}</strong>/month</span>
-                ${kpiLines([
-                    [`Fixed · ${euro(k.fixedPerMonth)}/month`, euro(k.fixedTotal)],
-                    [`Planned · ${plural(plannedCount, 'cost')}`, euro(k.plannedTotal)]
+                <span class="fin-kpi-sub">${esc(span)}</span>
+                ${tiles([
+                    { label: 'Fixed', value: euro(k.fixedTotal), sub: `${euro(k.fixedPerMonth)}/month` },
+                    { label: 'Planned', value: euro(k.plannedTotal + k.debtTotal), sub: plannedNote }
                 ])}
                 ${suggestions && !state.costsOpen ? `<button type="button" class="fin-suggest-pill" data-fin-costs data-fin-focus="costs-suggest"
                     title="Recurring payments in Bookkeeping that are not among the fixed costs yet">${ICON.repeat}${esc(plural(suggestions, 'suggestion'))}</button>` : ''}
@@ -393,34 +416,31 @@
         const lowTone = !low ? '' : low.amount < 0 ? 'is-neg' : (k.belowBuffer ? 'is-warn' : '');
 
         return `
-            <article class="fin-kpi fin-kpi--liquidity">
+            <article class="fin-kpi fin-kpi--liquidity${state.folds.liquidity ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Liquidity</span>
                 <span class="fin-kpi-value${b && b.amount < 0 ? ' is-neg' : ''}">${b ? esc(money(b.amount)) : '—'}</span>
                 <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
                 <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
                     title="${esc(balanceNote())}">${b ? 'Update' : 'Enter balance'}</button>
-                <dl class="fin-kpi-lines">
-                    <div title="The last month before the balance would fall below zero, under the ${esc(scenarioName())} scenario">
-                        <dt>Lasts until</dt><dd class="${lastsTone}">${esc(lasts)}</dd>
+                <div class="fin-band ${lastsTone}" title="The last month before the balance would fall below zero">
+                    <div class="fin-band-head">
+                        <div class="fin-band-label">
+                            <span>Lasts until</span>
+                            <button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>
+                        </div>
+                        <strong class="fin-band-value">${esc(lasts)}</strong>
                     </div>
-                    <div>
-                        <dt>Low point${low ? ` · ${esc(low.label)}` : ''}</dt><dd class="${lowTone}">${low && b ? esc(money(low.amount)) : '—'}</dd>
-                    </div>
-                    <div>
-                        <dt>Buffer</dt>
-                        <dd><button type="button" class="fin-link fin-balance-link" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
-                            title="The least that should always be in the account; the chart and the low point warn below it">${p.settings.buffer > 0 ? esc(euro(p.settings.buffer)) : 'Set'}</button></dd>
-                    </div>
-                </dl>
+                </div>
+                ${state.folds.liquidity ? tiles([
+                    { label: 'Low point', value: low && b ? money(low.amount) : '—', sub: low ? low.label : '', valueCls: lowTone },
+                    { label: 'Buffer', sub: p.settings.buffer > 0 ? 'always keep' : '',
+                        valueHtml: `<button type="button" class="fin-link fin-balance-link" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
+                            title="The least that should always be in the account; the chart and the low point warn below it">${p.settings.buffer > 0 ? esc(euro(p.settings.buffer)) : 'Set'}</button>` }
+                ]) : ''}
+                ${foldToggle('liquidity')}
                 ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
                 ${state.bufferOpen ? bufferForm() : ''}
             </article>`;
-    }
-
-    /** The two lines under a card's figure: [[label, value, class?], ...]. */
-    function kpiLines(lines) {
-        return `<dl class="fin-kpi-lines">${lines.map(([label, value, cls]) => `
-            <div><dt>${esc(label)}</dt><dd class="${cls || ''}">${esc(value)}</dd></div>`).join('')}</dl>`;
     }
 
     /** "Realistic", or "custom" for a scenario adjusted by hand. */
@@ -432,31 +452,64 @@
 
     /**
      * The first card: this year's result so far - profit or loss without the
-     * VAT, from Bookkeeping - what the plan adds until December, and where
-     * the year ends under the scenario.
+     * VAT, from Bookkeeping plus fixed costs paid but not booked yet - and
+     * the year's result as the scenario projects it. Folded it shows just
+     * those two; unfolded, the revenue and costs behind each.
      */
     function yearCard() {
         const y = state.year;
-        const tone = v => (Math.round(v) > 0 ? 'is-pos' : Math.round(v) < 0 ? 'is-neg' : '');
-        // What came in and went out this year, each without its VAT.
-        const income = y.months.reduce((sum, m) => sum + m.income, 0);
-        const costs = y.months.reduce((sum, m) => sum + m.costs, 0);
+        const open = state.folds.year;
+        const unbooked = y.paidUnbooked > 0.005 ? ` - includes ${euro(y.paidUnbooked)} fixed costs paid but not booked yet` : '';
         return `
-            <article class="fin-kpi fin-kpi--year">
+            <article class="fin-kpi fin-kpi--year${open ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Net result YTD</span>
-                <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
-                <span class="fin-kpi-sub" title="Jan 1 – ${esc(dayName(todayIso()))}, from Bookkeeping, without VAT">In <strong class="is-pos">${esc(signed(income))}</strong> · Out <strong>${esc(signed(-costs))}</strong></span>
-                <dl class="fin-kpi-lines">
-                    <div title="What the plan nets from now until December: income under the scenario less the costs still to come">
-                        <dt>Planned until Dec</dt>
-                        <dd class="${tone(y.planned)}">${esc(signed(y.planned))}</dd>
+                <span class="fin-kpi-value ${tone(y.actual)}" title="Jan 1 – ${esc(dayName(todayIso()))}, without VAT">${esc(signed(y.actual))}</span>
+                ${open ? tiles([
+                    { label: 'Revenue', icon: ICON.up, cls: 'is-up', value: signed(y.income) },
+                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), title: 'Paid so far' + unbooked }
+                ]) : ''}
+                <div class="fin-band ${tone(y.projected)}">
+                    <div class="fin-band-head">
+                        <div class="fin-band-label">
+                            <span>Projected result ${y.year}</span>
+                            <button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>
+                        </div>
+                        <strong class="fin-band-value">${esc(signed(y.projected))}</strong>
                     </div>
-                    <div title="A projection: the result so far plus what the plan nets until December">
-                        <dt>${y.year} projection<span class="fin-tag fin-kpi-scenario">${esc(scenarioName())}</span></dt>
-                        <dd class="${tone(y.projected)}">${esc(signed(y.projected))}</dd>
-                    </div>
-                </dl>
+                    ${open ? `
+                    <dl class="fin-band-lines">
+                        <div><dt>Open revenue</dt><dd>${esc(signed(y.incomeRest))}</dd></div>
+                        <div><dt>Open costs</dt><dd>${esc(signed(-y.costsRest))}</dd></div>
+                    </dl>` : ''}
+                </div>
+                ${foldToggle('year')}
             </article>`;
+    }
+
+    /** "Show details" / "Hide details" under a card that folds. */
+    function foldToggle(key) {
+        const open = state.folds[key];
+        return `<button type="button" class="fin-kpi-toggle" data-fin-fold="${key}" data-fin-focus="fold-${key}" aria-expanded="${open}">
+                    ${open ? 'Hide details' : 'Show details'}${ICON.chevron}
+                </button>`;
+    }
+
+    /** "is-pos" / "is-neg" / "" for a result, by its whole euros. */
+    function tone(v) {
+        return Math.round(v) > 0 ? 'is-pos' : Math.round(v) < 0 ? 'is-neg' : '';
+    }
+
+    /**
+     * Two figures side by side on soft tiles inside a card:
+     * [{ label, value, sub?, icon?, cls?, valueCls?, title?, valueHtml? }].
+     */
+    function tiles(list) {
+        return `<div class="fin-tiles">${list.map(t => `
+            <div class="fin-tile"${t.title ? ` title="${esc(t.title)}"` : ''}>
+                <span class="fin-tile-label ${t.cls || ''}">${t.icon || ''}${esc(t.label)}</span>
+                <strong class="fin-tile-value ${t.valueCls || ''}">${t.valueHtml || esc(t.value)}</strong>
+                ${t.sub ? `<small class="fin-tile-sub">${esc(t.sub)}</small>` : ''}
+            </div>`).join('')}</div>`;
     }
 
     function bufferForm() {
@@ -509,14 +562,11 @@
 
     function renderAlerts() {
         const p = state.plan;
-        const k = p.kpis;
         const alerts = [];
         // Below zero or below the buffer is on the "Lowest balance" card
         // already, in its colour; a banner repeating it was one too many.
-        if (k.overdue.count) {
-            const oldest = p.income.filter(x => x.counted && x.overdue).sort((a, b) => a.due - b.due)[0];
-            alerts.push({ tone: 'warn', html: `<strong>${esc(euro(k.overdue.amount))} overdue</strong> · ${esc(oldest.name)}${k.overdue.count > 1 ? ` and ${k.overdue.count - 1} more` : ''}` });
-        }
+        // Overdue payments show in the month detail and the forecast;
+        // no banner for them here.
         if (!p.hasBalance) {
             alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one on the first card.' });
         }
@@ -793,18 +843,28 @@
         const buffer = p.settings.buffer;
         const balClass = v => (v < 0 ? 'is-neg' : buffer > 0 && v < buffer ? 'is-low' : '');
 
-        // This year's months gone by, as their actual result from Bookkeeping.
+        // This year's months gone by, as their actual result from Bookkeeping:
+        // one summary row, unfolded to the single months.
         const dash = '<span class="fin-muted">–</span>';
-        const past = state.year.months.filter(m => m.offset < 0).map(m => `
-                <tr class="fin-month is-past">
+        const months = state.year.months.filter(m => m.offset < 0);
+        const pastOpen = state.folds.past;
+        const pastRows = months.map(m => {
+            const open = state.openMonths.has(m.offset);
+            return `
+                <tr class="fin-month is-past${open ? ' is-open' : ''}">
                     <th scope="row">
-                        <span class="fin-month-label"><span>${esc(m.label)}</span><span class="fin-tag">actual</span></span>
+                        ${m.rows ? `<button type="button" class="fin-month-toggle" data-fin-month="${m.offset}" data-fin-focus="month-${m.offset}" aria-expanded="${open}">
+                            ${ICON.chevron}<span>${esc(m.label)}</span><span class="fin-tag">actual</span>
+                        </button>` : `<span class="fin-month-label"><span>${esc(m.label)}</span><span class="fin-tag">actual</span></span>`}
                     </th>
                     <td class="is-pos">${m.income > 0.005 ? esc(signed(m.income)) : dash}</td>
                     <td>${m.costs > 0.005 ? esc(signed(-m.costs)) : dash}</td>
                     <td class="${m.result < 0 ? 'is-neg' : 'is-pos'}">${m.rows ? `<strong>${esc(signed(m.result))}</strong>` : dash}</td>
                     <td class="fin-col-balance ${m.rows && m.closing !== null ? balClass(m.closing) : ''}">${m.rows && m.closing !== null ? esc((m.closing < 0 ? MINUS : '') + euro(Math.abs(m.closing))) : dash}</td>
-                </tr>`).join('');
+                </tr>
+                ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(m.offset, null)}</td></tr>` : ''}`;
+        }).join('');
+        const past = months.length ? pastSummary(months, pastOpen, balClass) + (pastOpen ? pastRows : '') : '';
 
         const sofar = state.year.months.find(m => m.offset === 0);
         const body = past + p.rows.map(r => {
@@ -813,7 +873,9 @@
             // plus what the plan still expects - not only what is left.
             const now = r.offset === 0 && sofar;
             const inV = r.in + (now ? sofar.income : 0);
-            const outV = r.fixed + r.planned + (now ? sofar.costs : 0);
+            // Every cost of the month, paid ones too: a fixed cost already
+            // paid but not in Bookkeeping yet counts here (not again in the balance).
+            const outV = r.fixed + r.planned + r.debt + r.paidUnbooked + (now ? sofar.costs : 0);
             const net = inV - outV;
             return `
                 <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}"${now ? ' title="Already in Bookkeeping this month plus what is still planned"' : ''}>
@@ -827,7 +889,7 @@
                     <td class="${net < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(net))}</strong></td>
                     <td class="fin-col-balance ${p.hasBalance ? balClass(r.closing) : ''}">${p.hasBalance ? esc((r.closing < 0 ? MINUS : '') + euro(Math.abs(r.closing))) : '<span class="fin-muted">–</span>'}</td>
                 </tr>
-                ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(r)}</td></tr>` : ''}`;
+                ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(r.offset, r)}</td></tr>` : ''}`;
         }).join('');
 
         els.finMonths.innerHTML = `
@@ -845,27 +907,287 @@
             </div>`;
     }
 
-    function monthDetail(r) {
+    /** "Jan – Oct 2026": the months gone by this year, in one row with their totals. */
+    function pastSummary(months, open, balClass) {
+        const first = months[0];
+        const last = months[months.length - 1];
+        const label = months.length === 1 ? last.label
+            : first.label.replace(/\s\d{4}$/, '') + ' – ' + last.label;
+        const income = months.reduce((n, m) => n + m.income, 0);
+        const costs = months.reduce((n, m) => n + m.costs, 0);
+        const result = income - costs;
+        const withBalance = months.filter(m => m.rows && m.closing !== null);
+        const closing = withBalance.length ? withBalance[withBalance.length - 1].closing : null;
+        const dash = '<span class="fin-muted">–</span>';
+        return `
+                <tr class="fin-month is-past is-summary${open ? ' is-open' : ''}">
+                    <th scope="row">
+                        <button type="button" class="fin-month-toggle" data-fin-fold="past" data-fin-focus="fold-past" aria-expanded="${open}"
+                            title="${open ? 'Fold the months gone by' : 'Show each month gone by'}">
+                            ${ICON.chevron}<span>${esc(label)}</span><span class="fin-tag">actual</span>
+                        </button>
+                    </th>
+                    <td class="is-pos">${income > 0.005 ? esc(signed(income)) : dash}</td>
+                    <td>${costs > 0.005 ? esc(signed(-costs)) : dash}</td>
+                    <td class="${result < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(result))}</strong></td>
+                    <td class="fin-col-balance ${closing !== null ? balClass(closing) : ''}">${closing !== null ? esc((closing < 0 ? MINUS : '') + euro(Math.abs(closing))) : dash}</td>
+                </tr>`;
+    }
+
+    /**
+     * A month's bank rows from Bookkeeping, net of VAT like the month's
+     * totals, largest first: { in: [...], out: [...] }.
+     */
+    function bookedRows(offset) {
+        const key = monthKey(offset, RF.monthOf(new Date()));
+        const net = t => t.amount + (Number(t.vat) || 0);
+        const rows = (state.tx.rows || []).filter(t => !t.excluded && String(t.date).slice(0, 7) === key);
+        const item = (t, fallback, sign) => ({ name: t.party || fallback, date: t.date, amount: sign * net(t), open: !!t.open });
+        return {
+            in: rows.filter(t => t.amount > 0).map(t => item(t, 'Incoming payment', 1)).sort((a, b) => b.amount - a.amount),
+            out: rows.filter(t => t.amount < 0).map(t => item(t, 'Payment', -1)).sort((a, b) => b.amount - a.amount)
+        };
+    }
+
+    const BOOKED_LIMIT = 8;
+
+    /**
+     * An unfolded month: income on one side, costs on the other - each
+     * split into what has already flowed (Bookkeeping) and what is still to
+     * come (the plan), with its sum. The two columns add up to the month's
+     * In and Costs in the table.
+     *   offset: the month; r: its plan row, or null for a month gone by
+     */
+    function monthDetail(offset, r) {
+        const booked = offset <= 0 ? bookedRows(offset) : { in: [], out: [] };
+        const sumOf = (list, fn) => list.reduce((t, x) => t + fn(x), 0);
+
         const line = (name, meta, amount, cls) => `
-            <li class="${cls || ''}"><span class="fin-detail-name">${name}${meta ? `<span class="fin-detail-meta">${meta}</span>` : ''}</span><span class="fin-detail-amount">${amount}</span></li>`;
-        const income = r.items.income.map(x => line(
+            <li class="fin-flow-item${cls ? ' ' + cls : ''}">
+                <span class="fin-flow-name">${name}${meta ? `<span class="fin-flow-meta">${meta}</span>` : ''}</span>
+                <span class="fin-flow-amount">${amount}</span>
+            </li>`;
+
+        const bookedList = (rows, sign) => {
+            const shown = rows.slice(0, BOOKED_LIMIT);
+            const rest = rows.slice(BOOKED_LIMIT);
+            return shown.map(t => line(esc(t.name), esc(dayName(t.date)), esc(signed(sign * t.amount)))).join('')
+                + (rest.length ? `<li class="fin-flow-more">${esc(plural(rest.length, 'more'))} · ${esc(signed(sign * sumOf(rest, t => t.amount)))}</li>` : '');
+        };
+
+        const group = (title, total, sign, body, cls) => body ? `
+            <div class="fin-flow-group${cls ? ' ' + cls : ''}">
+                <p class="fin-flow-group-title"><span>${esc(title)}</span><strong>${esc(signed(sign * total))}</strong></p>
+                <ul class="fin-flow-list">${body}</ul>
+            </div>` : '';
+
+        // Income: what came in, then what is still open.
+        const expected = r ? r.items.income : [];
+        const received = group('Received', sumOf(booked.in, t => t.amount), 1, bookedList(booked.in, 1));
+        const openIn = group('Open', sumOf(expected, x => x.expected), 1, expected.map(x => line(
             `<a href="#" data-crm-action="open-project-overview" data-project-id="${esc(x.projectId)}">${esc(x.name)}</a>`,
-            esc(incomeKind(x) + (x.overdue ? ' · overdue' : '') + (x.factor < 1 ? ` · ${Math.round(x.factor * 100)}% of ${euro(x.net)}` : '')),
-            esc(signed(x.expected)), 'is-in'));
-        const costs = r.items.costs.map(c => line(esc(c.cost.name),
-            esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost), c.paid ? 'already paid this month' : ''].filter(Boolean).join(' · ')),
-            esc(signed(-c.amount)), c.paid ? 'is-paid' : 'is-out'));
-        const sofar = r.offset === 0 ? state.year.months.find(m => m.offset === 0) : null;
-        const actual = sofar && sofar.rows ? [line('So far this month',
-            esc('actual, from Bookkeeping'),
-            esc(signed(sofar.result)), 'is-actual')] : [];
-        const all = actual.concat(income, costs);
-        return all.length ? `<ul class="fin-detail">${all.join('')}</ul>` : '<p class="fin-muted fin-detail-empty">Nothing planned this month.</p>';
+            esc([incomeKind(x), x.factor < 1 ? `${Math.round(x.factor * 100)}% of ${euro(x.net)}` : ''].filter(Boolean).join(' · '))
+                + (x.overdue ? '<span class="fin-flow-late">overdue</span>' : ''),
+            esc(signed(x.expected)))).join(''), 'is-open');
+        const inTotal = sumOf(booked.in, t => t.amount) + sumOf(expected, x => x.expected);
+
+        // Costs: everything paid this month - the bank rows, and fixed costs
+        // whose day has passed that Bookkeeping does not have yet - then
+        // what is still open.
+        const costs = r ? r.items.costs : [];
+        const unbooked = costs.filter(c => c.paid && !c.booked);
+        const toCome = costs.filter(c => !c.paid);
+        const debts = r ? r.items.debts : [];
+        const paidTotal = sumOf(booked.out, t => t.amount) + sumOf(unbooked, c => c.amount);
+        const paid = group('Paid', paidTotal, -1, bookedList(booked.out, -1)
+            + unbooked.map(c => line(esc(c.cost.name), esc(rhythm(c.cost)), esc(signed(-c.amount)))).join(''));
+        const openTotal = sumOf(toCome, c => c.amount) + sumOf(debts, d => d.amount);
+        const openOut = group('Open', openTotal, -1, toCome.map(c => line(esc(c.cost.name),
+            esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost)].filter(Boolean).join(' · ')),
+            esc(signed(-c.amount)))).join('')
+            + debts.map(d => line(esc(d.debt.name), esc(`repayment ${euro(d.principal)} + ${euro(d.interest)} interest`),
+                esc(signed(-d.amount)))).join(''), 'is-open');
+        const outTotal = paidTotal + openTotal;
+
+        const empty = '<p class="fin-flow-empty">Nothing</p>';
+        if (!received && !openIn && !paid && !openOut) {
+            return '<p class="fin-muted fin-detail-empty">Nothing booked or planned this month.</p>';
+        }
+        return `
+            <div class="fin-flow">
+                <section class="fin-flow-col is-in" aria-label="Income">
+                    <header class="fin-flow-head"><span>Income</span><strong>${esc(signed(inTotal))}</strong></header>
+                    ${received + openIn || empty}
+                </section>
+                <section class="fin-flow-col is-out" aria-label="Costs">
+                    <header class="fin-flow-head"><span>Costs</span><strong>${esc(signed(-outTotal))}</strong></header>
+                    ${paid + openOut || empty}
+                </section>
+            </div>`;
     }
 
     function incomeKind(x) {
-        if (x.kind === 'payment') return 'Expected payment';
+        if (x.kind === 'payment') return x.full ? 'Payment in full' : 'Expected payment';
         return x.partial ? 'Rest of budget' : 'Final invoice';
+    }
+
+    // ---- Debts ----
+
+    /** "Mar 1, 2025": loans run over years, so always with the year. */
+    const fullDay = iso => (iso ? window.CRMFormat.date(iso, { year: true }) : '');
+
+    /** "4,5 %" */
+    const ratePct = r => String(Math.round((Number(r) || 0) * 1000) / 1000).replace('.', ',') + ' %';
+
+    /** Interest with cents: on a loan they add up and are checked to the cent. */
+    const cents = n => PP.euro(Math.round(n * 100) / 100);
+
+    /**
+     * Debts: every loan with whom it is owed to, its dates and rate, and the
+     * interest it has run up until today - and will have by its repayment.
+     * A loan opens into its detail view to change it.
+     */
+    function renderDebts() {
+        if (!els.finDebts) return;
+        const debts = state.overview.debts || [];
+        const today = todayIso();
+        const sum = CF.debtSummary(debts, today);
+        const draft = state.debtDraft;
+
+        const rows = sum.list.map(d => {
+            if (draft && draft.id === d.id) return `<li>${debtForm(draft)}</li>`;
+            const i = d.interest;
+            const when = fullDay(d.start_date) + (d.end_date ? ' – ' + fullDay(d.end_date) : '');
+            return `
+                <li>
+                    <button type="button" class="fin-debt${i.repaid ? ' is-repaid' : ''}" data-fin-debt-edit="${d.id}" data-fin-focus="debt-${d.id}">
+                        <span class="fin-debt-main">
+                            <span class="fin-debt-name">${esc(d.name)}${i.repaid ? '<span class="fin-tag">repaid</span>' : ''}</span>
+                            <span class="fin-debt-meta">${esc(when)}</span>
+                        </span>
+                        <span class="fin-debt-figures">
+                            <strong>${esc(euro(d.amount))}</strong>
+                            <span>${i.started ? `${esc(signed(-i.toDate))} interest so far` : 'not started yet'}</span>
+                        </span>
+                    </button>
+                </li>`;
+        }).join('');
+
+        const stats = sum.count ? `
+            <dl class="fin-debt-stats">
+                <div><dt>Owed</dt><dd>${esc(euro(sum.outstanding))}</dd></div>
+                <div title="Amount × rate p.a. × days / 365, until today"><dt>Interest so far</dt><dd class="is-neg">${esc(signed(-sum.interestToDate))}</dd></div>
+            </dl>` : '';
+
+        els.finDebts.innerHTML = `
+            <div class="fin-card-head">
+                <h2 class="fin-card-title">Debts</h2>
+                <button type="button" class="ov-add-btn" data-fin-debt-add data-fin-focus="debt-add">${ICON.plus}Add debt</button>
+            </div>
+            ${draft && draft.id === null ? debtForm(draft) : ''}
+            ${stats}
+            ${rows ? `<ul class="fin-debt-list">${rows}</ul>` : (draft ? '' : '<p class="fin-muted fin-panel-empty">No debts entered.</p>')}`;
+    }
+
+    /** The interest a draft would run up, worked out as it is typed. */
+    function debtPreview(d) {
+        const amount = readAmount(d.amount);
+        const rate = d.rate === '' ? 0 : readAmount(d.rate);
+        if (amount === null || Number.isNaN(amount) || amount <= 0 || Number.isNaN(rate) || !d.start_date) {
+            return '<p class="fin-hint">Enter the amount, rate and start date to see the interest.</p>';
+        }
+        const i = CF.debtInterest({ amount, rate, start_date: d.start_date, end_date: d.end_date || null }, todayIso());
+        const parts = [
+            `<div><dt>Per day</dt><dd>${esc(cents(i.daily))}</dd></div>`,
+            `<div><dt>So far · ${esc(plural(i.days, 'day'))}</dt><dd>${esc(cents(i.toDate))}</dd></div>`,
+            i.total !== null
+                ? `<div><dt>By repayment${i.daysLeft ? ' · ' + esc(plural(i.daysLeft, 'day')) + ' left' : ''}</dt><dd>${esc(cents(i.total))}</dd></div>`
+                : '<div><dt>By repayment</dt><dd class="fin-muted">no date set</dd></div>'
+        ];
+        return `<dl class="fin-debt-preview" data-fin-debt-preview>${parts.join('')}</dl>`;
+    }
+
+    function debtForm(d) {
+        return `
+            <form class="fin-cost-form fin-debt-form" data-fin-debt-form aria-label="${d.id ? 'Edit debt' : 'New debt'}">
+                <p class="fin-form-title">${d.id ? 'Debt' : 'New debt'}</p>
+                <div class="fin-field-grid">
+                    <label class="fin-field is-wide"><span>Name</span>
+                        <input type="text" class="form-input" name="name" value="${esc(d.name)}" maxlength="255" required placeholder="e.g. Bank loan, shareholder loan" data-fin-focus="debt-name"></label>
+                    <label class="fin-field is-wide"><span>Owed to</span>
+                        <input type="text" class="form-input" name="lender" value="${esc(d.lender || '')}" maxlength="255" placeholder="Who lent us the money, e.g. Erste Bank"></label>
+                    <label class="fin-field"><span>Amount</span>
+                        <span class="fin-amount"><input type="text" class="form-input" name="amount" value="${esc(d.amount)}" required data-amount inputmode="decimal" autocomplete="off" placeholder="0"><span aria-hidden="true">€</span></span></label>
+                    <label class="fin-field"><span>Interest rate p.a.</span>
+                        <span class="fin-amount"><input type="text" class="form-input" name="rate" value="${esc(d.rate)}" inputmode="decimal" autocomplete="off" placeholder="0"><span aria-hidden="true">%</span></span></label>
+                    <label class="fin-field"><span>Start date</span>
+                        <input type="date" class="form-input" name="start_date" value="${esc(d.start_date)}" required></label>
+                    <label class="fin-field"><span>Repayment date <em class="fin-optional">optional</em></span>
+                        <input type="date" class="form-input" name="end_date" value="${esc(d.end_date || '')}"></label>
+                    <label class="fin-field is-wide"><span>Note <em class="fin-optional">optional</em></span>
+                        <textarea class="form-input" name="note" rows="2" maxlength="2000" placeholder="Terms, contract number, …">${esc(d.note || '')}</textarea></label>
+                </div>
+                <div data-fin-debt-preview-wrap>${debtPreview(d)}</div>
+                ${state.debtError ? `<p class="fin-form-error">${esc(state.debtError)}</p>` : ''}
+                <div class="fin-form-actions">
+                    ${d.id ? `<button type="button" class="btn btn-secondary btn-small fin-delete" data-fin-debt-delete="${d.id}">${ICON.trash}Delete</button>` : ''}
+                    <span class="fin-spacer"></span>
+                    <button type="button" class="btn btn-secondary btn-small" data-fin-debt-cancel>Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-small">${d.id ? 'Save' : 'Add debt'}</button>
+                </div>
+            </form>`;
+    }
+
+    function readDebtForm(form) {
+        const f = new FormData(form);
+        const d = Object.assign({}, state.debtDraft);
+        ['name', 'lender', 'amount', 'rate', 'start_date', 'end_date', 'note'].forEach(k => {
+            if (f.has(k)) d[k] = f.get(k);
+        });
+        return d;
+    }
+
+    async function saveDebt(form) {
+        const d = readDebtForm(form);
+        state.debtDraft = d;
+        const amount = readAmount(d.amount);
+        const rate = String(d.rate).trim() === '' ? 0 : readAmount(d.rate);
+        const fail = (message, field) => {
+            state.debtError = message;
+            renderDebts();
+            const el = els.finDebts.querySelector(`[data-fin-debt-form] [name="${field}"]`);
+            if (el) el.focus();
+        };
+        if (amount === null || Number.isNaN(amount) || amount <= 0) return fail('Enter an amount above 0, e.g. 50.000', 'amount');
+        if (rate === null || Number.isNaN(rate) || rate < 0) return fail('Enter the interest rate per year, e.g. 4,5', 'rate');
+        try {
+            const result = await post('save-debt', {
+                id: d.id, name: d.name, lender: d.lender, amount, rate,
+                start_date: d.start_date, end_date: d.end_date || null, note: d.note
+            });
+            state.overview = result.data;
+            state.debtDraft = null;
+            state.debtError = '';
+            renderDebts();
+            const saved = els.finDebts.querySelector(`[data-fin-debt-edit="${result.id}"]`);
+            if (saved) saved.focus();
+        } catch (error) {
+            fail(error.message, 'name');
+        }
+    }
+
+    async function deleteDebt(id) {
+        if (!confirm('Delete this debt?')) return;
+        try {
+            const result = await post('delete-debt', { id });
+            state.overview = result.data;
+            state.debtDraft = null;
+            state.debtError = '';
+            renderDebts();
+        } catch (error) {
+            state.debtError = error.message;
+            renderDebts();
+        }
     }
 
     // ---- Costs ----
@@ -884,6 +1206,32 @@
         const current = monthKey(0, RF.monthOf(new Date()));
         return state.overview.costs.filter(c => c.kind === 'once' && c.start_month >= current)
             .sort((a, b) => (a.start_month < b.start_month ? -1 : a.start_month > b.start_month ? 1 : 0));
+    }
+
+    /**
+     * Loan repayments in the months planned - principal and interest at the
+     * repayment date - as planned costs: [{ debt, offset, amount }].
+     */
+    function repaymentsAhead() {
+        const out = [];
+        (state.plan ? state.plan.rows : []).forEach(r => (r.items.debts || []).forEach(x => {
+            out.push({ debt: x.debt, offset: r.offset, label: r.label, amount: x.amount, interest: x.interest });
+        }));
+        return out;
+    }
+
+    /** A repayment among the planned costs: opens the loan in Debts. */
+    function repaymentRow(x) {
+        return `
+            <li>
+                <button type="button" class="fin-cost" data-fin-debt-edit="${x.debt.id}" title="From Debts - edit it there">
+                    <span class="fin-cost-main">
+                        <span class="fin-cost-name">${esc(x.debt.name)}<span class="fin-chip">Repayment</span></span>
+                        <span class="fin-cost-meta">${esc(x.label)} · incl. ${esc(euro(x.interest))} interest</span>
+                    </span>
+                    <span class="fin-cost-amount"><strong>${esc(euro(x.amount))}</strong></span>
+                </button>
+            </li>`;
     }
 
     function costRow(c) {
@@ -957,6 +1305,7 @@
     function plannedSection() {
         const current = monthKey(0, RF.monthOf(new Date()));
         const upcoming = upcomingPlanned();
+        const repayments = repaymentsAhead();
         const past = state.overview.costs.filter(c => c.kind === 'once' && c.start_month < current);
         const draft = state.draft && state.draft.kind === 'once' ? state.draft : null;
         return `
@@ -964,7 +1313,7 @@
                     <h3 class="fin-group-title"><span>Planned costs</span>
                         <button type="button" class="ov-add-btn" data-fin-add="once" data-fin-focus="add-once">${ICON.plus}Add</button></h3>
                     ${draft ? costForm(draft) : ''}
-                    ${upcoming.length ? `<ul class="fin-cost-list">${upcoming.map(costRow).join('')}</ul>`
+                    ${upcoming.length || repayments.length ? `<ul class="fin-cost-list">${upcoming.map(costRow).join('')}${repayments.map(repaymentRow).join('')}</ul>`
                         : (draft ? '' : '<p class="fin-muted fin-panel-empty">Nothing planned.</p>')}
                     ${past.length ? `<button type="button" class="fin-link" data-fin-past>${state.showPastPlanned ? 'Hide' : 'Show'} ${esc(plural(past.length, 'past planned cost'))}</button>
                         ${state.showPastPlanned ? `<ul class="fin-cost-list is-past">${past.map(costRow).join('')}</ul>` : ''}` : ''}
@@ -1218,7 +1567,7 @@
                 state.horizon = value === 'year' ? 'year' : Number(value);
                 state.months = monthsFor(state.horizon);
                 try { localStorage.setItem(HORIZON_KEY, String(state.horizon)); } catch (err) { /* fine */ }
-                Card.setMonths(state.months);
+                Card.setMonths(state.months, periodText());
                 compute();
                 render();
             } else if (t.hasAttribute('data-fin-balance')) {
@@ -1245,6 +1594,21 @@
                 if (btn) btn.focus();
             } else if (t.hasAttribute('data-fin-balance-delete')) {
                 deleteBalance(Number(t.getAttribute('data-fin-balance-delete')));
+            } else if (t.hasAttribute('data-fin-fold')) {
+                const key = t.getAttribute('data-fin-fold');
+                state.folds[key] = !state.folds[key];
+                if (key === 'liquidity' && !state.folds[key]) state.bufferOpen = false;
+                try { localStorage.setItem(FOLD_KEY + key, state.folds[key] ? '1' : '0'); } catch (e) { /* this visit only */ }
+                const host = key === 'past' ? els.finMonths : els.finKpis;
+                if (key === 'past') renderMonths(); else renderKpis();
+                const again = host.querySelector(`[data-fin-fold="${key}"]`);
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-scenario-jump')) {
+                if (els.finScenario) {
+                    els.finScenario.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const first = els.finScenario.querySelector('button, select, input');
+                    if (first) first.focus({ preventScroll: true });
+                }
             } else if (t.hasAttribute('data-fin-month')) {
                 const o = Number(t.getAttribute('data-fin-month'));
                 if (state.openMonths.has(o)) state.openMonths.delete(o); else state.openMonths.add(o);
@@ -1278,6 +1642,33 @@
             } else if (t.hasAttribute('data-fin-past')) {
                 state.showPastPlanned = !state.showPastPlanned;
                 renderKpis();
+            } else if (t.hasAttribute('data-fin-debt-add')) {
+                state.debtDraft = { id: null, name: '', lender: '', amount: '', rate: '', start_date: todayIso(), end_date: '', note: '' };
+                state.debtError = '';
+                renderDebts();
+                const name = els.finDebts.querySelector('[data-fin-focus="debt-name"]');
+                if (name) name.focus();
+            } else if (t.hasAttribute('data-fin-debt-edit')) {
+                const debt = (state.overview.debts || []).find(d => d.id === Number(t.getAttribute('data-fin-debt-edit')));
+                if (!debt) return;
+                state.debtDraft = Object.assign({}, debt, {
+                    amount: showAmount(debt.amount),
+                    rate: String(debt.rate).replace('.', ','),
+                    end_date: debt.end_date || '', lender: debt.lender || '', note: debt.note || ''
+                });
+                state.debtError = '';
+                renderDebts();
+                const name = els.finDebts.querySelector('[data-fin-focus="debt-name"]');
+                if (name) name.focus();
+            } else if (t.hasAttribute('data-fin-debt-cancel')) {
+                const id = state.debtDraft && state.debtDraft.id;
+                state.debtDraft = null;
+                state.debtError = '';
+                renderDebts();
+                const back = els.finDebts.querySelector(id ? `[data-fin-debt-edit="${id}"]` : '[data-fin-debt-add]');
+                if (back) back.focus();
+            } else if (t.hasAttribute('data-fin-debt-delete')) {
+                deleteDebt(Number(t.getAttribute('data-fin-debt-delete')));
             }
         });
 
@@ -1291,18 +1682,38 @@
             } else if (e.target.matches('[data-fin-buffer-form]')) {
                 e.preventDefault();
                 saveBuffer(e.target);
+            } else if (e.target.matches('[data-fin-debt-form]')) {
+                e.preventDefault();
+                saveDebt(e.target);
             }
         });
 
-        // Keep what is typed in the cost form when the page redraws.
+        // Keep what is typed in the cost form when the page redraws; a debt's
+        // interest is worked out again as it is typed.
+        const onDebtInput = e => {
+            const debtForm = e.target.closest('[data-fin-debt-form]');
+            if (debtForm && state.debtDraft) {
+                state.debtDraft = readDebtForm(debtForm);
+                const wrap = debtForm.querySelector('[data-fin-debt-preview-wrap]');
+                if (wrap) wrap.innerHTML = debtPreview(state.debtDraft);
+            }
+        };
         view.addEventListener('input', e => {
-            const form = e.target.closest('[data-fin-cost-form]');
+            const form = e.target.closest('[data-fin-cost-form]:not([data-fin-debt-form])');
             if (form && state.draft) state.draft = readCostForm(form);
+            onDebtInput(e);
         });
+        view.addEventListener('change', onDebtInput);
 
         view.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
-            if (state.draft && e.target.closest('[data-fin-cost-form]')) {
+            if (state.debtDraft && e.target.closest('[data-fin-debt-form]')) {
+                const id = state.debtDraft.id;
+                state.debtDraft = null;
+                renderDebts();
+                const back = els.finDebts.querySelector(id ? `[data-fin-debt-edit="${id}"]` : '[data-fin-debt-add]');
+                if (back) back.focus();
+            } else if (state.draft && e.target.closest('[data-fin-cost-form]')) {
                 state.draft = null;
                 renderKpis();
             } else if (e.target.closest('.fin-kpi-panel')) {

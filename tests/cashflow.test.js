@@ -125,6 +125,14 @@
         near(p.rows[0].income, 6000, 'overdue invoice');
     });
 
+    test('a complete project owed its payment in full brings the cash in the month it is expected', () => {
+        nextId = 1;
+        const p = run({ projects: [project('Complete', 9000, 9000, null, '2026-01-01', '2026-09-30',
+            { payments: [{ month: '2026-12', amount: 9000, paid: false, full: true }] })], scenario: RF.settingsFor('worst') });
+        near(p.rows[0].income, 0, 'not this month');
+        near(p.rows[2].income, 9000, 'December, as expected');
+    });
+
     // ------------------------------------------------------------------
     // Money out
     // ------------------------------------------------------------------
@@ -327,6 +335,105 @@
         });
         near(p.kpis.fixedTotal, 6000, 'six months of rent');
         near(p.kpis.plannedTotal, 3000, 'only what falls inside the six months');
+    });
+
+    // ------------------------------------------------------------------
+    // Debts
+    // ------------------------------------------------------------------
+
+    test('interest accrues day by day, to today and to the repayment', () => {
+        const i = CF.debtInterest({ amount: 100000, rate: 5, start_date: '2026-01-01', end_date: '2026-12-31' }, TODAY);
+        eq(i.days, 281, 'Jan 1 to Oct 9');
+        near(i.toDate, 3849.32, 'so far');
+        near(i.total, 4986.30, 'until the repayment');
+        eq(i.repaid, false);
+        eq(i.daysLeft, 83);
+    });
+
+    test('a loan without an end date has interest so far, none in total', () => {
+        const i = CF.debtInterest({ amount: 20000, rate: 3.5, start_date: '2025-10-09' }, TODAY);
+        eq(i.days, 365);
+        near(i.toDate, 700);
+        eq(i.total, null);
+    });
+
+    test('a repaid loan stops at its end; one not started has none yet', () => {
+        const done = CF.debtInterest({ amount: 36500, rate: 10, start_date: '2026-01-01', end_date: '2026-01-11' }, TODAY);
+        eq(done.days, 10);
+        near(done.toDate, 100);
+        eq(done.repaid, true);
+        const later = CF.debtInterest({ amount: 10000, rate: 4, start_date: '2026-12-01' }, TODAY);
+        eq(later.started, false);
+        near(later.toDate, 0);
+    });
+
+    test('the debts summed: what is owed and its interest', () => {
+        const sum = CF.debtSummary([
+            { id: 1, amount: 100000, rate: 5, start_date: '2026-01-01', end_date: '2026-12-31' },
+            { id: 2, amount: 20000, rate: 3.5, start_date: '2025-10-09' },
+            { id: 3, amount: 36500, rate: 10, start_date: '2026-01-01', end_date: '2026-01-11' }
+        ], TODAY);
+        near(sum.outstanding, 120000, 'the repaid one is not owed');
+        near(sum.interestToDate, 4549.32);
+        near(sum.interestTotal, 4986.30, 'only loans with an end date');
+        eq(sum.undatedCount, 1);
+    });
+
+    test('a loan with a repayment date goes out in that month, with its interest', () => {
+        const p = run({
+            months: 12,
+            debts: [
+                { id: 1, name: 'Loan', amount: 36500, rate: 10, start_date: '2026-01-01', end_date: '2027-01-01' },
+                { id: 2, name: 'Open-ended', amount: 5000, rate: 5, start_date: '2026-01-01' },
+                { id: 3, name: 'Repaid', amount: 1000, rate: 5, start_date: '2026-01-01', end_date: '2026-10-01' }
+            ]
+        });
+        near(p.rows[3].debt, 36500 + 3650, 'January: amount plus 365 days of interest');
+        near(p.rows[3].debtInterest, 3650);
+        near(p.rows[3].out, 40150, 'counted as money out');
+        eq(p.rows[3].items.debts.length, 1);
+        near(p.kpis.debtTotal, 40150, 'no other loan in the plan');
+    });
+
+    test('a fixed cost paid this month counts once: from Bookkeeping, or on its own when not booked yet', () => {
+        const costs = [
+            { id: 1, name: 'Office rent', kind: 'recurring', amount: 1000, interval_months: 1, start_month: '2026-01', day: 1 },
+            { id: 2, name: 'Adobe', kind: 'recurring', amount: 60, interval_months: 1, start_month: '2026-01', day: 2 }
+        ];
+        const p = run({ costs, transactions: [{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }] });
+        near(p.rows[0].paidUnbooked, 1000, 'the rent is not in Bookkeeping yet');
+        near(p.rows[0].out, 0, 'and not taken off the balance again');
+        eq(p.rows[0].items.costs.find(c => c.cost.id === 2).booked, true, 'Adobe is booked');
+        const y = CF.yearResult([{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }], run({ costs, months: 3,
+            transactions: [{ date: '2026-10-02', amount: -72, vat: 12, party: 'Adobe Systems' }] }), NOW);
+        near(y.costs, 60 + 1000, 'paid so far: booked Adobe + the rent paid but not booked');
+        near(y.actual, -1060, 'and the result so far with it');
+        near(y.costsRest, 2 * 1060, 'still to pay: Nov and Dec');
+        near(y.costsYear, 60 + 1000 + 2 * 1060, 'booked + unbooked rent + Nov and Dec');
+    });
+
+    test('the year in full: revenue, costs and result', () => {
+        nextId = 1;
+        const p = run({
+            months: 3,
+            projects: [project('In Progress', 6000, 6000, 100, '2026-09-01', '2026-11-30')],
+            costs: [{ id: 1, kind: 'recurring', amount: 1000, interval_months: 1, start_month: '2026-01', day: 28 }],
+            transactions: [
+                { date: '2026-03-10', amount: 12000, vat: -2000 },
+                { date: '2026-04-10', amount: -1200, vat: 200 }
+            ]
+        });
+        const y = CF.yearResult([
+            { date: '2026-03-10', amount: 12000, vat: -2000 },
+            { date: '2026-04-10', amount: -1200, vat: 200 }
+        ], p, NOW);
+        near(y.income, 10000, 'so far, without VAT');
+        near(y.costs, 1000, 'so far, without VAT');
+        near(y.incomeRest, 6000, 'the project, in November');
+        near(y.costsRest, 3000, 'rent Oct to Dec');
+        near(y.revenue, 16000);
+        near(y.costsYear, 4000);
+        near(y.projected, 12000, 'revenue less costs');
     });
 
     root.cashflowTestResults = results;

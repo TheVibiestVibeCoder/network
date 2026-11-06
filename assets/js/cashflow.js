@@ -12,7 +12,10 @@
  * final invoice), not spread. A project past its end, or a payment past its
  * month, is due now: it lands in this month and counts as overdue. Without an
  * end date, the rest has no month and is listed apart. Complete projects
- * still bring their unpaid payments, in full.
+ * still bring their unpaid payments, in full, in every scenario. A payment in
+ * full counts as cash in the month it is expected (which may be after the
+ * project's end) - the revenue forecast books a complete project's in this
+ * month instead, since the work is done.
  *
  * VAT is left out: project amounts are net, and costs are entered net too.
  * Over a VAT period that is what stays in the account - the VAT collected
@@ -26,7 +29,16 @@
  *
  * The year's result: this year's months in Bookkeeping as profit or loss,
  * without the VAT in them, and where the year ends if the plan holds
- * (yearMonths, yearResult).
+ * (yearMonths, yearResult) - revenue, costs and result for the whole year.
+ *
+ * Debts: interest accrued on each loan day by day, to today and to its
+ * repayment (debtInterest, debtSummary). A loan with a repayment date goes
+ * out of the account in that month, with all its interest.
+ *
+ * This month's costs in full: a fixed cost whose day has passed is taken
+ * to be in the balance already. When Bookkeeping has no row for it yet, it
+ * still counts as a cost of this month (paidUnbooked) - only not again
+ * against the balance.
  *
  * Recurring payments in Bookkeeping that no fixed cost covers yet are
  * offered as suggestions (recurringSuggestions).
@@ -41,7 +53,6 @@
     'use strict';
 
     const RF = root.RevenueForecast;
-    const PP = root.ProjectPayments;
 
     const HORIZONS = [6, 12, 24];
     const DEFAULT_HORIZON = 12;
@@ -87,12 +98,6 @@
     // Money in
     // ------------------------------------------------------------------
 
-    function budgetFor(p, budget) {
-        if (budget === 'low') return p.min;
-        if (budget === 'high') return p.max;
-        return (p.min + p.max) / 2;
-    }
-
     /**
      * Every amount the projects are expected to bring, one item each:
      *   { projectId, name, company, stage, kind: 'payment' | 'final',
@@ -106,15 +111,17 @@
         const out = [];
 
         items.forEach(p => {
-            const counted = scenario.stages.indexOf(p.stage) >= 0 && !(scenario.excluded && scenario.excluded[p.id]);
-            const factor = scenario.chance === 'all' ? 1 : p.chance / 100;
+            const counted = RF.isCounted(p, scenario, true);
+            const factor = RF.factorFor(p, scenario);
             const base = { projectId: p.id, name: p.name, company: p.company, stage: p.stage, chance: p.chance, factor, counted };
 
+            // Cash comes when it is expected: a payment in its month, this
+            // month once that has passed.
             p.due.forEach(x => out.push(Object.assign({}, base, {
-                kind: 'payment', due: x.o, offset: Math.max(x.o, 0), overdue: x.o < 0, net: x.amount
+                kind: 'payment', full: x.full, due: x.o, offset: Math.max(x.o, 0), overdue: x.o < 0, net: x.amount
             })));
 
-            const rest = Math.max(0, budgetFor(p, scenario.budget) - p.planned);
+            const rest = Math.max(0, RF.budgetFor(p, scenario.budget) - p.planned);
             if (rest > 0.005) {
                 out.push(Object.assign({}, base, {
                     kind: 'final',
@@ -125,19 +132,6 @@
                     partial: p.payments > 0
                 }));
             }
-        });
-
-        // Finished work still owed: its unpaid payments, certain.
-        (projects || []).forEach(p => {
-            if (p.stage !== 'Complete' || p.review_status === 'pending') return;
-            PP.parse(p.payments).filter(x => !x.paid).forEach(x => {
-                const o = RF.offsetOf(x.month, now);
-                out.push({
-                    projectId: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: 'Complete',
-                    chance: 100, factor: 1, counted: true,
-                    kind: 'payment', due: o, offset: Math.max(o, 0), overdue: o < 0, net: x.amount
-                });
-            });
         });
 
         out.forEach(x => { x.expected = x.net * x.factor; });
@@ -294,23 +288,111 @@
      * has happened (actual) and what is still planned (the plan leaves out
      * costs already paid).
      *
+     * Each figure for the whole year as well, January to December: what will
+     * have come in (`revenue`), what will have gone out (`costs`) and the
+     * result they leave (`projected` = revenue - costs).
+     *
      *   plan: a plan() reaching at least to December
      *   -> { year, months, actual, planned, projected,
+     *        income, costs (so far), incomeRest, costsRest (still to come),
+     *        revenue, costsYear (the whole year),
      *        fixedRest, plannedRest (the costs of each kind until December) }
      */
     function yearResult(transactions, plan, now) {
         const months = yearMonths(transactions, now, plan.balance);
         const rest = plan.rows.filter(r => RF.calendarMonth(r.offset, now).year === now.year);
-        const actual = round2(sum(months, m => m.result));
-        const planned = round2(sum(rest, r => r.net));
+        // Fixed costs already paid this month but not in Bookkeeping yet
+        // are money out already: they count with the year so far.
+        const paidUnbooked = round2(sum(rest, r => r.paidUnbooked || 0));
+        const income = round2(sum(months, m => m.income));
+        const costs = round2(sum(months, m => m.costs) + paidUnbooked);
+        const actual = round2(income - costs);
+        const incomeRest = round2(sum(rest, r => r.in));
+        // Still to pay until December. A loan's repayment is not a cost;
+        // the interest paid with it is.
+        const costsRest = round2(sum(rest, r => r.fixed + r.planned + (r.debtInterest || 0)));
+        const planned = round2(incomeRest - costsRest);
         return {
             year: now.year,
             months,
             actual,
             planned,
             projected: round2(actual + planned),
+            income,
+            costs,
+            paidUnbooked,
+            incomeRest,
+            costsRest,
+            revenue: round2(income + incomeRest),
+            costsYear: round2(costs + costsRest),
             fixedRest: round2(sum(rest, r => r.fixed)),
             plannedRest: round2(sum(rest, r => r.planned))
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Debts
+    // ------------------------------------------------------------------
+
+    /** Days from one "YYYY-MM-DD" to another (negative when `to` is earlier); null when either is not a date. */
+    function daysBetween(from, to) {
+        const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(from || ''));
+        const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(to || ''));
+        if (!a || !b) return null;
+        const t = m => Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return Math.round((t(b) - t(a)) / 86400000);
+    }
+
+    /**
+     * Interest on one loan, day by day: simple interest on the amount at
+     * the yearly rate, actual days over 365 (act/365) - the way a loan
+     * agreement without compounding reckons it.
+     *
+     *   debt: { amount, rate (% p.a.), start_date, end_date? }
+     *   -> { days, toDate (accrued until today, or until the repayment once
+     *        it is past), total (until the repayment; null without an end
+     *        date), daily, repaid, started, daysLeft (null without an end) }
+     */
+    function debtInterest(debt, today) {
+        const amount = Math.max(0, number(debt && debt.amount) || 0);
+        const rate = Math.max(0, number(debt && debt.rate) || 0);
+        const daily = amount * rate / 100 / 365;
+        const start = debt && debt.start_date;
+        const end = debt && debt.end_date ? debt.end_date : null;
+        const sinceStart = daysBetween(start, today);
+        const term = end ? daysBetween(start, end) : null;
+        const started = sinceStart !== null && sinceStart >= 0;
+        const repaid = end !== null && daysBetween(end, today) !== null && daysBetween(end, today) >= 0;
+        let days = started ? sinceStart : 0;
+        if (term !== null) days = Math.min(days, Math.max(0, term));
+        return {
+            days,
+            daily: round2(daily),
+            toDate: round2(daily * days),
+            total: term === null ? null : round2(daily * Math.max(0, term)),
+            started,
+            repaid,
+            daysLeft: end === null ? null : Math.max(0, daysBetween(today, end) || 0)
+        };
+    }
+
+    /**
+     * All loans together: what is still owed (loans not yet repaid), the
+     * interest accrued on all of them until today, and until their repayment
+     * (for the loans that have an end date).
+     */
+    function debtSummary(debts, today) {
+        const list = (debts || []).map(d => Object.assign({}, d, { interest: debtInterest(d, today) }));
+        const open = list.filter(d => !d.interest.repaid);
+        const dated = list.filter(d => d.interest.total !== null);
+        return {
+            list,
+            count: list.length,
+            openCount: open.length,
+            outstanding: round2(sum(open, d => number(d.amount) || 0)),
+            interestToDate: round2(sum(open, d => d.interest.toDate)),
+            interestTotal: round2(sum(dated.filter(d => !d.interest.repaid), d => d.interest.total)),
+            undatedCount: open.filter(d => d.interest.total === null).length
         };
     }
 
@@ -436,9 +518,24 @@
     // ------------------------------------------------------------------
 
     /**
+     * Whether a fixed cost paid this month is among the month's bank rows:
+     * a word of its name in the party, or about the same amount (within
+     * 10%, net of the VAT the row gives back).
+     */
+    function isBooked(cost, amount, rows) {
+        const words = nameWords(cost.name);
+        return rows.some(t => {
+            const party = nameWords(t.party);
+            if (words.some(w => party.indexOf(w) >= 0)) return true;
+            const net = -(t.amount + (number(t.vat) || 0));
+            return Math.abs(net - amount) <= Math.max(1, amount * 0.1);
+        });
+    }
+
+    /**
      * Everything the tab shows, for one scenario.
-     *   input: { projects, costs, balances, transactions, settings, scenario,
-     *            months, now: {year, month}, today: "YYYY-MM-DD" }
+     *   input: { projects, costs, balances, transactions, debts, settings,
+     *            scenario, months, now: {year, month}, today: "YYYY-MM-DD" }
      * months: how many months ahead, this one included - one of HORIZONS, or
      * any other count up to 36 (Financials' "until December").
      */
@@ -455,8 +552,8 @@
         for (let i = 0; i < months; i++) {
             rows.push({
                 offset: i, label: RF.monthName(i, now),
-                income: 0, fixed: 0, planned: 0,
-                items: { income: [], costs: [] }
+                income: 0, fixed: 0, planned: 0, debt: 0, debtInterest: 0, paidUnbooked: 0,
+                items: { income: [], costs: [], debts: [] }
             });
         }
 
@@ -468,23 +565,48 @@
         });
 
         const costs = (input.costs || []).map(c => Object.assign({}, c, { occurrences: costOccurrences(c, months, now, todayDay) }));
+        // This month's bank rows going out, to tell which paid fixed costs
+        // Bookkeeping already has.
+        const thisMonth = RF.calendarMonth(0, now);
+        const monthPrefix = thisMonth.year + '-' + String(thisMonth.month + 1).padStart(2, '0');
+        const bookedOut = (input.transactions || []).filter(t => !t.excluded && t.amount < 0 && String(t.date).slice(0, 7) === monthPrefix);
+
         costs.forEach(c => c.occurrences.forEach(o => {
             const r = rows[o.offset];
-            r.items.costs.push({ cost: c, amount: o.amount, paid: o.paid });
-            if (o.paid) return;
+            const item = { cost: c, amount: o.amount, paid: o.paid };
+            r.items.costs.push(item);
+            if (o.paid) {
+                item.booked = isBooked(c, o.amount, bookedOut);
+                if (!item.booked) r.paidUnbooked += o.amount;
+                return;
+            }
             if (c.kind === 'once') r.planned += o.amount; else r.fixed += o.amount;
         }));
+
+        // Loans with a repayment date still to come: out in that month,
+        // with every day's interest until then.
+        (input.debts || []).forEach(d => {
+            if (!d.end_date || !(String(d.end_date) > String(today))) return;
+            const o = RF.offsetOf(d.end_date, now);
+            if (o === null || o < 0 || o >= months) return;
+            const interest = debtInterest(d, d.end_date).total || 0;
+            const principal = number(d.amount) || 0;
+            const r = rows[o];
+            r.debt += principal + interest;
+            r.debtInterest += interest;
+            r.items.debts.push({ debt: d, principal, interest, amount: round2(principal + interest) });
+        });
 
         const balance = balanceToday(input.balances, input.transactions);
         let running = balance ? balance.amount : 0;
         rows.forEach(r => {
             r.opening = round2(running);
-            r.out = r.fixed + r.planned;
+            r.out = r.fixed + r.planned + r.debt;
             r.in = r.income;
             r.net = r.in - r.out;
             running += r.net;
             r.closing = round2(running);
-            ['income', 'fixed', 'planned', 'out', 'in', 'net']
+            ['income', 'fixed', 'planned', 'debt', 'debtInterest', 'paidUnbooked', 'out', 'in', 'net']
                 .forEach(k => { r[k] = round2(r[k]); });
         });
 
@@ -514,6 +636,7 @@
                 // What each kind of cost comes to over the months shown.
                 fixedTotal: round2(sum(rows, r => r.fixed)),
                 plannedTotal: round2(sum(rows, r => r.planned)),
+                debtTotal: round2(sum(rows, r => r.debt)),
                 lowest: lowest ? { offset: lowest.offset, label: lowest.label, amount: lowest.closing } : null,
                 end: rows.length ? rows[rows.length - 1].closing : null,
                 belowBuffer: settings.buffer > 0 ? below(settings.buffer) : null,
@@ -530,6 +653,7 @@
         cleanSettings, incomeItems, costOccurrences, monthlyFixed,
         anchorOf, balanceToday, pastMonths, lastDayOf,
         yearMonths, yearResult, recurringSuggestions,
+        daysBetween, debtInterest, debtSummary,
         plan
     };
 })(typeof window !== 'undefined' ? window : globalThis);

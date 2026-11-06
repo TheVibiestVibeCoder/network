@@ -214,7 +214,7 @@ class Project
 
     /**
      * Cleans expected payments as they come in: a list of
-     * {month: "YYYY-MM", amount > 0, paid: bool}, returned ordered by month
+     * {month: "YYYY-MM", amount > 0, paid: bool, full?: true}, returned ordered by month
      * (stable, so equal months keep their order). Null or an empty list is
      * no payments. Returns an error message instead when anything is off;
      * nothing is guessed or dropped silently.
@@ -234,6 +234,7 @@ class Project
         }
 
         $payments = [];
+        $full = false;
         foreach ($input as $i => $row) {
             $n = $i + 1;
             if (!is_array($row)) {
@@ -247,11 +248,22 @@ class Project
             if (!is_numeric($amount) || (float) $amount <= 0 || (float) $amount > 1e10) {
                 return 'Payment ' . $n . ' needs an amount above 0';
             }
-            $payments[] = [
+            $payment = [
                 'month' => $month,
                 'amount' => round((float) $amount, 2),
                 'paid' => filter_var($row['paid'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
+            // Payment in full: the whole project paid at once, in one
+            // payment - possibly after the project has ended. It is then
+            // the only payment the project has.
+            if (filter_var($row['full'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $payment['full'] = true;
+                $full = true;
+            }
+            $payments[] = $payment;
+        }
+        if ($full && count($payments) > 1) {
+            return 'A payment in full is the only payment of a project';
         }
 
         // usort is stable since PHP 8.0.

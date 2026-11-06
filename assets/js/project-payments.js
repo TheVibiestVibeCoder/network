@@ -13,6 +13,15 @@
  * The budget stays the project's total. Payments plan it: what they do not
  * cover is "not planned yet", what has been paid is subtracted from what is
  * still open. Payments above the budget make the payments the total.
+ *
+ * Two ways to plan it: partial payments (any number, each in a month of the
+ * project), or one payment in full - the whole project at once, in a month
+ * that may lie after the project's end (invoices are paid late). A payment
+ * in full is the project's value: no budget is "not planned yet" beside it.
+ * It is stored as the one payment, marked { full: true }.
+ *
+ * When a project is set to Complete, askOnComplete() asks whether it has
+ * all been paid - a finished project can still be owed its money.
  */
 (function (root) {
     'use strict';
@@ -21,6 +30,8 @@
 
     // Months offered after the start when a project has no end date.
     const MONTHS_AHEAD = 24;
+    // How long after the end a payment in full can be expected.
+    const MONTHS_AFTER_END = 12;
 
     // ------------------------------------------------------------------
     // Numbers
@@ -38,7 +49,7 @@
         return n === null || Number.isNaN(n) ? null : n;
     }
 
-    /** A project's payments (JSON text from the API, or a list) as [{ month, amount, paid }]. */
+    /** A project's payments (JSON text from the API, or a list) as [{ month, amount, paid, full }]. */
     function parse(raw) {
         let list = raw;
         if (typeof raw === 'string') {
@@ -46,8 +57,18 @@
         }
         if (!Array.isArray(list)) return [];
         return list
-            .map(x => ({ month: String((x && x.month) || ''), amount: number(x && x.amount), paid: !!(x && x.paid) }))
+            .map(x => ({ month: String((x && x.month) || ''), amount: number(x && x.amount), paid: !!(x && x.paid), full: !!(x && x.full) }))
             .filter(x => /^\d{4}-(0[1-9]|1[0-2])$/.test(x.month) && x.amount !== null && x.amount > 0);
+    }
+
+    /** True when the payments are one payment in full. */
+    function isFull(list) {
+        return Array.isArray(list) && list.length === 1 && !!list[0].full;
+    }
+
+    /** 'full' or 'partial' - how a project's payments are planned. */
+    function modeOf(project) {
+        return isFull(parse(project && project.payments)) ? 'full' : 'partial';
     }
 
     /** The budget as { min, max }, a missing end copying the other; null when there is none. */
@@ -76,8 +97,10 @@
         const list = payments || parse(project && project.payments);
         const planned = list.reduce((s, x) => s + x.amount, 0);
         const paid = list.filter(x => x.paid).reduce((s, x) => s + x.amount, 0);
-        const budget = budgetOf(project);
-        const out = { count: list.length, paidCount: list.filter(x => x.paid).length, planned, paid, budget, above: 0, below: 0, unplanned: null, open: null };
+        const full = isFull(list);
+        // A payment in full is the project's value; the budget beside it is only for reference.
+        const budget = full ? null : budgetOf(project);
+        const out = { count: list.length, paidCount: list.filter(x => x.paid).length, planned, paid, budget, full, above: 0, below: 0, unplanned: null, open: null };
         if (budget) {
             out.above = Math.max(0, planned - budget.max);
             out.below = Math.max(0, budget.min - planned);
@@ -107,29 +130,43 @@
      * The months a payment can be in: start month to end month. Without an
      * end date, the start and the 24 months after it; without a start date
      * (older projects), from this month or the end month, whichever is first.
+     * A payment in full (`full`) can also come up to a year after the end.
      */
-    function monthRange(startDate, endDate, today) {
+    function monthRange(startDate, endDate, today, full) {
         const now = monthIndex(today) !== null ? monthIndex(today) : monthIndex(new Date().toISOString());
         const s = monthIndex(startDate);
         const e = monthIndex(endDate);
         const from = s !== null ? s : (e !== null ? Math.min(now, e) : now);
-        const to = e !== null && e >= from ? e : from + MONTHS_AHEAD;
+        let to = e !== null && e >= from ? e : from + MONTHS_AHEAD;
+        if (full && e !== null && e >= from) to = e + MONTHS_AFTER_END;
+        // Never short of this month: a finished project's money can still be due now.
+        if (full) to = Math.max(to, now + MONTHS_AFTER_END);
         return { from, to };
     }
 
     /** True when a "YYYY-MM" lies outside the project's months. */
-    function isOutside(month, startDate, endDate, today) {
-        const r = monthRange(startDate, endDate, today);
+    function isOutside(month, startDate, endDate, today, full) {
+        const r = monthRange(startDate, endDate, today, full);
         const i = monthIndex(month);
         return i !== null && (i < r.from || i > r.to);
+    }
+
+    /** "at the end" / "2 months after the end" / '' - a month against the project's end. */
+    function afterEndLabel(month, endDate) {
+        const i = monthIndex(month);
+        const e = monthIndex(endDate);
+        if (i === null || e === null || i < e) return '';
+        if (i === e) return 'at the end';
+        const n = i - e;
+        return n + (n === 1 ? ' month' : ' months') + ' after the end';
     }
 
     /**
      * The dropdown's months: the project's range plus any month already in
      * use outside it, so changing a date never silently moves a payment.
      */
-    function monthOptions(startDate, endDate, used, today) {
-        const r = monthRange(startDate, endDate, today);
+    function monthOptions(startDate, endDate, used, today, full) {
+        const r = monthRange(startDate, endDate, today, full);
         const options = [];
         for (let i = r.from; i <= r.to; i++) options.push({ value: monthKey(i), label: monthLabel(i), outside: false });
         (used || []).forEach(key => {
@@ -176,7 +213,8 @@
      * bar scales to the budget, or to the payments when they go past it, and
      * then marks where the budget ends. A legend gives each part's amount.
      */
-    function sumBlock(sum) {
+    function sumBlock(sum, ctx) {
+        if (sum.full) return fullBlock(sum, ctx);
         const b = sum.budget;
         const expected = sum.planned - sum.paid;
         const open = openLabel(sum);
@@ -207,6 +245,24 @@
                 ${budgetBar(sum)}
                 ${keys ? `<ul class="ppay-legend">${keys}</ul>` : ''}
                 ${note}
+            </div>`;
+    }
+
+    /**
+     * Under a payment in full: whether it has come in, and the budget for
+     * reference when it says something else.
+     */
+    function fullBlock(sum, ctx) {
+        const open = openLabel(sum);
+        const b = budgetOf(ctx || {});
+        const differs = b && (sum.planned < b.min - 0.005 || sum.planned > b.max + 0.005);
+        return `
+            <div class="ppay-sum">
+                <div class="ppay-sum-head">
+                    <span class="ppay-sum-planned">Payment in full <strong>${esc(euro(sum.planned))}</strong></span>
+                    <span class="ppay-sum-open${open.done ? ' is-done' : ''}">${open.html}</span>
+                </div>
+                ${differs ? `<p class="ppay-note">The budget is ${esc(euroRange(b))}; the forecast counts the payment.</p>` : ''}
             </div>`;
     }
 
@@ -285,13 +341,15 @@
             text = `<span class="is-paid">${esc(euro(sum.paid))} received</span>`;
         } else {
             const next = list.find(x => !x.paid);
-            text = `<span class="is-due">First ${esc(euro(next.amount))} in ${esc(monthName(next.month))}</span>`;
+            text = sum.full
+                ? `<span class="is-due">${esc(euro(next.amount))} due in ${esc(monthName(next.month))}</span>`
+                : `<span class="is-due">First ${esc(euro(next.amount))} in ${esc(monthName(next.month))}</span>`;
         }
         if (sum.above > 0) {
             text += `<span class="ppay-sep">·</span><span class="is-warn">over budget</span>`;
         }
 
-        const tip = list.map(x => `${monthName(x.month)}: ${euro(x.amount)} · ${x.paid ? 'received' : isLate(x) ? 'overdue' : 'expected'}`);
+        const tip = list.map(x => `${sum.full ? 'Payment in full, ' : ''}${monthName(x.month)}: ${euro(x.amount)} · ${x.paid ? 'received' : isLate(x) ? 'overdue' : 'expected'}`);
         if (unplanned) tip.push(`Not planned yet: ${sum.unplanned.min > 0 ? euroRange(sum.unplanned) : 'up to ' + euro(sum.unplanned.max)}`);
         if (sum.above > 0) tip.push(`${euro(sum.above)} above the budget of ${euro(sum.budget.max)}`);
         if (!done) tip.push(`Still open: ${euroRange(sum.open)}`);
@@ -325,28 +383,31 @@
         const open = openLabel(sum);
         summaryEl.hidden = false;
         summaryEl.innerHTML = `
-            <span class="ppay-count">${esc(plural(list.length, 'expected payment'))}</span>
+            <span class="ppay-count">${sum.full ? 'Payment in full' : esc(plural(list.length, 'expected payment'))}</span>
             <span class="ppay-open${open.done ? ' is-done' : ''}">${open.html}</span>
             ${sum.above > 0 ? `<span class="ppay-flag is-warn">${ICON_WARN}${esc(euro(sum.above))} above budget</span>` : ''}`;
 
         const startDate = project.start_date;
         const endDate = project.estimated_completion;
+        const now = monthIndex(new Date().toISOString());
         const rows = list.map((p, i) => {
-            const outside = isOutside(p.month, startDate, endDate);
+            const outside = isOutside(p.month, startDate, endDate, null, sum.full);
+            const after = sum.full ? afterEndLabel(p.month, endDate) : '';
+            const late = !p.paid && monthIndex(p.month) < now;
             return `
-                <li class="ppay-item${p.paid ? ' is-paid' : ''}">
-                    <span class="ppay-num" aria-hidden="true">${i + 1}</span>
-                    <span class="ppay-item-month">${esc(monthName(p.month))}${outside ? '<span class="ppay-flag is-warn">outside project dates</span>' : ''}</span>
+                <li class="ppay-item${p.paid ? ' is-paid' : ''}${late ? ' is-late' : ''}">
+                    <span class="ppay-num" aria-hidden="true">${sum.full ? '' : i + 1}</span>
+                    <span class="ppay-item-month">${esc(monthName(p.month))}${after ? `<span class="ppay-item-after">${esc(after)}</span>` : ''}${outside ? '<span class="ppay-flag is-warn">outside project dates</span>' : ''}</span>
                     <span class="ppay-item-amount">${esc(euro(p.amount))}</span>
-                    <span class="ppay-item-status">${p.paid ? `${ICON_CHECK}Paid` : 'Expected'}</span>
+                    <span class="ppay-item-status">${p.paid ? `${ICON_CHECK}Paid` : late ? 'Overdue' : 'Expected'}</span>
                 </li>`;
         }).join('');
 
         listEl.hidden = false;
         listEl.innerHTML = `
-            <span class="detail-label">Expected payments</span>
-            <ol class="ppay-items">${rows}</ol>
-            ${sumBlock(sum)}`;
+            <span class="detail-label">${sum.full ? 'Payment in full' : 'Expected payments'}</span>
+            <ol class="ppay-items${sum.full ? ' is-full' : ''}">${rows}</ol>
+            ${sumBlock(sum, project)}`;
     }
 
     // ---- Editing ----
@@ -354,9 +415,16 @@
     const editor = {
         el: null,
         fields: null,
+        // 'partial': any number of rows; 'full': exactly one, the payment in full.
+        mode: 'partial',
         rows: [],   // { key, month, amount (text as typed), paid }
         seq: 0
     };
+
+    const MODES = [
+        { key: 'partial', label: 'Partial payments', hint: 'Several payments, each in a month of the project' },
+        { key: 'full', label: 'Payment in full', hint: 'The whole project in one payment - also after it has ended' }
+    ];
 
     function context() {
         const f = editor.fields;
@@ -370,15 +438,66 @@
 
     /** The rows as payments; rows without a usable amount are left out. */
     function currentPayments() {
+        const full = editor.mode === 'full';
         return editor.rows
-            .map(r => ({ month: r.month, amount: typed(r.amount), paid: r.paid }))
+            .map(r => Object.assign({ month: r.month, amount: typed(r.amount), paid: r.paid }, full ? { full: true } : {}))
             .filter(p => p.amount !== null && p.amount > 0);
     }
 
     function monthOptionsHtml(row, ctx, used) {
-        return monthOptions(ctx.start, ctx.end, used).map(o =>
-            `<option value="${esc(o.value)}"${o.value === row.month ? ' selected' : ''}>${esc(o.label)}${o.outside ? ' (outside dates)' : ''}</option>`
-        ).join('');
+        const full = editor.mode === 'full';
+        return monthOptions(ctx.start, ctx.end, used, null, full).map(o => {
+            const after = full ? afterEndLabel(o.value, ctx.end) : '';
+            return `<option value="${esc(o.value)}"${o.value === row.month ? ' selected' : ''}>${esc(o.label)}${after ? ' · ' + esc(after) : ''}${o.outside ? ' (outside dates)' : ''}</option>`;
+        }).join('');
+    }
+
+    /** What a payment in full starts at: the budget (its middle for a range), else nothing. */
+    function defaultFullAmount(ctx) {
+        const b = budgetOf(ctx);
+        if (!b) return '';
+        const v = b.min === b.max ? b.max : (b.min + b.max) / 2;
+        return root.CRMAmount ? root.CRMAmount.format(v) : String(Math.round(v * 100) / 100);
+    }
+
+    /** Where a payment in full starts: the end month, else this month - inside the months on offer. */
+    function defaultFullMonth(ctx) {
+        const r = monthRange(ctx.start, ctx.end, null, true);
+        const e = monthIndex(ctx.end);
+        const now = monthIndex(new Date().toISOString());
+        const pick = e !== null ? e : now;
+        return monthKey(Math.min(r.to, Math.max(r.from, pick)));
+    }
+
+    /**
+     * Partial to full: the rows become one payment - what they add up to
+     * (the budget when there are none), in the last of their months, paid
+     * when all of them were. Full to partial: the payment stays, as the
+     * first of the partial payments.
+     */
+    function switchMode(mode) {
+        if (mode === editor.mode) return;
+        const ctx = context();
+        if (mode === 'full') {
+            const amounts = editor.rows.map(r => typed(r.amount)).filter(n => n !== null && n > 0);
+            const total = amounts.reduce((a, b) => a + b, 0);
+            const months = editor.rows.map(r => r.month).sort();
+            editor.rows = [{
+                key: ++editor.seq,
+                month: months.length ? months[months.length - 1] : defaultFullMonth(ctx),
+                amount: total > 0 ? (root.CRMAmount ? root.CRMAmount.format(total) : String(total)) : defaultFullAmount(ctx),
+                paid: editor.rows.length > 0 && editor.rows.every(r => r.paid)
+            }];
+        }
+        editor.mode = mode;
+        renderEditor(`[data-ppay-mode="${mode}"]`);
+    }
+
+    function modeSwitch() {
+        return `<div class="segmented ppay-mode" role="group" aria-label="How the project is paid">${MODES.map(m => {
+            const on = m.key === editor.mode;
+            return `<button type="button" class="segmented-btn${on ? ' active' : ''}" aria-pressed="${on}" data-ppay-mode="${m.key}" title="${esc(m.hint)}">${esc(m.label)}</button>`;
+        }).join('')}</div>`;
     }
 
     function renderEditor(focusKey) {
@@ -386,6 +505,41 @@
         if (!el) return;
         const ctx = context();
         const used = editor.rows.map(r => r.month);
+        const full = editor.mode === 'full';
+        if (full && !editor.rows.length) {
+            editor.rows = [{ key: ++editor.seq, month: defaultFullMonth(ctx), amount: defaultFullAmount(ctx), paid: false }];
+        }
+
+        if (full) {
+            const r = editor.rows[0];
+            el.innerHTML = `
+                ${modeSwitch()}
+                <ol class="ppay-rows is-full">
+                    <li class="ppay-row${r.paid ? ' is-paid' : ''}" data-ppay-row="${r.key}">
+                        <select class="form-select ov-field ppay-month" data-ppay-month aria-label="Payment in full: expected in">
+                            ${monthOptionsHtml(r, ctx, used)}
+                        </select>
+                        <span class="ppay-amount">
+                            <input type="text" class="form-input ov-field" data-ppay-amount data-amount inputmode="decimal" autocomplete="off"
+                                placeholder="Amount" aria-label="Payment in full: amount in euros" value="${esc(r.amount)}">
+                            <span class="ppay-currency" aria-hidden="true">€</span>
+                        </span>
+                        <button type="button" class="ppay-paid" data-ppay-paid role="checkbox" aria-checked="${r.paid}"
+                            title="${r.paid ? 'Mark as not paid' : 'Mark as paid'}">
+                            <span class="ppay-paid-box" aria-hidden="true">${ICON_CHECK}</span>Paid
+                        </button>
+                    </li>
+                </ol>
+                <div class="ppay-foot">
+                    <div class="ppay-status" data-ppay-status aria-live="polite"></div>
+                </div>`;
+            renderStatus();
+            if (focusKey) {
+                const target = el.querySelector(focusKey);
+                if (target) target.focus();
+            }
+            return;
+        }
 
         const rows = editor.rows.map((r, i) => {
             const n = i + 1;
@@ -410,6 +564,7 @@
         }).join('');
 
         el.innerHTML = `
+            ${modeSwitch()}
             ${editor.rows.length ? `<ol class="ppay-rows">${rows}</ol>` : ''}
             <div class="ppay-foot">
                 <button type="button" class="ov-add-btn ppay-add" data-ppay-add>${ICON_PLUS}Add payment</button>
@@ -431,12 +586,20 @@
         const ctx = context();
         const payments = currentPayments();
 
-        if (!editor.rows.length) {
-            box.innerHTML = '<p class="ppay-note">Without payments, the forecast spreads the budget over the project’s months.</p>';
+        if (editor.mode === 'full') {
+            const r = editor.rows[0];
+            const after = r ? afterEndLabel(r.month, ctx.end) : '';
+            box.innerHTML = (payments.length ? sumBlock(summarize(ctx, payments), ctx) : '')
+                + `<p class="ppay-note">The whole project in one payment${after ? ', expected ' + esc(after) : ''}. Pick a month after the end when the invoice is paid later.</p>`;
             return;
         }
 
-        box.innerHTML = sumBlock(summarize(ctx, payments));
+        if (!editor.rows.length) {
+            box.innerHTML = '<p class="ppay-note">Without payments, the forecast counts the budget at the project’s end.</p>';
+            return;
+        }
+
+        box.innerHTML = sumBlock(summarize(ctx, payments), ctx);
     }
 
     /** The first month of the range no payment uses yet, else the last one used. */
@@ -464,6 +627,10 @@
         el.addEventListener('click', e => {
             const btn = e.target.closest('button');
             if (!btn || !el.contains(btn)) return;
+            if (btn.hasAttribute('data-ppay-mode')) {
+                switchMode(btn.getAttribute('data-ppay-mode'));
+                return;
+            }
             if (btn.hasAttribute('data-ppay-add')) {
                 const key = ++editor.seq;
                 editor.rows.push({ key, month: nextMonth(), amount: '', paid: false });
@@ -508,6 +675,7 @@
 
     /** Edit mode: the editor with this project's payments (none for a new project). */
     function edit(project) {
+        editor.mode = modeOf(project);
         editor.rows = parse(project && project.payments).map(p => ({
             key: ++editor.seq,
             month: p.month,
@@ -532,7 +700,7 @@
         });
         if (bad) {
             bad.focus();
-            return { error: 'Every expected payment needs an amount above 0.' };
+            return { error: editor.mode === 'full' ? 'The payment in full needs an amount above 0.' : 'Every expected payment needs an amount above 0.' };
         }
         return { payments: currentPayments() };
     }
@@ -582,7 +750,7 @@
             parse(p.payments).forEach(x => {
                 if (x.paid) return;
                 const match = incomes.find(inc => sameAmount(inc.amount, x.amount)) || null;
-                open.push({ key: open.length, project: p, month: x.month, amount: x.amount, match });
+                open.push({ key: open.length, project: p, month: x.month, amount: x.amount, full: x.full, match });
             });
         });
         if (!open.length) return 0;
@@ -630,7 +798,7 @@
                         <input type="checkbox" id="${id}" data-ppaid-key="${item.key}"${ask.selected.has(item.key) ? ' checked' : ''}>
                         <span class="ppaid-row-main">
                             <span class="ppaid-row-name">${esc(p.name || 'Untitled project')}</span>
-                            <span class="ppaid-row-meta">${esc([p.company, p.stage].filter(Boolean).join(' · '))}</span>
+                            <span class="ppaid-row-meta">${esc([p.company, p.stage, item.full ? 'Payment in full' : ''].filter(Boolean).join(' · '))}</span>
                             ${item.match ? `<span class="ppaid-row-match">${ICON_CHECK}Same amount as ${esc(item.match.party || 'an income')}${item.match.date ? ' on ' + esc(dayName(item.match.date)) : ''}</span>` : ''}
                         </span>
                         <span class="ppaid-row-month">${esc(monthName(item.month))}</span>
@@ -718,11 +886,236 @@
         modal.querySelector('#ppayPaidConfirm').addEventListener('click', confirmAsk);
     }
 
+    // ---- Set to Complete: has it all been paid? ----
+
+    /**
+     * Whether completing a project with these payments needs asking: unless
+     * every payment is already marked paid and they cover the budget, a
+     * finished project may still be owed money.
+     */
+    function needsCompleteCheck(project, payments) {
+        const list = parse(payments);
+        if (!list.length || list.some(x => !x.paid)) return true;
+        const sum = summarize(project, list);
+        return !sum.full && !!sum.budget && sum.unplanned.max > 0.005;
+    }
+
+    const done = { modal: null, project: null, list: [], answer: null, ticked: new Set(), rest: false, resolve: null, returnFocus: null };
+
+    /**
+     * Asks, when a project is set to Complete, whether everything has been
+     * paid. project: the project as it is about to be saved (budget, dates,
+     * name); payments: what the sheet is about to save.
+     *
+     * Resolves with the payments to save instead:
+     *   yes, all paid       every payment marked paid (none stay none)
+     *   not yet, partial    the open payments stay open; the ones ticked as
+     *                       received are marked paid. Budget no payment
+     *                       covers can be added as one more payment.
+     *   not yet, otherwise  one payment in full, unpaid, with the amount and
+     *                       the month it is expected in
+     * or with null when the user goes back to editing.
+     */
+    function askOnComplete(project, payments) {
+        const modal = document.getElementById('ppayCompleteModal');
+        const list = parse(payments);
+        if (!modal || done.resolve) return Promise.resolve({ payments: list });
+
+        done.modal = modal;
+        done.project = project || {};
+        done.list = list;
+        done.answer = null;
+        done.ticked = new Set();
+        done.amount = undefined;
+        done.month = null;
+        done.restMonth = null;
+        done.returnFocus = document.activeElement;
+        const sum = summarize(done.project, list);
+        // Budget the payments leave open: offered as a final payment.
+        done.restAmount = !sum.full && sum.budget && sum.unplanned.max > 0.005 ? sum.unplanned.max : 0;
+        done.rest = done.restAmount > 0 && list.every(x => x.paid);
+        bindComplete(modal);
+        renderComplete();
+        modal.classList.add('active');
+        const first = modal.querySelector('[data-pdone-answer]');
+        if (first) first.focus();
+        return new Promise(resolve => { done.resolve = resolve; });
+    }
+
+    /** "Nov 2026 · this month" etc: months from half a year back to a year ahead, the end month included. */
+    function completeMonthOptions(selected) {
+        const now = monthIndex(new Date().toISOString());
+        const end = monthIndex(done.project.estimated_completion);
+        const from = Math.min(now - 6, end === null ? now : end);
+        const to = Math.max(now + MONTHS_AFTER_END, end === null ? now : end);
+        const out = [];
+        for (let i = from; i <= to; i++) {
+            const key = monthKey(i);
+            const notes = [];
+            if (i === now) notes.push('this month');
+            const after = afterEndLabel(key, done.project.estimated_completion);
+            if (after) notes.push(after);
+            out.push(`<option value="${key}"${key === selected ? ' selected' : ''}>${esc(monthLabel(i))}${notes.length ? ' · ' + esc(notes.join(', ')) : ''}</option>`);
+        }
+        return out.join('');
+    }
+
+    function renderComplete() {
+        const modal = done.modal;
+        const p = done.project;
+        const list = done.list;
+        const open = list.filter(x => !x.paid);
+        const partial = list.length > 0 && !isFull(list);
+        const existingFull = isFull(list) ? list[0] : null;
+        const nowKey = monthKey(monthIndex(new Date().toISOString()));
+
+        modal.querySelector('#ppayCompleteSub').textContent =
+            `${p.name || 'This project'} is now complete. Finished work can still be owed money - say what has come in, so the forecast and the cashflow stay right.`;
+
+        const option = (value, title, text) => `
+            <label class="pdone-choice${done.answer === value ? ' is-on' : ''}">
+                <input type="radio" name="pdoneAnswer" value="${value}" data-pdone-answer${done.answer === value ? ' checked' : ''}>
+                <span class="pdone-choice-text"><strong>${esc(title)}</strong><span>${esc(text)}</span></span>
+            </label>`;
+
+        const openSum = open.reduce((t, x) => t + x.amount, 0);
+        let html = `<div class="pdone-choices" role="radiogroup" aria-label="Has everything been paid?">
+            ${option('yes', 'Yes, everything is paid', list.length ? 'Every payment is marked as received.' : 'Nothing is left to come in.')}
+            ${option('no', 'Not yet', partial && open.length
+                ? `${euro(openSum)} in ${plural(open.length, 'payment')} still open - they stay in the forecast and the cashflow.`
+                : 'The money still to come stays in the forecast (this month) and the cashflow.')}
+        </div>`;
+
+        if (done.answer === 'no' && partial) {
+            const rows = open.map((x, i) => `
+                <li><label class="pdone-pay">
+                    <input type="checkbox" data-pdone-tick="${i}"${done.ticked.has(i) ? ' checked' : ''}>
+                    <span class="pdone-pay-month">${esc(monthName(x.month))}</span>
+                    <span class="pdone-pay-amount">${esc(euro(x.amount))}</span>
+                </label></li>`).join('');
+            html += `<div class="pdone-detail">
+                ${open.length ? `<p class="pdone-label">Already received? Tick them - the rest stays open.</p><ul class="pdone-pays">${rows}</ul>` : ''}
+                ${done.restAmount > 0 ? `
+                <label class="pdone-pay pdone-rest">
+                    <input type="checkbox" data-pdone-rest${done.rest ? ' checked' : ''}>
+                    <span class="pdone-pay-month">Expect the rest of the budget (${esc(euro(done.restAmount))}) as a final payment in</span>
+                    <select class="form-select" data-pdone-rest-month aria-label="Final payment expected in">${completeMonthOptions(done.restMonth || nowKey)}</select>
+                </label>` : ''}
+            </div>`;
+        } else if (done.answer === 'no') {
+            const amount = done.amount !== undefined ? done.amount
+                : existingFull ? (root.CRMAmount ? root.CRMAmount.format(existingFull.amount) : String(existingFull.amount))
+                : defaultFullAmount({ budget_min: p.budget_min, budget_max: p.budget_max });
+            html += `<div class="pdone-detail">
+                <p class="pdone-label">The payment still to come, as one payment in full:</p>
+                <div class="pdone-fields">
+                    <label class="pdone-field"><span>Amount</span>
+                        <span class="ppay-amount"><input type="text" class="form-input" data-pdone-amount data-amount inputmode="decimal" autocomplete="off" value="${esc(amount)}" placeholder="Amount"><span class="ppay-currency" aria-hidden="true">€</span></span></label>
+                    <label class="pdone-field"><span>Expected in</span>
+                        <select class="form-select" data-pdone-month>${completeMonthOptions(done.month || (existingFull ? existingFull.month : nowKey))}</select></label>
+                </div>
+                <p class="pdone-error" data-pdone-error role="alert" hidden></p>
+            </div>`;
+        }
+
+        modal.querySelector('#ppayCompleteBody').innerHTML = html;
+        const confirm = modal.querySelector('#ppayCompleteConfirm');
+        confirm.disabled = !done.answer;
+        confirm.textContent = done.answer === 'yes' ? 'Save as paid' : done.answer === 'no' ? 'Save as open' : 'Save';
+    }
+
+    function closeComplete(result) {
+        if (!done.modal) return;
+        done.modal.classList.remove('active');
+        const resolve = done.resolve;
+        done.resolve = null;
+        if (done.returnFocus && done.returnFocus.focus) done.returnFocus.focus();
+        if (resolve) resolve(result);
+    }
+
+    function confirmComplete() {
+        const list = done.list;
+        if (done.answer === 'yes') {
+            closeComplete({ payments: list.map(x => Object.assign({}, x, { paid: true })) });
+            return;
+        }
+        if (done.answer !== 'no') return;
+
+        if (list.length && !isFull(list)) {
+            const open = list.filter(x => !x.paid);
+            const out = list.map(x => {
+                const i = open.indexOf(x);
+                return Object.assign({}, x, { paid: x.paid || (i >= 0 && done.ticked.has(i)) });
+            });
+            if (done.rest && done.restAmount > 0) {
+                out.push({ month: done.restMonth || monthKey(monthIndex(new Date().toISOString())), amount: Math.round(done.restAmount * 100) / 100, paid: false });
+                out.sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+            }
+            closeComplete({ payments: out.map(x => ({ month: x.month, amount: x.amount, paid: x.paid })) });
+            return;
+        }
+
+        const field = done.modal.querySelector('[data-pdone-amount]');
+        const amount = typed(field ? field.value : '');
+        if (amount === null || amount <= 0) {
+            const err = done.modal.querySelector('[data-pdone-error]');
+            err.textContent = 'Enter the amount still to come, e.g. 12.000';
+            err.hidden = false;
+            if (field) { field.classList.add('is-invalid'); field.focus(); }
+            return;
+        }
+        const month = done.modal.querySelector('[data-pdone-month]').value;
+        closeComplete({ payments: [{ month, amount: Math.round(amount * 100) / 100, paid: false, full: true }] });
+    }
+
+    let doneBound = false;
+    function bindComplete(modal) {
+        if (doneBound) return;
+        doneBound = true;
+        modal.addEventListener('click', e => {
+            if (e.target.closest('[data-pdone-close]')) closeComplete(null);
+        });
+        modal.addEventListener('change', e => {
+            const t = e.target;
+            if (t.hasAttribute('data-pdone-answer')) {
+                done.answer = t.value;
+                renderComplete();
+                const again = modal.querySelector(`[data-pdone-answer][value="${t.value}"]`);
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-pdone-tick')) {
+                const i = Number(t.getAttribute('data-pdone-tick'));
+                if (t.checked) done.ticked.add(i); else done.ticked.delete(i);
+            } else if (t.hasAttribute('data-pdone-rest')) {
+                done.rest = t.checked;
+            } else if (t.hasAttribute('data-pdone-rest-month')) {
+                done.restMonth = t.value;
+                done.rest = true;
+                const box = modal.querySelector('[data-pdone-rest]');
+                if (box) box.checked = true;
+            } else if (t.hasAttribute('data-pdone-month')) {
+                done.month = t.value;
+            }
+        });
+        modal.addEventListener('input', e => {
+            if (e.target.hasAttribute('data-pdone-amount')) {
+                done.amount = e.target.value;
+                e.target.classList.remove('is-invalid');
+            }
+        });
+        modal.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { e.stopPropagation(); closeComplete(null); }
+            if (e.key === 'Enter' && e.target.matches('input[type="text"]')) { e.preventDefault(); confirmComplete(); }
+        });
+        modal.querySelector('#ppayCompleteConfirm').addEventListener('click', confirmComplete);
+    }
+
     root.ProjectPayments = {
         // numbers
-        parse, budgetOf, summarize, monthRange, monthOptions, isOutside, monthName, euro, euroRange,
+        parse, isFull, modeOf, budgetOf, summarize, monthRange, monthOptions, isOutside, afterEndLabel, monthName, euro, euroRange,
         // sheet
         init, edit, read, renderView, cardSummary,
+        // set to Complete
+        needsCompleteCheck, askOnComplete,
         // bookkeeping
         askAfterImport
     };

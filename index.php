@@ -440,14 +440,16 @@ function assetUrl(string $path): string
         The CRM's mark: projects, to-dos, calendar and contacts as four tiles in
         the company colours on the CRM's light background. favicon.ico (16/32/48,
         plain tiles at 16) for browsers without SVG favicons. The apple-touch-icon
-        is what Safari shows in Favourites and on the home screen: all seven
-        sections, tossed together, full bleed because the system rounds the
-        corners itself. assets/img also holds the other variant of each - the
-        tidy grid touch icon and the tossed favicon (*-scatter) - to swap in here.
+        is what Safari shows in Favourites and on the home screen: the same four
+        as one block, split into quarters, full bleed because the system rounds
+        the corners itself. assets/img also holds other variants to swap in
+        here: the four separate tiles (apple-touch-icon.png), as coloured line
+        icons (-line), all seven sections tossed together (-scatter), and the
+        tossed favicon (favicon-scatter).
     -->
     <link rel="icon" href="favicon.ico" sizes="48x48">
     <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-scatter.png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-block.png">
 
     <!--
         The type is Helvetica Neue from the system (--font in design.css), so
@@ -1124,6 +1126,8 @@ function assetUrl(string $path): string
                         <div id="finAlerts"></div>
                         <section class="fin-card fin-chart-card" id="finChart" aria-label="Cashflow"></section>
                         <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
+                        <!-- Loans we owe: lender, dates, rate and the interest so far. -->
+                        <section class="fin-card" id="finDebts" aria-label="Debts"></section>
                     </div>
                     <!-- The costs, opened from the "Fixed costs" figure: a sheet like
                          a project's, where they are added and edited (financials.js). -->
@@ -1980,7 +1984,7 @@ function assetUrl(string $path): string
                                  budget), the editor while editing (project-payments.js) -->
                             <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
                             <div class="overview-detail-item full-width ppay-panel" data-ov="edit">
-                                <span class="detail-label" id="projectPaymentsLabel">Expected payments</span>
+                                <span class="detail-label" id="projectPaymentsLabel">Payments</span>
                                 <div class="ppay-editor" id="projectPaymentsEditor" role="group" aria-labelledby="projectPaymentsLabel"></div>
                             </div>
                             <div class="overview-detail-item full-width">
@@ -2404,6 +2408,25 @@ function assetUrl(string $path): string
                     <span class="ppaid-count" id="ppayPaidCount" aria-live="polite"></span>
                     <button type="button" class="btn btn-secondary" data-ppaid-close>Not now</button>
                     <button type="button" class="btn btn-primary" id="ppayPaidConfirm" disabled>Mark as paid</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- A project set to Complete: has it all been paid? (project-payments.js) -->
+        <div class="modal" id="ppayCompleteModal">
+            <div class="modal-backdrop" data-pdone-close></div>
+            <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="ppayCompleteTitle" aria-describedby="ppayCompleteSub">
+                <div class="modal-header">
+                    <div class="ppaid-head">
+                        <h2 id="ppayCompleteTitle">Has everything been paid?</h2>
+                        <p class="ppaid-sub" id="ppayCompleteSub"></p>
+                    </div>
+                    <button type="button" class="modal-close" data-pdone-close aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body pdone-body" id="ppayCompleteBody"></div>
+                <div class="modal-footer ppaid-foot">
+                    <button type="button" class="btn btn-secondary" data-pdone-close>Back to editing</button>
+                    <button type="button" class="btn btn-primary" id="ppayCompleteConfirm" disabled>Save</button>
                 </div>
             </div>
         </div>

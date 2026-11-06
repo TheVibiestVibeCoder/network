@@ -1221,3 +1221,37 @@
         transition: none;
     }
 }
+
+/* Whose a new contact, project or to-do is: their face in the row. */
+.review-assignee {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.review-assignee .by-line-avatar {
+    width: 20px;
+    height: 20px;
+}
+
+.review-assignee.is-none {
+    width: 20px;
+    height: 20px;
+    border: 1px dashed var(--c-ink-4);
+    border-radius: 50%;
+}
+
+#reviewSheetBy {
+    flex-wrap: wrap;
+    row-gap: 4px;
+}
+
+#reviewSheetBy .edited-by + .edited-by::before {
+    content: "\00b7";
+    margin-right: 6px;
+    color: var(--c-ink-4);
+}
+
+.review-assignee-nobody {
+    font-weight: 600;
+    color: var(--c-ink-3);
+}

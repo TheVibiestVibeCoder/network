@@ -381,6 +381,40 @@
         return escapeHtml(summaryFor(item));
     }
 
+    /**
+     * Who a new contact, project or to-do is assigned to: a reassignment
+     * Claude proposed for it as well comes first, else the record's own.
+     * null for proposals that have no assignee.
+     */
+    function assigneeFor(item) {
+        if (item.kind !== 'create' || !ASSIGN_TYPE[item.entity_type]) return null;
+        const pending = (state.items || []).find(i => i.kind === 'assign' && i.status === 'pending'
+            && i.entity_type === item.entity_type && Number(i.entity_id) === Number(item.entity_id));
+        if (pending) {
+            const p = pending.payload || {};
+            return { id: p.assigned_to ?? null, name: p.assigned_to_name || null, proposed: true };
+        }
+        const r = item.record || {};
+        return { id: r.assigned_to ?? null, name: r.assigned_to_name || null, proposed: false };
+    }
+
+    function avatarHtml(id, name) {
+        const people = window.CRMPeople;
+        const url = people && people.avatarFor ? people.avatarFor(id, name) : null;
+        return `<span class="by-line-avatar${url ? ' has-photo' : ''}" data-actor-id="${id === null || id === undefined ? '' : escapeHtml(id)}" data-actor-name="${escapeHtml(name)}">${url ? `<img src="${escapeHtml(url)}" alt="">` : escapeHtml(initials(name))}</span>`;
+    }
+
+    /** In a row: whose the new record is - their face; an empty ring on a to-do nobody has. */
+    function assigneeChip(item) {
+        const a = assigneeFor(item);
+        if (!a) return '';
+        if (!a.name) {
+            return item.entity_type === 'todo' ? '<span class="review-assignee is-none" title="Not assigned" aria-label="Not assigned"></span>' : '';
+        }
+        const label = 'Assigned to ' + a.name + (a.proposed ? ' (proposed)' : '');
+        return `<span class="review-assignee" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${avatarHtml(a.id, a.name)}</span>`;
+    }
+
     /** The fields somebody changed since Claude proposed, with their value now. */
     function staleFields(item) {
         if (item.kind !== 'update' || !item.record) return [];
@@ -504,6 +538,7 @@
                             <span class="review-row-title">${escapeHtml(titleFor(item))}</span>
                             <span class="review-row-summary">
                                 <span class="review-kind">${escapeHtml(kindLabel(item))}</span>
+                                ${assigneeChip(item)}
                                 ${stale ? `<span class="review-outdated" title="${escapeHtml(staleTitle)}">${ICON_WARN}Outdated</span>` : ''}
                                 ${summary ? `<span class="review-row-summary-text">${summary}</span>` : ''}
                             </span>
@@ -616,7 +651,9 @@
                     ], 3));
                 }
                 if (item.entity_type === 'todo') {
+                    const assignee = assigneeFor(item) || {};
                     return section('Details', facts([
+                        ['Assigned to', assignee.name ? assignee.name + (assignee.proposed ? ' (proposed)' : '') : 'Nobody'],
                         ['Belongs to', r.project_name || r.contact_name],
                         ['Due', isEmpty(s.due_date) ? '' : formatDay(s.due_date)],
                         ['Priority', isEmpty(s.priority) ? '' : displayValue('priority', s.priority)],
@@ -790,7 +827,11 @@
         els.sheetIcon.innerHTML = typeIcon(item);
         els.sheetTitle.textContent = titleFor(item) || 'Proposal';
         els.sheetContext.innerHTML = `<span class="review-kind review-tone--${tone(item)}">${escapeHtml(kindLabel(item))}</span>${context ? `<span class="review-sheet-context-sep">·</span>${escapeHtml(context)}` : ''}`;
-        els.sheetBy.innerHTML = personLine('Proposed by', item.source || 'Claude', null, item.created_at);
+        const assignee = assigneeFor(item);
+        els.sheetBy.innerHTML = personLine('Proposed by', item.source || 'Claude', null, item.created_at)
+            + (!assignee ? ''
+                : assignee.name ? personLine(assignee.proposed ? 'To be assigned to' : 'Assigned to', assignee.name, assignee.id, null)
+                : '<span class="edited-by">Assigned to <strong class="review-assignee-nobody">nobody</strong></span>');
         els.sheetBody.innerHTML = sheetBody(item, editing);
         els.sheetFooter.innerHTML = sheetFooter(item, editing, busy);
     }

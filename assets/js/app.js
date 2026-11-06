@@ -5424,9 +5424,32 @@
             return;
         }
 
-        const payments = window.ProjectPayments ? window.ProjectPayments.read() : { payments: undefined };
+        let payments = window.ProjectPayments ? window.ProjectPayments.read() : { payments: undefined };
         if (payments.error) {
             return;
+        }
+
+        // Set to Complete just now: finished work can still be owed money,
+        // so ask whether it has all come in before saving.
+        const stage = elements.projectEditStage.value;
+        const wasComplete = !creating && state.viewingProject && state.viewingProject.stage === 'Complete';
+        const PP = window.ProjectPayments;
+        if (stage === 'Complete' && !wasComplete && PP && PP.askOnComplete) {
+            const draft = {
+                name: elements.projectEditName.value.trim(),
+                budget_min: budget[0],
+                budget_max: budget[1],
+                start_date: elements.projectEditStartDate.value,
+                estimated_completion: elements.projectEditEstCompletion.value || null
+            };
+            if (PP.needsCompleteCheck(draft, payments.payments)) {
+                const answer = await PP.askOnComplete(draft, payments.payments);
+                if (!answer) {
+                    elements.projectEditStage.focus();
+                    return;
+                }
+                payments = answer;
+            }
         }
 
         const data = {

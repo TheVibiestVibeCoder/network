@@ -1705,14 +1705,27 @@ input[type="checkbox"] {
 
 /* A plain small button like any other; one width for "Expand" and
    "Collapse", so nothing beside it moves. */
-.rf-expand.btn {
-    min-width: 104px;
-    gap: 6px;
+/* "Show details" / "Hide details": a quiet text link with a chevron, the
+   same as under the cards on Financials (.fin-kpi-toggle). */
+.rf-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font: 500 var(--t-xs)/1.4 var(--font);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+    cursor: pointer;
 }
 
+.rf-expand:hover { color: var(--c-accent); }
+.rf-expand:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+
 .rf-expand svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     transition: transform var(--dur-2) var(--ease);
 }
 
@@ -2537,20 +2550,6 @@ input[type="checkbox"] {
     border: 0;
 }
 
-.rf-foot {
-    margin: 0;
-    padding: 14px 22px 18px;
-    border-top: 1px solid var(--c-line-2);
-    font-size: var(--t-xs);
-    line-height: 1.5;
-    color: var(--c-ink-3);
-}
-
-.rf-foot strong {
-    font-weight: 600;
-    color: var(--c-ink-2);
-}
-
 .rf-empty {
     margin: 0;
     padding: 24px 0 8px;
@@ -2631,8 +2630,7 @@ input[type="checkbox"] {
     }
 
     .rf-detail-bar,
-    .rf-missing,
-    .rf-foot {
+    .rf-missing {
         padding-left: 14px;
         padding-right: 14px;
     }
@@ -10050,47 +10048,6 @@ details.import-instructions p {
 .fin-kpi-value.is-neg { color: var(--c-danger-ink); }
 .fin-kpi-sub strong.is-pos { color: var(--c-success-ink); }
 
-/* The scenario the projection uses, as a label beside it. */
-.fin-kpi-scenario {
-    margin-left: 6px;
-    vertical-align: 1px;
-}
-
-
-.fin-kpi-lines {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: 10px 0 0;
-    padding-top: 8px;
-    border-top: 1px solid var(--c-line-2);
-}
-
-.fin-kpi-lines > div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 28px;
-}
-
-.fin-kpi-lines dt {
-    font-size: var(--t-sm);
-    color: var(--c-ink-3);
-}
-
-.fin-kpi-lines dd {
-    margin: 0;
-    font-size: var(--t-sm);
-    font-weight: 600;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.fin-kpi-lines dd.is-pos { color: var(--c-success-ink); }
-.fin-kpi-lines dd.is-neg { color: var(--c-danger-ink); }
-.fin-kpi-lines dd.is-warn { color: var(--c-warning-ink); }
 
 .fin-balance-link {
     font-weight: 600;
@@ -10443,20 +10400,23 @@ details.import-instructions p {
     fill: var(--c-ink-3);
 }
 
+/* The balance: what it was, from Bookkeeping, as a solid line; what the
+   scenario projects from today, dashed - blue above zero, red below. */
 .fin-line {
     fill: none;
     stroke: var(--c-accent);
-    stroke-width: 3.5;
+    stroke-width: 3;
     stroke-linejoin: round;
     stroke-linecap: round;
+    stroke-dasharray: 7 7;
 }
 
 .fin-line.is-neg { stroke: var(--c-danger); }
 
 .fin-line.is-past {
-    stroke: var(--c-ink-4);
-    stroke-width: 2.5;
-    stroke-dasharray: 2 7;
+    stroke: var(--c-primary);
+    stroke-width: 3;
+    stroke-dasharray: none;
 }
 
 .fin-grid.is-dashed { stroke-dasharray: 4 6; }
@@ -10651,6 +10611,24 @@ details.import-instructions p {
 .fin-month.is-past th {
     background: var(--c-tint-3);
 }
+
+/* Unfolded, the single months sit under their summary row, a little
+   tighter and lighter; the summary row reads as the heading over them. */
+.fin-month.is-past:not(.is-summary) :is(th, td) {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    border-top-color: transparent;
+}
+
+.fin-month.is-past:not(.is-summary) th { padding-left: 36px; }
+.fin-month.is-past:not(.is-summary) .fin-month-label { padding-left: 20px; font-weight: 500; }
+.fin-month.is-past:not(.is-summary) .fin-month-toggle { font-weight: 500; }
+.fin-month.is-past:not(.is-summary) .fin-tag { display: none; }
+
+/* This month: a line in the accent at its start, so it stands out from
+   the months gone by above it. */
+.fin-month.is-now th { box-shadow: inset 3px 0 0 var(--c-accent); }
+.fin-month.is-now .fin-tag { background: var(--c-accent-soft); color: var(--c-accent); }
 
 .fin-detail-empty {
     margin: 0;
@@ -11044,5 +11022,819 @@ details.import-instructions p {
 @media (max-width: 720px) {
     .users-page {
         padding: 16px;
+    }
+}
+
+/* ---- Payments: partial or in full (project-payments.js) ----
+   The switch over the editor; a payment in full is one row without a number
+   or a remove button, its month labelled against the project's end. */
+
+.ppay-mode.segmented {
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.ppay-rows.is-full .ppay-row {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+    grid-template-areas: "month amount paid";
+}
+
+.ppay-items.is-full .ppay-num {
+    visibility: hidden;
+}
+
+.ppay-item-after {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.ppay-item.is-late .ppay-item-status {
+    font-weight: 600;
+    color: var(--c-danger-ink);
+}
+
+@media (max-width: 560px) {
+    .ppay-rows.is-full .ppay-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "month  month"
+            "amount paid";
+    }
+}
+
+/* ---- Set to Complete: has everything been paid? ---- */
+
+.pdone-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pdone-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.pdone-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.pdone-choice:hover {
+    border-color: var(--c-line-strong);
+}
+
+.pdone-choice.is-on {
+    border-color: color-mix(in srgb, var(--c-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--c-accent) 7%, var(--c-surface));
+}
+
+.pdone-choice input {
+    margin: 2px 0 0;
+    accent-color: var(--c-accent);
+}
+
+.pdone-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pdone-choice-text strong {
+    color: var(--c-ink);
+}
+
+.pdone-choice-text span {
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    color: var(--c-ink-3);
+}
+
+.pdone-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pdone-label {
+    margin: 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.pdone-pays {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pdone-pay {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    cursor: pointer;
+}
+
+.pdone-pay:has(input:checked) {
+    border-color: color-mix(in srgb, var(--c-success) 45%, transparent);
+    background: var(--c-success-soft);
+}
+
+.pdone-pay input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--c-success);
+}
+
+.pdone-pay-month {
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.pdone-pay-amount {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.pdone-rest .form-select {
+    width: auto;
+    min-width: 0;
+}
+
+.pdone-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 10px;
+}
+
+.pdone-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.pdone-field .ppay-amount .form-input {
+    padding-right: 26px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdone-error {
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-danger-ink);
+}
+
+@media (max-width: 560px) {
+    .pdone-choices,
+    .pdone-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .pdone-rest {
+        grid-template-columns: 18px minmax(0, 1fr);
+    }
+
+    .pdone-rest .form-select {
+        grid-column: 2;
+    }
+}
+
+/* ---- Revenue forecast: completed projects still owed money ---- */
+
+:is(.rf-card, .rf-adjust-panel) [data-tone="complete"] { --rf-tone: var(--stage-complete); }
+
+.rf-split {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 2px 0 4px;
+    font-size: var(--t-sm);
+    line-height: 1.45;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.rf-split-line {
+    white-space: nowrap;
+}
+
+.rf-split strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.rf-overdue {
+    display: inline-block;
+    align-self: flex-start;
+    margin: 1px 0 1px 0;
+    padding: 0 6px;
+    border-radius: var(--r-full);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    vertical-align: 1px;
+}
+
+.rf-overdue.is-open {
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
+}
+
+/* ---- Financials: the three cards on top ----
+   Each card: its figure, then soft tiles with the two figures behind it,
+   and - on the year and liquidity cards - a band for what the scenario
+   projects (the year's result, how long the money lasts), tinted in its
+   tone, with the scenario as a chip. */
+
+.fin-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.fin-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.fin-tile-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-tile-label.is-up svg { color: var(--c-success-ink); }
+.fin-tile-label.is-down svg { color: var(--c-danger-ink); }
+
+.fin-tile-value {
+    font-size: var(--t-md);
+    font-weight: 700;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fin-tile-value.is-neg { color: var(--c-danger-ink); }
+.fin-tile-value.is-warn { color: var(--c-warning-ink); }
+/* A link as the figure (the buffer): its hover pill reaches out past the
+   text, so the figure must not clip it - and keeps inside the tile. */
+.fin-tile-value:has(.fin-link) { overflow: visible; }
+.fin-tile-value .fin-balance-link {
+    height: 24px;
+    margin: 0 -6px;
+    padding: 0 6px;
+    font-size: inherit;
+    font-weight: 700;
+}
+
+.fin-tile-sub {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fin-band {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.fin-band-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.fin-band-label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+}
+
+.fin-band-label > span {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+/* The scenario: leads to the forecast's scenario switch. */
+.fin-band-chip {
+    padding: 1px 9px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    font: inherit;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-accent);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.fin-band-chip:hover { box-shadow: inset 0 0 0 1px var(--c-accent-soft); }
+.fin-band-chip:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.fin-band-value {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-band.is-pos { background: var(--c-success-soft); }
+.fin-band.is-pos .fin-band-value { color: var(--c-success-ink); }
+.fin-band.is-neg { background: var(--c-danger-soft); }
+.fin-band.is-neg .fin-band-value { color: var(--c-danger-ink); }
+.fin-band.is-warn { background: var(--c-warning-soft); }
+.fin-band.is-warn .fin-band-value { color: var(--c-warning-ink); }
+
+/* Unfolded: what the projected result is made of, inside its band. */
+.fin-band-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 10px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid color-mix(in srgb, var(--c-ink) 12%, transparent);
+}
+
+.fin-band-lines > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+}
+
+.fin-band-lines dt {
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.fin-band-lines dd {
+    margin: 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-kpi-toggle {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.fin-kpi-toggle:hover { color: var(--c-accent); }
+.fin-kpi-toggle:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+.fin-kpi-toggle svg { transform: rotate(90deg); transition: transform var(--d-fast, 150ms) ease; }
+.fin-kpi.is-open .fin-kpi-toggle svg { transform: rotate(-90deg); }
+
+
+
+/* ---- Financials: an unfolded month ----
+   No card inside the card: two columns straight on the table's ground -
+   income left, costs right - each with what has flowed (a filled check)
+   above what is still to come (an empty ring; red when overdue). */
+
+.fin-month.is-open th,
+.fin-month.is-open td {
+    border-bottom: 0;
+}
+
+.fin-month-detail td {
+    padding: 2px 20px 16px 44px !important;
+}
+
+.fin-flow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 32px;
+}
+
+.fin-flow-col {
+    min-width: 0;
+}
+
+.fin-flow-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--c-line);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    color: var(--c-ink-2);
+}
+
+.fin-flow-col.is-in .fin-flow-head { border-bottom-color: color-mix(in srgb, var(--c-success) 55%, transparent); }
+.fin-flow-col.is-out .fin-flow-head { border-bottom-color: color-mix(in srgb, var(--c-danger) 45%, transparent); }
+
+.fin-flow-head strong {
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-flow-col.is-in .fin-flow-head strong { color: var(--c-success-ink); }
+.fin-flow-col.is-out .fin-flow-head strong { color: var(--c-ink); }
+
+.fin-flow-group {
+    margin-top: 8px;
+}
+
+.fin-flow-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0 0 2px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.fin-flow-group-title strong {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-flow-hint {
+    font-weight: 400;
+    color: var(--c-ink-4);
+}
+
+.fin-flow-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fin-flow-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 12px;
+    padding: 3px 0;
+}
+
+/* Open items stand apart: a soft band behind the group. */
+.fin-flow-group.is-open {
+    padding: 4px 8px 6px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.fin-flow-group.is-open .fin-flow-group-title,
+.fin-flow-group.is-open .fin-flow-group-title strong {
+    color: var(--c-ink-2);
+}
+
+.fin-flow-late {
+    margin-left: 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-danger-ink);
+}
+
+.fin-flow-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 8px;
+    min-width: 0;
+    color: var(--c-ink);
+    white-space: normal;
+}
+
+.fin-flow-name a {
+    color: var(--c-ink);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.fin-flow-name a:hover {
+    color: var(--c-accent-2);
+    text-decoration: underline;
+}
+
+.fin-flow-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-flow-amount {
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-flow-col.is-in .fin-flow-amount { color: var(--c-success-ink); }
+.fin-flow-col.is-out .fin-flow-amount { color: var(--c-ink-2); }
+
+.fin-flow-more {
+    padding: 2px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-flow-empty {
+    margin: 8px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+}
+
+@media (max-width: 680px) {
+    .fin-flow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .fin-month-detail td {
+        padding: 2px 14px 14px !important;
+    }
+}
+
+/* The table scrolls sideways on a phone; an unfolded month stays put at
+   the visible width instead of running off with the columns. */
+@media (max-width: 560px) {
+    .fin-flow {
+        position: sticky;
+        left: 14px;
+        width: calc(100vw - 60px);
+    }
+}
+
+/* ---- Financials: debts ---- */
+
+#finDebts .fin-card-head .ov-add-btn {
+    flex-shrink: 0;
+}
+
+.fin-debt-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.fin-debt-stats > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+}
+
+.fin-debt-stats dt {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-debt-stats dd {
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 700;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-debt-stats dd.is-neg { color: var(--c-danger-ink); }
+
+.fin-debt-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fin-debt-list > li + li {
+    border-top: 1px solid var(--c-line-2);
+}
+
+.fin-debt-list .fin-debt-form {
+    margin: 8px 0;
+}
+
+.fin-debt {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.fin-debt:hover {
+    background: var(--c-tint-3);
+}
+
+.fin-debt:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+}
+
+.fin-debt.is-repaid {
+    opacity: 0.55;
+}
+
+.fin-debt-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fin-debt-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.fin-debt-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-debt-meta strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.fin-debt-figures {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-debt-figures strong {
+    font-weight: 700;
+    color: var(--c-ink);
+}
+
+.fin-debt-figures span {
+    font-size: var(--t-xs);
+    color: var(--c-danger-ink);
+    white-space: nowrap;
+}
+
+.fin-debt-form textarea.form-input {
+    height: auto;
+    min-height: 56px;
+    padding-top: 8px;
+    resize: vertical;
+}
+
+.fin-optional {
+    font-style: normal;
+    font-weight: 400;
+    color: var(--c-ink-4);
+}
+
+.fin-debt-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line-2);
+}
+
+.fin-debt-preview > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fin-debt-preview dt {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-debt-preview dd {
+    margin: 0;
+    font-weight: 700;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+    .fin-debt-stats,
+    .fin-debt-preview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .fin-debt-stats {
+        gap: 0;
+        padding: 4px 12px;
+        border-radius: var(--r-md);
+        background: var(--c-tint-3);
+    }
+
+    .fin-debt-stats > div,
+    .fin-debt-preview > div {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 6px 0;
+        background: transparent;
+    }
+
+    .fin-debt-stats dd {
+        font-size: var(--t-md);
+    }
+
+    .fin-debt {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .fin-debt-figures {
+        align-items: flex-start;
+    }
+
+    .fin-debt-figures span {
+        white-space: normal;
     }
 }

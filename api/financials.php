@@ -9,6 +9,8 @@
  * GET  ?action=overview         costs, balances (newest first), settings
  * POST ?action=save-cost        { id?, name, category, amount, kind, interval_months, start_month, end_month, day }
  * POST ?action=delete-cost      { id }
+ * POST ?action=save-debt        { id?, name, lender, amount, start_date, end_date?, rate, note? }
+ * POST ?action=delete-debt      { id }
  * POST ?action=set-balance      { amount, as_of, note? }
  * POST ?action=delete-balance   { id }
  * POST ?action=save-settings    { buffer?, dismiss_recurring? (a suggestion's key, turned down) }
@@ -87,6 +89,28 @@ try {
                 finJson(['error' => 'A cost id is required'], 400);
             }
             $model->deleteCost($id);
+            finJson(['success' => true, 'data' => $model->overview()]);
+            break;
+
+        case 'save-debt':
+            $debt = Financials::normalizeDebt($input);
+            if (is_string($debt)) {
+                finJson(['error' => $debt], 400);
+            }
+            $id = array_key_exists('id', $input) && $input['id'] !== null ? finId($input['id']) : null;
+            if (array_key_exists('id', $input) && $input['id'] !== null && $id === null) {
+                finJson(['error' => 'Invalid debt id'], 400);
+            }
+            $savedId = $model->saveDebt($id, $debt);
+            finJson(['success' => true, 'id' => $savedId, 'data' => $model->overview()]);
+            break;
+
+        case 'delete-debt':
+            $id = finId($input['id'] ?? null);
+            if ($id === null) {
+                finJson(['error' => 'A debt id is required'], 400);
+            }
+            $model->deleteDebt($id);
             finJson(['success' => true, 'data' => $model->overview()]);
             break;
 

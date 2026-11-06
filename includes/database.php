@@ -212,6 +212,7 @@ class Database
 
         // Expected payments: a JSON list of {month: "YYYY-MM", amount, paid},
         // ordered by month (see Project::normalizePayments). NULL = none.
+        // A payment in full is the one entry, marked "full": true.
         self::addColumnIfMissing($db, 'projects', 'payments', 'TEXT');
 
         // Create indexes for projects
