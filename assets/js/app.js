@@ -107,7 +107,11 @@
         composeView: document.getElementById('composeView'),
         usersView: document.getElementById('usersView'),
         listView: document.getElementById('listView'),
+        // The team calendar (team-calendar.js); only there with the calendar right.
         calendarView: document.getElementById('calendarView'),
+        // The activity log (admins only, so absent for everyone else). It was
+        // the Calendar tab; the cal* elements and calendar* functions are its.
+        logView: document.getElementById('logView'),
         todoView: document.getElementById('todoView'),
         mapContainer: document.getElementById('map'),
 
@@ -586,14 +590,14 @@
             return response.json();
         },
 
-        // Calendar API
+        // Log API (the activity stream; admins only)
         async getCalendarNotes(start, end, search = '', tagId = '') {
             const params = new URLSearchParams();
             if (start) params.set('start', start);
             if (end) params.set('end', end);
             if (search) params.set('search', search);
             if (tagId) params.set('tag_id', tagId);
-            const response = await fetch(`api/calendar.php?${params}`);
+            const response = await fetch(`api/log.php?${params}`);
             return response.json();
         },
 
@@ -1374,7 +1378,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'bookkeeping', 'financials', 'review', 'users'];
+    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'log', 'bookkeeping', 'financials', 'review', 'users'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1392,9 +1396,10 @@
         // The map used to be a tab of its own; it is now a mode of Contacts.
         if (stored === 'map') return 'list';
 
-        // Bookkeeping, Financials and Users are only on the page for admins,
-        // Quick add only while it is switched on.
-        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
+        // Bookkeeping, Financials, Users and the Log are only on the page for
+        // admins, the Calendar for people with the calendar right, Quick add
+        // only while it is switched on.
+        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users' || stored === 'log' || stored === 'calendar' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1435,7 +1440,12 @@
             elements.workloadView.classList.toggle('active', view === 'workload');
         }
         elements.listView.classList.toggle('active', view === 'list');
-        elements.calendarView.classList.toggle('active', view === 'calendar');
+        if (elements.calendarView) {
+            elements.calendarView.classList.toggle('active', view === 'calendar');
+        }
+        if (elements.logView) {
+            elements.logView.classList.toggle('active', view === 'log');
+        }
         elements.todoView.classList.toggle('active', view === 'todos');
         elements.projectsView.classList.toggle('active', view === 'projects');
         if (elements.bookkeepingView) {
@@ -1462,8 +1472,13 @@
                 // Opening Home always starts at the signed-in person.
                 window.CRMWorkload.open();
             }
-        } else if (view === 'calendar') {
+        } else if (view === 'log') {
             loadCalendarNotes();
+        } else if (view === 'calendar') {
+            // The team calendar (assets/js/team-calendar.js).
+            if (window.CRMCalendar) {
+                window.CRMCalendar.open();
+            }
         } else if (view === 'todos') {
             loadTodos();
         } else if (view === 'projects') {
@@ -3018,6 +3033,11 @@
             // Load and render to-dos
             await loadContactTodos(contactId);
 
+            // Appointments linked to the contact (team calendar, if allowed)
+            if (window.CRMCalendar && window.CRMCalendar.renderLinked) {
+                window.CRMCalendar.renderLinked('contact', contactId, document.getElementById('contactAppointments'));
+            }
+
             // Show modal
             elements.overviewModal.classList.add('active');
 
@@ -4380,6 +4400,8 @@
 
     function populateCalendarTagFilter() {
         const select = elements.calTagFilter;
+        // Only admins have the log, and with it the tag filter.
+        if (!select) return;
         // Keep the first "all" option
         while (select.options.length > 1) {
             select.remove(1);
@@ -4393,6 +4415,8 @@
     }
 
     function initCalendarEvents() {
+        // The log's controls are only on the page for admins.
+        if (!elements.logView) return;
         elements.calPrev.addEventListener('click', () => navigateCalendar(-1));
         elements.calNext.addEventListener('click', () => navigateCalendar(1));
         elements.calToday.addEventListener('click', () => {
@@ -4907,6 +4931,10 @@
                     notesResult.success ? (notesResult.data || []) : [],
                     todosResult.success ? (todosResult.data || []) : []
                 );
+                // Appointments linked to the project (team calendar, if allowed)
+                if (window.CRMCalendar && window.CRMCalendar.renderLinked) {
+                    window.CRMCalendar.renderLinked('project', projectId, document.getElementById('projectAppointments'));
+                }
                 elements.projectOverviewModal.classList.add('active');
                 if (edit) enterProjectEdit();
             } else {
@@ -5901,7 +5929,7 @@
     function refreshData() {
         if (state.currentView === 'list' && state.contactsMode === 'map') {
             loadMapMarkers();
-        } else if (state.currentView === 'calendar') {
+        } else if (state.currentView === 'log') {
             loadCalendarNotes();
         } else if (state.currentView === 'projects') {
             loadProjects();

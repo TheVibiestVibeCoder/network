@@ -143,8 +143,14 @@ function envBool(string $key, bool $default): bool
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'Disinfo CRM');
 define('APP_PASSWORD', $_ENV['APP_PASSWORD'] ?? '');
 // The database, invoice PDFs and profile pictures all live under DATA_DIR.
-define('DATA_DIR', (PRIVATE_DIR ?? APP_ROOT) . '/data');
-define('DB_PATH', DATA_DIR . '/crm.db');
+// A test script may point both at a scratch directory before loading this
+// file (tests/calendar.test.php), so it never touches the real database.
+if (!defined('DATA_DIR')) {
+    define('DATA_DIR', (PRIVATE_DIR ?? APP_ROOT) . '/data');
+}
+if (!defined('DB_PATH')) {
+    define('DB_PATH', DATA_DIR . '/crm.db');
+}
 
 // ---------------------------------------------------------------------------
 // Refuse to start on a database that was not moved along
@@ -281,3 +287,40 @@ define('MCP_API_ALLOW_WRITES', envBool('MCP_API_ALLOW_WRITES', true));
 define('MCP_API_RATE_LIMIT', max(10, envInt('MCP_API_RATE_LIMIT', 120)));      // signed requests per minute
 define('MCP_API_MAX_PENDING', max(10, envInt('MCP_API_MAX_PENDING', 200)));    // open proposals before new ones are refused
 define('MCP_ACTOR_NAME', trim((string) ($_ENV['MCP_ACTOR_NAME'] ?? '')) !== '' ? trim((string) $_ENV['MCP_ACTOR_NAME']) : 'Claude');
+
+// -----------------------------------------------------------------------------
+// Team calendar (CalDAV) - docs/kalender-spec.md
+// -----------------------------------------------------------------------------
+// One shared account reads and writes the calendars the team has shared with
+// it on the mail server. Its password is the only mail credential the CRM
+// holds; it also opens that account's mailbox and SMTP. Empty = not set up.
+define('CALDAV_BASE_URL', rtrim(trim((string) ($_ENV['CALDAV_BASE_URL'] ?? '')), '/'));
+define('CALENDAR_ACCOUNT', trim((string) ($_ENV['CALENDAR_ACCOUNT'] ?? '')));
+define('CALENDAR_ACCOUNT_PASSWORD', (string) ($_ENV['CALENDAR_ACCOUNT_PASSWORD'] ?? ''));
+define('CALENDAR_MAIL_HOST', trim((string) ($_ENV['CALENDAR_MAIL_HOST'] ?? '')));
+
+// Times are stored in UTC and shown in this zone.
+$calendarZone = trim((string) ($_ENV['CALENDAR_TIMEZONE'] ?? ''));
+define('CALENDAR_TIMEZONE', in_array($calendarZone, timezone_identifiers_list(), true) ? $calendarZone : 'Europe/Vienna');
+unset($calendarZone);
+// The sync expands every occurrence from this many months back to this many
+// ahead. The past side is also how long a finished appointment stays in the
+// cache: after that only its server address and ETag are kept, so the sync
+// does not download it again, and its contents are gone.
+define('CALENDAR_RETENTION_MONTHS', max(1, envInt('CALENDAR_RETENTION_MONTHS', 12)));
+define('CALENDAR_FUTURE_MONTHS', max(1, envInt('CALENDAR_FUTURE_MONTHS', 12)));
+// Opening the calendar syncs as well, at most once in this many seconds. The
+// regular work is the cron job, cli/calendar-sync.php, every 5 minutes.
+define('CALENDAR_OPEN_SYNC_SECONDS', max(10, envInt('CALENDAR_OPEN_SYNC_SECONDS', 30)));
+// The sync keeps the copies of shared appointments in the team's work
+// calendars in step with the original: answers given on a phone go into the
+// original, other changes to a copy are overwritten, appointments made on a
+// phone with team members in them get their copies (spec, section 4). Only
+// for an emergency: 0 stops it, the CRM's own writes still make copies.
+define('CALENDAR_COPIES', envBool('CALENDAR_COPIES', true));
+
+/** True once the shared account is fully configured in .env. */
+function calendarConfigured(): bool
+{
+    return CALDAV_BASE_URL !== '' && CALENDAR_ACCOUNT !== '' && CALENDAR_ACCOUNT_PASSWORD !== '';
+}

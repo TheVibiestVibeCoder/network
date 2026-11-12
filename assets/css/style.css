@@ -2319,16 +2319,16 @@ textarea.form-input {
 }
 
 /* ============================================
-   Calendar View
+   Log (formerly the Calendar tab; admins only)
    ============================================ */
 
-#calendarView {
+#logView {
     flex-direction: column;
     background-color: var(--color-bg);
     overflow: hidden;
 }
 
-#calendarView.active {
+#logView.active {
     display: flex;
 }
 
@@ -4919,22 +4919,22 @@ textarea.form-input {
     animation-delay: calc(var(--deck-order, 0) * 36ms);
 }
 
-#calendarView .calendar-body {
+#logView .calendar-body {
     perspective: 1400px;
     transform-style: preserve-3d;
 }
 
-#calendarView .calendar-body .cal-month-header-cell,
-#calendarView .calendar-body .cal-month-cell,
-#calendarView .calendar-body .cal-week-day,
-#calendarView .calendar-body .cal-day-note,
-#calendarView .calendar-body .cal-day-empty {
+#logView .calendar-body .cal-month-header-cell,
+#logView .calendar-body .cal-month-cell,
+#logView .calendar-body .cal-week-day,
+#logView .calendar-body .cal-day-note,
+#logView .calendar-body .cal-day-empty {
     transform-origin: 50% 10%;
     backface-visibility: hidden;
     will-change: transform, opacity, filter;
 }
 
-#calendarView .calendar-body .calendar-anim-enter {
+#logView .calendar-body .calendar-anim-enter {
     animation-name: calendarDeckIn;
     animation-duration: 540ms;
     animation-timing-function: cubic-bezier(0.22, 0.68, 0.2, 1);
@@ -4963,7 +4963,7 @@ textarea.form-input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #calendarView .calendar-body .calendar-anim-enter {
+    #logView .calendar-body .calendar-anim-enter {
         animation: none !important;
         opacity: 1 !important;
         transform: none !important;

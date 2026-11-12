@@ -205,6 +205,20 @@ function handleUpdate(User $model, ?int $id, string $action): void
         return;
     }
 
+    // --- Team calendar: see it / change appointments in it -------------------
+    if (array_key_exists('can_calendar', $input) || array_key_exists('can_calendar_edit', $input)) {
+        $view = array_key_exists('can_calendar', $input) ? (bool) $input['can_calendar'] : null;
+        $edit = array_key_exists('can_calendar_edit', $input) ? (bool) $input['can_calendar_edit'] : null;
+        $model->setCalendarAccess($id, $view, $edit);
+        $updated = $model->getById($id);
+        logAccountEvent('updated', $updated, 'Teamkalender: '
+            . ($updated['can_calendar_edit'] ? 'sehen und bearbeiten' : ($updated['can_calendar'] ? 'sehen' : 'kein Zugriff'))
+            . ' für ' . $updated['name']);
+
+        echo json_encode(['success' => true, 'data' => $updated]);
+        return;
+    }
+
     // --- Status change (enable / disable) ---------------------------------
     if (array_key_exists('status', $input)) {
         $status = (string) $input['status'];

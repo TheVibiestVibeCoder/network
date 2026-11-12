@@ -5077,14 +5077,14 @@ textarea.form-input:focus {
 
 
 /* --------------------------------------------------------------------------
-   22. Calendar
+   22. Log (formerly the Calendar tab; admins only)
    --------------------------------------------------------------------------
    The month is one card with hairline gridlines, not forty-two boxes.
    -------------------------------------------------------------------------- */
 
 /* Month view: an entry is its dot and its name. The coloured bar down its
    left edge said the same thing a second time. */
-#calendarView .cal-month-note-dot {
+#logView .cal-month-note-dot {
     border-left: 0;
     padding-left: 2px;
 }
@@ -5096,42 +5096,42 @@ textarea.form-input:focus {
 .cal-month-note-dot--project-activity .cal-kind-dot { background: var(--c-ink-3); }
 
 
-#calendarView .calendar-toolbar {
+#logView .calendar-toolbar {
     padding: 12px 0 14px;
     border: 0;
     background: transparent;
 }
 
-#calendarView .calendar-toolbar-left {
+#logView .calendar-toolbar-left {
     min-height: 42px;
 }
 
 /* The page title starts the toolbar row, as on the other pages. */
-#calendarView .calendar-page-title {
+#logView .calendar-page-title {
     margin: 0 14px 0 0;
 }
 
 /* Narrow screens stack the toolbar: the title on top, then the way through
    the months, then Month / Week / Day. */
 @media (max-width: 768px) {
-    #calendarView .calendar-toolbar-left {
+    #logView .calendar-toolbar-left {
         order: 1;
         flex-wrap: wrap;
         justify-content: flex-start;
     }
 
-    #calendarView .calendar-toolbar-right {
+    #logView .calendar-toolbar-right {
         order: 2;
     }
 
-    #calendarView .calendar-page-title {
+    #logView .calendar-page-title {
         flex-basis: 100%;
         margin: 0 0 8px;
         font-size: 22px;
     }
 }
 
-#calendarView .calendar-title {
+#logView .calendar-title {
     font-size: var(--t-lg);
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -5139,7 +5139,7 @@ textarea.form-input:focus {
 }
 
 /* Month / Week / Day uses the shared segmented control. */
-#calendarView .calendar-mode-toggle {
+#logView .calendar-mode-toggle {
     display: inline-flex;
     gap: 2px;
     padding: 3px;
@@ -5148,7 +5148,7 @@ textarea.form-input:focus {
     border-radius: var(--r-md);
 }
 
-#calendarView .cal-mode-btn {
+#logView .cal-mode-btn {
     height: 32px;
     padding: 0 14px;
     border: 0;
@@ -5160,23 +5160,23 @@ textarea.form-input:focus {
     transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 
-#calendarView .cal-mode-btn:hover {
+#logView .cal-mode-btn:hover {
     color: var(--c-ink);
 }
 
-#calendarView .cal-mode-btn.active {
+#logView .cal-mode-btn.active {
     background: var(--c-surface);
     color: var(--c-ink);
     box-shadow: var(--e-1);
 }
 
-#calendarView .calendar-filters {
+#logView .calendar-filters {
     padding: 0 0 14px;
     border: 0;
     background: transparent;
 }
 
-#calendarView .cal-search-input {
+#logView .cal-search-input {
     height: 38px;
     border: 1px solid var(--c-line);
     border-radius: var(--r-md);
@@ -5184,21 +5184,21 @@ textarea.form-input:focus {
     font: 400 var(--t-sm)/1 var(--font);
 }
 
-#calendarView .cal-search-input:focus {
+#logView .cal-search-input:focus {
     outline: none;
     border-color: var(--c-accent);
     box-shadow: 0 0 0 3px var(--c-accent-soft);
 }
 
-#calendarView .calendar-body {
+#logView .calendar-body {
     padding: 0;
 }
 
-#calendarView .cal-month-header {
+#logView .cal-month-header {
     margin-bottom: 8px;
 }
 
-#calendarView .cal-month-header-cell {
+#logView .cal-month-header-cell {
     font-size: var(--t-xs);
     font-weight: 500;
     color: var(--c-ink-3);
@@ -5206,7 +5206,7 @@ textarea.form-input:focus {
     letter-spacing: 0;
 }
 
-#calendarView .cal-month-body {
+#logView .cal-month-body {
     gap: 0;
     background: var(--c-surface);
     border: 1px solid transparent;
@@ -5215,7 +5215,7 @@ textarea.form-input:focus {
     overflow: hidden;
 }
 
-#calendarView .calendar-body .cal-month-cell {
+#logView .calendar-body .cal-month-cell {
     margin: 0;
     background: transparent;
     border: 0;
@@ -5225,45 +5225,45 @@ textarea.form-input:focus {
     box-shadow: none;
 }
 
-#calendarView .calendar-body .cal-month-cell:nth-child(7n) {
+#logView .calendar-body .cal-month-cell:nth-child(7n) {
     border-right: 0;
 }
 
-#calendarView .calendar-body .cal-month-cell:nth-last-child(-n + 7) {
+#logView .calendar-body .cal-month-cell:nth-last-child(-n + 7) {
     border-bottom: 0;
 }
 
-#calendarView .calendar-body .cal-month-cell:hover {
+#logView .calendar-body .cal-month-cell:hover {
     background: var(--c-tint-3);
 }
 
 /* Days outside the month recede. */
-#calendarView .calendar-body .cal-month-cell.cal-other-month {
+#logView .calendar-body .cal-month-cell.cal-other-month {
     background: var(--c-bg);
 }
 
-#calendarView .cal-month-day-num {
+#logView .cal-month-day-num {
     font-size: var(--t-sm);
     font-weight: 500;
     color: var(--c-ink-2);
 }
 
 /* Today: a navy disc on the date, and a soft accent wash on the cell. */
-#calendarView .calendar-body .cal-month-cell.cal-today {
+#logView .calendar-body .cal-month-cell.cal-today {
     background: var(--c-accent-softer);
     box-shadow: none;
     outline: 0;
 }
 
 /* Week view uses the same quiet surfaces. */
-#calendarView .calendar-body .cal-week-day {
+#logView .calendar-body .cal-week-day {
     background: var(--c-surface);
     border: 1px solid var(--c-line);
     border-radius: var(--r-lg);
     box-shadow: var(--e-1);
 }
 
-#calendarView .cal-week-day-name {
+#logView .cal-week-day-name {
     font-size: var(--t-xs);
     font-weight: 500;
     color: var(--c-ink-3);
@@ -5272,14 +5272,14 @@ textarea.form-input:focus {
 }
 
 /* Entries in the day list. */
-#calendarView .cal-day-note {
+#logView .cal-day-note {
     background: var(--c-surface);
     border: 1px solid var(--c-line);
     border-radius: var(--r-md);
     box-shadow: none;
 }
 
-#calendarView .cal-day-note-type {
+#logView .cal-day-note-type {
     font-size: var(--t-xs);
     text-transform: none;
     letter-spacing: 0;
@@ -5860,7 +5860,7 @@ textarea.form-input:focus {
 
 /* Today's date: light numerals on the navy disc. The day-number colour above
    outranks the old today rule, which left the date navy on navy. */
-#calendarView .cal-month-cell.cal-today .cal-month-day-num {
+#logView .cal-month-cell.cal-today .cal-month-day-num {
     background: var(--c-primary);
     color: var(--c-on-primary);
     font-weight: 600;

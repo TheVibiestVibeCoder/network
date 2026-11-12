@@ -23,6 +23,13 @@ data/avatars/
 # PHP session files - live sign-ins. Created automatically by Auth::startSession().
 data/sessions/
 
+# What cli/caldav-probe.php wrote to the live calendars (hrefs, ETags, tokens),
+# so that its cleanup can find every test appointment again.
+data/caldav-probe.json
+
+# Held while cli/calendar-sync.php runs, so two runs never overlap.
+data/calendar-sync.lock
+
 # Local development helpers and test credentials - never commit them.
 # dev/ holds seeded accounts whose passwords are written down in plain text;
 # they are only safe on a machine that is not reachable from anywhere else.

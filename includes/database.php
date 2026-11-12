@@ -660,6 +660,172 @@ class Database
             )
         ");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_mcp_api_nonces_seen ON mcp_api_nonces(seen_at)");
+
+        self::initializeCalendarSchema($db);
+    }
+
+    /**
+     * Team calendar (docs/kalender-spec.md).
+     *
+     * The mail server's CalDAV service is the only source of truth. These
+     * tables are a cache of what the sync (includes/CalendarSync.php) read
+     * from it, plus the CRM's own settings about it. Nothing here goes back to
+     * the server except through CalDAV.
+     */
+    private static function initializeCalendarSchema(PDO $db): void
+    {
+        // The people the calendars belong to, keyed by mail address because
+        // that is what the calendar server knows. user_id maps a person to a
+        // CRM account; colour and position give the team view its columns.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_people (
+                email VARCHAR(255) PRIMARY KEY COLLATE NOCASE,
+                user_id INTEGER,
+                name VARCHAR(255),
+                color VARCHAR(16),
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        // One row per calendar collection the shared account can see.
+        //   kind        work | private
+        //   visibility  what everyone but the owner sees of it:
+        //               details | busy (time only) | private (time only)
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                href VARCHAR(512) NOT NULL UNIQUE,
+                owner_email VARCHAR(255) NOT NULL COLLATE NOCASE,
+                display_name VARCHAR(255),
+                kind VARCHAR(16) NOT NULL DEFAULT 'work',
+                writable INTEGER NOT NULL DEFAULT 0,
+                visibility VARCHAR(16) NOT NULL DEFAULT 'details',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                ctag VARCHAR(255),
+                last_synced_at DATETIME,
+                last_error VARCHAR(255),
+                expanded_on DATE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_sources_owner ON calendar_sources(owner_email)");
+
+        // Calendar objects as the server holds them: the raw iCalendar plus
+        // the master event's fields. archived = finished longer ago than the
+        // retention period; its contents are gone, only href and ETag remain
+        // so the sync does not fetch it again.
+        // recheck = changed in the last run. The server's ETags only change
+        // once a second, so these are compared by content once more.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id INTEGER NOT NULL,
+                href VARCHAR(512) NOT NULL,
+                etag VARCHAR(255),
+                content_hash VARCHAR(64),
+                uid VARCHAR(512),
+                ics TEXT,
+                summary TEXT,
+                location TEXT,
+                starts_at DATETIME,
+                ends_at DATETIME,
+                all_day INTEGER NOT NULL DEFAULT 0,
+                is_recurring INTEGER NOT NULL DEFAULT 0,
+                organizer TEXT,
+                attendees TEXT,
+                status VARCHAR(32),
+                class VARCHAR(32),
+                sequence INTEGER NOT NULL DEFAULT 0,
+                archived INTEGER NOT NULL DEFAULT 0,
+                recheck INTEGER NOT NULL DEFAULT 0,
+                synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (source_id, href),
+                FOREIGN KEY (source_id) REFERENCES calendar_sources(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_events_uid ON calendar_events(uid)");
+
+        // Every occurrence inside the sync window - series expanded, moved
+        // and cancelled occurrences applied - so no view has to understand
+        // RRULE. Timed ones in UTC, all-day ones as plain dates (end exclusive).
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_instances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                source_id INTEGER NOT NULL,
+                uid VARCHAR(512),
+                recurrence_id VARCHAR(32),
+                starts_at DATETIME NOT NULL,
+                ends_at DATETIME NOT NULL,
+                all_day INTEGER NOT NULL DEFAULT 0,
+                summary TEXT,
+                location TEXT,
+                description TEXT,
+                url TEXT,
+                status VARCHAR(32),
+                class VARCHAR(32),
+                transparent INTEGER NOT NULL DEFAULT 0,
+                organizer TEXT,
+                attendees TEXT,
+                FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_instances_range ON calendar_instances(starts_at, ends_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_instances_event ON calendar_instances(event_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_instances_uid ON calendar_instances(uid)");
+
+        // Contacts and projects an appointment belongs to (spec, section 3).
+        // Only in the CRM, never on the calendar server. Keyed by the
+        // appointment's UID, so a link outlives the cache dropping an old
+        // appointment's contents.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uid VARCHAR(512) NOT NULL,
+                contact_id INTEGER,
+                project_id INTEGER,
+                created_by INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                CHECK (contact_id IS NOT NULL OR project_id IS NOT NULL),
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_links_uid_contact ON calendar_links(uid, contact_id) WHERE contact_id IS NOT NULL");
+        $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_links_uid_project ON calendar_links(uid, project_id) WHERE project_id IS NOT NULL");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_links_contact ON calendar_links(contact_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_calendar_links_project ON calendar_links(project_id)");
+
+        // The copies of a shared appointment in the work calendars of the
+        // team members taking part (spec, section 4): the server does not
+        // hand them out itself, so the CRM writes and maintains them.
+        //   state  active  | removed - the person deleted their copy on the
+        //          phone; that counts as declining, and it is not written back
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_copies (
+                uid VARCHAR(512) NOT NULL,
+                email VARCHAR(255) NOT NULL COLLATE NOCASE,
+                href VARCHAR(512) NOT NULL,
+                state VARCHAR(16) NOT NULL DEFAULT 'active',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (uid, email)
+            )
+        ");
+
+        // Who may see the team calendar, and who may change appointments in
+        // it. Granted per person by an admin; whoever is an admin when this
+        // arrives starts with both, so the people setting it up can.
+        $userColumns = array_column($db->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+        foreach (['can_calendar', 'can_calendar_edit'] as $column) {
+            if (!in_array($column, $userColumns, true)) {
+                self::addColumnIfMissing($db, 'users', $column, 'INTEGER NOT NULL DEFAULT 0');
+                $db->exec("UPDATE users SET " . $column . " = 1 WHERE role = 'admin'");
+            }
+        }
     }
 
     /**

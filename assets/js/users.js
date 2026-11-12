@@ -161,6 +161,14 @@
                </label>`
             : '';
 
+        // Team calendar: none, see, or see and change (docs/kalender-spec.md).
+        const calendarLevel = user.can_calendar_edit ? 'edit' : (user.can_calendar ? 'view' : 'none');
+        const calendarControl = `<select class="form-select user-row-role-select user-row-calendar-select" data-user-action="calendar" data-user-id="${user.id}" title="Team calendar access">
+                   <option value="none"${calendarLevel === 'none' ? ' selected' : ''}>No calendar</option>
+                   <option value="view"${calendarLevel === 'view' ? ' selected' : ''}>Calendar: view</option>
+                   <option value="edit"${calendarLevel === 'edit' ? ' selected' : ''}>Calendar: edit</option>
+               </select>`;
+
         const toggleBtn = isSelf
             ? ''
             : `<button type="button" class="user-action-btn" data-user-action="${isDisabled ? 'enable' : 'disable'}" data-user-id="${user.id}" title="${isDisabled ? 'Enable account' : 'Disable account'}">
@@ -193,6 +201,7 @@
                 <div class="user-row-meta">${meta}</div>
                 <div class="user-row-actions">
                     ${meetingControl}
+                    ${calendarControl}
                     ${roleControl}
                     <button type="button" class="user-action-btn" data-user-action="resend" data-user-id="${user.id}" title="${resendTitle}">
                         ${ICON_LINK}
@@ -340,6 +349,22 @@
         }
     }
 
+    /** Team calendar: 'none', 'view' or 'edit'. */
+    async function setCalendarAccess(userId, level) {
+        try {
+            await api('?id=' + encodeURIComponent(userId), {
+                method: 'PATCH',
+                body: JSON.stringify({ can_calendar: level !== 'none', can_calendar_edit: level === 'edit' })
+            });
+            showToast(level === 'edit' ? 'Can now see and change the team calendar.'
+                : (level === 'view' ? 'Can now see the team calendar.' : 'No access to the team calendar.'));
+            await load();
+        } catch (e) {
+            showToast(e.message, true);
+            await load();
+        }
+    }
+
     async function setStatus(userId, status) {
         try {
             await api('?id=' + encodeURIComponent(userId), {
@@ -454,6 +479,11 @@
             const meeting = event.target.closest('input[data-user-action="meeting"]');
             if (meeting) {
                 setMeetingAccess(meeting.getAttribute('data-user-id'), meeting.checked);
+                return;
+            }
+            const calendar = event.target.closest('select[data-user-action="calendar"]');
+            if (calendar) {
+                setCalendarAccess(calendar.getAttribute('data-user-id'), calendar.value);
                 return;
             }
             const select = event.target.closest('select[data-user-action="role"]');

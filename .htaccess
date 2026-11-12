@@ -103,13 +103,15 @@ Options -Indexes -MultiViews
 #  vendor/   - third party code
 #  MCP/      - the MCP server's source lives in its own repository now; the
 #              rule stays in case a copy ever lands here again
+#  cli/      - command-line scripts (calendar probe and sync), never web pages
+#  docs/     - specifications and test reports
 #  .git/     - full source history
 #  Each of these also ships its own .htaccess for servers where only per
 #  directory overrides are enabled.
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(?:data|includes|config|vendor|MCP)(?:/|$) - [F,L]
+    RewriteRule ^(?:data|includes|config|vendor|MCP|cli|docs)(?:/|$) - [F,L]
 </IfModule>
 
 # -----------------------------------------------------------------------------

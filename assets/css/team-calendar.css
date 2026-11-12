@@ -1,0 +1,1771 @@
+/* ==========================================================================
+   Team calendar (assets/js/team-calendar.js, docs/kalender-spec.md)
+
+   Built on the design tokens in design.css, so light and dark follow the rest
+   of the CRM. A column per day; each appointment shows the profile pictures
+   of the people in it. Yours are filled in the accent blue, everyone else's
+   stay light, Busy and Private neutral grey, free time found by "Find a free
+   slot" in the positive green.
+   ========================================================================== */
+
+#calendarView,
+#eventSheet,
+.tcal-linked {
+    --tcal-main: #1C3258;
+    --tcal-mine: #30599D;
+    --tcal-mine-hover: #284C87;
+    --tcal-mine-ink: #FFFFFF;
+    --tcal-mine-ink-2: rgba(255, 255, 255, 0.8);
+    --tcal-other: color-mix(in srgb, var(--c-accent) 8%, var(--c-surface));
+    --tcal-other-hover: color-mix(in srgb, var(--c-accent) 14%, var(--c-surface));
+    --tcal-other-line: color-mix(in srgb, var(--c-accent) 20%, var(--c-surface));
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) :is(#calendarView, #eventSheet, .tcal-linked) {
+        --tcal-main: #8FA9D6;
+        --tcal-mine: #355FA6;
+        --tcal-mine-hover: #3D6BB8;
+    }
+}
+
+:root[data-theme="dark"] :is(#calendarView, #eventSheet, .tcal-linked) {
+    --tcal-main: #8FA9D6;
+    --tcal-mine: #355FA6;
+    --tcal-mine-hover: #3D6BB8;
+}
+
+#calendarView.active {
+    padding-bottom: 32px;
+}
+
+.tcal {
+    position: relative;
+}
+
+.tcal.is-loading .tcal-body {
+    opacity: 0.6;
+    transition: opacity 0.15s ease 0.2s;
+}
+
+/* ---- Toolbar ------------------------------------------------------------ */
+
+.tcal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 16px;
+    flex-wrap: wrap;
+    min-height: 54px;
+    padding-top: 12px;
+    margin-bottom: 12px;
+}
+
+.tcal-toolbar-left,
+.tcal-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tcal-title {
+    margin: 0 6px 0 0;
+}
+
+.tcal-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tcal-date {
+    margin: 0;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    color: var(--c-ink);
+    letter-spacing: -0.01em;
+}
+
+.tcal-date.is-today::after {
+    content: "Today";
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    vertical-align: 2px;
+}
+
+.tcal-mode {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-2);
+}
+
+.tcal-mode-btn {
+    border: 0;
+    background: transparent;
+    color: var(--c-ink-3);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.tcal-mode-btn:hover {
+    color: var(--c-ink);
+}
+
+.tcal-mode-btn.is-active {
+    background: var(--c-surface);
+    color: var(--c-ink);
+    box-shadow: 0 1px 2px rgba(28, 50, 88, 0.12);
+}
+
+.tcal-free-btn.is-active {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+    border-color: transparent;
+}
+
+/* ---- Faces: a profile picture, or initials in the person's colour ------- */
+
+.tcal-faces {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+}
+
+.tcal-face {
+    --face: 18px;
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: var(--face);
+    height: var(--face);
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--person, var(--c-accent));
+    color: #FFFFFF;
+    font-size: calc(var(--face) * 0.42);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    box-shadow: 0 0 0 1.5px var(--face-ring, var(--c-surface));
+}
+
+.tcal-face img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.tcal-faces .tcal-face + .tcal-face {
+    margin-left: -5px;
+}
+
+.tcal-face--more,
+.tcal-face--guest {
+    background: var(--c-tint);
+    color: var(--c-ink-2);
+}
+
+.tcal-face--more {
+    font-size: calc(var(--face) * 0.5);
+    letter-spacing: -0.02em;
+}
+
+/* ---- People and sync ---------------------------------------------------- */
+
+.tcal-subbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.tcal-people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tcal-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px 3px 3px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    color: var(--c-ink-4);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+}
+
+.tcal-chip .tcal-face {
+    --face: 22px;
+    box-shadow: none;
+}
+
+.tcal-chip:not(.is-on) .tcal-face {
+    filter: grayscale(1);
+    opacity: 0.45;
+}
+
+.tcal-chip.is-on {
+    color: var(--c-ink);
+    border-color: var(--c-line-strong);
+}
+
+.tcal-chip:hover {
+    background: var(--c-tint-3);
+}
+
+.tcal-chip-me {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.tcal-sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.tcal-sync-problem {
+    color: var(--c-danger-ink);
+    cursor: help;
+}
+
+.tcal-sync-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.tcal-sync-btn:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+.tcal-sync-btn:disabled svg {
+    animation: tcal-spin 1s linear infinite;
+}
+
+@keyframes tcal-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tcal-sync-btn:disabled svg { animation: none; }
+}
+
+/* ---- Find a free slot --------------------------------------------------- */
+
+.tcal-free {
+    margin-bottom: 14px;
+}
+
+.tcal-free-card {
+    padding: 14px 16px;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+}
+
+.tcal-free-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px 18px;
+    flex-wrap: wrap;
+}
+
+.tcal-free-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tcal-free-label {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.tcal-free-people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+}
+
+.tcal-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+    cursor: pointer;
+}
+
+.tcal-check input {
+    accent-color: var(--c-accent);
+}
+
+.tcal-check .tcal-face {
+    --face: 20px;
+    box-shadow: none;
+}
+
+.tcal-free-group .form-select {
+    width: auto;
+    min-width: 120px;
+}
+
+.tcal-free-hint {
+    margin: 10px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.tcal-free-note {
+    margin: 12px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.tcal-free-note.is-error {
+    color: var(--c-danger-ink);
+}
+
+.tcal-free-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.tcal-free-day {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.tcal-free-dayname {
+    flex: none;
+    width: 92px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.tcal-free-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tcal-free-slot {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--r-sm);
+    border: 1px dashed color-mix(in srgb, var(--c-success) 65%, transparent);
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.tcal-free-slot:hover {
+    background: color-mix(in srgb, var(--c-success) 24%, transparent);
+}
+
+.tcal-free-len {
+    font-size: var(--t-xs);
+    font-weight: 400;
+    color: var(--c-ink-4);
+}
+
+/* ---- Empty and loading --------------------------------------------------- */
+
+.tcal-loading {
+    padding: 56px 24px;
+    text-align: center;
+    color: var(--c-ink-4);
+    font-size: var(--t-sm);
+}
+
+.tcal-empty h3 {
+    margin: 0 0 6px;
+    font-size: var(--t-md);
+    color: var(--c-ink-2);
+}
+
+.tcal-empty p {
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+/* ---- The grid ----------------------------------------------------------- */
+
+.tcal-cal {
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    overflow: hidden;
+}
+
+.tcal-scroll {
+    max-height: calc(100vh - 250px);
+    min-height: 440px;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.tcal-head,
+.tcal-grid {
+    display: grid;
+}
+
+/* Day headings and the all-day bars stay on top while the hours scroll. */
+.tcal-head {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-line);
+}
+
+/* On a narrow screen the week scrolls sideways; the hours stay put. */
+.tcal-corner,
+.tcal-allday-label,
+.tcal-gutter {
+    position: sticky;
+    left: 0;
+    background: var(--c-surface);
+}
+
+.tcal-corner {
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 2;
+}
+
+.tcal-dayhead {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    grid-row: 1;
+    min-width: 0;
+    padding: 8px 4px;
+    border: 0;
+    border-left: 1px solid var(--c-line-2);
+    background: transparent;
+    color: var(--c-ink-2);
+    font: inherit;
+    white-space: nowrap;
+}
+
+button.tcal-dayhead {
+    cursor: pointer;
+}
+
+button.tcal-dayhead:hover {
+    background: var(--c-tint-3);
+}
+
+.tcal-dayhead-name {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.tcal-dayhead-num {
+    display: inline-grid;
+    place-items: center;
+    min-width: 28px;
+    height: 28px;
+    border-radius: var(--r-full);
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.tcal-dayhead.is-off .tcal-dayhead-num,
+.tcal-dayhead.is-off .tcal-dayhead-name {
+    color: var(--c-ink-4);
+}
+
+.tcal-dayhead.is-today .tcal-dayhead-name {
+    color: var(--c-accent);
+    font-weight: 600;
+}
+
+.tcal-dayhead.is-today .tcal-dayhead-num {
+    background: var(--tcal-mine);
+    color: var(--tcal-mine-ink);
+}
+
+.tcal-allday-label {
+    grid-column: 1;
+    z-index: 2;
+    padding: 7px 8px 0 0;
+    border-top: 1px solid var(--c-line-2);
+    text-align: right;
+    font-size: 11px;
+    color: var(--c-ink-4);
+}
+
+.tcal-allday-cell {
+    border-top: 1px solid var(--c-line-2);
+    border-left: 1px solid var(--c-line-2);
+}
+
+.tcal-allday-cell.is-off {
+    background: color-mix(in srgb, var(--c-sunken) 70%, transparent);
+}
+
+.tcal-grid {
+    position: relative;
+    grid-template-rows: 100%;
+}
+
+.tcal-gutter {
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 4;
+}
+
+.tcal-hour {
+    position: absolute;
+    left: 0;
+    right: 8px;
+    height: 0;
+    text-align: right;
+}
+
+.tcal-hour span {
+    position: relative;
+    top: -7px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink-4);
+}
+
+.tcal-hour:first-child span {
+    visibility: hidden;
+}
+
+/* Hour lines and a fainter half hour, behind everything. */
+.tcal-daycol {
+    position: relative;
+    grid-row: 1;
+    min-width: 0;
+    border-left: 1px solid var(--c-line-2);
+    background:
+        linear-gradient(to bottom, var(--c-line-2) 1px, transparent 1px) 0 0 / 100% 48px,
+        linear-gradient(to bottom, color-mix(in srgb, var(--c-line-2) 55%, transparent) 1px, transparent 1px) 0 24px / 100% 48px;
+}
+
+.tcal-daycol.is-today {
+    background-color: color-mix(in srgb, var(--c-accent) 3%, transparent);
+}
+
+.tcal-offhours {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: color-mix(in srgb, var(--c-sunken) 70%, transparent);
+    pointer-events: none;
+}
+
+.tcal-slot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    padding: 0;
+    border: 0;
+    border-top: 1px dashed color-mix(in srgb, var(--c-success) 70%, transparent);
+    border-bottom: 1px dashed color-mix(in srgb, var(--c-success) 70%, transparent);
+    background: color-mix(in srgb, var(--c-success) 13%, transparent);
+    font: inherit;
+    text-align: left;
+    pointer-events: none;
+}
+
+/* With the right to add appointments, a found slot is booked by a click. */
+.tcal-cal.can-create .tcal-slot {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.tcal-cal.can-create .tcal-slot:hover,
+.tcal-cal.can-create .tcal-slot:focus-visible {
+    background: color-mix(in srgb, var(--c-success) 22%, transparent);
+}
+
+.tcal-cal.can-create .tcal-slot:hover span::after {
+    content: " · book";
+    font-weight: 500;
+}
+
+.tcal-slot span {
+    position: absolute;
+    top: 3px;
+    left: 6px;
+    right: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--c-success-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.tcal-now {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    height: 0;
+    border-top: 2px solid var(--c-danger);
+    pointer-events: none;
+}
+
+.tcal-now::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: -6px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--c-danger);
+}
+
+/* ---- Appointments and bars ---------------------------------------------- */
+
+.tcal-ev,
+.tcal-bar {
+    --ev-bg: var(--tcal-other);
+    --ev-hover: var(--tcal-other-hover);
+    --ev-line: var(--tcal-other-line);
+    --ev-ink: var(--c-ink);
+    --ev-ink-2: var(--c-ink-3);
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--ev-line);
+    border-radius: var(--r-xs);
+    background: var(--ev-bg);
+    color: var(--ev-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tcal-ev:hover,
+.tcal-bar:hover,
+.tcal-ev:focus-visible,
+.tcal-bar:focus-visible {
+    background: var(--ev-hover);
+}
+
+.tcal-ev:focus-visible,
+.tcal-bar:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+/* Yours - alone or with others: the accent blue. */
+.tcal-ev.is-mine,
+.tcal-bar.is-mine {
+    --ev-bg: var(--tcal-mine);
+    --ev-hover: var(--tcal-mine-hover);
+    --ev-line: var(--tcal-mine);
+    --ev-ink: var(--tcal-mine-ink);
+    --ev-ink-2: var(--tcal-mine-ink-2);
+}
+
+/* Busy and Private: neutral grey with a faint hatch, nothing to read but
+   the time - set apart from the light cards that do have something. */
+.tcal-ev.is-masked,
+.tcal-bar.is-masked {
+    --ev-bg: var(--c-tint-3);
+    --ev-hover: var(--c-tint-2);
+    --ev-line: var(--c-line);
+    --ev-ink: var(--c-ink-3);
+    --ev-ink-2: var(--c-ink-4);
+    background-image: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--c-ink-4) 13%, transparent) 6px 7px);
+}
+
+/* Marked as free time in the calendar app. */
+.tcal-ev.is-free,
+.tcal-bar.is-free {
+    --ev-bg: var(--c-surface);
+    border-style: dashed;
+}
+
+.tcal-ev.is-mine.is-free,
+.tcal-bar.is-mine.is-free {
+    --ev-bg: color-mix(in srgb, var(--tcal-mine) 8%, var(--c-surface));
+    --ev-hover: color-mix(in srgb, var(--tcal-mine) 16%, var(--c-surface));
+    --ev-ink: var(--c-accent);
+    --ev-ink-2: var(--c-accent);
+}
+
+.tcal-ev.is-past,
+.tcal-bar.is-past {
+    opacity: 0.6;
+}
+
+.tcal-ev .tcal-face,
+.tcal-bar .tcal-face {
+    --face: 16px;
+    --face-ring: var(--ev-bg);
+}
+
+/* On the blue a light outline, so a photo never melts into the card. */
+.tcal-ev.is-mine:not(.is-free) .tcal-face,
+.tcal-bar.is-mine:not(.is-free) .tcal-face {
+    --face-ring: rgba(255, 255, 255, 0.85);
+}
+
+.tcal-ev {
+    position: absolute;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 3px 6px 3px 7px;
+    /* Narrow cards (overlaps, a phone's week) drop the time, see below. */
+    container-type: inline-size;
+}
+
+.tcal-ev:hover,
+.tcal-ev:focus-visible {
+    z-index: 2;
+    box-shadow: 0 3px 10px rgba(28, 50, 88, 0.16);
+}
+
+/* Lines are cut off at the bottom, never squeezed into each other. */
+.tcal-ev > * {
+    flex-shrink: 0;
+}
+
+.tcal-ev-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.tcal-ev.is-tall .tcal-ev-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    hyphens: auto;
+    overflow-wrap: break-word;
+}
+
+.tcal-ev-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    color: var(--ev-ink-2);
+}
+
+.tcal-ev-time,
+.tcal-ev-place,
+.tcal-bar-time {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--ev-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A short one on one line: who, what, when. */
+.tcal-ev.is-compact {
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.tcal-ev.is-compact .tcal-face {
+    --face: 14px;
+}
+
+.tcal-ev.is-compact .tcal-ev-title {
+    flex: 0 1 auto;
+}
+
+.tcal-ev.is-compact .tcal-ev-time {
+    flex: none;
+}
+
+/* Too narrow for title and time: the title wins, the grid shows the time
+   and the details have it exactly. */
+@container (max-width: 112px) {
+    .tcal-ev-time {
+        display: none;
+    }
+}
+
+.tcal-cal--day .tcal-ev .tcal-face {
+    --face: 18px;
+}
+
+.tcal-cal--day .tcal-ev.is-compact .tcal-face {
+    --face: 15px;
+}
+
+.tcal-video,
+.tcal-guests {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ev-ink-2, var(--c-ink-3));
+}
+
+.tcal-lock {
+    flex: none;
+    margin-right: 3px;
+    vertical-align: -1px;
+}
+
+.tcal-bar {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    margin: 2px 3px;
+    padding: 0 8px 0 3px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    container-type: inline-size;
+}
+
+@container (max-width: 104px) {
+    .tcal-bar .tcal-lock {
+        display: none;
+    }
+}
+
+.tcal-bar.is-cut-start {
+    margin-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.tcal-bar.is-cut-end {
+    margin-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.tcal-bar-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tcal-bar-time {
+    flex: none;
+    font-weight: 500;
+}
+
+/* ---- The appointment sheet (#eventSheet) ---------------------------------
+   The CRM's sheet: header, facts, sections, footer with the destructive
+   action on the left. Editing outlines it in the accent, as the project and
+   to-do sheets do. */
+
+#eventSheet .modal-content {
+    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+
+#eventSheet.is-editing .modal-content {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
+}
+
+#eventSheet .overview-header-info,
+#eventSheet .overview-title-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Nothing to do (no right to change it): no empty footer strip. */
+#eventSheet #esheetFoot:empty {
+    display: none;
+}
+
+/* Links in places and notes in the accent, readable in dark mode too. */
+#eventSheet .overview-body a:not(.btn) {
+    color: var(--c-accent);
+    text-underline-offset: 2px;
+}
+
+#eventSheet .ov-edit-title {
+    width: 100%;
+    height: 36px;
+    padding: 0 8px;
+    margin-left: -9px;
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+#eventSheet h2 {
+    overflow-wrap: anywhere;
+}
+
+.esheet-title-loading {
+    color: var(--c-ink-4);
+}
+
+.esheet-when {
+    margin: 4px 0 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.esheet-loading {
+    margin: 0;
+    padding: 28px 0;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+.esheet-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.esheet-join {
+    margin-top: 2px;
+}
+
+/* Will you be there? Three quiet choices; the one given is filled. */
+.esheet-answer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 0 0 18px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-sunken);
+}
+
+.esheet-answer-label {
+    margin-right: auto;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.esheet-answer-btn {
+    min-width: 64px;
+    padding: 6px 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    color: var(--c-ink-2);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.esheet-answer-btn:hover:not(:disabled) {
+    border-color: var(--c-line-strong);
+    color: var(--c-ink);
+}
+
+.esheet-answer-btn.is-on[data-esheet-answer="ACCEPTED"] {
+    border-color: var(--c-success);
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+.esheet-answer-btn.is-on[data-esheet-answer="TENTATIVE"] {
+    border-color: var(--c-warning);
+    background: var(--c-warning-soft);
+    color: var(--c-warning-ink);
+}
+
+.esheet-answer-btn.is-on[data-esheet-answer="DECLINED"] {
+    border-color: var(--c-danger);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+.esheet-people {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.esheet-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+#eventSheet .tcal-face {
+    --face: 26px;
+    box-shadow: none;
+}
+
+.esheet-person-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.esheet-you {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.tcal-status {
+    flex: none;
+    font-size: var(--t-xs);
+    font-weight: 600;
+}
+
+.tcal-status.is-yes { color: var(--c-success-ink); }
+.tcal-status.is-no { color: var(--c-danger-ink); }
+.tcal-status.is-maybe { color: var(--c-warning-ink); }
+.tcal-status.is-open { color: var(--c-ink-4); font-weight: 500; }
+
+.esheet-note {
+    margin: 10px 0 0;
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.esheet-desc {
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    background: var(--c-sunken);
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 240px;
+    overflow: auto;
+}
+
+.esheet-owner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.esheet-empty {
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+}
+
+/* ---- The form ---------------------------------------------------------- */
+
+.esheet-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.esheet-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.esheet-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.esheet-field > span:first-child {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.esheet-field--short {
+    max-width: 260px;
+}
+
+.esheet-field .form-input,
+.esheet-field .form-select {
+    width: 100%;
+    min-width: 0;
+}
+
+.esheet-field textarea.form-input {
+    min-height: 92px;
+    resize: vertical;
+}
+
+.esheet-dt {
+    display: flex;
+    gap: 6px;
+}
+
+.esheet-dt input[type="date"] {
+    flex: 1 1 auto;
+}
+
+.esheet-dt input[type="time"] {
+    flex: 0 0 104px;
+}
+
+.esheet-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+    cursor: pointer;
+}
+
+.esheet-check input {
+    accent-color: var(--c-accent);
+}
+
+.esheet-static {
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.esheet-choose {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.esheet-choose-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px 3px 3px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.esheet-choose-person input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#eventSheet .esheet-choose-person .tcal-face {
+    --face: 22px;
+    filter: grayscale(1);
+    opacity: 0.5;
+}
+
+.esheet-choose-person.is-on {
+    border-color: var(--c-accent);
+    background: var(--c-accent-softer);
+    color: var(--c-ink);
+}
+
+#eventSheet .esheet-choose-person.is-on .tcal-face {
+    filter: none;
+    opacity: 1;
+}
+
+.esheet-choose-person:focus-within {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+/* ---- Changed meanwhile ----------------------------------------------------- */
+
+.esheet-banner {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--c-warning) 45%, transparent);
+    border-radius: var(--r-md);
+    background: var(--c-warning-soft);
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.esheet-banner.is-gone {
+    border-color: color-mix(in srgb, var(--c-danger) 45%, transparent);
+    background: var(--c-danger-soft);
+}
+
+.esheet-banner p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.esheet-banner-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+/* ---- Linked contacts and projects ----------------------------------------- */
+
+.esheet-link-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.esheet-link {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+}
+
+.esheet-link-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px 4px 5px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+}
+
+.esheet-link-open span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.esheet-link-open:hover span:first-of-type {
+    text-decoration: underline;
+}
+
+.esheet-link-detail {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.esheet-link-icon {
+    flex: none;
+    color: var(--c-ink-3);
+}
+
+.esheet-link-remove {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    margin-right: 2px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-4);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.esheet-link-remove:hover {
+    background: var(--c-tint-2);
+    color: var(--c-ink);
+}
+
+.esheet-suggest {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    background: var(--c-accent-softer);
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.esheet-suggest span {
+    flex: 1;
+    min-width: 0;
+}
+
+.esheet-picker {
+    margin-bottom: 10px;
+}
+
+.esheet-picker .form-input {
+    width: 100%;
+}
+
+.esheet-picker-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+    max-height: 220px;
+    overflow: auto;
+}
+
+.esheet-picker-results .esheet-empty {
+    padding: 6px 2px;
+}
+
+.esheet-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    text-align: left;
+    cursor: pointer;
+}
+
+.esheet-picker-item:hover,
+.esheet-picker-item:focus-visible {
+    background: var(--c-tint-3);
+}
+
+.esheet-picker-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Footer prompts -------------------------------------------------------- */
+
+#eventSheet .ov-footer {
+    flex-wrap: wrap;
+}
+
+/* The question gets its own line, the answers sit below it on the right. */
+.esheet-confirm {
+    flex: 1 1 100%;
+    margin: 0 0 2px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-2);
+}
+
+/* ---- Appointments in the contact and project sheets ------------------------ */
+
+.tcal-linked {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tcal-linked-empty {
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-4);
+}
+
+.tcal-linked-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tcal-linked-label {
+    margin-bottom: 4px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-4);
+}
+
+.tcal-linked-item {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    margin: 0 -8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    text-align: left;
+    cursor: pointer;
+}
+
+.tcal-linked-item:hover,
+.tcal-linked-item:focus-visible {
+    background: var(--c-tint-3);
+}
+
+.tcal-linked-when {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tcal-linked-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.tcal-linked-item.is-mine .tcal-linked-title::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin: 0 7px 1px 0;
+    border-radius: 50%;
+    background: var(--tcal-mine, #30599D);
+}
+
+.tcal-linked .tcal-face {
+    --face: 20px;
+    --face-ring: var(--c-surface);
+}
+
+@media (max-width: 640px) {
+    .esheet-pair,
+    .esheet-facts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .esheet-dt input[type="time"] {
+        flex-basis: 96px;
+    }
+
+    .tcal-linked-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .tcal-linked-when {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ---- Settings ------------------------------------------------------------ */
+
+.tcal-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    background: var(--c-scrim);
+}
+
+.tcal-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1200;
+    width: min(460px, 100vw);
+    display: flex;
+    flex-direction: column;
+    background: var(--c-surface);
+    box-shadow: -18px 0 44px rgba(28, 50, 88, 0.18);
+}
+
+.tcal-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 18px 12px 22px;
+    border-bottom: 1px solid var(--c-line);
+}
+
+.tcal-drawer-head h3 {
+    margin: 0;
+    font-size: var(--t-lg);
+    color: var(--c-ink);
+}
+
+.tcal-drawer-body {
+    flex: 1;
+    overflow: auto;
+    padding: 6px 22px 28px;
+}
+
+.tcal-drawer-loading {
+    padding: 40px 22px;
+    color: var(--c-ink-3);
+    font-size: var(--t-sm);
+}
+
+.tcal-set-section {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--c-line-2);
+}
+
+.tcal-set-section:last-child {
+    border-bottom: 0;
+}
+
+.tcal-set-section h4 {
+    margin: 0 0 4px;
+    font-size: var(--t-md);
+    color: var(--c-ink);
+}
+
+.tcal-set-hint {
+    margin: 0 0 12px;
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
+
+.tcal-set-muted {
+    font-size: var(--t-xs);
+    font-weight: 400;
+    color: var(--c-ink-4);
+}
+
+.tcal-set-owner + .tcal-set-owner {
+    margin-top: 14px;
+}
+
+.tcal-set-owner-name {
+    margin-bottom: 6px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.tcal-set-source {
+    padding: 10px 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+}
+
+.tcal-set-source + .tcal-set-source {
+    margin-top: 6px;
+}
+
+.tcal-set-source.is-off {
+    background: var(--c-sunken);
+}
+
+.tcal-set-source-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tcal-set-source-name {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.tcal-badge {
+    padding: 1px 8px;
+    border-radius: var(--r-full);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.tcal-badge--quiet {
+    background: var(--c-tint-2);
+    color: var(--c-ink-3);
+}
+
+.tcal-set-source-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.tcal-set-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.tcal-set-field .form-select,
+.tcal-set-field .form-input {
+    width: auto;
+    min-width: 0;
+}
+
+.tcal-set-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 7px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.tcal-set-error {
+    margin: 8px 0 0;
+    font-size: var(--t-xs);
+    color: var(--c-danger-ink);
+}
+
+.tcal-set-person {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1.3fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.tcal-set-person + .tcal-set-person {
+    margin-top: 8px;
+}
+
+.tcal-set-color {
+    width: 34px;
+    height: 34px;
+    padding: 2px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    cursor: pointer;
+}
+
+.tcal-set-move {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.tcal-set-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 10px;
+}
+
+.tcal-set-day {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.tcal-set-times {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ---- Narrow screens ----------------------------------------------------- */
+
+@media (max-width: 768px) {
+    .tcal-toolbar-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* People in one row that scrolls, so the grid keeps the room. */
+    .tcal-people {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        max-width: 100%;
+        scrollbar-width: none;
+    }
+
+    .tcal-chip {
+        flex: none;
+    }
+
+    .tcal-scroll {
+        max-height: calc(100vh - 300px);
+    }
+
+    .tcal-set-person {
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+    }
+
+    .tcal-set-account {
+        grid-column: 2 / -1;
+    }
+}

@@ -36,7 +36,7 @@ class User
     public const PURPOSE_RESET  = 'reset';
 
     /** Columns that are safe to hand to the client. password_hash never is. */
-    private const PUBLIC_COLUMNS = 'id, email, name, role, status, last_login_at, created_at, can_meeting';
+    private const PUBLIC_COLUMNS = 'id, email, name, role, status, last_login_at, created_at, can_meeting, can_calendar, can_calendar_edit';
 
     private PDO $db;
 
@@ -159,6 +159,29 @@ class User
         $stmt = $this->db->prepare("UPDATE users SET can_meeting = :allowed, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
 
         return $stmt->execute(['id' => $id, 'allowed' => $allowed ? 1 : 0]);
+    }
+
+    /**
+     * Team calendar: may see it, may change appointments in it. Changing
+     * needs seeing, so taking away "see" takes "change" with it, and granting
+     * "change" grants "see".
+     */
+    public function setCalendarAccess(int $id, ?bool $view, ?bool $edit): bool
+    {
+        $row = $this->getById($id);
+        if ($row === null) {
+            return false;
+        }
+        $view = $view ?? $row['can_calendar'];
+        $edit = $edit ?? $row['can_calendar_edit'];
+        if ($edit) {
+            $view = true;
+        }
+        if (!$view) {
+            $edit = false;
+        }
+        $stmt = $this->db->prepare("UPDATE users SET can_calendar = :view, can_calendar_edit = :edit, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+        return $stmt->execute(['id' => $id, 'view' => $view ? 1 : 0, 'edit' => $edit ? 1 : 0]);
     }
 
     public function setStatus(int $id, string $status): bool
@@ -428,6 +451,8 @@ class User
             'last_login_at' => $row['last_login_at'] ?? null,
             'created_at' => $row['created_at'] ?? null,
             'can_meeting' => (int) ($row['can_meeting'] ?? 0) === 1,
+            'can_calendar' => (int) ($row['can_calendar'] ?? 0) === 1,
+            'can_calendar_edit' => (int) ($row['can_calendar_edit'] ?? 0) === 1,
         ];
     }
 }

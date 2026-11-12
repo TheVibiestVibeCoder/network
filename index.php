@@ -16,6 +16,7 @@ require_once APP_ROOT . '/includes/Project.php';
 require_once APP_ROOT . '/includes/MeetingAssistant.php';
 require_once APP_ROOT . '/includes/ProjectSummary.php';
 require_once APP_ROOT . '/includes/UserPrefs.php';
+require_once APP_ROOT . '/includes/CalendarView.php';
 
 // Start session
 Auth::startSession();
@@ -286,6 +287,10 @@ $meetingEnabled = MeetingAssistant::enabled() && MeetingAssistant::allowed();
 $quickAddEnabled = false;
 // Claude's summary under a project's description: on while the API key is set.
 $summaryEnabled = ProjectSummary::enabled();
+// Team calendar: only for whoever has the right to see it (docs/kalender-spec.md).
+$calendarViewer = $isAuthenticated ? CalendarView::viewer() : null;
+$canCalendar = $calendarViewer !== null && $calendarViewer['can_view'];
+$canCalendarEdit = $canCalendar && $calendarViewer['can_edit'];
 
 // Get contact count for dashboard
 $contactCount = 0;
@@ -496,6 +501,10 @@ function assetUrl(string $path): string
     <?php if ($meetingEnabled): ?>
     <!-- Meeting assistant (test) -->
     <link rel="stylesheet" href="<?= assetUrl('assets/css/meeting.css') ?>">
+    <?php endif; ?>
+    <?php if ($canCalendar): ?>
+    <!-- Team calendar -->
+    <link rel="stylesheet" href="<?= assetUrl('assets/css/team-calendar.css') ?>">
     <?php endif; ?>
 </head>
 <body>
@@ -798,12 +807,14 @@ function assetUrl(string $path): string
                         </svg>
                         <span class="nav-label">Contacts</span>
                     </button>
+                    <?php if ($canCalendar): ?>
                     <button type="button" class="toggle-btn nav-item" data-view="calendar" title="Calendar">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
                         </svg>
                         <span class="nav-label">Calendar</span>
                     </button>
+                    <?php endif; ?>
                     <?php if ($isAdmin): ?>
                     <button type="button" class="toggle-btn nav-item" data-view="bookkeeping" title="Bookkeeping">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -911,6 +922,13 @@ function assetUrl(string $path): string
                                     </svg>
                                     <span class="nav-label">Users</span>
                                 </button>
+                                <!-- Everything that changed in the CRM. Used to be the Calendar tab. -->
+                                <button type="button" class="toggle-btn nav-item nav-item--quiet profile-pop-item" data-view="log" id="openLogBtn" title="Log - what changed in the CRM">
+                                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/>
+                                    </svg>
+                                    <span class="nav-label">Log</span>
+                                </button>
                                 <?php endif; ?>
                                 <button type="button" class="nav-item nav-item--quiet theme-toggle-btn profile-pop-item" id="themeToggleBtn" aria-label="Switch to dark mode" title="Switch to dark mode">
                                     <span class="nav-label theme-toggle-label">Dark mode</span>
@@ -976,12 +994,64 @@ function assetUrl(string $path): string
                 </div>
                 <?php endif; ?>
 
-                <!-- Calendar View -->
+                <!-- Team calendar: everyone's calendars from the mail server (CalDAV),
+                     docs/kalender-spec.md. Rendered by assets/js/team-calendar.js from
+                     api/calendar.php, which has already removed what this person may
+                     not see. Only for people with the calendar right. -->
+                <?php if ($canCalendar): ?>
                 <div class="view-panel" id="calendarView">
+                    <div class="tcal" id="teamCalendar" data-tz="<?= htmlspecialchars(CALENDAR_TIMEZONE, ENT_QUOTES, 'UTF-8') ?>" data-can-edit="<?= $canCalendarEdit ? '1' : '0' ?>">
+                        <div class="tcal-toolbar">
+                            <div class="tcal-toolbar-left">
+                                <h1 class="view-title tcal-title">Calendar</h1>
+                                <div class="tcal-nav">
+                                    <button type="button" class="btn btn-icon" data-tcal="prev" title="Previous" aria-label="Previous">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-small" data-tcal="today">Today</button>
+                                    <button type="button" class="btn btn-icon" data-tcal="next" title="Next" aria-label="Next">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+                                    </button>
+                                </div>
+                                <h2 class="tcal-date" id="tcalDate"></h2>
+                            </div>
+                            <div class="tcal-toolbar-right">
+                                <div class="tcal-mode" role="group" aria-label="View">
+                                    <button type="button" class="tcal-mode-btn is-active" data-tcal-mode="day" aria-pressed="true">Day</button>
+                                    <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-small tcal-free-btn" data-tcal="free" aria-expanded="false" aria-controls="tcalFree">Find a free slot</button>
+                                <button type="button" class="btn btn-primary btn-small tcal-new-btn" data-tcal="new" hidden>
+                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                    New appointment
+                                </button>
+                                <button type="button" class="btn btn-icon" data-tcal="settings" title="Calendar settings" aria-label="Calendar settings" hidden>
+                                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tcal-subbar">
+                            <div class="tcal-people" id="tcalPeople" role="group" aria-label="Show or hide people"></div>
+                            <div class="tcal-sync" id="tcalSync"></div>
+                        </div>
+                        <div class="tcal-free" id="tcalFree" hidden></div>
+                        <div class="tcal-body" id="tcalBody"></div>
+                    </div>
+                    <div class="tcal-drawer-scrim" id="tcalScrim" hidden></div>
+                    <aside class="tcal-drawer" id="tcalSettings" role="dialog" aria-label="Calendar settings" hidden></aside>
+                </div>
+                <?php endif; ?>
+
+                <!-- Log: everything that changed in the CRM - notes, to-dos and
+                     changes to contacts and projects - by month, week or day.
+                     Admins only, opened from the profile menu. It used to be
+                     the Calendar tab, which is why its parts are still cal*. -->
+                <?php if ($isAdmin): ?>
+                <div class="view-panel" id="logView">
                     <!-- Title, the way through the months and the view switch in one row -->
                     <div class="calendar-toolbar">
                         <div class="calendar-toolbar-left">
-                            <h1 class="view-title calendar-page-title">Calendar</h1>
+                            <h1 class="view-title calendar-page-title">Log</h1>
                             <button type="button" class="btn btn-icon" id="calPrev" title="Previous">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 6-6 6 6 6"/></svg>
                             </button>
@@ -1014,9 +1084,10 @@ function assetUrl(string $path): string
                         </button>
                     </div>
                     <div class="calendar-body" id="calendarBody">
-                        <!-- Calendar grid rendered by JS -->
+                        <!-- Log grid rendered by JS (app.js, the calendar* functions) -->
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Bookkeeping View -->
                 <!-- From Claude: everything the MCP API proposed, waiting for a person.
@@ -1695,6 +1766,21 @@ function assetUrl(string $path): string
                         </div>
                     </div>
 
+                    <?php if ($canCalendar): ?>
+                    <!-- Appointments linked to this contact (team calendar,
+                         assets/js/team-calendar.js renderLinked). -->
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Appointments</h3>
+                            <button type="button" class="ov-add-btn" data-tcal-new-for="contact" hidden>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                New
+                            </button>
+                        </div>
+                        <div class="tcal-linked" id="contactAppointments"></div>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Notes Timeline Section -->
                     <div class="overview-section">
                         <h3 class="overview-section-title">Notes Timeline</h3>
@@ -2052,6 +2138,21 @@ function assetUrl(string $path): string
                         </div>
                     </div>
 
+                    <?php if ($canCalendar): ?>
+                    <!-- Appointments linked to this project (team calendar,
+                         assets/js/team-calendar.js renderLinked). -->
+                    <div class="overview-section ov-section">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Appointments</h3>
+                            <button type="button" class="ov-add-btn" data-tcal-new-for="project" hidden>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                New
+                            </button>
+                        </div>
+                        <div class="tcal-linked" id="projectAppointments"></div>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Project Documents Section (assets/js/documents.js).
                          Dragging files over the sheet shows one drop target
                          per label, so a file is labelled as it is added. -->
@@ -2209,6 +2310,27 @@ function assetUrl(string $path): string
                 </div>
             </div>
         </div>
+
+        <?php if ($canCalendar): ?>
+        <!-- One appointment of the team calendar: view, edit and new in one
+             sheet, opened from the calendar, the contact and project sheets
+             and found free slots alike (assets/js/team-calendar.js,
+             openEvent / openNewEvent). After the contact and project sheets,
+             so it opens on top of them. -->
+        <div class="modal" id="eventSheet">
+            <div class="modal-backdrop" data-esheet="close"></div>
+            <div class="modal-content modal-large" role="dialog" aria-modal="true" aria-labelledby="esheetTitle">
+                <div class="modal-header">
+                    <div class="overview-header-info">
+                        <div class="overview-title-info" id="esheetHead"></div>
+                    </div>
+                    <button type="button" class="modal-close" data-esheet="close" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-body overview-body" id="esheetBody"></div>
+                <div class="modal-footer ov-footer" id="esheetFoot"></div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- One proposal from Claude, opened from the From Claude list or from
              the box in a contact's or project's sheet. Last of the sheets, so
@@ -2477,6 +2599,9 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/workload.js') ?>"></script>
         <?php if ($isAdmin): ?>
         <script src="<?= assetUrl('assets/js/users.js') ?>"></script>
+        <?php endif; ?>
+        <?php if ($canCalendar): ?>
+        <script src="<?= assetUrl('assets/js/team-calendar.js') ?>"></script>
         <?php endif; ?>
     <?php endif; ?>
 </body>
