@@ -220,6 +220,14 @@ check('no errors', $stats['errors'] === 0, $stats['errors']);
 $people = $db->query("SELECT email, user_id, color, position FROM calendar_people ORDER BY position")->fetchAll();
 check('three people, in order of discovery', array_column($people, 'email') === [LIVIO, MARKUS, VIVIAN], array_column($people, 'email'));
 check('people mapped to CRM accounts', count(array_filter(array_column($people, 'user_id'))) === 3);
+// The name follows the CRM account: renamed there, renamed in the calendar.
+$db->exec("UPDATE calendar_people SET name = 'Markus (alt)' WHERE email = '" . MARKUS . "'");
+$db->exec("UPDATE users SET name = 'Markus S.' WHERE email = '" . MARKUS . "'");
+$named = array_column(CalendarView::people(viewer(LIVIO)), 'name', 'email');
+$namedAdmin = array_column(CalendarSettings::people(), 'name', 'email');
+check('a linked person carries the CRM account\'s name', ($named[MARKUS] ?? null) === 'Markus S.' && ($namedAdmin[MARKUS] ?? null) === 'Markus S.', $named);
+$db->exec("UPDATE users SET name = 'Markus Schwinghammer' WHERE email = '" . MARKUS . "'");
+$db->exec("UPDATE calendar_people SET name = 'Markus Schwinghammer' WHERE email = '" . MARKUS . "'");
 check('person colours from the palette', array_column($people, 'color') === array_slice(CalendarSync::PALETTE, 0, 3), array_column($people, 'color'));
 $defaults = $db->query("SELECT kind, visibility FROM calendar_sources ORDER BY id")->fetchAll();
 check('work calendars default to details, private ones to private', array_reduce($defaults, static function (bool $ok, array $row): bool {

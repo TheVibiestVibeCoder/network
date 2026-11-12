@@ -195,8 +195,12 @@ final class CalendarSettings
     /** Everyone with a calendar, with their CRM account mapping (admins). */
     public static function people(): array
     {
+        // Named after the linked CRM account, as everywhere in the calendar.
         $rows = Database::getInstance()->query("
-            SELECT email, user_id, name, color, position FROM calendar_people ORDER BY position, name COLLATE NOCASE
+            SELECT p.email, p.user_id, COALESCE(NULLIF(u.name, ''), p.name) AS name, p.color, p.position
+            FROM calendar_people p
+            LEFT JOIN users u ON u.id = p.user_id
+            ORDER BY p.position, name COLLATE NOCASE
         ")->fetchAll();
         return array_map(static function (array $row): array {
             return [

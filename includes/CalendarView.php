@@ -87,12 +87,14 @@ final class CalendarView
      */
     public static function people(array $viewer): array
     {
+        // The name is the linked CRM account's; only someone without an
+        // account keeps the name the calendar was found with.
         $rows = Database::getInstance()->query("
-            SELECT p.email, p.name, p.color, p.position, p.user_id, u.avatar
+            SELECT p.email, COALESCE(NULLIF(u.name, ''), p.name) AS name, p.color, p.position, p.user_id, u.avatar
             FROM calendar_people p
             LEFT JOIN users u ON u.id = p.user_id
             WHERE EXISTS (SELECT 1 FROM calendar_sources s WHERE s.owner_email = p.email AND s.enabled = 1)
-            ORDER BY p.position, p.name COLLATE NOCASE
+            ORDER BY p.position, name COLLATE NOCASE
         ")->fetchAll();
 
         return array_map(static function (array $row) use ($viewer): array {

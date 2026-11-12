@@ -1654,7 +1654,10 @@
     // Settings
     // =========================================================================
 
-    const VISIBILITY_LABELS = { details: 'Details', private: 'Private (time only)' };
+    const VISIBILITY_LABELS = { details: 'Details', private: 'Private' };
+    // Show or hide a calendar in the CRM.
+    const EYE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+    const EYE_OFF_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5C18 5.5 21.5 12 21.5 12a17 17 0 0 1-2.6 3.4M6.3 6.9C3.9 8.5 2.5 12 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4.4-1.1"/><path d="M9.9 10a2.8 2.8 0 0 0 4 4"/><path d="m3.5 3.5 17 17"/></svg>';
 
     /** focus: 'hours' opens it at the working hours and buffer. */
     async function openSettings(focus) {
@@ -1686,45 +1689,37 @@
         if (!s) return;
         const admin = !!s.is_admin;
         const peopleList = admin ? s.people : (state.data ? state.data.people : []);
-        const nameOf = email => {
+        const known = state.data ? state.data.people : [];
+        const ownerHead = email => {
             const p = peopleList.find(x => x.email === email);
-            return p ? p.name : email;
+            const shown = known.find(x => x.email === email);
+            return `${shown ? face(shown) : ''}<span>${esc(p ? p.name : email)}</span>`;
         };
+        const select = (attrs, options, current, label) => `<select class="form-select tcal-set-select" ${attrs} aria-label="${esc(label)}">
+                ${options.map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}
+            </select>`;
 
+        // Calendars: one row each - shown or not, name, kind, what others see.
         const byOwner = new Map();
         s.sources.forEach(source => {
             if (!byOwner.has(source.owner_email)) byOwner.set(source.owner_email, []);
             byOwner.get(source.owner_email).push(source);
         });
-
-        const calendars = byOwner.size ? Array.from(byOwner.entries()).map(([owner, sources]) => `
+        const grid = admin ? 'is-admin' : '';
+        const calendars = byOwner.size ? `
+                <div class="tcal-set-cols ${grid}" aria-hidden="true">
+                    <span></span>${admin ? '<span>Kind</span>' : ''}<span>Others see</span>${admin ? '<span></span>' : ''}
+                </div>` + Array.from(byOwner.entries()).map(([owner, sources]) => `
                 <div class="tcal-set-owner">
-                    <div class="tcal-set-owner-name">${esc(nameOf(owner))}</div>
-                    ${sources.map(source => `<div class="tcal-set-source${source.enabled ? '' : ' is-off'}">
-                        <div class="tcal-set-source-head">
-                            <span class="tcal-set-source-name">${esc(source.name)}</span>
-                            <span class="tcal-badge">${source.kind === 'work' ? 'Work' : 'Private'}</span>
-                            ${source.writable ? '' : '<span class="tcal-badge tcal-badge--quiet" title="The calendar account may only read it">Read only</span>'}
-                        </div>
-                        <div class="tcal-set-source-controls">
-                            <label class="tcal-set-field">
-                                <span>Others see</span>
-                                <select class="form-select" data-tcal-source="${source.id}" data-field="visibility">
-                                    ${Object.entries(VISIBILITY_LABELS).map(([value, label]) => `<option value="${value}"${value === source.visibility ? ' selected' : ''}>${esc(label)}</option>`).join('')}
-                                </select>
-                            </label>
-                            ${admin ? `<label class="tcal-set-field">
-                                <span>Kind</span>
-                                <select class="form-select" data-tcal-source="${source.id}" data-field="kind">
-                                    <option value="work"${source.kind === 'work' ? ' selected' : ''}>Work</option>
-                                    <option value="private"${source.kind === 'private' ? ' selected' : ''}>Private</option>
-                                </select>
-                            </label>
-                            <label class="tcal-set-toggle">
-                                <input type="checkbox" data-tcal-source="${source.id}" data-field="enabled"${source.enabled ? ' checked' : ''}>
-                                <span>Show in the CRM</span>
-                            </label>` : ''}
-                        </div>
+                    <div class="tcal-set-owner-name">${ownerHead(owner)}</div>
+                    ${sources.map(source => `<div class="tcal-set-cal ${grid}${source.enabled ? '' : ' is-off'}">
+                        <span class="tcal-set-cal-name">${esc(source.name)}${source.writable ? '' : ' <span class="tcal-set-muted" title="The calendar account may only read it">read only</span>'}</span>
+                        ${admin ? select(`data-tcal-source="${source.id}" data-field="kind"`, [['work', 'Work'], ['private', 'Private']], source.kind, 'Kind') : ''}
+                        ${select(`data-tcal-source="${source.id}" data-field="visibility"`, Object.entries(VISIBILITY_LABELS), source.visibility, 'Others see')}
+                        ${admin ? `<button type="button" class="tcal-set-icon tcal-set-eye" data-tcal-toggle-source="${source.id}" data-enabled="${source.enabled ? 1 : 0}"
+                            title="${source.enabled ? 'Hide in the CRM' : 'Show in the CRM'}" aria-label="${source.enabled ? 'Hide' : 'Show'} ${esc(source.name)}" aria-pressed="${source.enabled ? 'false' : 'true'}">
+                            ${source.enabled ? EYE_ICON : EYE_OFF_ICON}
+                        </button>` : ''}
                         ${source.last_error ? `<p class="tcal-set-error">${esc(source.last_error)}</p>` : ''}
                     </div>`).join('')}
                 </div>`).join('') : '<p class="tcal-set-muted">None shared yet.</p>';
@@ -1732,23 +1727,22 @@
         let adminSections = '';
         if (admin) {
             const accounts = s.accounts || [];
-            const people = (s.people || []).map((p, i, all) => `<div class="tcal-set-person">
-                    <input type="color" class="tcal-set-color" value="${esc(p.color)}" data-tcal-person-field="color" data-email="${esc(p.email)}" aria-label="Colour of ${esc(p.name)}">
-                    <input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name">
-                    <select class="form-select tcal-set-account" data-tcal-person-field="user_id" data-email="${esc(p.email)}" aria-label="CRM account">
-                        <option value="">No CRM account</option>
-                        ${accounts.map(a => `<option value="${a.id}"${Number(a.id) === Number(p.user_id) ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}
-                    </select>
+            const arrow = d => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+            const people = (s.people || []).map((p, i, all) => `<div class="tcal-set-person${p.user_id === null || p.user_id === undefined ? ' has-name' : ''}">
+                    <label class="tcal-set-color" style="--swatch:${esc(p.color)}" title="Colour, where there is no profile picture">
+                        <input type="color" value="${esc(p.color)}" data-tcal-person-field="color" data-email="${esc(p.email)}" aria-label="Colour of ${esc(p.name)}">
+                    </label>
+                    ${p.user_id === null || p.user_id === undefined
+                        ? `<input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name" title="Without a CRM account: the name the calendar shows">`
+                        : ''}
+                    ${select(`data-tcal-person-field="user_id" data-email="${esc(p.email)}"`, [['', 'No CRM account']].concat(accounts.map(a => [String(a.id), a.name])), p.user_id === null || p.user_id === undefined ? '' : String(p.user_id), 'CRM account')}
                     <span class="tcal-set-move">
-                        <button type="button" class="btn btn-icon btn-small" data-tcal-move="up" data-email="${esc(p.email)}" aria-label="Move up"${i === 0 ? ' disabled' : ''}>
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14.5 6-6 6 6"/></svg>
-                        </button>
-                        <button type="button" class="btn btn-icon btn-small" data-tcal-move="down" data-email="${esc(p.email)}" aria-label="Move down"${i === all.length - 1 ? ' disabled' : ''}>
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
-                        </button>
+                        <button type="button" class="tcal-set-icon" data-tcal-move="up" data-email="${esc(p.email)}" title="Move up" aria-label="Move up"${i === 0 ? ' disabled' : ''}>${arrow('m6 14.5 6-6 6 6')}</button>
+                        <button type="button" class="tcal-set-icon" data-tcal-move="down" data-email="${esc(p.email)}" title="Move down" aria-label="Move down"${i === all.length - 1 ? ' disabled' : ''}>${arrow('m6 9.5 6 6 6-6')}</button>
                     </span>
                 </div>`).join('');
 
+            // Working hours save as soon as something changes.
             const wh = s.working_hours;
             adminSections = `
                 <section class="tcal-set-section">
@@ -1757,26 +1751,26 @@
                 </section>
                 <section class="tcal-set-section" data-tcal-set="hours">
                     <h4>Working hours</h4>
-                    <div class="tcal-set-days">${DAY_NAMES.map((name, i) => `<label class="tcal-set-day">
-                        <input type="checkbox" data-tcal-hours-day="${i + 1}"${wh.days.includes(i + 1) ? ' checked' : ''}><span>${name}</span></label>`).join('')}</div>
+                    <div class="tcal-set-days" role="group" aria-label="Working days">${DAY_NAMES.map((name, i) => `<label class="tcal-set-day" title="${name}">
+                        <input type="checkbox" data-tcal-hours-day="${i + 1}"${wh.days.includes(i + 1) ? ' checked' : ''}><span>${name.slice(0, 2)}</span></label>`).join('')}</div>
                     <div class="tcal-set-times">
-                        <label class="tcal-set-field"><span>From</span><input type="time" class="form-input" data-tcal-hours="start" value="${esc(wh.start)}" step="900"></label>
-                        <label class="tcal-set-field"><span>To</span><input type="time" class="form-input" data-tcal-hours="end" value="${esc(wh.end)}" step="900"></label>
-                        <label class="tcal-set-field"><span>Buffer</span><select class="form-select" data-tcal-hours="buffer">
-                            ${BUFFERS.map(m => `<option value="${m}"${m === wh.buffer ? ' selected' : ''}>${m ? esc(durationLabel(m)) : 'None'}</option>`).join('')}
-                        </select></label>
-                        <button type="button" class="btn btn-secondary btn-small" data-tcal="save-hours">Save hours</button>
+                        <input type="time" class="form-input tcal-set-select" data-tcal-hours="start" value="${esc(wh.start)}" step="900" aria-label="From">
+                        <span class="tcal-set-dash">–</span>
+                        <input type="time" class="form-input tcal-set-select" data-tcal-hours="end" value="${esc(wh.end)}" step="900" aria-label="To">
+                        <label class="tcal-set-buffer"><span>Buffer</span>${select('data-tcal-hours="buffer"', BUFFERS.map(m => [String(m), m ? durationLabel(m) : 'None']), String(wh.buffer), 'Buffer before and after appointments')}</label>
                     </div>
-                </section>
-                <section class="tcal-set-section">
-                    <h4>New calendars</h4>
-                    <button type="button" class="btn btn-secondary btn-small" data-tcal="discover" title="Picked up once a day by themselves">Look for new shares</button>
                 </section>`;
         }
 
+        const discoverBtn = admin
+            ? `<button type="button" class="ov-icon-btn tcal-discover" data-tcal="discover" title="Look for new shares (also once a day by itself)" aria-label="Look for new shares">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
+                </button>`
+            : '';
+
         els.settings.innerHTML = `<div class="tcal-drawer-head">
                 <h3>Calendar settings</h3>
-                <button type="button" class="modal-close" data-tcal="close-settings" aria-label="Close">&times;</button>
+                <div class="ov-head-actions">${discoverBtn}<button type="button" class="modal-close" data-tcal="close-settings" aria-label="Close">&times;</button></div>
             </div>
             <div class="tcal-drawer-body">
                 <section class="tcal-set-section">
@@ -1822,7 +1816,7 @@
             state.settings = await api({ action: 'settings' });
             renderSettings();
             load({ skipSync: true });
-            toast('Working hours saved.');
+            toast('Saved.');
         } catch (e) {
             toast(e.message, true);
         }
@@ -1831,7 +1825,7 @@
     async function discover(button) {
         if (button) {
             button.disabled = true;
-            button.textContent = 'Looking…';
+            button.classList.add('is-busy');
         }
         try {
             const result = await api({ action: 'discover' }, { method: 'POST' });
@@ -2156,14 +2150,14 @@
     // ---- Settings ----------------------------------------------------------
 
     els.settings.addEventListener('click', event => {
-        const target = event.target.closest('[data-tcal], [data-tcal-move]');
+        const target = event.target.closest('[data-tcal], [data-tcal-move], [data-tcal-toggle-source]');
         if (!target) return;
-        if (target.dataset.tcalMove) {
+        if (target.dataset.tcalToggleSource) {
+            updateSource(target.dataset.tcalToggleSource, 'enabled', target.dataset.enabled !== '1');
+        } else if (target.dataset.tcalMove) {
             updatePerson(target.dataset.email, { move: target.dataset.tcalMove });
         } else if (target.dataset.tcal === 'close-settings') {
             closeSettings();
-        } else if (target.dataset.tcal === 'save-hours') {
-            saveHours();
         } else if (target.dataset.tcal === 'discover') {
             discover(target);
         }
@@ -2183,6 +2177,8 @@
                 return;
             }
             updatePerson(target.dataset.email, { [field]: value });
+        } else if (target.dataset.tcalHoursDay || target.dataset.tcalHours) {
+            saveHours();
         }
     });
 

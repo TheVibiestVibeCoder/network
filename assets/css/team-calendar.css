@@ -1727,16 +1727,9 @@ button.tcal-dayhead:hover {
 }
 
 .tcal-set-section h4 {
-    margin: 0 0 4px;
+    margin: 0 0 10px;
     font-size: var(--t-md);
     color: var(--c-ink);
-}
-
-.tcal-set-hint {
-    margin: 0 0 12px;
-    font-size: var(--t-xs);
-    line-height: 1.5;
-    color: var(--c-ink-3);
 }
 
 .tcal-set-muted {
@@ -1745,142 +1738,250 @@ button.tcal-dayhead:hover {
     color: var(--c-ink-4);
 }
 
+.tcal-discover.is-busy svg {
+    animation: tcal-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes tcal-pulse {
+    to { opacity: 0.35; }
+}
+
+/* Compact fields, one height for all of them. */
+.tcal-set-select.form-select,
+.tcal-set-select.form-input {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: var(--t-sm);
+}
+
+.tcal-set-select.form-select {
+    padding-left: 10px;
+    padding-right: 28px;
+    background-position: right 8px center;
+}
+
+/* ---- Calendars: a row each, the column labels once ---- */
+
+.tcal-set-cols,
+.tcal-set-cal {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 104px;
+    align-items: center;
+    gap: 8px;
+}
+
+.tcal-set-cols.is-admin,
+.tcal-set-cal.is-admin {
+    grid-template-columns: minmax(0, 1fr) 92px 104px 30px;
+}
+
+.tcal-set-cols {
+    margin: -4px 0 2px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
 .tcal-set-owner + .tcal-set-owner {
-    margin-top: 14px;
+    margin-top: 12px;
 }
 
 .tcal-set-owner-name {
-    margin-bottom: 6px;
-    font-size: var(--t-sm);
-    font-weight: 600;
-    color: var(--c-ink-2);
-}
-
-.tcal-set-source {
-    padding: 10px 12px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
-    background: var(--c-surface);
-}
-
-.tcal-set-source + .tcal-set-source {
-    margin-top: 6px;
-}
-
-.tcal-set-source.is-off {
-    background: var(--c-sunken);
-}
-
-.tcal-set-source-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
-}
-
-.tcal-set-source-name {
+    margin-bottom: 4px;
     font-size: var(--t-sm);
     font-weight: 600;
-    color: var(--c-ink);
-}
-
-.tcal-badge {
-    padding: 1px 8px;
-    border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.tcal-badge--quiet {
-    background: var(--c-tint-2);
-    color: var(--c-ink-3);
-}
-
-.tcal-set-source-controls {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px 12px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-}
-
-.tcal-set-field {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-}
-
-.tcal-set-field .form-select,
-.tcal-set-field .form-input {
-    width: auto;
-    min-width: 0;
-}
-
-.tcal-set-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding-bottom: 7px;
-    font-size: var(--t-sm);
     color: var(--c-ink-2);
 }
 
+.tcal-set-owner-name .tcal-face {
+    --face: 20px;
+    box-shadow: none;
+}
+
+.tcal-set-cal {
+    padding: 4px 0;
+}
+
+.tcal-set-cal-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    color: var(--c-ink);
+}
+
 .tcal-set-error {
-    margin: 8px 0 0;
+    grid-column: 1 / -1;
+    margin: 0;
     font-size: var(--t-xs);
     color: var(--c-danger-ink);
 }
 
+/* Shown or hidden: an eye in front of the row. A hidden calendar pales as
+   a whole, all but its eye. */
+.tcal-set-eye {
+    width: 30px;
+    height: 30px;
+}
+
+.tcal-set-cal.is-off .tcal-set-eye {
+    color: var(--c-ink-4);
+}
+
+.tcal-set-cal.is-off > :not(.tcal-set-eye):not(.tcal-set-error) {
+    opacity: 0.4;
+}
+
+/* ---- People ---- */
+
+/* Colour, CRM account, order. Only someone without an account also gets a
+   name field. */
 .tcal-set-person {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1.3fr) auto;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
 }
 
-.tcal-set-person + .tcal-set-person {
-    margin-top: 8px;
+.tcal-set-person.has-name {
+    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.1fr) auto;
 }
 
+.tcal-set-person + .tcal-set-person {
+    margin-top: 6px;
+}
+
+.tcal-set-name.form-input {
+    height: 32px;
+    padding: 0 10px;
+    font-size: var(--t-sm);
+}
+
+/* The colour as a round swatch; the native picker opens on a click. */
 .tcal-set-color {
-    width: 34px;
-    height: 34px;
-    padding: 2px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
-    background: var(--c-surface);
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--swatch);
+    box-shadow: 0 0 0 1px var(--c-line);
+    cursor: pointer;
+}
+
+.tcal-set-color input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
     cursor: pointer;
 }
 
 .tcal-set-move {
     display: inline-flex;
-    gap: 2px;
 }
+
+.tcal-set-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.tcal-set-icon:hover:not(:disabled) {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+.tcal-set-icon:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ---- Working hours: the days as chips, then the times on one line ---- */
 
 .tcal-set-days {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 12px;
+    gap: 4px;
     margin-bottom: 10px;
 }
 
 .tcal-set-day {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
+    position: relative;
+    cursor: pointer;
+}
+
+.tcal-set-day input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.tcal-set-day span {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 30px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-4);
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.tcal-set-day input:checked + span {
+    border-color: color-mix(in srgb, var(--c-accent) 35%, var(--c-line));
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.tcal-set-day input:focus-visible + span {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
 }
 
 .tcal-set-times {
     display: flex;
-    align-items: flex-end;
-    gap: 10px;
+    align-items: center;
+    gap: 6px;
     flex-wrap: wrap;
+}
+
+.tcal-set-times > .tcal-set-select {
+    width: 104px;
+}
+
+.tcal-set-dash {
+    color: var(--c-ink-4);
+}
+
+.tcal-set-buffer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.tcal-set-buffer .tcal-set-select {
+    width: 96px;
 }
 
 /* ---- Narrow screens ----------------------------------------------------- */
@@ -1943,11 +2044,12 @@ button.tcal-dayhead:hover {
         flex: none;
     }
 
-    .tcal-set-person {
-        grid-template-columns: 34px minmax(0, 1fr) auto;
+    .tcal-set-person.has-name {
+        grid-template-columns: 22px minmax(0, 1fr) auto;
     }
 
-    .tcal-set-account {
-        grid-column: 2 / -1;
+    .tcal-set-person.has-name > .tcal-set-select {
+        grid-column: 2 / 3;
+        grid-row: 2;
     }
 }
