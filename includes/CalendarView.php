@@ -83,14 +83,14 @@ final class CalendarView
      * The people who have at least one enabled calendar, in the team's order,
      * with the profile picture of the CRM account each one is mapped to.
      *
-     * @return list<array{email: string, name: string, initials: string, color: string, position: int, is_me: bool, avatar_url: ?string}>
+     * @return list<array{email: string, name: string, initials: string, position: int, is_me: bool, avatar_url: ?string}>
      */
     public static function people(array $viewer): array
     {
         // The name is the linked CRM account's; only someone without an
         // account keeps the name the calendar was found with.
         $rows = Database::getInstance()->query("
-            SELECT p.email, COALESCE(NULLIF(u.name, ''), p.name) AS name, p.color, p.position, p.user_id, u.avatar
+            SELECT p.email, COALESCE(NULLIF(u.name, ''), p.name) AS name, p.position, p.user_id, u.avatar
             FROM calendar_people p
             LEFT JOIN users u ON u.id = p.user_id
             WHERE EXISTS (SELECT 1 FROM calendar_sources s WHERE s.owner_email = p.email AND s.enabled = 1)
@@ -104,7 +104,6 @@ final class CalendarView
                 'email'      => $email,
                 'name'       => $name,
                 'initials'   => self::initials($name),
-                'color'      => (string) ($row['color'] ?: '#30599D'),
                 'position'   => (int) $row['position'],
                 'is_me'      => in_array($email, $viewer['emails'], true),
                 'avatar_url' => $row['user_id'] !== null && $row['avatar']

@@ -262,7 +262,7 @@
         const inner = p.avatar_url
             ? `<img src="${esc(p.avatar_url)}" alt="" loading="lazy" decoding="async">`
             : esc(p.initials);
-        return `<span class="tcal-face${p.avatar_url ? ' has-photo' : ''}" style="--person:${esc(p.color)}"
+        return `<span class="tcal-face${p.avatar_url ? ' has-photo' : ''}"
                     data-initials="${esc(p.initials)}" title="${esc(p.name)}">${inner}</span>`;
     }
 
@@ -1729,13 +1729,10 @@
             // People only come up when one of them has no CRM account: the
             // calendar links owners to accounts by their email address by
             // itself, and takes name and picture from the account. Whoever
-            // is left over can be linked here, or named and coloured.
+            // is left over can be linked here, or named.
             const accounts = s.accounts || [];
             const unlinked = (s.people || []).filter(p => p.user_id === null || p.user_id === undefined);
             const people = unlinked.map(p => `<div class="tcal-set-person">
-                    <label class="tcal-set-color" style="--swatch:${esc(p.color)}" title="Colour">
-                        <input type="color" value="${esc(p.color)}" data-tcal-person-field="color" data-email="${esc(p.email)}" aria-label="Colour of ${esc(p.name)}">
-                    </label>
                     <input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name" title="${esc(p.email)}">
                     ${select(`data-tcal-person-field="user_id" data-email="${esc(p.email)}"`, [['', 'No CRM account']].concat(accounts.map(a => [String(a.id), a.name])), '', 'CRM account')}
                 </div>`).join('');

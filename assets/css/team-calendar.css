@@ -238,13 +238,19 @@
     height: var(--face);
     border-radius: 50%;
     overflow: hidden;
-    background: var(--person, var(--c-accent));
-    color: #FFFFFF;
+    /* Initials on the CRM's neutral grey, as on every other face; a profile
+       picture brings its own look - nothing behind it shows through. */
+    background: var(--c-tint-2);
+    color: var(--c-ink-2);
     font-size: calc(var(--face) * 0.42);
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.01em;
     box-shadow: 0 0 0 1.5px var(--face-ring, var(--c-surface));
+}
+
+.tcal-face.has-photo {
+    background: transparent;
 }
 
 .tcal-face img {
@@ -1831,10 +1837,10 @@ button.tcal-dayhead:hover {
 
 /* ---- People ---- */
 
-/* Someone without a CRM account: colour, name, and the account to link. */
+/* Someone without a CRM account: name, and the account to link. */
 .tcal-set-person {
     display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     align-items: center;
     gap: 8px;
 }
@@ -1847,26 +1853,6 @@ button.tcal-dayhead:hover {
     height: 32px;
     padding: 0 10px;
     font-size: var(--t-sm);
-}
-
-/* The colour as a round swatch; the native picker opens on a click. */
-.tcal-set-color {
-    position: relative;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--swatch);
-    box-shadow: 0 0 0 1px var(--c-line);
-    cursor: pointer;
-}
-
-.tcal-set-color input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
 }
 
 .tcal-set-icon {
@@ -2027,10 +2013,6 @@ button.tcal-dayhead:hover {
     }
 
     .tcal-set-person {
-        grid-template-columns: 22px minmax(0, 1fr);
-    }
-
-    .tcal-set-person > .tcal-set-select {
-        grid-column: 2 / 3;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
