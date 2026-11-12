@@ -1840,17 +1840,12 @@ button.tcal-dayhead:hover {
 
 /* ---- People ---- */
 
-/* Colour, CRM account, order. Only someone without an account also gets a
-   name field. */
+/* Someone without a CRM account: colour, name, and the account to link. */
 .tcal-set-person {
     display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) auto;
+    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.1fr);
     align-items: center;
     gap: 8px;
-}
-
-.tcal-set-person.has-name {
-    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.1fr) auto;
 }
 
 .tcal-set-person + .tcal-set-person {
@@ -1881,10 +1876,6 @@ button.tcal-dayhead:hover {
     height: 100%;
     opacity: 0;
     cursor: pointer;
-}
-
-.tcal-set-move {
-    display: inline-flex;
 }
 
 .tcal-set-icon {
@@ -2044,12 +2035,11 @@ button.tcal-dayhead:hover {
         flex: none;
     }
 
-    .tcal-set-person.has-name {
-        grid-template-columns: 22px minmax(0, 1fr) auto;
+    .tcal-set-person {
+        grid-template-columns: 22px minmax(0, 1fr);
     }
 
-    .tcal-set-person.has-name > .tcal-set-select {
+    .tcal-set-person > .tcal-set-select {
         grid-column: 2 / 3;
-        grid-row: 2;
     }
 }

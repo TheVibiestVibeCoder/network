@@ -1726,29 +1726,27 @@
 
         let adminSections = '';
         if (admin) {
+            // People only come up when one of them has no CRM account: the
+            // calendar links owners to accounts by their email address by
+            // itself, and takes name and picture from the account. Whoever
+            // is left over can be linked here, or named and coloured.
             const accounts = s.accounts || [];
-            const arrow = d => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
-            const people = (s.people || []).map((p, i, all) => `<div class="tcal-set-person${p.user_id === null || p.user_id === undefined ? ' has-name' : ''}">
-                    <label class="tcal-set-color" style="--swatch:${esc(p.color)}" title="Colour, where there is no profile picture">
+            const unlinked = (s.people || []).filter(p => p.user_id === null || p.user_id === undefined);
+            const people = unlinked.map(p => `<div class="tcal-set-person">
+                    <label class="tcal-set-color" style="--swatch:${esc(p.color)}" title="Colour">
                         <input type="color" value="${esc(p.color)}" data-tcal-person-field="color" data-email="${esc(p.email)}" aria-label="Colour of ${esc(p.name)}">
                     </label>
-                    ${p.user_id === null || p.user_id === undefined
-                        ? `<input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name" title="Without a CRM account: the name the calendar shows">`
-                        : ''}
-                    ${select(`data-tcal-person-field="user_id" data-email="${esc(p.email)}"`, [['', 'No CRM account']].concat(accounts.map(a => [String(a.id), a.name])), p.user_id === null || p.user_id === undefined ? '' : String(p.user_id), 'CRM account')}
-                    <span class="tcal-set-move">
-                        <button type="button" class="tcal-set-icon" data-tcal-move="up" data-email="${esc(p.email)}" title="Move up" aria-label="Move up"${i === 0 ? ' disabled' : ''}>${arrow('m6 14.5 6-6 6 6')}</button>
-                        <button type="button" class="tcal-set-icon" data-tcal-move="down" data-email="${esc(p.email)}" title="Move down" aria-label="Move down"${i === all.length - 1 ? ' disabled' : ''}>${arrow('m6 9.5 6 6 6-6')}</button>
-                    </span>
+                    <input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name" title="${esc(p.email)}">
+                    ${select(`data-tcal-person-field="user_id" data-email="${esc(p.email)}"`, [['', 'No CRM account']].concat(accounts.map(a => [String(a.id), a.name])), '', 'CRM account')}
                 </div>`).join('');
 
             // Working hours save as soon as something changes.
             const wh = s.working_hours;
             adminSections = `
-                <section class="tcal-set-section">
-                    <h4>People</h4>
-                    ${people || '<p class="tcal-set-muted">Nobody yet.</p>'}
-                </section>
+                ${people ? `<section class="tcal-set-section">
+                    <h4>Without a CRM account</h4>
+                    ${people}
+                </section>` : ''}
                 <section class="tcal-set-section" data-tcal-set="hours">
                     <h4>Working hours</h4>
                     <div class="tcal-set-days" role="group" aria-label="Working days">${DAY_NAMES.map((name, i) => `<label class="tcal-set-day" title="${name}">
@@ -2150,12 +2148,10 @@
     // ---- Settings ----------------------------------------------------------
 
     els.settings.addEventListener('click', event => {
-        const target = event.target.closest('[data-tcal], [data-tcal-move], [data-tcal-toggle-source]');
+        const target = event.target.closest('[data-tcal], [data-tcal-toggle-source]');
         if (!target) return;
         if (target.dataset.tcalToggleSource) {
             updateSource(target.dataset.tcalToggleSource, 'enabled', target.dataset.enabled !== '1');
-        } else if (target.dataset.tcalMove) {
-            updatePerson(target.dataset.email, { move: target.dataset.tcalMove });
         } else if (target.dataset.tcal === 'close-settings') {
             closeSettings();
         } else if (target.dataset.tcal === 'discover') {
