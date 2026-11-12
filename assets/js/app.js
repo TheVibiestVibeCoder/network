@@ -45,8 +45,7 @@
         taggedData: null,
         selectedImportFile: null,
         // Calendar state
-        calendarMode: 'month', // 'month', 'week', 'day'
-        calendarDate: new Date(),
+        logDays: 30, // how many days back the log reaches; "Show earlier" adds more
         calendarNotes: [],
         calendarSearch: '',
         calendarTagFilter: '',
@@ -117,11 +116,6 @@
 
         // Calendar elements
         calendarBody: document.getElementById('calendarBody'),
-        calTitle: document.getElementById('calTitle'),
-        calPrev: document.getElementById('calPrev'),
-        calNext: document.getElementById('calNext'),
-        calToday: document.getElementById('calToday'),
-        calModeBtns: document.querySelectorAll('.cal-mode-btn'),
         calSearchInput: document.getElementById('calSearchInput'),
         calTagFilter: document.getElementById('calTagFilter'),
         calFilterToggle: document.getElementById('calFilterToggle'),
@@ -3874,62 +3868,29 @@
     // Calendar Functions
     // ============================================
 
-    function getCalendarDateRange() {
-        const d = state.calendarDate;
-        const mode = state.calendarMode;
-        let start, end;
+    // The Log: everything that changed, as a list by day, newest first. It
+    // starts with the last LOG_STEP_DAYS days; "Show earlier" reaches further
+    // back a step at a time.
+    const LOG_STEP_DAYS = 30;
+    const logDayFmt = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
-        if (mode === 'month') {
-            start = new Date(d.getFullYear(), d.getMonth(), 1);
-            // Include days from previous month that appear in the grid
-            const dayOfWeek = start.getDay();
-            const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday start
-            start = new Date(start);
-            start.setDate(start.getDate() - offset);
+    // Local time, not UTC, so the days do not shift.
+    function toLocalDatetime(dt) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+    }
 
-            end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-            const endDow = end.getDay();
-            const endOffset = endDow === 0 ? 0 : 7 - endDow;
-            end = new Date(end);
-            end.setDate(end.getDate() + endOffset);
-            end.setHours(23, 59, 59);
-        } else if (mode === 'week') {
-            start = new Date(d);
-            const dow = start.getDay();
-            const mondayOffset = dow === 0 ? -6 : 1 - dow;
-            start.setDate(start.getDate() + mondayOffset);
-            start.setHours(0, 0, 0, 0);
-            end = new Date(start);
-            end.setDate(end.getDate() + 6);
-            end.setHours(23, 59, 59);
-        } else {
-            start = new Date(d);
-            start.setHours(0, 0, 0, 0);
-            end = new Date(d);
-            end.setHours(23, 59, 59);
-        }
-
-        // Format using local time (not UTC) to avoid timezone offset shifting dates
-        function toLocalDatetime(dt) {
-            const y = dt.getFullYear();
-            const m = String(dt.getMonth() + 1).padStart(2, '0');
-            const d = String(dt.getDate()).padStart(2, '0');
-            const h = String(dt.getHours()).padStart(2, '0');
-            const min = String(dt.getMinutes()).padStart(2, '0');
-            const s = String(dt.getSeconds()).padStart(2, '0');
-            return `${y}-${m}-${d} ${h}:${min}:${s}`;
-        }
-
-        return {
-            start: toLocalDatetime(start),
-            end: toLocalDatetime(end),
-            startDate: start,
-            endDate: end
-        };
+    function getLogRange() {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - (state.logDays - 1));
+        const end = new Date();
+        end.setHours(23, 59, 59, 0);
+        return { start: toLocalDatetime(start), end: toLocalDatetime(end), startDate: start };
     }
 
     async function loadCalendarNotes() {
-        const range = getCalendarDateRange();
+        const range = getLogRange();
         try {
             const result = await api.getCalendarNotes(
                 range.start,
@@ -3942,75 +3903,73 @@
                 renderCalendar();
             }
         } catch (error) {
-            console.error('Error loading calendar notes:', error);
+            console.error('Error loading the log:', error);
         }
     }
 
     function renderCalendar() {
-        updateCalendarTitle();
-        if (state.calendarMode === 'month') {
-            renderMonthView();
-        } else if (state.calendarMode === 'week') {
-            renderWeekView();
-        } else {
-            renderDayView();
-        }
+        const byDay = groupNotesByDate(state.calendarNotes);
+        const days = Object.keys(byDay).sort().reverse();
+        const filtered = state.calendarSearch || state.calendarTagFilter;
 
-        triggerCalendarDeckAnimation();
+        let html = days.length
+            ? days.map(key => `<section class="log-day">
+                    <h2 class="log-day-head">${logDayLabel(key)}<span class="log-day-count">${byDay[key].length}</span></h2>
+                    <div class="log-day-list">${byDay[key].map(renderLogEntry).join('')}</div>
+                </section>`).join('')
+            : `<div class="cal-day-empty"><p>${filtered ? 'Nothing matches' : 'Nothing happened'} in the last ${state.logDays} days.</p></div>`;
+
+        html += `<div class="log-more">
+                <span>Since ${escapeHtml(logDayFmt.format(getLogRange().startDate))}</span>
+                <button type="button" class="btn btn-secondary btn-small" data-log-more>Show ${LOG_STEP_DAYS} days earlier</button>
+            </div>`;
+        elements.calendarBody.innerHTML = html;
     }
 
-    function triggerCalendarDeckAnimation() {
-        if (!elements.calendarBody) {
-            return;
-        }
-
-        let selector;
-        if (state.calendarMode === 'month') {
-            selector = '.cal-month-header-cell, .cal-month-cell';
-        } else if (state.calendarMode === 'week') {
-            selector = '.cal-week-day';
-        } else {
-            selector = '.cal-day-note, .cal-day-empty';
-        }
-
-        const animTargets = elements.calendarBody.querySelectorAll(selector);
-        if (!animTargets || animTargets.length === 0) {
-            return;
-        }
-
-        animTargets.forEach((el, index) => {
-            el.style.setProperty('--cal-deck-order', Math.min(index, 26));
-            el.classList.remove('calendar-anim-enter');
-        });
-
-        // Reflow ensures animation restarts when toggling modes quickly.
-        void elements.calendarBody.offsetWidth;
-
-        requestAnimationFrame(() => {
-            animTargets.forEach((el) => {
-                el.classList.add('calendar-anim-enter');
-            });
-        });
+    /** "Today", "Yesterday" or the weekday, each with its date. */
+    function logDayLabel(key) {
+        const date = new Date(key + 'T12:00:00');
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+        const full = escapeHtml(logDayFmt.format(date));
+        const near = key === toLocalDateKey(today) ? 'Today' : (key === toLocalDateKey(yesterday) ? 'Yesterday' : '');
+        return near
+            ? `<span class="log-day-name">${near}</span><span class="log-day-date">${full}</span>`
+            : `<span class="log-day-name">${full}</span>`;
     }
 
-    function updateCalendarTitle() {
-        const d = state.calendarDate;
-        const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    function renderLogEntry(entry) {
+        const time = entry.created_at ? entry.created_at.substring(11, 16) : '--:--';
+        const context = getCalendarEntryContext(entry);
+        const name = escapeHtml(context.primary || '');
+        const company = context.secondary ? escapeHtml(context.secondary) : '';
+        const typeClass = getCalendarEntryTypeClass(entry);
+        const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
+        const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
+        const content = escapeHtml(getCalendarEntryText(entry));
+        const navAttrs = getCalendarEntryNavigationAttrs(entry);
+        const tagBadges = getCalendarEntryTags(entry).map(tag =>
+            `<span class="cal-day-tag" style="--tag-color: ${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`
+        ).join('');
+        const todoMeta = getCalendarEntryType(entry) === 'todo'
+            ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Done' : 'Open'}${entry.due_date ? ` · Due ${escapeHtml(window.CRMFormat.date(entry.due_date))}` : ''}</span>`
+            : '';
 
-        if (state.calendarMode === 'month') {
-            elements.calTitle.textContent = `${months[d.getMonth()]} ${d.getFullYear()}`;
-        } else if (state.calendarMode === 'week') {
-            const range = getCalendarDateRange();
-            const s = range.startDate;
-            const e = range.endDate;
-            const sStr = `${months[s.getMonth()].substring(0, 3)} ${s.getDate()}`;
-            const eStr = `${months[e.getMonth()].substring(0, 3)} ${e.getDate()}, ${e.getFullYear()}`;
-            elements.calTitle.textContent = `${sStr} – ${eStr}`;
-        } else {
-            elements.calTitle.textContent = `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-        }
+        return `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
+                <div class="cal-day-note-time">${time}</div>
+                <div class="cal-day-note-body">
+                    <div class="cal-day-note-meta">
+                        <span class="cal-day-note-name">${name}</span>
+                        ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
+                        <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
+                        ${byLine(entry.actor_name, entry.actor_id)}
+                        ${todoMeta}
+                        ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
+                    </div>
+                    <div class="cal-day-note-content">${content}</div>
+                </div>
+            </div>`;
     }
 
     function toLocalDateKey(date) {
@@ -4144,16 +4103,6 @@
         return text;
     }
 
-    function getCalendarEntryMonthLabel(entry) {
-        const type = getCalendarEntryType(entry);
-        if (type === 'todo') {
-            return entry.title || 'To-do';
-        }
-
-        const context = getCalendarEntryContext(entry);
-        return context.primary;
-    }
-
     function getCalendarEntryNavigationAttrs(entry) {
         const attrs = ['data-calendar-entry="1"'];
         const contactId = parseInt(entry.contact_id, 10);
@@ -4171,231 +4120,6 @@
 
     function isCalendarTodoCompleted(entry) {
         return getCalendarEntryType(entry) === 'todo' && Number(entry.is_completed) === 1;
-    }
-
-    function renderNoteChip(entry) {
-        const context = getCalendarEntryContext(entry);
-        const primary = escapeHtml(context.primary || '');
-        const secondary = context.secondary ? escapeHtml(context.secondary) : '';
-        const typeClass = getCalendarEntryTypeClass(entry);
-        const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
-        const content = escapeHtml(getCalendarEntryText(entry, 60));
-        const tags = getCalendarEntryTags(entry);
-        const navAttrs = getCalendarEntryNavigationAttrs(entry);
-        const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
-        const tagDots = tags.map(tag =>
-            `<span class="cal-tag-dot" style="background:${tag.color}" title="${escapeHtml(tag.name)}"></span>`
-        ).join('');
-
-        return `<div class="cal-note-chip cal-note-chip--${typeClass}${completedClass}" ${navAttrs}>
-            <div class="cal-note-chip-header">
-                <span class="cal-note-person">${primary}</span>
-                ${secondary ? `<span class="cal-note-company">${secondary}</span>` : ''}
-                <span class="cal-note-type cal-note-type--${typeClass}">${typeLabel}</span>
-                ${tagDots ? `<span class="cal-note-tags">${tagDots}</span>` : ''}
-            </div>
-            <div class="cal-note-text">${content}</div>
-        </div>`;
-    }
-
-    function renderMonthView() {
-        const d = state.calendarDate;
-        const today = new Date();
-        const currentMonth = d.getMonth();
-        const range = getCalendarDateRange();
-        const notesByDate = groupNotesByDate(state.calendarNotes);
-
-        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        let html = '<div class="cal-month-grid">';
-
-        // Header row
-        html += '<div class="cal-month-header">';
-        dayLabels.forEach(label => {
-            html += `<div class="cal-month-header-cell">${label}</div>`;
-        });
-        html += '</div>';
-
-        // Day cells
-        html += '<div class="cal-month-body">';
-        const cursor = new Date(range.startDate);
-        while (cursor <= range.endDate) {
-            const dateKey = toLocalDateKey(cursor);
-            const isToday = cursor.toDateString() === today.toDateString();
-            const isOtherMonth = cursor.getMonth() !== currentMonth;
-            const dayNotes = notesByDate[dateKey] || [];
-
-            html += `<div class="cal-month-cell${isToday ? ' cal-today' : ''}${isOtherMonth ? ' cal-other-month' : ''}" data-date="${dateKey}">`;
-            html += `<div class="cal-month-day-num">${cursor.getDate()}</div>`;
-            if (dayNotes.length > 0) {
-                html += '<div class="cal-month-notes">';
-                const maxShow = 3;
-                dayNotes.slice(0, maxShow).forEach(entry => {
-                    const label = escapeHtml(getCalendarEntryMonthLabel(entry));
-                    const preview = escapeHtml(getCalendarEntryText(entry, 140));
-                    const tags = getCalendarEntryTags(entry);
-                    const typeClass = getCalendarEntryTypeClass(entry);
-                    const navAttrs = getCalendarEntryNavigationAttrs(entry);
-                    const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
-                    // One dot per entry: its first tag's colour, or without
-                    // tags the colour of its kind (design.css, Calendar).
-                    const tagDot = tags.length > 0
-                        ? `<span class="cal-tag-dot-sm" style="background:${tags[0].color}"></span>`
-                        : '<span class="cal-tag-dot-sm cal-kind-dot"></span>';
-
-                    html += `<div class="cal-month-note-dot cal-month-note-dot--${typeClass}${completedClass}" ${navAttrs} title="${preview}">
-                        ${tagDot}<span class="cal-month-note-label">${label}</span>
-                    </div>`;
-                });
-                if (dayNotes.length > maxShow) {
-                    html += `<div class="cal-month-more">+${dayNotes.length - maxShow} more</div>`;
-                }
-                html += '</div>';
-            }
-            html += '</div>';
-            cursor.setDate(cursor.getDate() + 1);
-        }
-        html += '</div></div>';
-
-        elements.calendarBody.innerHTML = html;
-        addCalendarClickHandlers();
-    }
-
-    function renderWeekView() {
-        const range = getCalendarDateRange();
-        const today = new Date();
-        const notesByDate = groupNotesByDate(state.calendarNotes);
-        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-        let html = '<div class="cal-week-grid">';
-
-        const cursor = new Date(range.startDate);
-        for (let i = 0; i < 7; i++) {
-            const dateKey = toLocalDateKey(cursor);
-            const isToday = cursor.toDateString() === today.toDateString();
-            const dayNotes = notesByDate[dateKey] || [];
-
-            html += `<div class="cal-week-day${isToday ? ' cal-today' : ''}" data-date="${dateKey}">`;
-            html += `<div class="cal-week-day-header">
-                <span class="cal-week-day-name">${dayNames[i]}</span>
-                <span class="cal-week-day-date">${months[cursor.getMonth()]} ${cursor.getDate()}</span>
-                ${dayNotes.length > 0 ? `<span class="cal-week-day-count">${dayNotes.length}</span>` : ''}
-            </div>`;
-            html += '<div class="cal-week-day-body">';
-            dayNotes.forEach(entry => {
-                html += renderNoteChip(entry);
-            });
-            if (dayNotes.length === 0) {
-                html += '<div class="cal-week-empty">Nothing this day</div>';
-            }
-            html += '</div></div>';
-            cursor.setDate(cursor.getDate() + 1);
-        }
-
-        html += '</div>';
-        elements.calendarBody.innerHTML = html;
-        addCalendarClickHandlers();
-    }
-
-    function renderDayView() {
-        const d = state.calendarDate;
-        const dateKey = toLocalDateKey(d);
-        const notesByDate = groupNotesByDate(state.calendarNotes);
-        const dayNotes = notesByDate[dateKey] || [];
-
-        let html = '<div class="cal-day-view">';
-
-        if (dayNotes.length === 0) {
-            html += `<div class="cal-day-empty">
-                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
-                <p>Nothing on this day</p>
-            </div>`;
-        } else {
-            dayNotes.forEach(entry => {
-                const time = entry.created_at ? entry.created_at.substring(11, 16) : '--:--';
-                const context = getCalendarEntryContext(entry);
-                const name = escapeHtml(context.primary || '');
-                const company = context.secondary ? escapeHtml(context.secondary) : '';
-                const typeClass = getCalendarEntryTypeClass(entry);
-                const typeLabel = escapeHtml(getCalendarEntryTypeLabel(entry));
-                const completedClass = isCalendarTodoCompleted(entry) ? ' is-completed' : '';
-                const content = escapeHtml(getCalendarEntryText(entry));
-                const navAttrs = getCalendarEntryNavigationAttrs(entry);
-                const tags = getCalendarEntryTags(entry);
-                const tagBadges = tags.map(tag =>
-                    `<span class="cal-day-tag" style="--tag-color: ${escapeHtml(tag.color)}">${escapeHtml(tag.name)}</span>`
-                ).join('');
-                const todoMeta = getCalendarEntryType(entry) === 'todo'
-                    ? `<span class="cal-day-note-extra">${Number(entry.is_completed) === 1 ? 'Done' : 'Open'}${entry.due_date ? ` · Due ${escapeHtml(window.CRMFormat.date(entry.due_date))}` : ''}</span>`
-                    : '';
-
-                html += `<div class="cal-day-note cal-day-note--${typeClass}${completedClass}" ${navAttrs}>
-                    <div class="cal-day-note-time">${time}</div>
-                    <div class="cal-day-note-body">
-                        <div class="cal-day-note-meta">
-                            <span class="cal-day-note-name">${name}</span>
-                            ${company ? `<span class="cal-day-note-company">${company}</span>` : ''}
-                            <span class="cal-day-note-type cal-day-note-type--${typeClass}">${typeLabel}</span>
-                            ${byLine(entry.actor_name, entry.actor_id)}
-                            ${todoMeta}
-                            ${tagBadges ? `<div class="cal-day-note-tags">${tagBadges}</div>` : ''}
-                        </div>
-                        <div class="cal-day-note-content">${content}</div>
-                    </div>
-                </div>`;
-            });
-        }
-
-        html += '</div>';
-        elements.calendarBody.innerHTML = html;
-        addCalendarClickHandlers();
-    }
-
-    function addCalendarClickHandlers() {
-        // Click on activity cards -> open project or contact overview
-        elements.calendarBody.querySelectorAll('[data-calendar-entry]').forEach(el => {
-            el.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const projectId = parseInt(el.dataset.projectId, 10);
-                const contactId = parseInt(el.dataset.contactId, 10);
-                if (Number.isInteger(projectId) && projectId > 0) {
-                    openProjectOverview(projectId);
-                    return;
-                }
-                if (Number.isInteger(contactId) && contactId > 0) {
-                    openOverviewModal(contactId);
-                }
-            });
-        });
-
-        // Click on day cells in month view -> switch to day view
-        if (state.calendarMode === 'month') {
-            elements.calendarBody.querySelectorAll('.cal-month-cell').forEach(cell => {
-                cell.addEventListener('click', (e) => {
-                    if (e.target.closest('[data-calendar-entry]')) return;
-                    const dateStr = cell.dataset.date;
-                    if (dateStr) {
-                        state.calendarDate = new Date(dateStr + 'T12:00:00');
-                        state.calendarMode = 'day';
-                        elements.calModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === 'day'));
-                        loadCalendarNotes();
-                    }
-                });
-            });
-        }
-    }
-
-    function navigateCalendar(direction) {
-        const d = state.calendarDate;
-        if (state.calendarMode === 'month') {
-            d.setMonth(d.getMonth() + direction);
-        } else if (state.calendarMode === 'week') {
-            d.setDate(d.getDate() + (direction * 7));
-        } else {
-            d.setDate(d.getDate() + direction);
-        }
-        state.calendarDate = new Date(d);
-        loadCalendarNotes();
     }
 
     function populateCalendarTagFilter() {
@@ -4417,19 +4141,23 @@
     function initCalendarEvents() {
         // The log's controls are only on the page for admins.
         if (!elements.logView) return;
-        elements.calPrev.addEventListener('click', () => navigateCalendar(-1));
-        elements.calNext.addEventListener('click', () => navigateCalendar(1));
-        elements.calToday.addEventListener('click', () => {
-            state.calendarDate = new Date();
-            loadCalendarNotes();
-        });
 
-        elements.calModeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                state.calendarMode = btn.dataset.mode;
-                elements.calModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === state.calendarMode));
+        // An entry opens its project or contact; "Show earlier" reaches back.
+        elements.calendarBody.addEventListener('click', (e) => {
+            if (e.target.closest('[data-log-more]')) {
+                state.logDays += LOG_STEP_DAYS;
                 loadCalendarNotes();
-            });
+                return;
+            }
+            const el = e.target.closest('[data-calendar-entry]');
+            if (!el) return;
+            const projectId = parseInt(el.dataset.projectId, 10);
+            const contactId = parseInt(el.dataset.contactId, 10);
+            if (Number.isInteger(projectId) && projectId > 0) {
+                openProjectOverview(projectId);
+            } else if (Number.isInteger(contactId) && contactId > 0) {
+                openOverviewModal(contactId);
+            }
         });
 
         const debouncedCalSearch = debounce(() => {

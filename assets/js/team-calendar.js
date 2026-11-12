@@ -5,7 +5,7 @@
  * day: the week is the main view, a single day the closer look. Each
  * appointment carries the profile pictures of the team members in it. The
  * ones the signed-in person takes part in - alone or with others - are filled
- * in the accent colour; everyone else's stay light, Busy and Private grey.
+ * in the accent colour; everyone else's stay light, Private ones grey.
  * People can be hidden and shown.
  *
  * A meeting in several calendars (the same UID) arrives as one appointment
@@ -17,7 +17,7 @@
  * found free slot, and the contact and project sheets (renderLinked).
  *
  * Everything comes from api/calendar.php, which has already reduced what this
- * person may not see to "Busy" or "Private". Nothing here decides about
+ * person may not see to "Private". Nothing here decides about
  * privacy or who may change what. Times are shown in the calendar's time
  * zone (data-tz), whatever the browser's own is.
  */
@@ -75,7 +75,9 @@
     // Local dates ("2026-11-12") are formatted as noon UTC, which is the same
     // calendar day everywhere.
     const longDayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const shortDayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+    // The day view's heading, as short as the week's, so switching never moves the toolbar.
+    const dayTitleFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const shortDayFmt =new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
     const weekdayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' });
     const dayMonthFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' });
     const dayMonthYearFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
@@ -408,9 +410,8 @@
             }
             els.date.textContent = label;
         } else {
-            els.date.textContent = longDayFmt.format(keyDate(state.date));
+            els.date.textContent = dayTitleFmt.format(keyDate(state.date));
         }
-        els.date.classList.toggle('is-today', state.mode === 'day' && state.date === todayKey());
     }
 
     function renderModes() {
@@ -423,13 +424,21 @@
 
     function renderPeople() {
         const people = state.data ? state.data.people : [];
-        els.people.innerHTML = people.map(p => {
-            const on = !state.hidden.has(p.email);
-            return `<button type="button" class="tcal-chip${on ? ' is-on' : ''}" data-tcal-person="${esc(p.email)}"
-                        aria-pressed="${on ? 'true' : 'false'}" title="${on ? 'Hide' : 'Show'} ${esc(p.name)}">
-                        ${face(p)}<span class="tcal-chip-name">${esc(p.name)}</span>${p.is_me ? '<span class="tcal-chip-me">you</span>' : ''}
-                    </button>`;
-        }).join('');
+        els.people.innerHTML = people.map(p => personToggle(p, !state.hidden.has(p.email), 'data-tcal-person')).join('');
+    }
+
+    /**
+     * A person to switch on or off: a small pill with the profile picture and
+     * a tick or a cross - the name comes on hover. The same in the calendar
+     * and in "Find a free slot".
+     */
+    function personToggle(p, on, attribute) {
+        const name = p.name + (p.is_me ? ' (you)' : '');
+        const mark = on
+            ? '<path d="m5 12.5 4.5 4.5L19 7.5"/>'
+            : '<path d="M7 7l10 10M17 7 7 17"/>';
+        return `<button type="button" class="tcal-pick${on ? ' is-on' : ''}" ${attribute}="${esc(p.email)}"
+                    aria-pressed="${on ? 'true' : 'false'}" aria-label="${esc(name)}" title="${esc(name)}">${face(p)}<svg class="tcal-pick-mark" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${mark}</svg></button>`;
     }
 
     function renderSync() {
@@ -642,7 +651,8 @@
             const slots = slotsOn(day).map(({ seg, index }) => `<button type="button" class="tcal-slot" data-tcal-slot-mark="${index}"
                     style="top:${seg.start * HOUR_PX / 60}px;height:${(seg.end - seg.start) * HOUR_PX / 60}px"${create ? ' title="Book this time"' : ' tabindex="-1"'}>
                     <span>Free ${minutesLabel(seg.start)}–${minutesLabel(seg.end)}</span></button>`).join('');
-            const line = day === today ? `<div class="tcal-now" style="top:${now * HOUR_PX / 60}px"></div>` : '';
+            const line = day === today
+                ? `<div class="tcal-now" style="top:${now * HOUR_PX / 60}px"></div><div class="tcal-now-dot" style="top:${now * HOUR_PX / 60}px"></div>` : '';
             return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${blocks.map(eventHtml).join('')}${line}</div>`;
         }).join('');
 
@@ -671,7 +681,7 @@
         const time = !item.all_day && !bar.cutStart ? `<span class="tcal-bar-time">${esc(fmtTime(item.start))}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" data-tcal-item="${esc(item.id)}"
                     style="grid-column:${bar.from + 2} / ${bar.to + 3};grid-row:${bar.row + 2}" title="${esc(tooltip(item))}">
-                    ${faces(item, 3)}${item.masked && item.label === 'private' ? lockIcon() : ''}${time}<span class="tcal-bar-title"${TITLE_LANG}>${esc(item.title)}</span>
+                    ${faces(item, 3)}${time}<span class="tcal-bar-title"${TITLE_LANG}>${esc(item.title)}</span>
                 </button>`;
     }
 
@@ -683,14 +693,13 @@
         const width = block.span / block.lanes * 100;
         const geometry = `top:${top}px;height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)`;
         const classes = ['tcal-ev'].concat(itemClasses(item));
-        const lock = item.masked && item.label === 'private' ? lockIcon() : '';
         const attrs = `data-tcal-item="${esc(item.id)}" style="${geometry}" title="${esc(tooltip(item))}"`;
 
         // Under three quarters of an hour: one line.
         if (height < 38) {
             classes.push('is-compact');
             return `<button type="button" class="${classes.join(' ')}" ${attrs}>
-                    ${faces(item, 3)}<span class="tcal-ev-title"${TITLE_LANG}>${lock}${esc(item.title)}</span><span class="tcal-ev-time">${esc(fmtTime(item.start))}</span>
+                    ${faces(item, 3)}<span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span><span class="tcal-ev-time">${esc(fmtTime(item.start))}</span>
                 </button>`;
         }
         if (height >= 66) classes.push('is-tall');
@@ -698,7 +707,7 @@
         const place = !item.masked && item.location && height >= 66 && !/^https?:\/\//i.test(item.location)
             ? `<span class="tcal-ev-place">${esc(item.location)}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" ${attrs}>
-                <span class="tcal-ev-title"${TITLE_LANG}>${lock}${esc(item.title)}</span>
+                <span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span>
                 <span class="tcal-ev-meta">${faces(item, 3)}<span class="tcal-ev-time">${esc(fmtTime(item.start))}–${esc(fmtTime(item.end))}</span>${extras}</span>
                 ${place}
             </button>`;
@@ -708,9 +717,6 @@
         return '<span class="tcal-video" title="Video call" aria-label="Video call"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/></svg></span>';
     }
 
-    function lockIcon() {
-        return '<svg class="tcal-lock" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
-    }
 
     /** How many people from outside the team are invited. */
     function guestsBadge(item) {
@@ -886,7 +892,7 @@
         }
     }
 
-    /** Busy / Private from the grid: there is nothing to load or show but the time. */
+    /** Private from the grid: there is nothing to load or show but the time. */
     function openMasked(item) {
         resetSheet('masked');
         sheet.data = item;
@@ -1482,14 +1488,8 @@
     // =========================================================================
 
     const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    function hoursLabel(hours) {
-        const days = (hours.days || []).slice().sort();
-        let dayText = days.map(d => DAY_NAMES[d - 1]).join(', ');
-        const contiguous = days.length > 2 && days.every((d, i) => i === 0 || d === days[i - 1] + 1);
-        if (contiguous) dayText = DAY_NAMES[days[0] - 1] + '–' + DAY_NAMES[days[days.length - 1] - 1];
-        return `${dayText}, ${hours.start}–${hours.end}`;
-    }
+    /** As CalendarSettings::BUFFERS. */
+    const BUFFERS = [0, 10, 15, 30, 45, 60];
 
     function freeRange() {
         const today = todayKey();
@@ -1536,9 +1536,7 @@
                 <div class="tcal-free-controls">
                     <div class="tcal-free-group">
                         <span class="tcal-free-label">Who</span>
-                        <div class="tcal-free-people">${people.map(p => `<label class="tcal-check">
-                            <input type="checkbox" data-tcal-free-person="${esc(p.email)}"${chosen.includes(p.email) ? ' checked' : ''}>
-                            ${face(p)}<span>${esc(p.name)}</span></label>`).join('')}</div>
+                        <div class="tcal-picks" role="group" aria-label="Who">${people.map(p => personToggle(p, chosen.includes(p.email), 'data-tcal-free-person')).join('')}</div>
                     </div>
                     <div class="tcal-free-group">
                         <label class="tcal-free-label" for="tcalFreeMinutes">How long</label>
@@ -1555,9 +1553,18 @@
                     <button type="button" class="btn btn-primary btn-small" data-tcal="free-search"${state.free.busy ? ' disabled' : ''}>Find</button>
                     ${state.slots.length ? '<button type="button" class="btn btn-secondary btn-small" data-tcal="free-clear">Clear</button>' : ''}
                 </div>
-                <p class="tcal-free-hint">Within working hours (${esc(hoursLabel(state.data.working_hours))}). Every calendar counts, private ones too - only the gaps are shown.</p>
+                ${freeHint()}
                 ${results}
             </div>`;
+    }
+
+    /** Working hours and buffer in one line; admins can change them right there. */
+    function freeHint() {
+        const wh = state.data.working_hours;
+        const buffer = wh.buffer ? `${esc(durationLabel(wh.buffer))} buffer before &amp; after appointments` : 'no buffer';
+        const change = state.data.me && state.data.me.is_admin
+            ? ' <button type="button" class="tcal-free-change" data-tcal="change-hours">Change</button>' : '';
+        return `<p class="tcal-free-hint">Working hours: ${esc(wh.start)}–${esc(wh.end)}; ${buffer}.${change}</p>`;
     }
 
     async function searchFree() {
@@ -1608,15 +1615,22 @@
     // Settings
     // =========================================================================
 
-    const VISIBILITY_LABELS = { details: 'Details', busy: 'Busy (time only)', private: 'Private (time only)' };
+    const VISIBILITY_LABELS = { details: 'Details', private: 'Private (time only)' };
 
-    async function openSettings() {
+    /** focus: 'hours' opens it at the working hours and buffer. */
+    async function openSettings(focus) {
         els.scrim.hidden = false;
         els.settings.hidden = false;
         els.settings.innerHTML = '<div class="tcal-drawer-loading">Loading…</div>';
         try {
             state.settings = await api({ action: 'settings' });
             renderSettings();
+            const section = focus === 'hours' && els.settings.querySelector('[data-tcal-set="hours"]');
+            if (section) {
+                section.scrollIntoView({ block: 'start' });
+                const field = section.querySelector('[data-tcal-hours="start"]');
+                if (field) field.focus({ preventScroll: true });
+            }
         } catch (e) {
             els.settings.innerHTML = `<div class="tcal-drawer-loading">${esc(e.message)}</div>`;
         }
@@ -1704,14 +1718,17 @@
                     <p class="tcal-set-hint">The order people are listed in, their colour where there is no profile picture, and which CRM account each calendar owner is. The account brings the profile picture and decides whose appointments count as "yours".</p>
                     ${people || '<p class="tcal-set-muted">Nobody yet.</p>'}
                 </section>
-                <section class="tcal-set-section">
+                <section class="tcal-set-section" data-tcal-set="hours">
                     <h4>Working hours</h4>
-                    <p class="tcal-set-hint">Where "Find a free slot" looks; the grid shades the rest.</p>
+                    <p class="tcal-set-hint">Where "Find a free slot" looks, and how much time it keeps clear before and after appointments. The grid shades the rest.</p>
                     <div class="tcal-set-days">${DAY_NAMES.map((name, i) => `<label class="tcal-set-day">
                         <input type="checkbox" data-tcal-hours-day="${i + 1}"${wh.days.includes(i + 1) ? ' checked' : ''}><span>${name}</span></label>`).join('')}</div>
                     <div class="tcal-set-times">
                         <label class="tcal-set-field"><span>From</span><input type="time" class="form-input" data-tcal-hours="start" value="${esc(wh.start)}" step="900"></label>
                         <label class="tcal-set-field"><span>To</span><input type="time" class="form-input" data-tcal-hours="end" value="${esc(wh.end)}" step="900"></label>
+                        <label class="tcal-set-field"><span>Buffer</span><select class="form-select" data-tcal-hours="buffer">
+                            ${BUFFERS.map(m => `<option value="${m}"${m === wh.buffer ? ' selected' : ''}>${m ? esc(durationLabel(m)) + ' before and after' : 'None'}</option>`).join('')}
+                        </select></label>
                         <button type="button" class="btn btn-secondary btn-small" data-tcal="save-hours">Save hours</button>
                     </div>
                 </section>
@@ -1724,14 +1741,12 @@
 
         els.settings.innerHTML = `<div class="tcal-drawer-head">
                 <h3>Calendar settings</h3>
-                <button type="button" class="tcal-pop-close" data-tcal="close-settings" aria-label="Close">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-                </button>
+                <button type="button" class="modal-close" data-tcal="close-settings" aria-label="Close">&times;</button>
             </div>
             <div class="tcal-drawer-body">
                 <section class="tcal-set-section">
                     <h4>${admin ? 'Calendars' : 'Your calendars'}</h4>
-                    <p class="tcal-set-hint">What everyone else sees of ${admin ? 'each' : 'your'} calendar: everything, or only the time marked Busy or Private. ${admin ? 'Owners' : 'You'} always see their own in full, and appointments marked private in the calendar app stay private either way.</p>
+                    <p class="tcal-set-hint">What everyone else sees of ${admin ? 'each' : 'your'} calendar: everything, or only the time marked Private. ${admin ? 'Owners' : 'You'} always see their own in full, and appointments marked private in the calendar app stay private either way.</p>
                     ${calendars}
                 </section>
                 ${adminSections}
@@ -1767,8 +1782,9 @@
         const days = Array.from(els.settings.querySelectorAll('[data-tcal-hours-day]')).filter(box => box.checked).map(box => Number(box.dataset.tcalHoursDay));
         const start = els.settings.querySelector('[data-tcal-hours="start"]').value;
         const end = els.settings.querySelector('[data-tcal-hours="end"]').value;
+        const buffer = Number(els.settings.querySelector('[data-tcal-hours="buffer"]').value);
         try {
-            await api({ action: 'working_hours' }, { method: 'PATCH', body: JSON.stringify({ days, start, end }) });
+            await api({ action: 'working_hours' }, { method: 'PATCH', body: JSON.stringify({ days, start, end, buffer }) });
             state.settings = await api({ action: 'settings' });
             renderSettings();
             load({ skipSync: true });
@@ -1812,8 +1828,17 @@
     }
 
     root.addEventListener('click', event => {
-        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-col]');
+        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-col]');
         if (!target || !root.contains(target)) return;
+
+        if (target.dataset.tcalFreePerson) {
+            const email = target.dataset.tcalFreePerson;
+            const chosen = new Set(state.free.people || visiblePeople().map(p => p.email));
+            if (chosen.has(email)) chosen.delete(email); else chosen.add(email);
+            state.free.people = Array.from(chosen);
+            renderFree();
+            return;
+        }
 
         if (target.dataset.tcalItem) {
             const item = state.data && state.data.items.find(i => i.id === target.dataset.tcalItem);
@@ -1884,17 +1909,14 @@
                 render();
                 break;
             case 'settings': openSettings(); break;
+            case 'change-hours': openSettings('hours'); break;
             default: break;
         }
     });
 
     root.addEventListener('change', event => {
         const target = event.target;
-        if (target.dataset.tcalFreePerson) {
-            const chosen = new Set(state.free.people || visiblePeople().map(p => p.email));
-            if (target.checked) chosen.add(target.dataset.tcalFreePerson); else chosen.delete(target.dataset.tcalFreePerson);
-            state.free.people = Array.from(chosen);
-        } else if (target.dataset.tcalFree === 'minutes') {
+        if (target.dataset.tcalFree === 'minutes') {
             state.free.minutes = Number(target.value);
         } else if (target.dataset.tcalFree === 'range') {
             state.free.range = target.value;

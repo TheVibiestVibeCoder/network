@@ -63,7 +63,7 @@ Grundprinzip: Der CalDAV-Server ist die einzige Datenquelle. Das CRM ist ein Cal
 
 | Tabelle | Inhalt |
 | --- | --- |
-| calendar\_sources | Eigentümer (CRM-User), URL, Typ Arbeit/Privat, schreibbar, Anzeige (Details/Beschäftigt/Privat), sync-token, CTag, zuletzt synchronisiert |
+| calendar\_sources | Eigentümer (CRM-User), URL, Typ Arbeit/Privat, schreibbar, Anzeige (Details/Privat), sync-token, CTag, zuletzt synchronisiert |
 | events | Quelle, href, ETag, UID, Roh-ICS, Titel, Ort, Beschreibung, Start/Ende UTC, ganztägig, Serie ja/nein, Organisator, Teilnehmer (JSON mit PARTSTAT), Status, CLASS, SEQUENCE |
 | event\_instances | expandierte Vorkommen: Termin, Start/Ende UTC, RECURRENCE-ID |
 | event\_links | UID ↔ Kontakt und/oder Projekt; nur im CRM, nie in CalDAV |
@@ -76,8 +76,8 @@ Grundprinzip: Der CalDAV-Server ist die einzige Datenquelle. Das CRM ist ein Cal
 
 - Zwei neue CRM-Rechte: „Teamkalender sehen“ und „Teamkalender bearbeiten“. Nicht jeder CRM-User bekommt sie.
 - Admin-Einstellungsseite: Zuordnung CRM-User ↔ Mailadresse ↔ Kalenderquellen.
-- Anzeige pro Kalender einstellbar, durch den Eigentümer oder einen Admin: „Details“, „Beschäftigt“ (nur Zeitraum, Titel „Beschäftigt“) oder „Privat“ (nur Zeitraum, Titel „Privat“). Standard: Arbeitskalender „Details“, Privat-Kalender „Privat“. Eigene Termine sieht jede Person immer mit Details.
-- Bei „Beschäftigt“ und „Privat“ sehen andere nur den Zeitraum, keinen Titel, Ort, keine Beschreibung und keine Teilnehmer. Termine mit CLASS:PRIVATE oder CONFIDENTIAL werden unabhängig von der Kalendereinstellung wie „Privat“ behandelt.
+- Anzeige pro Kalender einstellbar, durch den Eigentümer oder einen Admin: „Details“ oder „Privat“ (nur Zeitraum, Titel „Privat“). Standard: Arbeitskalender „Details“, Privat-Kalender „Privat“. Eigene Termine sieht jede Person immer mit Details. (Entscheidung Livio, 12.11.2026: „Beschäftigt“ entfällt. Es zeigte genauso wenig wie „Privat“, nur mit anderer Aufschrift.)
+- Bei „Privat“ sehen andere nur den Zeitraum, keinen Titel, Ort, keine Beschreibung und keine Teilnehmer. Termine mit CLASS:PRIVATE oder CONFIDENTIAL werden unabhängig von der Kalendereinstellung wie „Privat“ behandelt.
 - Diese Filterung passiert serverseitig. Details dürfen weder an den Browser noch über API oder MCP ausgeliefert werden.
 
 ### Teamansicht
@@ -86,7 +86,7 @@ Grundprinzip: Der CalDAV-Server ist die einzige Datenquelle. Das CRM ist ein Cal
 - Tagesansicht: links eine schmale Spalte „Gemeinsam“, daneben eine Spalte pro Person in fester Reihenfolge und eigener Farbe. Personen lassen sich ein- und ausblenden. Die Wochenansicht folgt derselben Logik pro Tag, aber kompakt als Farbblöcke: Titel per Mouseover, ein Klick öffnet den Tag.
 - Gemeinsame Termine (gleiche UID in mehreren Kalendern) erscheinen nur einmal. Nehmen alle Teammitglieder teil: eine Karte über die volle Breite aller Spalten. Nimmt nur ein Teil teil: eine Karte in der Spalte „Gemeinsam“ mit Initialen der Beteiligten, Anzahl Externer und Videolink-Symbol; in den Spalten der Beteiligten ein schraffierter Platzhalter in ihrer Farbe, der auf die Karte verweist (Klick öffnet sie). Nie eine Karte quer über nicht benachbarte Spalten. Zusage-Status pro Person in der Detailansicht.
 - „Freien Termin finden“: Personen, Dauer und Zeitraum wählen, das CRM zeigt gemeinsame Lücken innerhalb der Arbeitszeit (Standard Mo–Fr 08:00–18:00, konfigurierbar). Gefundene Lücken markiert das CRM direkt im Raster. Dieselbe Logik nutzt der MCP.
-- Farben aus dem Corporate Design: #1C3258 Hauptfarbe, #EEEEEE helle Flächen, #30599D Akzent und Hervorhebung, #63a375 positiv (z. B. zugesagt), #D76262 negativ (z. B. abgelehnt). Personenfarben passend dazu ableiten (Vorschlag: #30599D, #2E8A8A, #B07A2A). Gemeinsame Termine in #1C3258 mit weißer Schrift, „Privat“ und „Beschäftigt“ neutral grau.
+- Farben aus dem Corporate Design: #1C3258 Hauptfarbe, #EEEEEE helle Flächen, #30599D Akzent und Hervorhebung, #63a375 positiv (z. B. zugesagt), #D76262 negativ (z. B. abgelehnt). Personenfarben passend dazu ableiten (Vorschlag: #30599D, #2E8A8A, #B07A2A). Gemeinsame Termine in #1C3258 mit weißer Schrift, „Privat“ neutral grau.
 
 ### Termin anlegen und bearbeiten
 
@@ -149,7 +149,7 @@ Lesende Tools liefern direkt Ergebnisse. Schreibende Tools erzeugen nur Vorschl�
 | propose\_event\_cancel | Vorschlag | Absage eines Termins |
 
 - Erst nach der Freigabe im CRM wird in CalDAV geschrieben und werden Einladungen verschickt.
-- Der MCP sieht nur, was der verbundene CRM-User sieht. Termine mit Anzeige „Privat“ oder „Beschäftigt“ erscheinen auch hier nur als Zeitraum mit dieser Aufschrift.
+- Der MCP sieht nur, was der verbundene CRM-User sieht. Termine mit Anzeige „Privat“ erscheinen auch hier nur als Zeitraum mit dieser Aufschrift.
 - Zeiten im Tool-Interface als ISO 8601 mit Zeitzone, Standard Europe/Vienna.
 - Tool-Beschreibungen an den Stil der bestehenden CRM-Tools anpassen.
 
@@ -168,7 +168,7 @@ Lesende Tools liefern direkt Ergebnisse. Schreibende Tools erzeugen nur Vorschl�
 
 - Passwort von kalender@, Google-Client-Secret und OAuth-Tokens nur in der Server-Konfiguration (z. B. `.env`) bzw. verschlüsselt in der Datenbank. Der Schlüssel liegt nicht in der Datenbank. Nichts davon ins Git-Repo, nichts davon in Logs.
 - Logs enthalten nur IDs und Status, keine Titel, Beschreibungen oder Teilnehmer.
-- Filterung für „Privat“ und „Beschäftigt“ serverseitig (siehe Abschnitt 3).
+- Filterung für „Privat“ serverseitig (siehe Abschnitt 3).
 - Cache-Aufbewahrung: Termine, die länger als 12 Monate zurückliegen, aus dem Cache löschen (Wert konfigurierbar, Livio legt ihn final fest). Verknüpfungen mit Kontakten und Projekten bleiben.
 - Vor jedem Versand an Externe eine ausdrückliche Bestätigung; Audit-Log der Einsätze.
 
@@ -196,7 +196,7 @@ Tests am echten Server durchführen, Ergebnisse dokumentieren und Entscheidungen
 
 ### Phase 1: Lesen und Teamansicht
 
-Abnahme: Ein am iPhone angelegter, geänderter oder gelöschter Termin ist nach spätestens 5 Minuten im CRM nachgezogen. Termine mit Anzeige „Privat“ oder „Beschäftigt“ zeigen anderen nur Zeitraum und Aufschrift; Details stehen auch nicht im Seitenquelltext oder in API-Antworten. Serien und Sommerzeitwechsel stimmen. Ohne Recht ist kein Kalender sichtbar.
+Abnahme: Ein am iPhone angelegter, geänderter oder gelöschter Termin ist nach spätestens 5 Minuten im CRM nachgezogen. Termine mit Anzeige „Privat“ zeigen anderen nur Zeitraum und Aufschrift; Details stehen auch nicht im Seitenquelltext oder in API-Antworten. Serien und Sommerzeitwechsel stimmen. Ohne Recht ist kein Kalender sichtbar.
 
 ### Phase 2: Termine anlegen und bearbeiten, gemeinsame Termine, Verknüpfung
 

@@ -24,7 +24,7 @@ Das Blatt hat diese Felder:
 - Ort, Videolink, Erinnerung, Notizen
 - verknüpfte Kontakte und Projekte
 
-„Busy“ und „Private“ öffnen nur mit Zeitraum, wie bisher.
+„Private“ öffnet nur mit Zeitraum, wie bisher.
 
 ### Schreiben
 
@@ -128,9 +128,18 @@ Der Mailserver wertet `If-Match` nicht aus (Phase 0), deshalb prüft das CRM sel
   - Komplexere Regeln bleiben, wie das iPhone sie gesetzt hat. Die Spec sagt: „Komplexe Regeln bleiben dem iPhone überlassen“.
 - **Erinnerung:** Eine im CRM gesetzte Erinnerung ersetzt die Erinnerungen, die das iPhone in diesem Termin hatte. Ohne Änderung im CRM bleiben sie.
 - **Kopien:** Kopien gehen nur in Arbeitskalender, die zum Lesen und Schreiben freigegeben sind. Sonst sagt das Blatt, wer den Termin nicht bekommt.
+- **Nur „Private“:** „Busy“ ist gestrichen (Livio, 12.11.2026), es zeigte genauso wenig wie „Private“. Kalender, die auf „Busy“ standen, stellt die Datenbank beim nächsten Aufruf selbst auf „Private“ um.
 - **Owner-Login:** Wer sich mit dem Owner-Passwort anmeldet, hat keinen eigenen Kalender. Er sieht nichts als „seins“ hervorgehoben und kann nicht zu- oder absagen, kann mit Bearbeiten-Recht aber anlegen.
 - **Konfliktprüfung:** Ohne `If-Match` bleibt ein Bruchteil einer Sekunde zwischen Prüfen und Schreiben, in dem eine gleichzeitige iPhone-Änderung verloren ginge.
 - **Fehlermeldungen:** Sie enthalten keine Kalenderpfade mehr, denn die enthalten Mailadressen. Das gilt jetzt auch für Phase 1. Protokolliert werden nur Kalender-ID, Methode und HTTP-Status.
+
+## Nachträge (12.11.2026, nach Livios Durchsicht)
+
+- **Puffer bei „Find a free slot“:** Die Suche hält vor und nach jedem Termin Zeit frei, standardmäßig 30 Minuten. Einstellbar in den Kalendereinstellungen unter „Working hours“ (keiner, 10, 15, 30, 45 oder 60 Minuten). Er wird mit den Arbeitszeiten gespeichert. Früher gespeicherte Arbeitszeiten bekommen die 30 Minuten.
+- **Personen nur mit Profilbild:** Über dem Kalender und bei „Find a free slot“ werden Personen per Profilbild ein- und ausgeschaltet, der Name steht im Tooltip.
+- **Ohne Schloss:** Private Termine zeigen kein Schloss mehr, nur „Private“.
+- **Volle Fläche:** Das Raster reicht von der Seitenleiste bis zum rechten und unteren Fensterrand.
+- **Vergangene Termine:** Sie sind blass, aber deckend. Die Stundenlinien scheinen nicht mehr durch.
 
 ## Offen
 

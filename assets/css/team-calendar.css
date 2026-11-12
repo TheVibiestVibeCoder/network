@@ -4,7 +4,7 @@
    Built on the design tokens in design.css, so light and dark follow the rest
    of the CRM. A column per day; each appointment shows the profile pictures
    of the people in it. Yours are filled in the accent blue, everyone else's
-   stay light, Busy and Private neutral grey, free time found by "Find a free
+   stay light, Private ones neutral grey, free time found by "Find a free
    slot" in the positive green.
    ========================================================================== */
 
@@ -35,12 +35,54 @@
     --tcal-mine-hover: #3D6BB8;
 }
 
+/* The calendar fills the window down to its bottom edge: the toolbar takes
+   what it needs and the grid gets the rest (never less than MIN), scrolling
+   through the hours inside. Taller than the window, the page scrolls. */
+#calendarView {
+    --tcal-ctl: 34px;
+}
+
+/* The grid runs from the sidebar to the window's right and bottom edges, so
+   the days get every pixel; only the toolbar above keeps the page margin. */
 #calendarView.active {
-    padding-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+}
+
+#calendarView .tcal-toolbar,
+#calendarView .tcal-subbar,
+#calendarView .tcal-free {
+    padding-left: var(--page-pad);
+    padding-right: var(--page-pad);
+}
+
+#calendarView .tcal-body > .tcal-empty,
+#calendarView .tcal-body > .tcal-loading {
+    margin-left: var(--page-pad);
+    margin-right: var(--page-pad);
 }
 
 .tcal {
     position: relative;
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.tcal-toolbar,
+.tcal-subbar,
+.tcal-free {
+    flex: none;
+}
+
+/* The grid sits on top of the body instead of inside its flow, so its 24
+   hours never stretch the page; the body alone decides the height. */
+.tcal-body {
+    position: relative;
+    flex: 1 0 420px;
 }
 
 .tcal.is-loading .tcal-body {
@@ -56,53 +98,96 @@
     justify-content: space-between;
     gap: 12px 16px;
     flex-wrap: wrap;
-    min-height: 54px;
-    padding-top: 12px;
-    margin-bottom: 12px;
+    /* The title sits where every other view has its title. */
+    padding-top: 16px;
+    margin-bottom: 14px;
 }
 
 .tcal-toolbar-left,
 .tcal-toolbar-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
-.tcal-title {
-    margin: 0 6px 0 0;
+/* Wrapped onto a second line, the actions stay on the right. */
+.tcal-toolbar-right {
+    margin-left: auto;
 }
 
+.tcal-title {
+    margin: 0 8px 0 0;
+}
+
+/* Every control in the toolbar is the same height and shape. */
+.tcal-toolbar .btn {
+    height: var(--tcal-ctl);
+    border-radius: var(--r-sm);
+}
+
+.tcal-toolbar .btn-icon {
+    width: var(--tcal-ctl);
+}
+
+/* Back, Today, forward: one control. */
 .tcal-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    display: inline-flex;
+    align-items: stretch;
+    height: var(--tcal-ctl);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+    overflow: hidden;
+}
+
+.tcal-nav-btn {
+    display: inline-grid;
+    place-items: center;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: var(--c-ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.tcal-nav-step {
+    width: 32px;
+    padding: 0;
+    color: var(--c-ink-3);
+}
+
+.tcal-nav-btn + .tcal-nav-btn {
+    border-left: 1px solid var(--c-line);
+}
+
+.tcal-nav-btn:hover {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+.tcal-nav-btn:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
 }
 
 .tcal-date {
-    margin: 0;
+    margin: 0 0 0 4px;
     font-size: var(--t-lg);
     font-weight: 600;
     color: var(--c-ink);
     letter-spacing: -0.01em;
-}
-
-.tcal-date.is-today::after {
-    content: "Today";
-    margin-left: 8px;
-    padding: 2px 8px;
-    border-radius: var(--r-full);
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    vertical-align: 2px;
+    white-space: nowrap;
 }
 
 .tcal-mode {
     display: inline-flex;
+    height: var(--tcal-ctl);
     padding: 3px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     background: var(--c-tint-2);
 }
 
@@ -113,8 +198,8 @@
     font: inherit;
     font-size: var(--t-sm);
     font-weight: 500;
-    padding: 6px 14px;
-    border-radius: var(--r-sm);
+    padding: 0 14px;
+    border-radius: 6px;
     cursor: pointer;
 }
 
@@ -193,48 +278,67 @@
     margin-bottom: 14px;
 }
 
-.tcal-people {
+.tcal-people,
+.tcal-picks {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
 }
 
-.tcal-chip {
+/* A person to switch on or off: a pill with the profile picture and a tick
+   (shown) or a cross (hidden). The mark is the only signal; the picture
+   stays as it is. The name shows on hover. */
+.tcal-pick {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 3px 12px 3px 3px;
-    border-radius: var(--r-full);
+    gap: 5px;
+    height: 30px;
+    padding: 0 8px 0 3px;
     border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
     background: var(--c-surface);
     color: var(--c-ink-4);
     font: inherit;
-    font-size: var(--t-sm);
     cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
 
-.tcal-chip .tcal-face {
+.tcal-pick .tcal-face {
     --face: 22px;
     box-shadow: none;
 }
 
-.tcal-chip:not(.is-on) .tcal-face {
-    filter: grayscale(1);
-    opacity: 0.45;
+/* On: tinted in the accent blue with a tick. Off: the whole pill pales,
+   picture included, with a cross - told apart at a glance. */
+.tcal-pick.is-on {
+    border-color: color-mix(in srgb, var(--c-accent) 35%, var(--c-line));
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
 }
 
-.tcal-chip.is-on {
-    color: var(--c-ink);
+.tcal-pick:not(.is-on) {
+    opacity: 0.5;
+}
+
+.tcal-pick:not(.is-on) .tcal-face {
+    filter: grayscale(1);
+}
+
+.tcal-pick:hover {
     border-color: var(--c-line-strong);
 }
 
-.tcal-chip:hover {
-    background: var(--c-tint-3);
+.tcal-pick:not(.is-on):hover {
+    opacity: 0.8;
 }
 
-.tcal-chip-me {
-    font-size: var(--t-xs);
-    color: var(--c-ink-4);
+.tcal-pick:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+.tcal-pick-mark {
+    flex: none;
 }
 
 .tcal-sync {
@@ -312,33 +416,29 @@
     color: var(--c-ink-2);
 }
 
-.tcal-free-people {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 14px;
-}
-
-.tcal-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--t-sm);
-    color: var(--c-ink-2);
-    cursor: pointer;
-}
-
-.tcal-check input {
-    accent-color: var(--c-accent);
-}
-
-.tcal-check .tcal-face {
-    --face: 20px;
-    box-shadow: none;
-}
-
 .tcal-free-group .form-select {
     width: auto;
     min-width: 120px;
+    height: var(--tcal-ctl);
+    border-radius: var(--r-sm);
+}
+
+.tcal-free .btn-small {
+    height: var(--tcal-ctl);
+}
+
+.tcal-free-change {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tcal-free-change:hover {
+    text-decoration: underline;
 }
 
 .tcal-free-hint {
@@ -433,15 +533,15 @@
 /* ---- The grid ----------------------------------------------------------- */
 
 .tcal-cal {
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    position: absolute;
+    inset: 0;
+    border-top: 1px solid var(--c-line);
     background: var(--c-surface);
     overflow: hidden;
 }
 
 .tcal-scroll {
-    max-height: calc(100vh - 250px);
-    min-height: 440px;
+    height: 100%;
     overflow: auto;
     overscroll-behavior: contain;
 }
@@ -649,25 +749,29 @@ button.tcal-dayhead:hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* The time now: a line behind the appointments, so it never reads as a
+   crossed-out time, and a dot in front of them at the column's edge. */
 .tcal-now {
     position: absolute;
-    left: 0;
-    right: 0;
-    z-index: 3;
+    left: 2px;
+    right: 2px;
+    z-index: 0;
     height: 0;
     border-top: 2px solid var(--c-danger);
     pointer-events: none;
 }
 
-.tcal-now::before {
-    content: "";
+.tcal-now-dot {
     position: absolute;
     left: -5px;
-    top: -6px;
+    z-index: 3;
     width: 10px;
     height: 10px;
+    margin-top: -4px;
     border-radius: 50%;
     background: var(--c-danger);
+    box-shadow: 0 0 0 2px var(--c-surface);
+    pointer-events: none;
 }
 
 /* ---- Appointments and bars ---------------------------------------------- */
@@ -713,7 +817,7 @@ button.tcal-dayhead:hover {
     --ev-ink-2: var(--tcal-mine-ink-2);
 }
 
-/* Busy and Private: neutral grey with a faint hatch, nothing to read but
+/* Private: neutral grey with a faint hatch, nothing to read but
    the time - set apart from the light cards that do have something. */
 .tcal-ev.is-masked,
 .tcal-bar.is-masked {
@@ -740,9 +844,20 @@ button.tcal-dayhead:hover {
     --ev-ink-2: var(--c-accent);
 }
 
+/* Past: washed out, but solid - the hour lines never show through. */
 .tcal-ev.is-past,
 .tcal-bar.is-past {
-    opacity: 0.6;
+    border-color: color-mix(in srgb, var(--ev-line) 55%, var(--c-surface));
+}
+
+.tcal-ev.is-past::after,
+.tcal-bar.is-past::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--c-surface);
+    opacity: 0.45;
+    pointer-events: none;
 }
 
 .tcal-ev .tcal-face,
@@ -868,12 +983,6 @@ button.tcal-dayhead:hover {
     color: var(--ev-ink-2, var(--c-ink-3));
 }
 
-.tcal-lock {
-    flex: none;
-    margin-right: 3px;
-    vertical-align: -1px;
-}
-
 .tcal-bar {
     position: relative;
     z-index: 1;
@@ -887,12 +996,6 @@ button.tcal-dayhead:hover {
     font-weight: 600;
     white-space: nowrap;
     container-type: inline-size;
-}
-
-@container (max-width: 104px) {
-    .tcal-bar .tcal-lock {
-        display: none;
-    }
 }
 
 .tcal-bar.is-cut-start {
@@ -1740,25 +1843,60 @@ button.tcal-dayhead:hover {
 /* ---- Narrow screens ----------------------------------------------------- */
 
 @media (max-width: 768px) {
-    .tcal-toolbar-right {
-        width: 100%;
-        justify-content: space-between;
+    #calendarView {
+        --tcal-ctl: 38px;
     }
 
-    /* People in one row that scrolls, so the grid keeps the room. */
+    /* Three tidy rows: title and paging, the date and Day/Week, then the
+       actions. */
+    .tcal-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 10px 8px;
+    }
+
+    .tcal-toolbar-left,
+    .tcal-toolbar-right {
+        display: contents;
+    }
+
+    .tcal-title { grid-area: 1 / 1; }
+    .tcal-nav { grid-area: 1 / 2 / 2 / 4; justify-self: end; }
+    .tcal-date { grid-area: 2 / 1; margin-left: 0; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; }
+    .tcal-mode { grid-area: 2 / 2 / 3 / 4; justify-self: end; }
+    .tcal-free-btn { grid-area: 3 / 1; justify-self: start; }
+    .tcal-new-btn { grid-area: 3 / 2; }
+    .tcal-settings-btn { grid-area: 3 / 3; }
+
+    .tcal-new-more {
+        display: none;
+    }
+
+    /* People in one row that scrolls, the sync button at its end. */
+    .tcal-subbar {
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
     .tcal-people {
+        flex: 1 1 auto;
+        min-width: 0;
         flex-wrap: nowrap;
         overflow-x: auto;
-        max-width: 100%;
         scrollbar-width: none;
     }
 
-    .tcal-chip {
+    .tcal-pick {
         flex: none;
     }
 
-    .tcal-scroll {
-        max-height: calc(100vh - 300px);
+    .tcal-sync {
+        flex: none;
+    }
+
+    .tcal-sync-text {
+        display: none;
     }
 
     .tcal-set-person {

@@ -39,7 +39,6 @@
      - Status colours sit on their own soft tint, never on mist.
    ========================================================================== */
 
-
 /* --------------------------------------------------------------------------
    1. Type
    -------------------------------------------------------------------------- */
@@ -75,7 +74,6 @@
     font-style: normal;
     font-display: swap;
 }
-
 
 /* --------------------------------------------------------------------------
    2. Tokens
@@ -329,7 +327,6 @@
     --transition-slow: var(--dur-3) var(--ease);
 }
 
-
 /* --------------------------------------------------------------------------
    3. Base
    -------------------------------------------------------------------------- */
@@ -397,7 +394,6 @@ h1, h2, h3, h4 {
 [hidden] {
     display: none !important;
 }
-
 
 /* --------------------------------------------------------------------------
    4. App shell
@@ -850,7 +846,6 @@ h1, h2, h3, h4 {
     display: none;
 }
 
-
 /* --------------------------------------------------------------------------
    5. Views
    -------------------------------------------------------------------------- */
@@ -1049,7 +1044,6 @@ h1, h2, h3, h4 {
     text-transform: none;
     letter-spacing: 0;
 }
-
 
 /* --------------------------------------------------------------------------
    6. Primitives
@@ -1334,7 +1328,6 @@ input[type="checkbox"] {
 .project-stage-badge.stage-negotiation { --stage-tone: var(--stage-negotiation); }
 .project-stage-badge.stage-complete { --stage-tone: var(--stage-complete); }
 
-
 /* --------------------------------------------------------------------------
    7. Motion
    -------------------------------------------------------------------------- */
@@ -1349,7 +1342,6 @@ input[type="checkbox"] {
         scroll-behavior: auto !important;
     }
 }
-
 
 /* --------------------------------------------------------------------------
    8. Entrances - gentle
@@ -1373,12 +1365,6 @@ input[type="checkbox"] {
     from { opacity: 0; transform: translateY(4px); filter: none; }
     to { opacity: 1; transform: none; filter: none; }
 }
-
-@keyframes calendarDeckIn {
-    from { opacity: 0; transform: translateY(4px); filter: none; }
-    to { opacity: 1; transform: none; filter: none; }
-}
-
 
 /* --------------------------------------------------------------------------
    9. Grouped lists - one pattern for contacts, to-dos and home
@@ -1646,7 +1632,6 @@ input[type="checkbox"] {
     width: 100%;
     height: 100%;
 }
-
 
 /* --------------------------------------------------------------------------
    10. Projects
@@ -2952,7 +2937,6 @@ input[type="checkbox"] {
     mask: radial-gradient(closest-side, transparent 58%, #000 62%);
 }
 
-
 /* ---- List view: one row per project ------------------------------------- */
 /* The same facts as a card, side by side, in one white surface per stage.
    Chosen with the cards / list switch in the toolbar (kept per account). */
@@ -3122,7 +3106,6 @@ input[type="checkbox"] {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    11. To-dos
    -------------------------------------------------------------------------- */
@@ -3260,7 +3243,6 @@ input[type="checkbox"] {
     color: var(--c-danger-ink);
     font-weight: 500;
 }
-
 
 /* --------------------------------------------------------------------------
    12. Home - My Work
@@ -3477,7 +3459,6 @@ input[type="checkbox"] {
     padding: 4px 2px;
 }
 
-
 /* --------------------------------------------------------------------------
    13. Shared bits used by several views
    -------------------------------------------------------------------------- */
@@ -3506,7 +3487,6 @@ input[type="checkbox"] {
     color: var(--c-ink-4);
     margin-bottom: 8px;
 }
-
 
 /* --------------------------------------------------------------------------
    14. Refinements after the first review
@@ -3700,7 +3680,6 @@ input[type="checkbox"] {
     min-width: 150px;
     font-size: var(--t-sm);
 }
-
 
 /* --------------------------------------------------------------------------
    15. Screen sizes
@@ -4213,7 +4192,6 @@ input[type="checkbox"] {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    16. Toolbar - matching the weight of style.css's view-scoped rules
    --------------------------------------------------------------------------
@@ -4265,7 +4243,6 @@ input[type="checkbox"] {
         margin-bottom: 12px;
     }
 }
-
 
 /* --------------------------------------------------------------------------
    17. The map
@@ -4364,7 +4341,6 @@ input[type="checkbox"] {
     font-weight: 600;
     box-shadow: 0 0 0 3px var(--c-surface);
 }
-
 
 /* --------------------------------------------------------------------------
    18. Dialogs and sheets
@@ -4910,7 +4886,6 @@ a.detail-value:hover,
     font-weight: 400;
 }
 
-
 /* --------------------------------------------------------------------------
    20. Forms inside dialogs
    -------------------------------------------------------------------------- */
@@ -4953,7 +4928,6 @@ a.detail-value:hover,
 .required-mark {
     color: var(--c-danger-ink);
 }
-
 
 /* --------------------------------------------------------------------------
    21. Phones: everything is a bottom sheet
@@ -5075,26 +5049,11 @@ textarea.form-input:focus {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    22. Log (formerly the Calendar tab; admins only)
    --------------------------------------------------------------------------
-   The month is one card with hairline gridlines, not forty-two boxes.
+   Everything that changed, as a list by day, newest first.
    -------------------------------------------------------------------------- */
-
-/* Month view: an entry is its dot and its name. The coloured bar down its
-   left edge said the same thing a second time. */
-#logView .cal-month-note-dot {
-    border-left: 0;
-    padding-left: 2px;
-}
-
-.cal-kind-dot { background: var(--c-ink-4); }
-.cal-month-note-dot--project-note .cal-kind-dot { background: var(--c-warning); }
-.cal-month-note-dot--todo .cal-kind-dot { background: var(--c-success); }
-.cal-month-note-dot--contact-activity .cal-kind-dot { background: var(--c-primary); }
-.cal-month-note-dot--project-activity .cal-kind-dot { background: var(--c-ink-3); }
-
 
 #logView .calendar-toolbar {
     padding: 12px 0 14px;
@@ -5111,8 +5070,7 @@ textarea.form-input:focus {
     margin: 0 14px 0 0;
 }
 
-/* Narrow screens stack the toolbar: the title on top, then the way through
-   the months, then Month / Week / Day. */
+/* Narrow screens: a smaller title. */
 @media (max-width: 768px) {
     #logView .calendar-toolbar-left {
         order: 1;
@@ -5120,54 +5078,11 @@ textarea.form-input:focus {
         justify-content: flex-start;
     }
 
-    #logView .calendar-toolbar-right {
-        order: 2;
-    }
-
     #logView .calendar-page-title {
         flex-basis: 100%;
         margin: 0 0 8px;
         font-size: 22px;
     }
-}
-
-#logView .calendar-title {
-    font-size: var(--t-lg);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--c-ink);
-}
-
-/* Month / Week / Day uses the shared segmented control. */
-#logView .calendar-mode-toggle {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    background: var(--c-tint-2);
-    border: 0;
-    border-radius: var(--r-md);
-}
-
-#logView .cal-mode-btn {
-    height: 32px;
-    padding: 0 14px;
-    border: 0;
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: var(--c-ink-2);
-    font: 500 var(--t-sm)/1 var(--font);
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-
-#logView .cal-mode-btn:hover {
-    color: var(--c-ink);
-}
-
-#logView .cal-mode-btn.active {
-    background: var(--c-surface);
-    color: var(--c-ink);
-    box-shadow: var(--e-1);
 }
 
 #logView .calendar-filters {
@@ -5194,89 +5109,109 @@ textarea.form-input:focus {
     padding: 0;
 }
 
-#logView .cal-month-header {
-    margin-bottom: 8px;
+/* A day: its name, how many entries, then the entries. The heading stays
+   on top while its day scrolls past. */
+#logView .log-day {
+    max-width: 900px;
 }
 
-#logView .cal-month-header-cell {
-    font-size: var(--t-xs);
+#logView .log-day + .log-day {
+    margin-top: 22px;
+}
+
+#logView .log-day-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 8px;
+    padding: 6px 0;
+    background: var(--c-bg);
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+#logView .log-day-date {
+    font-size: var(--t-sm);
     font-weight: 500;
     color: var(--c-ink-3);
-    text-transform: none;
-    letter-spacing: 0;
 }
 
-#logView .cal-month-body {
-    gap: 0;
+#logView .log-day-count {
+    margin-left: auto;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-4);
+    font-variant-numeric: tabular-nums;
+}
+
+/* One card per day, its entries as rows divided by hairlines. */
+#logView .log-day-list {
+    display: flex;
+    flex-direction: column;
     background: var(--c-surface);
-    border: 1px solid transparent;
+    border: 1px solid var(--c-line);
     border-radius: var(--r-lg);
-    box-shadow: var(--e-1);
     overflow: hidden;
 }
 
-#logView .calendar-body .cal-month-cell {
-    margin: 0;
+#logView .log-more {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 900px;
+    margin: 24px 0 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-line);
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+#logView .log-more .btn {
+    margin-left: auto;
+}
+
+/* Entries in the day list: compact rows. */
+#logView .cal-day-note {
+    gap: 14px;
+    padding: 10px 16px;
     background: transparent;
     border: 0;
-    border-right: 1px solid var(--c-line-2);
-    border-bottom: 1px solid var(--c-line-2);
     border-radius: 0;
     box-shadow: none;
 }
 
-#logView .calendar-body .cal-month-cell:nth-child(7n) {
-    border-right: 0;
+#logView .cal-day-note + .cal-day-note {
+    border-top: 1px solid var(--c-line-2);
 }
 
-#logView .calendar-body .cal-month-cell:nth-last-child(-n + 7) {
-    border-bottom: 0;
-}
-
-#logView .calendar-body .cal-month-cell:hover {
+#logView .cal-day-note:hover {
     background: var(--c-tint-3);
 }
 
-/* Days outside the month recede. */
-#logView .calendar-body .cal-month-cell.cal-other-month {
-    background: var(--c-bg);
-}
-
-#logView .cal-month-day-num {
-    font-size: var(--t-sm);
-    font-weight: 500;
-    color: var(--c-ink-2);
-}
-
-/* Today: a navy disc on the date, and a soft accent wash on the cell. */
-#logView .calendar-body .cal-month-cell.cal-today {
-    background: var(--c-accent-softer);
-    box-shadow: none;
-    outline: 0;
-}
-
-/* Week view uses the same quiet surfaces. */
-#logView .calendar-body .cal-week-day {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e-1);
-}
-
-#logView .cal-week-day-name {
+#logView .cal-day-note-time {
+    min-width: 40px;
+    padding-top: 1px;
     font-size: var(--t-xs);
-    font-weight: 500;
-    color: var(--c-ink-3);
-    text-transform: none;
-    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
 }
 
-/* Entries in the day list. */
-#logView .cal-day-note {
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
-    box-shadow: none;
+#logView .cal-day-note-meta {
+    margin-bottom: 2px;
+}
+
+/* The filter button only folds the filters away on a phone. */
+#logView .calendar-filter-toggle-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #logView .calendar-filter-toggle-btn {
+        display: inline-flex;
+    }
 }
 
 #logView .cal-day-note-type {
@@ -5284,7 +5219,6 @@ textarea.form-input:focus {
     text-transform: none;
     letter-spacing: 0;
 }
-
 
 /* --------------------------------------------------------------------------
    23. Bookkeeping
@@ -5354,7 +5288,6 @@ textarea.form-input:focus {
     border-color: var(--c-primary-2);
 }
 
-
 /* --------------------------------------------------------------------------
    24. Users panel
    -------------------------------------------------------------------------- */
@@ -5413,7 +5346,6 @@ textarea.form-input:focus {
 .users-invite-fields .form-select {
     height: var(--control-h);
 }
-
 
 /* --------------------------------------------------------------------------
    25. Profile menu
@@ -5673,7 +5605,6 @@ textarea.form-input:focus {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    26. Toasts and alerts
    -------------------------------------------------------------------------- */
@@ -5721,7 +5652,6 @@ textarea.form-input:focus {
     border: 1px solid transparent;
     color: var(--c-success-ink);
 }
-
 
 /* --------------------------------------------------------------------------
    27. Sign in
@@ -5860,12 +5790,6 @@ textarea.form-input:focus {
 
 /* Today's date: light numerals on the navy disc. The day-number colour above
    outranks the old today rule, which left the date navy on navy. */
-#logView .cal-month-cell.cal-today .cal-month-day-num {
-    background: var(--c-primary);
-    color: var(--c-on-primary);
-    font-weight: 600;
-}
-
 
 /* --------------------------------------------------------------------------
    28. Tags
@@ -5990,7 +5914,6 @@ textarea.form-input:focus {
         min-width: 0;
     }
 }
-
 
 /* --------------------------------------------------------------------------
    29. Upload forms
@@ -6243,7 +6166,6 @@ details.import-instructions p {
     width: auto;
     justify-content: flex-end;
 }
-
 
 /* --------------------------------------------------------------------------
    30. Project documents
@@ -6661,7 +6583,6 @@ details.import-instructions p {
     width: 10px;
     height: 10px;
 }
-
 
 /* --------------------------------------------------------------------------
    31. The project sheet, compact
@@ -7391,7 +7312,6 @@ details.import-instructions p {
     min-width: 0;
 }
 
-
 /* ---- Expected payments (project-payments.js) ----
    Reading: a short summary under the budget ("3 expected payments", what is
    still open) and the full-width list. Editing: one row per payment - month,
@@ -7924,7 +7844,6 @@ details.import-instructions p {
     }
 }
 
-
 /* ---- "Payments received?" after a bookkeeping import ----
    The imported income on top as reference, then every open expected
    payment to tick: the ones with the same amount as an income first. */
@@ -8137,7 +8056,6 @@ details.import-instructions p {
         flex-basis: 100%;
     }
 }
-
 
 /* --------------------------------------------------------------------------
    32. To-do links and the to-do sheet
@@ -8432,7 +8350,6 @@ details.import-instructions p {
     text-decoration: none;
 }
 
-
 /* --------------------------------------------------------------------------
    33. Home: new for you
    --------------------------------------------------------------------------
@@ -8454,7 +8371,6 @@ details.import-instructions p {
     font-weight: 600;
     vertical-align: 1px;
 }
-
 
 /* --------------------------------------------------------------------------
    34. Home: the layout
@@ -8613,7 +8529,6 @@ details.import-instructions p {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    37. Faces: one look everywhere
    --------------------------------------------------------------------------
@@ -8677,7 +8592,6 @@ details.import-instructions p {
     border-color: transparent;
     box-shadow: none;
 }
-
 
 /* --------------------------------------------------------------------------
    38. Home: the calm version
@@ -8766,7 +8680,6 @@ details.import-instructions p {
     }
 }
 
-
 /* On someone else's page the line above the name is a summary, not a date:
    normal case, so it reads as a sentence. */
 #workloadView .workload-head:not(.is-me) .workload-subtitle {
@@ -8775,7 +8688,6 @@ details.import-instructions p {
     letter-spacing: 0;
     text-transform: none;
 }
-
 
 /* --------------------------------------------------------------------------
    41. Sidebar labels: room for descenders
@@ -8794,7 +8706,6 @@ details.import-instructions p {
 .sidebar .header-btn-label {
     line-height: 1.35;
 }
-
 
 /* --------------------------------------------------------------------------
    42. Home: the dashboard
@@ -9355,7 +9266,6 @@ details.import-instructions p {
     color: var(--c-ink-3);
 }
 
-
 /* ---- Lists ---- */
 
 .home-list-wrap {
@@ -9630,7 +9540,6 @@ details.import-instructions p {
     border-top: 1px solid var(--c-line-2);
 }
 
-
 /* ---- Bookkeeping and contacts: small cards ---- */
 
 #workloadView .home-mini.is-bookkeeping { --wl-type: var(--type-bookkeeping); }
@@ -9858,7 +9767,6 @@ details.import-instructions p {
     }
 }
 
-
 /* --------------------------------------------------------------------------
    43. Financials
    --------------------------------------------------------------------------
@@ -10029,7 +9937,6 @@ details.import-instructions p {
     font-weight: 600;
 }
 
-
 .fin-balance-note {
     margin: 0 0 4px;
     font-size: var(--t-xs);
@@ -10047,7 +9954,6 @@ details.import-instructions p {
 .fin-kpi-value.is-pos { color: var(--c-success-ink); }
 .fin-kpi-value.is-neg { color: var(--c-danger-ink); }
 .fin-kpi-sub strong.is-pos { color: var(--c-success-ink); }
-
 
 .fin-balance-link {
     font-weight: 600;
@@ -10438,7 +10344,6 @@ details.import-instructions p {
 }
 
 .fin-dot-mark.is-neg { stroke: var(--c-danger); }
-
 
 .fin-today {
     stroke: var(--c-ink-4);
@@ -11446,8 +11351,6 @@ details.import-instructions p {
 .fin-kpi-toggle:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
 .fin-kpi-toggle svg { transform: rotate(90deg); transition: transform var(--d-fast, 150ms) ease; }
 .fin-kpi.is-open .fin-kpi-toggle svg { transform: rotate(-90deg); }
-
-
 
 /* ---- Financials: an unfolded month ----
    No card inside the card: two columns straight on the table's ground -

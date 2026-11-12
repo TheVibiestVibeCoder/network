@@ -20,7 +20,7 @@ Phase 1 liest nur. Nichts im CRM schreibt bisher in die Kalender auf dem Mailser
   - Gespeichert wird in UTC, ganztägige Termine als reines Datum, Zeiten ohne Zone gelten als Europe/Vienna.
   - Zeitfenster: 12 Monate zurück und 12 Monate voraus. Was länger als 12 Monate vorbei ist, verliert im Cache seinen Inhalt.
 - **Datenschutz** (`includes/CalendarView.php`), serverseitig vor jeder Ausgabe:
-  - Bei „Busy“ und „Private“ geht nur der Zeitraum raus, ohne Titel, Ort, Beschreibung, Link oder Teilnehmer.
+  - Bei „Private“ geht nur der Zeitraum raus, ohne Titel, Ort, Beschreibung, Link oder Teilnehmer. (Bis 12.11.2026 gab es daneben „Busy“, das genauso wenig zeigte. Livio hat es gestrichen.)
   - `CLASS:PRIVATE`/`CONFIDENTIAL` gilt immer als privat.
   - Eigene Kalender sieht man vollständig.
   - Verdeckte Kopien werden nie über die UID zusammengeführt, das würde zeigen, wer mit wem einen Termin hat.
@@ -30,7 +30,7 @@ Phase 1 liest nur. Nichts im CRM schreibt bisher in die Kalender auf dem Mailser
 - **Teamansicht** (`assets/js/team-calendar.js`, `assets/css/team-calendar.css`), seit 12.11.2026 mit einer Spalte pro Tag (siehe Abweichungen):
   - Die Woche ist die Hauptansicht, der einzelne Tag die Detailansicht. Am Handy startet der Kalender mit dem Tag. Ein Klick auf einen Wochentag öffnet ihn.
   - Jeder Termin zeigt die CRM-Profilbilder der beteiligten Teammitglieder. Wer kein Profilbild hat, erscheint mit Initialen in seiner Farbe.
-  - Termine, an denen die angemeldete Person teilnimmt, sind in Akzentblau #30599D gefüllt, egal ob allein oder mit anderen. Die übrigen sind hell, „Busy“ und „Private“ grau schraffiert.
+  - Termine, an denen die angemeldete Person teilnimmt, sind in Akzentblau #30599D gefüllt, egal ob allein oder mit anderen. Die übrigen sind hell, „Private“ grau schraffiert.
   - Gemeinsame Termine (gleiche UID in mehreren Kalendern) erscheinen einmal, mit allen Gesichtern, Zahl der externen Gäste und Video-Symbol.
   - Ganztägige und mehrtägige Termine laufen als Balken über die Tage.
   - Überschneidungen stehen nebeneinander. Ist eine Karte zu schmal, entfällt die Uhrzeit vor dem Titel.
@@ -112,7 +112,7 @@ Phase 1 liest nur. Nichts im CRM schreibt bisher in die Kalender auf dem Mailser
 | Kriterium | Stand |
 |---|---|
 | Am iPhone angelegt, geändert oder gelöscht: nach spätestens 5 Minuten im CRM | Am 12.11. von Livio lokal bestätigt: zwei Termine (privat und öffentlich) angelegt und verschoben, beides kam im CRM an. Löschen ist automatisiert getestet, am iPhone noch kurz prüfen. Auf dem Server sorgt der Cron für die 5 Minuten |
-| „Private“ und „Busy“ nur Zeitraum und Aufschrift, auch nicht im Quelltext oder in API-Antworten | Getestet (Unit- und Browsertest) |
+| „Private“ nur Zeitraum und Aufschrift, auch nicht im Quelltext oder in API-Antworten | Getestet (Unit- und Browsertest) |
 | Serien und Sommerzeitwechsel stimmen | Getestet |
 | Ohne Recht kein Kalender sichtbar | Getestet |
 
@@ -129,8 +129,8 @@ Phase 1 liest nur. Nichts im CRM schreibt bisher in die Kalender auf dem Mailser
   - eigene Termine in Akzentblau #30599D, die der anderen hell
 
   Die Wochenansicht ist damit die Hauptansicht.
-- **Englische Beschriftung:** „Busy“, „Private“ usw. wie im Rest des CRM. Die Spec nennt die deutschen Begriffe, auf Wunsch lässt sich das schnell umstellen.
-- **Verdeckte Kopie bei sichtbarem Termin:** Sieht man einen gemeinsamen Termin über eine Kopie vollständig, erscheint die verdeckte Kopie derselben Person nicht zusätzlich als „Busy“.
+- **Englische Beschriftung:** „Private“ usw. wie im Rest des CRM. Die Spec nennt die deutschen Begriffe, auf Wunsch lässt sich das schnell umstellen.
+- **Verdeckte Kopie bei sichtbarem Termin:** Sieht man einen gemeinsamen Termin über eine Kopie vollständig, erscheint die verdeckte Kopie derselben Person nicht zusätzlich als „Private“.
 - **Owner-Login:** Wer sich mit dem Owner-Passwort (APP_PASSWORD) anmeldet, gehört zu keinem Kalender und hat deshalb keine „eigenen“ Termine. Hervorgehoben wird für CRM-Konten, die in den Einstellungen unter „People“ einer Person zugeordnet sind.
 - **Monatsansicht:** nicht gebaut, laut Spec optional.
 - **Nebenbefund:** Das bestehende `phpoffice/phpspreadsheet` 1.30.6 hat drei Sicherheitshinweise (`composer audit`). Ein Update ist ein eigenes Thema, weil es Import und Export betrifft.

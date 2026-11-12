@@ -338,7 +338,7 @@ $forAnna = CalendarLinks::appointments('contact', $annaId, $livio);
 check('the contact lists its appointments', count($forAnna['upcoming']) === 2, array_column($forAnna['upcoming'], 'title'));
 CalendarLinks::add('zahnarzt', 'contact', $annaId, null);
 $forAnnaLivio = CalendarLinks::appointments('contact', $annaId, $livio);
-check('an appointment hidden from the viewer is not listed for them', !in_array('Busy', array_column($forAnnaLivio['upcoming'], 'title'), true)
+check('an appointment hidden from the viewer is not listed for them', !in_array('Private', array_column($forAnnaLivio['upcoming'], 'title'), true)
     && !in_array('Zahnarzt', array_column($forAnnaLivio['upcoming'], 'title'), true));
 check('the link picker finds contacts and projects', count(CalendarLinks::targets('alpen')) === 2, CalendarLinks::targets('alpen'));
 

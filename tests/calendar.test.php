@@ -138,7 +138,7 @@ foreach (['livio', 'markus', 'vivian'] as $key) {
 }
 
 $server->put($work['vivian'], 'arzt.ics', ics(vevent([
-    'UID:busy-1', 'DTSTART;TZID=Europe/Vienna:20261216T090000', 'DTEND;TZID=Europe/Vienna:20261216T100000',
+    'UID:hidden-1', 'DTSTART;TZID=Europe/Vienna:20261216T090000', 'DTEND;TZID=Europe/Vienna:20261216T100000',
     'SUMMARY:Arzttermin', 'LOCATION:Ordination Dr. X',
 ])));
 $server->put($work['vivian'], 'frei.ics', ics(vevent([
@@ -298,7 +298,7 @@ fclose($lock);
 // =============================================================================
 
 section('What each person may see');
-CalendarSettings::updateSource(sourceId($work['vivian']), ['visibility' => 'busy'], viewer(LIVIO, true));
+CalendarSettings::updateSource(sourceId($work['vivian']), ['visibility' => 'private'], viewer(LIVIO, true));
 
 $forLivio = CalendarView::range('2026-12-16', '2026-12-17', viewer(LIVIO));
 $json = json_encode($forLivio, JSON_UNESCAPED_UNICODE);
@@ -306,9 +306,9 @@ $json = json_encode($forLivio, JSON_UNESCAPED_UNICODE);
 $arzt = item($forLivio, static function (array $i): bool {
     return $i['owners'] === [VIVIAN] && $i['masked'];
 });
-check('"busy" calendar: others see the time, titled Busy', $arzt !== null && $arzt['title'] === 'Busy' && $arzt['label'] === 'busy' && $arzt['start'] === '2026-12-16T08:00:00Z', $arzt);
-check('"busy" calendar: no place, description or people', $arzt !== null && $arzt['location'] === null && $arzt['description'] === null && $arzt['attendees'] === [] && $arzt['organizer'] === null);
-check('nothing of the hidden appointment is in the response', strpos($json, 'Arzttermin') === false && strpos($json, 'Ordination') === false && strpos($json, 'busy-1') === false);
+check('"private" calendar: others see the time, titled Private', $arzt !== null && $arzt['title'] === 'Private' && $arzt['start'] === '2026-12-16T08:00:00Z', $arzt);
+check('"private" calendar: no place, description or people', $arzt !== null && $arzt['location'] === null && $arzt['description'] === null && $arzt['attendees'] === [] && $arzt['organizer'] === null);
+check('nothing of the hidden appointment is in the response', strpos($json, 'Arzttermin') === false && strpos($json, 'Ordination') === false && strpos($json, 'hidden-1') === false);
 check('a free entry in a hidden calendar is not shown at all', strpos($json, 'Nur ein Hinweis') === false && count(array_filter($forLivio, static function (array $i): bool {
     return $i['owners'] === [VIVIAN] && $i['start'] === '2026-12-16T11:00:00Z';
 })) === 0);
@@ -316,7 +316,10 @@ check('a free entry in a hidden calendar is not shown at all', strpos($json, 'Nu
 $privat = item($forLivio, static function (array $i): bool {
     return $i['owners'] === [MARKUS] && $i['masked'];
 });
-check('CLASS:PRIVATE in a details calendar: Private for others', $privat !== null && $privat['title'] === 'Private' && $privat['label'] === 'private', $privat);
+check('CLASS:PRIVATE in a details calendar: Private for others', $privat !== null && $privat['title'] === 'Private', $privat);
+check('there is one kind of hidden only: no "Busy" anywhere', strpos($json, 'Busy') === false && !array_filter($forLivio, static function (array $i): bool {
+    return array_key_exists('label', $i);
+}));
 check('... and its title is not in the response', strpos($json, 'Privatsache') === false);
 
 $forMarkus = CalendarView::range('2026-12-16', '2026-12-17', viewer(MARKUS));
@@ -324,7 +327,7 @@ check('your own private appointment you see in full', item($forMarkus, static fu
     return $i['title'] === 'Privatsache' && !$i['masked'];
 }) !== null);
 $forVivian = CalendarView::range('2026-12-16', '2026-12-17', viewer(VIVIAN));
-check('your own "busy" calendar you see in full', item($forVivian, static function (array $i): bool {
+check('your own "private" calendar you see in full', item($forVivian, static function (array $i): bool {
     return $i['title'] === 'Arzttermin' && $i['location'] === 'Ordination Dr. X';
 }) !== null);
 
@@ -353,7 +356,7 @@ check('... and each person\'s answer', $markusAnswer !== null && $markusAnswer['
 $teamItems = array_values(array_filter($forLivio, static function (array $i): bool {
     return $i['start'] === '2026-12-16T15:30:00Z';
 }));
-check('team meeting: once, with all three people, even though one copy is in a "busy" calendar', count($teamItems) === 1 && $teamItems[0]['people'] === [LIVIO, MARKUS, VIVIAN] && !$teamItems[0]['masked'], $teamItems);
+check('team meeting: once, with all three people, even though one copy is in a "private" calendar', count($teamItems) === 1 && $teamItems[0]['people'] === [LIVIO, MARKUS, VIVIAN] && !$teamItems[0]['masked'], $teamItems);
 
 section('Yours, and whose face');
 $single = item($forLivio, static function (array $i): bool {
@@ -377,9 +380,9 @@ check('a person mapped to an account with a picture brings it along', is_string(
 check('... and one without a picture none', array_key_exists(LIVIO, $faces) && $faces[LIVIO] === null, $faces);
 
 // All three copies hidden from someone outside the meeting: three separate
-// "busy" blocks, never one appointment with three people on it.
+// "Private" blocks, never one appointment with three people on it.
 foreach (['livio', 'markus'] as $key) {
-    CalendarSettings::updateSource(sourceId($work[$key]), ['visibility' => 'busy'], viewer(LIVIO, true));
+    CalendarSettings::updateSource(sourceId($work[$key]), ['visibility' => 'private'], viewer(LIVIO, true));
 }
 $forGuest = CalendarView::range('2026-12-16', '2026-12-17', viewer(GUEST));
 $hiddenCopies = array_values(array_filter($forGuest, static function (array $i): bool {
@@ -427,6 +430,15 @@ check('time marked as free in the calendar app stays free', (bool) array_filter(
 $weekend = CalendarAvailability::freeSlots([LIVIO], 60, '2026-12-19', '2026-12-21', $hours, $before);
 check('no slots outside working days', $weekend === [], $weekend);
 
+// The same two people with 30 minutes kept clear around every appointment.
+$buffered = array_map(static function (array $s): string {
+    return $s['start'] . '/' . $s['end'];
+}, CalendarAvailability::freeSlots([LIVIO, MARKUS], 60, '2026-12-16', '2026-12-17', $hours + ['buffer' => 30], $before));
+check('a buffer keeps time clear before and after appointments', $buffered === [
+    '2026-12-16T07:00:00Z/2026-12-16T08:00:00Z',
+    '2026-12-16T11:30:00Z/2026-12-16T12:30:00Z',
+], $buffered);
+
 // =============================================================================
 // Settings
 // =============================================================================
@@ -440,13 +452,19 @@ try {
     check('only an admin may switch a calendar off', true);
 }
 try {
-    CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'busy'], viewer(LIVIO, false));
+    CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'private'], viewer(LIVIO, false));
     check('nobody else may change how your calendar shows', false);
 } catch (DomainException $e) {
     check('nobody else may change how your calendar shows', true);
 }
-$changed = CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'busy'], viewer(MARKUS, false));
-check('the owner may change how their calendar shows', $changed['visibility'] === 'busy');
+$changed = CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'private'], viewer(MARKUS, false));
+check('the owner may change how their calendar shows', $changed['visibility'] === 'private');
+try {
+    CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'busy'], viewer(MARKUS, false));
+    check('"Busy" is no longer a choice', false);
+} catch (InvalidArgumentException $e) {
+    check('"Busy" is no longer a choice', true);
+}
 CalendarSettings::updateSource(sourceId($work['markus']), ['visibility' => 'details'], viewer(MARKUS, false));
 
 $server->put($private['markus'], 'p.ics', ics(vevent([
@@ -465,6 +483,17 @@ try {
 } catch (InvalidArgumentException $e) {
     check('working hours must start before they end', true);
 }
+try {
+    CalendarSettings::setWorkingHours(['days' => [1], 'start' => '08:00', 'end' => '18:00', 'buffer' => 20]);
+    check('the buffer is one of the offered lengths', false);
+} catch (InvalidArgumentException $e) {
+    check('the buffer is one of the offered lengths', true);
+}
+$db->prepare("INSERT INTO app_settings (key, value) VALUES ('calendar.working_hours', :v) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    ->execute(['v' => json_encode(['days' => [1, 2, 3], 'start' => '09:00', 'end' => '17:00'])]);
+check('hours saved before there was a buffer get 30 minutes', CalendarSettings::workingHours() === ['days' => [1, 2, 3], 'start' => '09:00', 'end' => '17:00', 'buffer' => 30], CalendarSettings::workingHours());
+$saved = CalendarSettings::setWorkingHours(['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00', 'buffer' => 0]);
+check('a buffer can be switched off', $saved['buffer'] === 0 && CalendarSettings::workingHours()['buffer'] === 0, $saved);
 
 // A calendar that is not on the server - as the local demo adds them - is
 // none of the sync's business: not fetched, and not taken for withdrawn.

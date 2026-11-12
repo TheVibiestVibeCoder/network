@@ -692,7 +692,7 @@ class Database
         // One row per calendar collection the shared account can see.
         //   kind        work | private
         //   visibility  what everyone but the owner sees of it:
-        //               details | busy (time only) | private (time only)
+        //               details | private (the time only, marked Private)
         $db->exec("
             CREATE TABLE IF NOT EXISTS calendar_sources (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -815,6 +815,10 @@ class Database
                 PRIMARY KEY (uid, email)
             )
         ");
+
+        // "Busy" was a second way of hiding a calendar, the same as Private
+        // but for its label. Only Private is left.
+        $db->exec("UPDATE calendar_sources SET visibility = 'private' WHERE visibility NOT IN ('details', 'private')");
 
         // Who may see the team calendar, and who may change appointments in
         // it. Granted per person by an admin; whoever is an admin when this

@@ -83,7 +83,7 @@ final class CalendarEvents
 
     /**
      * Everything the sheet shows of one appointment, as $viewer may see it.
-     * Hidden from them (Busy / Private) is the same as not there.
+     * Hidden from them (Private) is the same as not there.
      */
     public function sheet(string $uid, ?string $occurrence, array $viewer): array
     {

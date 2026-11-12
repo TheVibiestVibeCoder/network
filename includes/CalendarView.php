@@ -5,16 +5,16 @@
  * Every privacy rule of docs/kalender-spec.md (section 3) is applied here, on
  * the server, before anything leaves for the browser, an API or the MCP:
  *
- *   - A calendar set to "busy" or "private" shows everyone but its owner the
- *     time only, titled Busy or Private: no title, place, description,
- *     link or participants.
+ *   - A calendar set to "private" shows everyone but its owner the time
+ *     only, titled Private: no title, place, description, link or
+ *     participants.
  *   - CLASS:PRIVATE and CLASS:CONFIDENTIAL count as private, whatever the
  *     calendar is set to.
  *   - Your own calendars you always see in full.
  *
  * Appointments with the same UID in several calendars (a shared meeting) are
  * shown once. Masked occurrences are never merged: putting two people's
- * "busy" blocks together by UID would tell who meets whom.
+ * "Private" blocks together by UID would tell who meets whom.
  */
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ require_once APP_ROOT . '/includes/CalendarIcs.php';
 
 final class CalendarView
 {
-    public const VISIBILITIES = ['details', 'busy', 'private'];
+    public const VISIBILITIES = ['details', 'private'];
     public const KINDS = ['work', 'private'];
 
     private const PRIVATE_CLASSES = ['PRIVATE', 'CONFIDENTIAL'];
@@ -267,13 +267,10 @@ final class CalendarView
     /** An occurrence the viewer may only see as a time slot. */
     private static function masked(array $row, string $owner): array
     {
-        $label = in_array(strtoupper((string) $row['class']), self::PRIVATE_CLASSES, true) || $row['visibility'] === 'private'
-            ? 'private' : 'busy';
         return self::times($row) + [
             'id'          => 'i' . $row['id'],
             'masked'      => true,
-            'label'       => $label,
-            'title'       => $label === 'private' ? 'Private' : 'Busy',
+            'title'       => 'Private',
             'location'    => null,
             'description' => null,
             'video_url'   => null,
@@ -342,7 +339,6 @@ final class CalendarView
             'uid'         => (string) $main['uid'],
             'occurrence'  => $main['recurrence_id'],
             'masked'      => false,
-            'label'       => null,
             'title'       => $main['summary'] ?: '(No title)',
             'location'    => $main['location'],
             'description' => $main['description'],

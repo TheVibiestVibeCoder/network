@@ -22,13 +22,15 @@ require_once APP_ROOT . '/includes/CalendarView.php';
 final class CalendarSettings
 {
     private const WORKING_HOURS_KEY = 'calendar.working_hours';
-    public const DEFAULT_WORKING_HOURS = ['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00'];
+    public const DEFAULT_WORKING_HOURS = ['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00', 'buffer' => 30];
+    /** Minutes "find a free slot" keeps clear before and after appointments. */
+    public const BUFFERS = [0, 10, 15, 30, 45, 60];
 
     // =========================================================================
     // Working hours
     // =========================================================================
 
-    /** @return array{days: list<int>, start: string, end: string} ISO weekdays, 1 = Monday. */
+    /** @return array{days: list<int>, start: string, end: string, buffer: int} ISO weekdays, 1 = Monday. */
     public static function workingHours(): array
     {
         $stmt = Database::getInstance()->prepare("SELECT value FROM app_settings WHERE key = :key");
@@ -41,7 +43,7 @@ final class CalendarSettings
     {
         $hours = self::validWorkingHours($input);
         if ($hours === null) {
-            throw new InvalidArgumentException('Working hours need at least one day and a start before the end (HH:MM).');
+            throw new InvalidArgumentException('Working hours need at least one day, a start before the end (HH:MM) and a buffer of ' . implode(', ', self::BUFFERS) . ' minutes.');
         }
         Database::getInstance()->prepare("
             INSERT INTO app_settings (key, value, updated_at) VALUES (:key, :value, CURRENT_TIMESTAMP)
@@ -59,10 +61,13 @@ final class CalendarSettings
         $start = (string) ($input['start'] ?? '');
         $end = (string) ($input['end'] ?? '');
         $time = '/^([01]\d|2[0-3]):[0-5]\d$/';
-        if (!$days || !preg_match($time, $start) || !preg_match($time, $end) || $start >= $end) {
+        // Stored before there was a buffer: the default.
+        $buffer = array_key_exists('buffer', $input) ? $input['buffer'] : self::DEFAULT_WORKING_HOURS['buffer'];
+        if (!$days || !preg_match($time, $start) || !preg_match($time, $end) || $start >= $end
+            || !is_numeric($buffer) || !in_array((int) $buffer, self::BUFFERS, true)) {
             return null;
         }
-        return ['days' => $days, 'start' => $start, 'end' => $end];
+        return ['days' => $days, 'start' => $start, 'end' => $end, 'buffer' => (int) $buffer];
     }
 
     // =========================================================================
@@ -113,7 +118,7 @@ final class CalendarSettings
         $changes = [];
         if (array_key_exists('visibility', $input)) {
             if (!in_array($input['visibility'], CalendarView::VISIBILITIES, true)) {
-                throw new InvalidArgumentException('Visibility must be details, busy or private.');
+                throw new InvalidArgumentException('Visibility must be details or private.');
             }
             $changes['visibility'] = $input['visibility'];
         }
@@ -283,7 +288,9 @@ final class CalendarSettings
 }
 
 /**
- * Common free time of several people, inside working hours.
+ * Common free time of several people, inside working hours, keeping the
+ * buffer (working hours "buffer", in minutes) clear before and after every
+ * appointment.
  *
  * Reads every calendar of each person, hidden ones included, but hands back
  * only the gaps - never what fills the rest.
@@ -304,10 +311,11 @@ final class CalendarAvailability
         // Nothing starts in the past; from now on, on the next quarter hour.
         $earliest = (int) (ceil($now / 900) * 900);
 
+        $buffer = max(0, (int) ($workingHours['buffer'] ?? 0)) * 60;
         $busy = [];
         foreach (CalendarView::busy($emails, $fromDate, $toDate) as $intervals) {
-            foreach ($intervals as $interval) {
-                $busy[] = $interval;
+            foreach ($intervals as [$start, $end]) {
+                $busy[] = [$start - $buffer, $end + $buffer];
             }
         }
         $busy = self::merge($busy);

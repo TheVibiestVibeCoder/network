@@ -1004,13 +1004,13 @@ function assetUrl(string $path): string
                         <div class="tcal-toolbar">
                             <div class="tcal-toolbar-left">
                                 <h1 class="view-title tcal-title">Calendar</h1>
-                                <div class="tcal-nav">
-                                    <button type="button" class="btn btn-icon" data-tcal="prev" title="Previous" aria-label="Previous">
-                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+                                <div class="tcal-nav" role="group" aria-label="Move through the calendar">
+                                    <button type="button" class="tcal-nav-btn tcal-nav-step" data-tcal="prev" title="Previous" aria-label="Previous">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
                                     </button>
-                                    <button type="button" class="btn btn-secondary btn-small" data-tcal="today">Today</button>
-                                    <button type="button" class="btn btn-icon" data-tcal="next" title="Next" aria-label="Next">
-                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+                                    <button type="button" class="tcal-nav-btn" data-tcal="today">Today</button>
+                                    <button type="button" class="tcal-nav-btn tcal-nav-step" data-tcal="next" title="Next" aria-label="Next">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
                                     </button>
                                 </div>
                                 <h2 class="tcal-date" id="tcalDate"></h2>
@@ -1021,12 +1021,12 @@ function assetUrl(string $path): string
                                     <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
                                 </div>
                                 <button type="button" class="btn btn-secondary btn-small tcal-free-btn" data-tcal="free" aria-expanded="false" aria-controls="tcalFree">Find a free slot</button>
-                                <button type="button" class="btn btn-primary btn-small tcal-new-btn" data-tcal="new" hidden>
+                                <button type="button" class="btn btn-primary btn-small tcal-new-btn" data-tcal="new" aria-label="New appointment" hidden>
                                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                                    New appointment
+                                    <span>New<span class="tcal-new-more"> appointment</span></span>
                                 </button>
-                                <button type="button" class="btn btn-icon" data-tcal="settings" title="Calendar settings" aria-label="Calendar settings" hidden>
-                                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+                                <button type="button" class="btn btn-icon tcal-settings-btn" data-tcal="settings" title="Calendar settings" aria-label="Calendar settings" hidden>
+                                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1043,30 +1043,14 @@ function assetUrl(string $path): string
                 <?php endif; ?>
 
                 <!-- Log: everything that changed in the CRM - notes, to-dos and
-                     changes to contacts and projects - by month, week or day.
-                     Admins only, opened from the profile menu. It used to be
-                     the Calendar tab, which is why its parts are still cal*. -->
+                     changes to contacts and projects - as a list by day, newest
+                     first. Admins only, opened from the profile menu. It used to
+                     be the Calendar tab, which is why its parts are still cal*. -->
                 <?php if ($isAdmin): ?>
                 <div class="view-panel" id="logView">
-                    <!-- Title, the way through the months and the view switch in one row -->
                     <div class="calendar-toolbar">
                         <div class="calendar-toolbar-left">
                             <h1 class="view-title calendar-page-title">Log</h1>
-                            <button type="button" class="btn btn-icon" id="calPrev" title="Previous">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 6-6 6 6 6"/></svg>
-                            </button>
-                            <button type="button" class="btn btn-secondary btn-small" id="calToday">Today</button>
-                            <button type="button" class="btn btn-icon" id="calNext" title="Next">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 6 6 6-6 6"/></svg>
-                            </button>
-                            <h2 class="calendar-title" id="calTitle"></h2>
-                        </div>
-                        <div class="calendar-toolbar-right">
-                            <div class="calendar-mode-toggle">
-                                <button type="button" class="cal-mode-btn active" data-mode="month">Month</button>
-                                <button type="button" class="cal-mode-btn" data-mode="week">Week</button>
-                                <button type="button" class="cal-mode-btn" data-mode="day">Day</button>
-                            </div>
                         </div>
                     </div>
                     <div class="calendar-filters" id="calendarFilters">
@@ -1084,7 +1068,7 @@ function assetUrl(string $path): string
                         </button>
                     </div>
                     <div class="calendar-body" id="calendarBody">
-                        <!-- Log grid rendered by JS (app.js, the calendar* functions) -->
+                        <!-- The list by day, drawn by app.js (renderCalendar) -->
                     </div>
                 </div>
                 <?php endif; ?>
