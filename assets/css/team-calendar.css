@@ -1035,18 +1035,9 @@ button.tcal-dayhead:hover {
 }
 
 /* ---- The appointment sheet (#eventSheet) ---------------------------------
-   The CRM's sheet: header, facts, sections, footer with the destructive
-   action on the left. Editing outlines it in the accent, as the project and
-   to-do sheets do. */
-
-#eventSheet .modal-content {
-    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
-}
-
-#eventSheet.is-editing .modal-content {
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
-}
+   The CRM's sheet: header with its actions as icons, facts, sections; the
+   footer only while editing or confirming, as on the project and to-do
+   sheets. */
 
 #eventSheet .overview-header-info,
 #eventSheet .overview-title-info {

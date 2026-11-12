@@ -1003,7 +1003,7 @@
         }
 
         els.sheetHead.innerHTML = editing
-            ? `<input type="text" id="esheetTitle" class="form-input ov-edit-title" data-ef="title" value="${esc(sheet.form.title)}" placeholder="What is it about?" maxlength="255" aria-label="Title">`
+            ? `<input type="text" id="esheetTitle" class="form-input ov-edit-title" data-ef="title" value="${esc(sheet.form.title)}" placeholder="Title" maxlength="255" aria-label="Title">`
             : `<h2 id="esheetTitle">${esc(sheet.data.title)}</h2><p class="overview-company esheet-when">${esc(sheetWhen(sheet.data))}${sheet.data.series ? ' · ' + esc(repeatText(sheet.data)) : ''}</p>`;
         els.sheetBody.innerHTML = (sheet.conflict ? conflictHtml() : '') + (editing ? formHtml() : viewHtml());
         renderFoot();

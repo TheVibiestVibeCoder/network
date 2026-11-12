@@ -7361,8 +7361,8 @@ details.import-instructions p {
 
 /* ---- Reading and editing: one layout, two states ----
    In edit mode every fact keeps its place and shows a field instead of its
-   value and the sheet gets an accent outline, so the mode is obvious without
-   anything moving. */
+   value; the fields and Cancel / Save make the mode obvious, without a frame
+   around the sheet and without anything moving. */
 
 #projectOverviewModal:not(.is-editing) [data-ov="edit"],
 #projectOverviewModal.is-editing [data-ov="view"],
@@ -7388,19 +7388,6 @@ details.import-instructions p {
 #projectOverviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"]:hover,
 #todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"]:hover {
     background: var(--c-tint-3);
-}
-
-#projectOverviewModal .modal-content,
-#todoDetailModal .modal-content,
-#reviewDetailModal .modal-content {
-    transition: box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
-}
-
-#projectOverviewModal.is-editing .modal-content,
-#todoDetailModal.is-editing .modal-content,
-#reviewDetailModal.is-editing .modal-content {
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 2px var(--c-accent), var(--e-4);
 }
 
 /* The name field takes the heading's size, so the header does not change. */
