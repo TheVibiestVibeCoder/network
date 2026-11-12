@@ -1871,6 +1871,12 @@
         };
     }
 
+    // The same glyphs as Projects and Contacts in the sidebar.
+    const TODO_GROUP_ICONS = {
+        project: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M3 12.5h18"/></svg>',
+        contact: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/></svg>'
+    };
+
     function renderGroupedTodosList(container, todos) {
         if (!container) {
             return;
@@ -1907,14 +1913,17 @@
             const opens = meta.projectId
                 ? `data-todo-open-project="${meta.projectId}" title="Open project"`
                 : `data-todo-open-contact="${meta.contactId}" title="Open contact"`;
+            // What the group is - project or contact - is said by its icon.
             const subtitle = meta.kind === 'project-contact'
                 ? `<button type="button" class="todo-group-subtitle todo-group-link" data-todo-open-contact="${meta.contactId}" title="Open contact">${escapeHtml(meta.subtitle)}</button>`
-                : `<span class="todo-group-subtitle">${escapeHtml(meta.subtitle)}</span>`;
+                : '';
+            const kindIcon = meta.projectId ? TODO_GROUP_ICONS.project : TODO_GROUP_ICONS.contact;
 
             return `
                 <div class="todo-group">
                     <div class="todo-group-header">
                         <div class="todo-group-title-wrap">
+                            <span class="todo-group-kind" role="img" aria-label="${meta.projectId ? 'Project' : 'Contact'}" title="${meta.projectId ? 'Project' : 'Contact'}">${kindIcon}</span>
                             <button type="button" class="todo-group-title todo-group-link" ${opens}>${escapeHtml(meta.title)}</button>
                             ${subtitle}
                         </div>
@@ -2007,7 +2016,7 @@
                         </div>
                         ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
                         <div class="todo-meta">
-                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
+                            ${priorityMeta ? window.CRMFormat.priorityMark(priorityMeta.key) : ''}
                             <span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}">${escapeHtml(dueText)}</span>
                             ${assigneeChip(todo)}
                             ${window.TodoLinks ? window.TodoLinks.quickLink(todo) : ''}
@@ -2075,7 +2084,6 @@
         const isProposed = todo.review_status === 'pending';
         const proposalId = todo.parent_todo_id ? todo.parent_todo_id : todo.id;
         const expanded = !opensSheet && state.expandedProjectTodos.has(Number(todo.id));
-        const priorityWord = priorityMeta ? priorityMeta.label.replace(/ Priority$/, '') : '';
 
         if (opensSheet) {
             return `
@@ -2088,7 +2096,7 @@
                     <span class="ptodo-title" title="${escapeHtml(todo.title || '')}">${escapeHtml(todo.title || '')}</span>
                     ${isProposed ? reviewPill(todo, 'todo', proposalId) : reviewChangeBadge(todo)}
                     <span class="ptodo-meta">
-                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${priorityMeta ? window.CRMFormat.priorityMark(priorityMeta.key) : ''}
                         ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
                         ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
                         ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
@@ -2108,7 +2116,7 @@
                     <button type="button" class="ptodo-title" data-todo-expand-btn aria-expanded="${expanded}">${escapeHtml(todo.title || '')}</button>
                     ${isProposed ? reviewBadge(todo) : reviewChangeBadge(todo)}
                     <span class="ptodo-meta">
-                        ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}" title="${escapeHtml(priorityMeta.label)}">${escapeHtml(priorityWord)}</span>` : ''}
+                        ${priorityMeta ? window.CRMFormat.priorityMark(priorityMeta.key) : ''}
                         ${dueText ? `<span class="todo-due${isOverdue ? ' todo-due-overdue' : ''}" title="Due ${escapeHtml(dueText)}">${escapeHtml(dueText)}</span>` : ''}
                         ${window.TodoLinks ? window.TodoLinks.quickLink(todo, { compact: true }) : ''}
                         ${assigneeChip(todo) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
@@ -2330,7 +2338,7 @@
 
         const priorityMeta = getTodoPriorityMeta(todo.priority);
         elements.todoDetailPriority.innerHTML = priorityMeta
-            ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>`
+            ? `<span class="prio-word">${window.CRMFormat.priorityMark(priorityMeta.key)}${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>`
             : '<span class="detail-empty">—</span>';
 
         elements.todoDetailDescription.innerHTML = todo.description
@@ -2345,7 +2353,11 @@
             window.CRMReview.renderRecordPanel('todo', todo.parent_todo_id || todo.id, document.getElementById('todoDetailReview'));
         }
 
-        elements.toggleTodoDetailDoneBtn.textContent = isCompleted ? 'Reopen' : 'Mark as done';
+        // An icon in the header: the tick, filled while the to-do is done.
+        const doneLabel = isCompleted ? 'Reopen' : 'Mark as done';
+        elements.toggleTodoDetailDoneBtn.title = doneLabel;
+        elements.toggleTodoDetailDoneBtn.setAttribute('aria-label', doneLabel);
+        elements.toggleTodoDetailDoneBtn.classList.toggle('is-on', isCompleted);
     }
 
     function renderTodoDetailLinks(links) {
@@ -4504,7 +4516,7 @@
 
     /**
      * One project, as a card: what it is, for whom and who has it on top;
-     * when it runs; budget and chance at the foot, and with expected
+     * budget and chance at the foot (no dates: they are in the sheet), and with expected
      * payments, a thin bar of what is paid under them. The description,
      * notes, contacts and the rest live in the detail view.
      */
@@ -4545,7 +4557,6 @@
                     ${claudeSlot(project)}
                 </div>
                 <div class="project-card-bottom">
-                    ${projectTimelineMarkup(project, isComplete)}
                     <div class="project-card-foot">
                         <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
                         ${budgetStat}
@@ -5325,7 +5336,7 @@
                     <div class="ptodo-row">
                         <span class="ptodo-title">${escapeHtml(todo.title)}</span>
                         <span class="ptodo-meta">
-                            ${priorityMeta ? `<span class="todo-priority todo-priority--${priorityMeta.key}">${escapeHtml(priorityMeta.label.replace(/ Priority$/, ''))}</span>` : ''}
+                            ${priorityMeta ? window.CRMFormat.priorityMark(priorityMeta.key) : ''}
                             ${dueText ? `<span class="todo-due">${escapeHtml(dueText)}</span>` : ''}
                             ${todo.assigned_to_name ? `<span class="ptodo-draft-assignee">${escapeHtml(todo.assigned_to_name)}</span>` : ''}
                         </span>
@@ -5865,6 +5876,8 @@
                 <div class="assignee-bar-body">
                     <span class="assignee-bar-label">Assigned to</span>
                     <select class="form-select assignee-select"
+                            data-previous="${escapeHtml(current)}"
+                            title="${escapeHtml(name ? 'Assigned to ' + name : 'Unassigned')}"
                             data-assign-type="${escapeHtml(type)}"
                             data-assign-id="${escapeHtml(String(record && record.id ? record.id : ''))}">
                         ${options.join('')}
@@ -5956,6 +5969,7 @@
                 }
 
                 select.setAttribute('data-previous', select.value);
+                select.title = saved.assigned_to_name ? 'Assigned to ' + saved.assigned_to_name : 'Unassigned';
                 applyAssignmentLocally(type, Number(id), saved);
                 showAssignmentToast(saved.assigned_to_name);
 

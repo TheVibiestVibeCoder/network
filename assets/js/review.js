@@ -926,11 +926,10 @@
         return SUBGROUPS.map(sub => {
             const mine = records.filter(list => subgroupOf(list) === sub.key);
             if (!mine.length) return '';
-            // Deleting a project archives it.
-            const title = sub.key === 'delete' && group.types[0] === 'project' ? 'Archiving' : sub.title;
+            // No heading: each row already says what it is ("New project
+            // note", "Change to budget"); the kinds stay apart as cards.
             return `
-                <div class="review-subgroup review-subgroup--${sub.key}">
-                    <h3 class="review-subgroup-title">${escapeHtml(title)}</h3>
+                <div class="review-subgroup review-subgroup--${sub.key}" aria-label="${escapeHtml(sub.key === 'delete' && group.types[0] === 'project' ? 'Archiving' : sub.title)}">
                     <div class="review-list-card">${mine.map(list => list.length > 1 ? renderCluster(list) : renderRow(list[0])).join('')}</div>
                 </div>`;
         }).join('');
@@ -948,6 +947,8 @@
         const key = recordKey(first);
         const n = list.length;
         const off = state.bulk ? ' disabled' : '';
+        // The date once, on the cluster: the newest of its proposals.
+        const when = list.map(i => i.created_at).filter(Boolean).sort().pop();
         return `
             <div class="review-cluster" data-review-cluster="${escapeHtml(key)}">
                 <div class="review-row-head review-cluster-head">
@@ -960,6 +961,7 @@
                                 <span class="review-row-summary-text">${escapeHtml(list.map(kindLabel).join(' · '))}</span>
                             </span>
                         </span>
+                        ${when ? `<span class="review-row-when" title="${escapeHtml(fullDate(when))}">${escapeHtml(timeAgo(when))}</span>` : ''}
                     </div>
                     <div class="review-row-actions">
                         <button type="button" class="review-act review-act--reject" data-review-cluster-act="reject" title="Reject all" aria-label="Reject all ${n} proposals"${off}>${ICON_X}</button>

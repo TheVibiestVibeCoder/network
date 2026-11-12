@@ -62,6 +62,7 @@
         sheetHead: document.getElementById('esheetHead'),
         sheetBody: document.getElementById('esheetBody'),
         sheetFoot: document.getElementById('esheetFoot'),
+        sheetActions: document.getElementById('esheetActions'),
     };
 
     // =========================================================================
@@ -129,6 +130,15 @@
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
         return h + ' h' + (m ? ' ' + m + ' min' : '');
+    }
+
+    /** "now", "5m", "3h", "2d": how long ago, as short as it gets. */
+    function ago(ts) {
+        const seconds = Math.max(0, Math.round((Date.now() - ts) / 1000));
+        if (seconds < 60) return 'now';
+        if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+        if (seconds < 86400) return Math.round(seconds / 3600) + 'h';
+        return Math.round(seconds / 86400) + 'd';
     }
 
     function relative(ts) {
@@ -447,13 +457,15 @@
             return;
         }
         const sync = state.data.sync || {};
-        const text = state.syncing ? 'Syncing…'
-            : (sync.last_sync_at ? 'Synced ' + relative(Date.parse(sync.last_sync_at)) : 'Not synced yet');
+        // Short beside the button ("5m"), in full on hover.
+        const at = sync.last_sync_at ? Date.parse(sync.last_sync_at) : null;
+        const text = state.syncing ? '…' : (at ? ago(at) : '–');
+        const full = state.syncing ? 'Syncing…' : (at ? 'Synced ' + relative(at) : 'Not synced yet');
         const problem = sync.error
-            ? `<span class="tcal-sync-problem" title="${esc(sync.error)}">Last sync had a problem</span>`
+            ? `<span class="tcal-sync-problem" title="Last sync had a problem: ${esc(sync.error)}">!</span>`
             : '';
-        els.sync.innerHTML = `${problem}<span class="tcal-sync-text">${esc(text)}</span>
-            <button type="button" class="tcal-sync-btn" data-tcal="sync" title="Sync now" aria-label="Sync now"${state.syncing ? ' disabled' : ''}>
+        els.sync.innerHTML = `${problem}<span class="tcal-sync-text" title="${esc(full)}">${esc(text)}</span>
+            <button type="button" class="tcal-sync-btn" data-tcal="sync" title="${esc(full)} · sync now" aria-label="Sync now"${state.syncing ? ' disabled' : ''}>
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>
             </button>`;
     }
@@ -858,6 +870,7 @@
         els.sheetHead.innerHTML = '<h2 id="esheetTitle" class="esheet-title-loading">Appointment</h2>';
         els.sheetBody.innerHTML = `<p class="esheet-loading">${esc(text)}</p>`;
         els.sheetFoot.innerHTML = '';
+        els.sheetActions.innerHTML = '';
     }
 
     /** The team, the right to add and where to: what the calendar loads anyway. */
@@ -983,8 +996,9 @@
             const item = sheet.data;
             const owner = person(item.owners[0]);
             els.sheetHead.innerHTML = `<h2 id="esheetTitle">${esc(item.title)}</h2><p class="overview-company esheet-when">${esc(whenLabel(item))}</p>`;
-            els.sheetBody.innerHTML = `<p class="esheet-owner">${face(owner)}<span>${owner ? esc(owner.name) + ' shares' : 'This calendar shares'} only the time of this appointment.</span></p>`;
+            els.sheetBody.innerHTML = owner ? `<p class="esheet-owner">${face(owner)}<span>${esc(owner.name)}</span></p>` : '';
             els.sheetFoot.innerHTML = '';
+            els.sheetActions.innerHTML = '';
             return;
         }
 
@@ -996,8 +1010,29 @@
         if (focused) focusField(focused);
     }
 
+    /** Edit and delete sit in the header as icons; the footer only holds
+     *  forms (Save, Create) and confirmations. */
     function renderFoot() {
         els.sheetFoot.innerHTML = footHtml();
+        els.sheetActions.innerHTML = actionsHtml();
+    }
+
+    function actionsHtml() {
+        const d = sheet.data;
+        if (sheet.mode !== 'view' || sheet.confirm || !d || !d.can) return '';
+        const off = sheet.busy ? ' disabled' : '';
+        const shared = d.attendees.length > 1;
+        const parts = [];
+        if (d.can.edit) {
+            parts.push(`<button type="button" class="ov-icon-btn" data-esheet="edit" title="Edit" aria-label="Edit"${off}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg></button>`);
+        }
+        if (d.can.cancel) {
+            const label = shared ? 'Cancel appointment' : 'Delete';
+            parts.push(`<button type="button" class="ov-icon-btn ov-icon-danger" data-esheet="cancel" title="${label}" aria-label="${label}"${off}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg></button>`);
+        }
+        return parts.join('');
     }
 
     function repeatText(d) {
@@ -1017,6 +1052,23 @@
         return `<div class="overview-detail-item${wide ? ' full-width' : ''}"><span class="detail-label">${esc(label)}</span><span class="detail-value">${value}</span></div>`;
     }
 
+    // Glyphs for the facts of an appointment: an icon says what a line is,
+    // the label comes on hover.
+    const FACT_ICONS = {
+        calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
+        reminder: '<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+        place: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+        video: '<rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/>',
+        people: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c0-3.3 2.5-5.8 5.5-5.8s5.5 2.5 5.5 5.8"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 6.1M17.5 13.9c1.9.7 3 2.8 3 5.6"/>',
+        notes: '<path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4M9 12h6M9 15.5h6"/>'
+    };
+
+    function iconFact(icon, label, value) {
+        return `<div class="esheet-fact"><span class="esheet-fact-icon" title="${esc(label)}" aria-label="${esc(label)}" role="img">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FACT_ICONS[icon]}</svg>
+            </span><div class="esheet-fact-value">${value}</div></div>`;
+    }
+
     function viewHtml() {
         const d = sheet.data;
         const parts = [];
@@ -1028,22 +1080,20 @@
                 </div>`);
         }
 
-        const facts = [fact('Calendar', esc(d.calendar.name))];
-        if (d.reminder !== null || d.reminder_custom) facts.push(fact('Reminder', esc(reminderText(d))));
+        // One line per fact, an icon in front instead of a label.
+        const facts = [];
         // A place that is only the video link is said once, by the button.
-        if (d.location && d.location.trim() !== d.video_url) facts.push(fact('Where', linkify(d.location), true));
+        if (d.location && d.location.trim() !== d.video_url) facts.push(iconFact('place', 'Where', linkify(d.location)));
         if (d.video_url) {
-            facts.push(fact('Video', `<a class="btn btn-primary btn-small esheet-join" href="${esc(d.video_url)}" target="_blank" rel="noopener noreferrer">Join video call</a>`, true));
+            facts.push(iconFact('video', 'Video call', `<a class="btn btn-primary btn-small esheet-join" href="${esc(d.video_url)}" target="_blank" rel="noopener noreferrer">Join video call</a>`));
         }
-        parts.push(`<div class="overview-section"><div class="overview-details esheet-facts">${facts.join('')}</div></div>`);
-
         const people = d.attendees.map(a => personRow(a, person(a.email))).concat(d.guests.map(g => personRow(g, null)));
-        parts.push(`<div class="overview-section"><h3 class="overview-section-title">Who</h3><ul class="esheet-people">${people.join('')}</ul>
-            ${d.guests.length && d.can.edit ? '<p class="esheet-note">Guests from outside the team were invited on a phone. Changes made here do not reach them.</p>' : ''}</div>`);
-
-        if (d.description) {
-            parts.push(`<div class="overview-section"><h3 class="overview-section-title">Notes</h3><div class="esheet-desc">${linkify(d.description)}</div></div>`);
-        }
+        facts.push(iconFact('people', 'Who', `<ul class="esheet-people">${people.join('')}</ul>
+            ${d.guests.length && d.can.edit ? '<p class="esheet-note">Outside guests don\'t hear about changes made here.</p>' : ''}`));
+        if (d.description) facts.push(iconFact('notes', 'Notes', `<div class="esheet-desc">${linkify(d.description)}</div>`));
+        facts.push(iconFact('calendar', 'Calendar', esc(d.calendar.name)));
+        if (d.reminder !== null || d.reminder_custom) facts.push(iconFact('reminder', 'Reminder', esc(reminderText(d))));
+        parts.push(`<div class="overview-section esheet-facts">${facts.join('')}</div>`);
         parts.push(linksHtml(d.links, d.suggestions, d.can.link));
         return parts.join('');
     }
@@ -1204,18 +1254,7 @@
                 <button type="button" class="btn btn-secondary" data-esheet="cancel-occurrence"${off}>Only this one</button>
                 <button type="button" class="btn btn-danger" data-esheet="cancel-series-all"${off}>The whole series</button>`;
         }
-        const parts = [];
-        if (d.can.cancel) {
-            parts.push(`<button type="button" class="btn btn-secondary ov-delete-btn" data-esheet="cancel"${off}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
-                ${shared ? 'Cancel appointment' : 'Delete'}</button>`);
-        }
-        if (d.can.edit) {
-            parts.push(`<button type="button" class="btn btn-secondary" data-esheet="edit"${off}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
-                Edit</button>`);
-        }
-        return parts.join('');
+        return '';
     }
 
     // ---- What changed, and saving ---------------------------------------
@@ -1660,13 +1699,12 @@
 
         const calendars = byOwner.size ? Array.from(byOwner.entries()).map(([owner, sources]) => `
                 <div class="tcal-set-owner">
-                    <div class="tcal-set-owner-name">${esc(nameOf(owner))} <span class="tcal-set-muted">${esc(owner)}</span></div>
+                    <div class="tcal-set-owner-name">${esc(nameOf(owner))}</div>
                     ${sources.map(source => `<div class="tcal-set-source${source.enabled ? '' : ' is-off'}">
                         <div class="tcal-set-source-head">
                             <span class="tcal-set-source-name">${esc(source.name)}</span>
                             <span class="tcal-badge">${source.kind === 'work' ? 'Work' : 'Private'}</span>
                             ${source.writable ? '' : '<span class="tcal-badge tcal-badge--quiet" title="The calendar account may only read it">Read only</span>'}
-                            <span class="tcal-set-muted">${source.occurrences} ${source.occurrences === 1 ? 'entry' : 'entries'}</span>
                         </div>
                         <div class="tcal-set-source-controls">
                             <label class="tcal-set-field">
@@ -1689,7 +1727,7 @@
                         </div>
                         ${source.last_error ? `<p class="tcal-set-error">${esc(source.last_error)}</p>` : ''}
                     </div>`).join('')}
-                </div>`).join('') : '<p class="tcal-set-muted">No calendars are shared with the calendar account yet.</p>';
+                </div>`).join('') : '<p class="tcal-set-muted">None shared yet.</p>';
 
         let adminSections = '';
         if (admin) {
@@ -1699,7 +1737,7 @@
                     <input type="text" class="form-input tcal-set-name" value="${esc(p.name)}" maxlength="80" data-tcal-person-field="name" data-email="${esc(p.email)}" aria-label="Name">
                     <select class="form-select tcal-set-account" data-tcal-person-field="user_id" data-email="${esc(p.email)}" aria-label="CRM account">
                         <option value="">No CRM account</option>
-                        ${accounts.map(a => `<option value="${a.id}"${Number(a.id) === Number(p.user_id) ? ' selected' : ''}>${esc(a.name)} (${esc(a.email)})</option>`).join('')}
+                        ${accounts.map(a => `<option value="${a.id}"${Number(a.id) === Number(p.user_id) ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}
                     </select>
                     <span class="tcal-set-move">
                         <button type="button" class="btn btn-icon btn-small" data-tcal-move="up" data-email="${esc(p.email)}" aria-label="Move up"${i === 0 ? ' disabled' : ''}>
@@ -1715,27 +1753,24 @@
             adminSections = `
                 <section class="tcal-set-section">
                     <h4>People</h4>
-                    <p class="tcal-set-hint">The order people are listed in, their colour where there is no profile picture, and which CRM account each calendar owner is. The account brings the profile picture and decides whose appointments count as "yours".</p>
                     ${people || '<p class="tcal-set-muted">Nobody yet.</p>'}
                 </section>
                 <section class="tcal-set-section" data-tcal-set="hours">
                     <h4>Working hours</h4>
-                    <p class="tcal-set-hint">Where "Find a free slot" looks, and how much time it keeps clear before and after appointments. The grid shades the rest.</p>
                     <div class="tcal-set-days">${DAY_NAMES.map((name, i) => `<label class="tcal-set-day">
                         <input type="checkbox" data-tcal-hours-day="${i + 1}"${wh.days.includes(i + 1) ? ' checked' : ''}><span>${name}</span></label>`).join('')}</div>
                     <div class="tcal-set-times">
                         <label class="tcal-set-field"><span>From</span><input type="time" class="form-input" data-tcal-hours="start" value="${esc(wh.start)}" step="900"></label>
                         <label class="tcal-set-field"><span>To</span><input type="time" class="form-input" data-tcal-hours="end" value="${esc(wh.end)}" step="900"></label>
                         <label class="tcal-set-field"><span>Buffer</span><select class="form-select" data-tcal-hours="buffer">
-                            ${BUFFERS.map(m => `<option value="${m}"${m === wh.buffer ? ' selected' : ''}>${m ? esc(durationLabel(m)) + ' before and after' : 'None'}</option>`).join('')}
+                            ${BUFFERS.map(m => `<option value="${m}"${m === wh.buffer ? ' selected' : ''}>${m ? esc(durationLabel(m)) : 'None'}</option>`).join('')}
                         </select></label>
                         <button type="button" class="btn btn-secondary btn-small" data-tcal="save-hours">Save hours</button>
                     </div>
                 </section>
                 <section class="tcal-set-section">
-                    <h4>Calendars on the mail server</h4>
-                    <p class="tcal-set-hint">New shares are picked up once a day by themselves. Each person shares in webmail with the calendar account: the work calendar to read and write, the private one to read only.</p>
-                    <button type="button" class="btn btn-secondary btn-small" data-tcal="discover">Look for new calendars now</button>
+                    <h4>New calendars</h4>
+                    <button type="button" class="btn btn-secondary btn-small" data-tcal="discover" title="Picked up once a day by themselves">Look for new shares</button>
                 </section>`;
         }
 
@@ -1746,7 +1781,6 @@
             <div class="tcal-drawer-body">
                 <section class="tcal-set-section">
                     <h4>${admin ? 'Calendars' : 'Your calendars'}</h4>
-                    <p class="tcal-set-hint">What everyone else sees of ${admin ? 'each' : 'your'} calendar: everything, or only the time marked Private. ${admin ? 'Owners' : 'You'} always see their own in full, and appointments marked private in the calendar app stay private either way.</p>
                     ${calendars}
                 </section>
                 ${adminSections}

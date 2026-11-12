@@ -452,6 +452,9 @@ function fetchBookkeeping(PDO $db, ?int $assignee): array
             'id' => (int) $row['id'],
             'row_date' => $row['row_date'],
             'summary' => $parts ? implode(' · ', $parts) : ('Row #' . (int) $row['id']),
+            // The same values one by one (date, partner, amount in the
+            // bank's column order), for Home's cards.
+            'parts' => $parts,
             'no_pdf_needed' => (int) $row['no_pdf_needed'] === 1,
             'excluded' => (int) $row['excluded'] === 1,
             'assigned_to' => $row['assigned_to'] === null ? null : (int) $row['assigned_to'],

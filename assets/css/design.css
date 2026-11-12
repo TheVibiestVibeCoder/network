@@ -685,10 +685,35 @@ h1, h2, h3, h4 {
     color: var(--c-ink-3);
 }
 
+/* The team as a row of faces; the name comes on hover. In the icon rail
+   (tablet, collapsed) they stand in a column again, see below. */
 .team-list {
     display: flex;
-    flex-direction: column;
-    gap: 1px;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 8px;
+}
+
+.sidebar-team .team-item {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--r-full);
+}
+
+.sidebar-team .team-item .team-face {
+    width: 30px;
+    height: 30px;
+}
+
+.sidebar-team .team-item .team-name {
+    display: none;
+}
+
+.sidebar-team .team-item.active {
+    box-shadow: 0 0 0 2px var(--c-accent);
+    background: transparent;
 }
 
 .team-item {
@@ -1132,6 +1157,24 @@ h1, h2, h3, h4 {
     height: 15px;
 }
 
+/* "+": the one primary action of a page, as an icon. */
+.btn-add {
+    width: var(--control-h);
+    padding: 0;
+}
+
+/* An occasional action: no frame until hovered. */
+.btn-icon.btn-quiet {
+    background: transparent;
+    border-color: transparent;
+    color: var(--c-ink-3);
+}
+
+.btn-icon.btn-quiet:hover:not(:disabled) {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
 .btn-icon {
     width: var(--control-h);
     padding: 0;
@@ -1568,9 +1611,10 @@ input[type="checkbox"] {
     transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 
+/* Pinned ones sit under "Pinned" already, so their pin waits for the
+   pointer like everyone else's. */
 #listView .contact-card:hover .pin-btn,
-#listView .pin-btn:focus-visible,
-#listView .pin-btn.pin-btn--active {
+#listView .pin-btn:focus-visible {
     opacity: 1;
 }
 
@@ -3239,6 +3283,33 @@ input[type="checkbox"] {
 .todo-priority--medium { background: var(--pri-medium-soft); color: var(--pri-medium-ink); }
 .todo-priority--low { background: var(--c-tint-2); color: var(--c-ink-2); }
 
+/* Priority as a mark, everywhere a to-do is listed (CRMFormat.priorityMark):
+   "!" in orange for medium, "!!" in red for high. Low and none: nothing. */
+.prio-mark {
+    display: inline-block;
+    min-width: 12px;
+    font: 800 var(--t-md)/1 var(--font);
+    letter-spacing: -0.06em;
+    text-align: center;
+    cursor: default;
+}
+
+.prio-mark--high { color: var(--c-danger); }
+.prio-mark--medium { color: var(--pri-medium); }
+
+/* On Home the mark stands in the middle of its row, where the pill was. */
+.home-todo-main > .prio-mark {
+    align-self: center;
+    margin-left: 8px;
+}
+
+/* In the to-do sheet: the mark, then the word. */
+.prio-word {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
 .todo-due-overdue {
     color: var(--c-danger-ink);
     font-weight: 500;
@@ -3522,6 +3593,13 @@ input[type="checkbox"] {
     min-width: 0;
 }
 
+#todoView .todo-group-kind {
+    flex: none;
+    align-self: center;
+    display: inline-grid;
+    color: var(--c-ink-4);
+}
+
 #todoView .todo-group-title {
     margin: 0;
     padding: 0;
@@ -3735,6 +3813,11 @@ input[type="checkbox"] {
         width: 100%;
     }
 
+    .team-list {
+        flex-direction: column;
+        padding: 0;
+    }
+
     .sidebar .nav-item:not(.profile-pop-item),
     .sidebar .nav-item.toggle-btn:not(.profile-pop-item) {
         width: 48px;
@@ -3842,6 +3925,11 @@ input[type="checkbox"] {
     .sidebar-collapsed .sidebar-foot {
         align-items: center;
         width: 100%;
+    }
+
+    .sidebar-collapsed .team-list {
+        flex-direction: column;
+        padding: 0;
     }
 
     .sidebar-collapsed .sidebar .nav-item:not(.profile-pop-item),
@@ -7103,6 +7191,145 @@ details.import-instructions p {
     gap: 6px;
 }
 
+/* ---- Header actions: assignee, then the sheet's actions as icons ----
+   Edit, done, archive and delete sit next to the close button; the footer
+   is only there while editing (Cancel / Save). */
+.ov-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    margin: -4px -8px 0 0;
+}
+
+.ov-head-actions .modal-close {
+    margin: 0;
+}
+
+.ov-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--c-ink-3);
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.ov-icon-btn:hover:not(:disabled) {
+    background: var(--c-tint-3);
+    color: var(--c-ink);
+}
+
+.ov-icon-btn:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+.ov-icon-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.ov-icon-btn.ov-icon-danger:hover:not(:disabled) {
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+
+/* Done: the tick filled green while the to-do is done. */
+.ov-done-btn.is-on {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+.ov-done-btn:hover:not(:disabled) {
+    color: var(--c-success-ink);
+}
+
+/* The assignee: just the face. The select lies invisibly on top of it, so a
+   click opens the usual picker - on a phone too. */
+.ov-head-assignee {
+    margin-right: 6px;
+}
+
+.ov-head-icons {
+    display: contents;
+}
+
+.ov-head-assignee .assignee-bar {
+    position: relative;
+    display: block;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+}
+
+.ov-head-assignee .assignee-bar-face {
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 3px var(--c-line);
+    transition: box-shadow var(--dur-1) var(--ease);
+}
+
+.ov-head-assignee .assignee-bar:hover .assignee-bar-face,
+.ov-head-assignee .assignee-bar:focus-within .assignee-bar-face {
+    box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 3px var(--c-accent);
+}
+
+.ov-head-assignee .assignee-bar-body {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+}
+
+.ov-head-assignee .assignee-bar-label {
+    display: none;
+}
+
+.ov-head-assignee .assignee-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Empty is not shown: no "No notes yet", no "—". Where something can be
+   added, the section's own add control stays; a section with nothing to
+   show and nothing to add goes altogether. */
+.modal .overview-body .empty-hint,
+#eventSheet .esheet-empty:not(.esheet-picker-results .esheet-empty),
+.modal .tcal-linked-empty {
+    display: none;
+}
+
+.modal .overview-section:has(> #contactProjects > .empty-hint:only-child) {
+    display: none;
+}
+
+#todoDetailModal:not(.is-editing) .overview-detail-item:has(> .detail-value[data-ov="view"] > .detail-empty:only-child),
+#projectOverviewModal:not(.is-editing) .overview-detail-item:has(> .detail-value[data-ov="view"] > .detail-empty:only-child),
+#todoDetailModal:not(.is-editing) .overview-detail-item:has(> .detail-value.detail-empty[data-ov="view"]),
+#projectOverviewModal:not(.is-editing) .overview-detail-item:has(> .detail-value.detail-empty[data-ov="view"]) {
+    display: none;
+}
+
+/* Viewing: no footer. Editing: Cancel and Save. */
+#projectOverviewModal:not(.is-editing) .ov-footer,
+#todoDetailModal:not(.is-editing) .ov-footer {
+    display: none;
+}
+
 /* ---- Footer: delete on the left, quietly; the main action right ---- */
 
 /* The destructive action: red text without a frame, a soft red behind it on
@@ -9611,13 +9838,12 @@ details.import-instructions p {
     margin: 0 0 20px;
 }
 
-/* Rows in columns. The line goes above each row rather than under it, so
-   every row of the grid has one, however many columns there are. */
+/* The entries as small cards side by side: date, partner, amount. */
 #workloadView .home-bk .home-bk-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    /* style.css spaces the stacked lists apart; here the lines meet. */
-    gap: 0;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    padding: 0 22px 20px;
     border-top: 0;
 }
 
@@ -9631,31 +9857,59 @@ details.import-instructions p {
     font-size: var(--t-lg);
 }
 
-#workloadView .home-bk .workload-row,
-#workloadView .home-bk .workload-row:last-child {
+#workloadView .home-bk .home-bk-item,
+#workloadView .home-bk .home-bk-item:last-child {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     min-height: 0;
-    border-top: 1px solid var(--c-line-2);
-    border-bottom: 0;
-}
-
-/* The drop frame sits a little inside the row: drawn on the row itself, the
-   card's rounded corners would cut into it on the rows along the card's
-   edge, giving it two different radii. */
-#workloadView .home-bk .workload-row.is-drop-target {
-    isolation: isolate;
-    background: transparent;
-    box-shadow: none;
-}
-
-#workloadView .home-bk .workload-row.is-drop-target::before {
-    content: "";
-    position: absolute;
-    inset: 4px 8px;
-    z-index: -1;
+    padding: 12px 14px;
+    border: 1px solid var(--c-line);
     border-radius: var(--r-md);
+    background: var(--c-surface);
+    text-align: left;
+    transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+
+#workloadView .home-bk .home-bk-item:hover {
+    border-color: var(--c-line-strong);
+    background: var(--c-tint-3);
+}
+
+.home-bk-date {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.home-bk-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.home-bk-sum {
+    margin-top: 4px;
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.home-bk-note {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+/* Dropping a PDF: the card itself lights up. */
+#workloadView .home-bk .home-bk-item.is-drop-target {
+    border-color: var(--c-accent);
     background: var(--c-accent-soft);
-    box-shadow: inset 0 0 0 2px var(--c-accent);
-    pointer-events: none;
+    box-shadow: inset 0 0 0 1px var(--c-accent);
 }
 
 /* ---- Loading: the cards' shape in placeholders ---- */

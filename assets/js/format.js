@@ -175,9 +175,22 @@
         return date(d);
     }
 
+    /**
+     * A to-do's priority as a mark: "!" orange for medium, "!!" red for high.
+     * Low and none show nothing - the same everywhere in the CRM.
+     */
+    function priorityMark(priority) {
+        const key = String(priority || '').trim().toLowerCase();
+        if (key !== 'high' && key !== 'medium') return '';
+        const label = key === 'high' ? 'High priority' : 'Medium priority';
+        return '<span class="prio-mark prio-mark--' + key + '" role="img" title="' + label + '" aria-label="' + label + '">'
+            + (key === 'high' ? '!!' : '!') + '</span>';
+    }
+
     root.CRMFormat = {
         MINUS, MONTHS,
         amount, amountRange, amountShort,
-        toDate, date, dateRange, time, dateTime, month, ago
+        toDate, date, dateRange, time, dateTime, month, ago,
+        priorityMark
     };
 })(typeof window !== 'undefined' ? window : this);

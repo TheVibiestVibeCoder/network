@@ -53,7 +53,12 @@
 /* Within a kind of record: new, changes, deletions - a quieter heading, so
    the record types stay the main structure. */
 .review-subgroup + .review-subgroup {
-    margin-top: 14px;
+    margin-top: 10px;
+}
+
+/* In a cluster the date stands once, on its head. */
+.review-cluster .review-row .review-row-when {
+    visibility: hidden;
 }
 
 /* Second level: a quiet grey label, no count - well below the record type

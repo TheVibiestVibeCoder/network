@@ -378,7 +378,7 @@
                         </span>
                         ${context ? `<span class="home-row-context">${context}</span>` : ''}
                     </span>
-                    ${priorityLabel ? `<span class="home-prio-pill" data-tone="${priority}">${priorityLabel}</span>` : ''}
+                    ${priorityLabel ? window.CRMFormat.priorityMark(priority) : ''}
                 </span>
             </li>`;
     }
@@ -445,14 +445,13 @@
      */
     function bookkeepingBand(entries) {
         if (!entries.length) return '';
-        const missing = entries.filter(e => !e.no_pdf_needed).length;
 
         return `
             <section class="home-card home-mini is-bookkeeping home-bk" aria-labelledby="homeBkHeading">
                 <div class="home-card-head">
                     <h2 class="home-card-title" id="homeBkHeading">
                         <span class="home-mini-icon" aria-hidden="true">${ICON_RECEIPT}</span>
-                        Bookkeeping${missing ? ` <span class="home-card-sub">· ${missing} ${missing === 1 ? 'PDF' : 'PDFs'} missing</span>` : ''}
+                        Bookkeeping
                     </h2>
                 </div>
                 <div class="workload-list home-bk-list">${entries.map(bookkeepingRow).join('')}</div>
@@ -629,16 +628,23 @@
      * attaching the invoice is what finishes it: drop the PDF onto the row
      * (bindPdfDrops), or click through to the Bookkeeping tab.
      */
+    /**
+     * One entry as a small card: the date small on top, the partner, then
+     * the amount - in the bank's column order. Still a drop target for its PDF.
+     */
     function bookkeepingRow(entry) {
-        // The date leads the summary ("Sep 19 · Partner · 120,00 €"), and that
-        // the PDF is missing the card's heading says once for all of them.
+        const parts = Array.isArray(entry.parts) && entry.parts.length ? entry.parts : [entry.summary || ''];
+        const [first, second, third] = parts;
+        const lines = parts.length >= 3
+            ? `<span class="home-bk-date">${escapeHtml(first)}</span>
+               <span class="home-bk-name">${escapeHtml(second)}${newTag('bookkeeping', entry.id)}</span>
+               <span class="home-bk-sum">${escapeHtml(third)}</span>`
+            : `<span class="home-bk-name">${parts.map(escapeHtml).join(' · ')}${newTag('bookkeeping', entry.id)}</span>`;
         return `
-            <button type="button" class="workload-row" data-workload-open="bookkeeping" data-id="${entry.id}"
+            <button type="button" class="workload-row home-bk-item" data-workload-open="bookkeeping" data-id="${entry.id}"
                     data-drop-label="Drop PDF to attach" title="Open in Bookkeeping, or drop the invoice PDF here">
-                <span class="workload-row-body">
-                    <span class="workload-row-title">${escapeHtml(entry.summary || '')}${newTag('bookkeeping', entry.id)}</span>
-                    ${entry.no_pdf_needed ? '<span class="workload-row-context">Marked as needing no PDF</span>' : ''}
-                </span>
+                ${lines}
+                ${entry.no_pdf_needed ? '<span class="home-bk-note">No PDF needed</span>' : ''}
             </button>
         `;
     }
@@ -1022,7 +1028,7 @@
                 : `<span class="team-face">${escapeHtml(getInitials(person.name))}</span>`;
 
             return `
-                <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="Open ${escapeHtml(person.name)}'s work">
+                <button type="button" class="team-item" data-team-person="${escapeHtml(key)}" title="${escapeHtml(person.name)}" aria-label="${escapeHtml(person.name)}">
                     ${face}
                     <span class="team-name">${escapeHtml(person.name)}</span>
                 </button>

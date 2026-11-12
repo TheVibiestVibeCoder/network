@@ -825,7 +825,6 @@
                 <span class="detail-label">${label}</span>
                 <span class="detail-value">${value}</span>
             </div>`;
-        const priorityWord = { high: 'High', medium: 'Medium', low: 'Low' };
 
         return `
             <div class="overview-section">
@@ -873,7 +872,7 @@
                             </label>
                             <button type="button" class="ptodo-title" data-meeting-open-todo="${t.id}" title="Open to edit or reassign">${escapeHtml(t.title)}</button>
                             <span class="ptodo-meta">
-                                ${t.priority ? `<span class="todo-priority todo-priority--${escapeHtml(t.priority)}">${escapeHtml(priorityWord[t.priority] || t.priority)}</span>` : ''}
+                                ${t.priority ? window.CRMFormat.priorityMark(t.priority) : ''}
                                 ${t.due_date ? `<span class="todo-due">${escapeHtml(formatDate(t.due_date))}</span>` : ''}
                                 ${personChip(t.assigned_to, t.assigned_to_name) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
                             </span>

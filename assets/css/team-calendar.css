@@ -126,8 +126,10 @@
     border-radius: var(--r-sm);
 }
 
-.tcal-toolbar .btn-icon {
+.tcal-toolbar .btn-icon,
+.tcal-toolbar .btn-add {
     width: var(--tcal-ctl);
+    padding: 0;
 }
 
 /* Back, Today, forward: one control. */
@@ -349,8 +351,19 @@
     color: var(--c-ink-4);
 }
 
+.tcal-sync-text {
+    font-variant-numeric: tabular-nums;
+}
+
 .tcal-sync-problem {
-    color: var(--c-danger-ink);
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--c-danger);
+    color: #FFFFFF;
+    font-weight: 700;
     cursor: help;
 }
 
@@ -1084,8 +1097,39 @@ button.tcal-dayhead:hover {
     font-size: var(--t-sm);
 }
 
+/* The facts of an appointment: one line each, an icon in front. */
 .esheet-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.esheet-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: var(--t-sm);
+    color: var(--c-ink);
+}
+
+.esheet-fact-icon {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    color: var(--c-ink-4);
+}
+
+.esheet-fact-value {
+    flex: 1;
+    min-width: 0;
+    padding-top: 3px;
+}
+
+.esheet-fact-value .esheet-people {
+    padding-top: 0;
+    margin-top: -3px;
 }
 
 .esheet-join {
@@ -1608,8 +1652,7 @@ button.tcal-dayhead:hover {
 }
 
 @media (max-width: 640px) {
-    .esheet-pair,
-    .esheet-facts {
+    .esheet-pair {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -1847,13 +1890,14 @@ button.tcal-dayhead:hover {
         --tcal-ctl: 38px;
     }
 
-    /* Three tidy rows: title and paging, the date and Day/Week, then the
-       actions. */
+    /* Two rows: the date and paging, then Day/Week and the actions. The
+       tab bar already says where you are, so the title is for screen
+       readers only here. */
     .tcal-toolbar {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
         align-items: center;
-        gap: 10px 8px;
+        gap: 10px 6px;
     }
 
     .tcal-toolbar-left,
@@ -1861,17 +1905,21 @@ button.tcal-dayhead:hover {
         display: contents;
     }
 
-    .tcal-title { grid-area: 1 / 1; }
-    .tcal-nav { grid-area: 1 / 2 / 2 / 4; justify-self: end; }
-    .tcal-date { grid-area: 2 / 1; margin-left: 0; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; }
-    .tcal-mode { grid-area: 2 / 2 / 3 / 4; justify-self: end; }
-    .tcal-free-btn { grid-area: 3 / 1; justify-self: start; }
-    .tcal-new-btn { grid-area: 3 / 2; }
-    .tcal-settings-btn { grid-area: 3 / 3; }
-
-    .tcal-new-more {
-        display: none;
+    .tcal-title {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
     }
+
+    .tcal-date { grid-area: 1 / 1; margin-left: 0; font-size: var(--t-md); overflow: hidden; text-overflow: ellipsis; }
+    .tcal-nav { grid-area: 1 / 2 / 2 / 5; justify-self: end; }
+    .tcal-mode { grid-area: 2 / 1; justify-self: start; }
+    .tcal-free-btn { grid-area: 2 / 2; }
+    .tcal-new-btn { grid-area: 2 / 3; }
+    .tcal-settings-btn { grid-area: 2 / 4; }
 
     /* People in one row that scrolls, the sync button at its end. */
     .tcal-subbar {
@@ -1893,10 +1941,6 @@ button.tcal-dayhead:hover {
 
     .tcal-sync {
         flex: none;
-    }
-
-    .tcal-sync-text {
-        display: none;
     }
 
     .tcal-set-person {

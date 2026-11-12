@@ -258,6 +258,12 @@ body.bk-col-resizing * {
     transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
+/* Icon only: square, the label in the tooltip. */
+.bk-btn.bk-btn-icon {
+    width: var(--bk-control-height);
+    padding: 0;
+}
+
 .bk-btn:hover {
     background: var(--color-surface-hover);
 }

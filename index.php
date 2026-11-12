@@ -841,19 +841,16 @@ function assetUrl(string $path): string
 
                 <!-- The team, one click away from each person's workload -->
                 <div class="sidebar-team" id="sidebarTeamWrap" hidden>
-                    <div class="sidebar-heading">Team</div>
-                    <div class="team-list" id="sidebarTeam"></div>
+                    <div class="team-list" id="sidebarTeam" role="group" aria-label="Team"></div>
                 </div>
 
                 <div class="sidebar-foot">
                     <div class="user-chip-wrap">
                         <button type="button" class="user-chip" id="userChip"
-                                title="<?= htmlspecialchars(($currentUser['email'] ?? 'Owner login') . ' - ' . ($isAdmin ? 'Administrator' : 'Member')) ?>"
-                                aria-haspopup="dialog" aria-expanded="false">
+                                title="Profile" aria-haspopup="dialog" aria-expanded="false">
                             <span class="user-chip-avatar" id="userChipAvatar"><?= htmlspecialchars(userInitials($currentUser['name'] ?? '')) ?></span>
                             <span class="user-chip-text">
                                 <span class="user-chip-name"><?= htmlspecialchars($currentUser['name'] ?? '') ?></span>
-                                <span class="user-chip-role"><?= $isAdmin ? 'Admin' : 'Member' ?></span>
                             </span>
                         </button>
                         <!-- Profile popover: your picture, your name, settings, sign out -->
@@ -881,7 +878,6 @@ function assetUrl(string $path): string
                                         </button>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="profile-pop-sub"><?= htmlspecialchars($currentUser['email'] ?? 'Owner login') ?></div>
                                 </div>
 
                                 <!-- What can be done with the picture -->
@@ -1020,10 +1016,11 @@ function assetUrl(string $path): string
                                     <button type="button" class="tcal-mode-btn is-active" data-tcal-mode="day" aria-pressed="true">Day</button>
                                     <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
                                 </div>
-                                <button type="button" class="btn btn-secondary btn-small tcal-free-btn" data-tcal="free" aria-expanded="false" aria-controls="tcalFree">Find a free slot</button>
-                                <button type="button" class="btn btn-primary btn-small tcal-new-btn" data-tcal="new" aria-label="New appointment" hidden>
-                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                                    <span>New<span class="tcal-new-more"> appointment</span></span>
+                                <button type="button" class="btn btn-icon tcal-free-btn" data-tcal="free" aria-expanded="false" aria-controls="tcalFree" title="Find a free slot" aria-label="Find a free slot">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11V6.5A1.5 1.5 0 0 0 18.5 5h-13A1.5 1.5 0 0 0 4 6.5v12A1.5 1.5 0 0 0 5.5 20H11"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/><circle cx="16.5" cy="16.5" r="3"/><path d="m21 21-2.4-2.4"/></svg>
+                                </button>
+                                <button type="button" class="btn btn-primary btn-add tcal-new-btn" data-tcal="new" title="New appointment" aria-label="New appointment" hidden>
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 </button>
                                 <button type="button" class="btn btn-icon tcal-settings-btn" data-tcal="settings" title="Calendar settings" aria-label="Calendar settings" hidden>
                                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
@@ -1198,7 +1195,7 @@ function assetUrl(string $path): string
                     <header class="bk-bar">
                         <div class="bk-bar-lead">
                             <h1 class="view-title bk-bar-title">Bookkeeping</h1>
-                            <span class="view-count bk-row-count" id="bkRowCount">0 entries</span>
+                            <span class="view-count bk-row-count" id="bkRowCount" hidden>0 entries</span>
                             <!-- Invoices in the drop zone that fit a row without a PDF
                                  (bookkeeping.js); opens the list to assign them all. -->
                             <button type="button" class="bk-match-pill" id="bkMatchPill" title="Invoices in the drop zone that fit an entry" hidden>
@@ -1214,12 +1211,11 @@ function assetUrl(string $path): string
                             </div>
 
                             <div class="bk-menu-wrap">
-                                <button type="button" class="bk-btn" id="bkSelectToolsBtn"
+                                <button type="button" class="bk-btn bk-btn-icon" id="bkSelectToolsBtn"
                                         aria-haspopup="dialog" aria-expanded="false" aria-controls="bkSelectTools"
                                         title="Select rows by date">
-                                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
-                                    <span>Select</span>
-                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="bk-btn-chevron" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+                                    <span class="sr-only">Select rows by date</span>
                                 </button>
 
                                 <div class="bk-menu" id="bkSelectTools" role="dialog" aria-label="Select rows by date" hidden>
@@ -1248,9 +1244,8 @@ function assetUrl(string $path): string
                                 </div>
                             </div>
 
-                            <button type="button" class="bk-btn bk-btn-primary" id="bkImportCsvBtn" title="Import a CSV file">
-                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
-                                <span>Import</span>
+                            <button type="button" class="bk-btn bk-btn-primary bk-btn-icon" id="bkImportCsvBtn" title="Import bank statement (CSV)" aria-label="Import bank statement (CSV)">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
                             </button>
                             <input type="file" id="bkCsvInput" accept=".csv,text/csv" hidden>
                         </div>
@@ -1277,9 +1272,8 @@ function assetUrl(string $path): string
                                     Drop Zone
                                     <span class="bk-pool-count" id="bkPoolCount">0 files</span>
                                 </h3>
-                                <button type="button" class="bk-btn bk-btn-small" id="bkPoolBrowseBtn" title="Upload PDFs">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
-                                    <span>Upload</span>
+                                <button type="button" class="bk-icon-btn" id="bkPoolBrowseBtn" title="Upload PDFs" aria-label="Upload PDFs">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
                                 </button>
                                 <button type="button" class="bk-icon-btn bk-dropzone-collapse" id="bkDropzoneCollapse" title="Fold the drop zone away" aria-controls="bkDropzone" aria-expanded="true">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1345,29 +1339,28 @@ function assetUrl(string $path): string
                             </div>
                             <div class="list-header-actions">
                                 <div class="segmented" role="tablist" aria-label="Show contacts as">
-                                    <button type="button" class="segmented-btn active" data-contacts-mode="list" role="tab" aria-selected="true">
+                                    <button type="button" class="segmented-btn active" data-contacts-mode="list" role="tab" aria-selected="true" title="List">
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
                                             <path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>
                                         </svg>
-                                        <span>List</span>
+                                        <span class="sr-only">List</span>
                                     </button>
-                                    <button type="button" class="segmented-btn" data-contacts-mode="map" id="contactsMapBtn" role="tab" aria-selected="false">
+                                    <button type="button" class="segmented-btn" data-contacts-mode="map" id="contactsMapBtn" role="tab" aria-selected="false" title="Map">
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                             <path d="m9 4.5-5.5 2v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>
                                         </svg>
-                                        <span>Map</span>
+                                        <span class="sr-only">Map</span>
                                     </button>
                                 </div>
                                 <button type="button" class="btn btn-icon list-filter-toggle" id="listFilterToggle" title="Filters">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
                                 </button>
-                                <button type="button" class="btn btn-secondary" id="importExportBtn" title="Import/Export Contacts">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
-                                    <span>Import/Export</span>
+                                <!-- Occasional: a quiet icon, out of the way -->
+                                <button type="button" class="btn btn-icon btn-quiet" id="importExportBtn" title="Import / export" aria-label="Import / export">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4.5v12"/><path d="m4.5 13 3.5 3.5 3.5-3.5"/><path d="M16 19.5v-12"/><path d="m12.5 11 3.5-3.5 3.5 3.5"/></svg>
                                 </button>
-                                <button type="button" class="btn btn-primary" id="addContactBtn" title="Add Contact">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                    <span>Add Contact</span>
+                                <button type="button" class="btn btn-primary btn-add" id="addContactBtn" title="New contact" aria-label="New contact">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1422,9 +1415,8 @@ function assetUrl(string $path): string
                                 <button type="button" class="btn btn-icon list-filter-toggle" id="todoFilterToggle" title="Filters">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
                                 </button>
-                                <button type="button" class="btn btn-primary" id="addTodoBtn" title="New To-Do">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                    <span>New To-Do</span>
+                                <button type="button" class="btn btn-primary btn-add" id="addTodoBtn" title="New to-do" aria-label="New to-do">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1497,9 +1489,8 @@ function assetUrl(string $path): string
                                     <span id="startMeetingLabel">Start meeting</span>
                                 </button>
                                 <?php endif; ?>
-                                <button type="button" class="btn btn-primary" id="addProjectBtn" title="Add Project">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                    <span>Add Project</span>
+                                <button type="button" class="btn btn-primary btn-add" id="addProjectBtn" title="New project" aria-label="New project">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -1693,18 +1684,22 @@ function assetUrl(string $path): string
                             <p class="overview-edited" id="overviewEdited"></p>
                         </div>
                     </div>
-                    <button type="button" class="modal-close" id="closeOverviewModal">&times;</button>
+                    <!-- Who is responsible, then the actions, as icons -->
+                    <div class="ov-head-actions">
+                        <div class="ov-head-assignee" id="overviewAssignee"></div>
+                        <button type="button" class="ov-icon-btn" id="editContactBtn" title="Edit" aria-label="Edit">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
+                        </button>
+                        <button type="button" class="modal-close" id="closeOverviewModal" aria-label="Close">&times;</button>
+                    </div>
                 </div>
                 <div class="modal-body overview-body">
-                    <!-- Who is responsible for this contact -->
-                    <div id="overviewAssignee"></div>
 
                     <!-- Proposals from Claude about this contact (review.js) -->
                     <div class="review-record-slot" id="overviewReview" hidden></div>
 
                     <!-- Contact Details Section -->
                     <div class="overview-section">
-                        <h3 class="overview-section-title">Contact Information</h3>
                         <div class="overview-details" id="overviewDetails">
                             <!-- Details will be populated by JS -->
                         </div>
@@ -1781,14 +1776,6 @@ function assetUrl(string $path): string
                             </button>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer ov-footer">
-                    <button type="button" class="btn btn-secondary" id="editContactBtn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/>
-                        </svg>
-                        Edit
-                    </button>
                 </div>
             </div>
         </div>
@@ -2000,11 +1987,18 @@ function assetUrl(string $path): string
                             <p class="overview-edited" id="projectOverviewEdited"></p>
                         </div>
                     </div>
-                    <button type="button" class="modal-close" id="closeProjectOverviewModal">&times;</button>
+                    <div class="ov-head-actions">
+                        <div class="ov-head-assignee" id="projectOverviewAssignee"></div>
+                        <button type="button" class="ov-icon-btn" id="editProjectBtn" data-ov="view" title="Edit" aria-label="Edit">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
+                        </button>
+                        <button type="button" class="ov-icon-btn ov-icon-danger ov-delete-btn" id="deleteProjectOverviewBtn" data-ov="view" title="Archive" aria-label="Archive">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="17" height="4.5" rx="1"/><path d="M5 8.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V8.5"/><path d="M10 12.5h4"/></svg>
+                        </button>
+                        <button type="button" class="modal-close" id="closeProjectOverviewModal" aria-label="Close">&times;</button>
+                    </div>
                 </div>
                 <div class="modal-body overview-body">
-                    <!-- Who is responsible for this project -->
-                    <div id="projectOverviewAssignee"></div>
 
                     <!-- Proposals from Claude about this project (review.js) -->
                     <div class="review-record-slot" id="projectOverviewReview" hidden></div>
@@ -2012,7 +2006,6 @@ function assetUrl(string $path): string
                     <!-- Project Details Section. Start and Est. Completion side by side,
                          then budget; chance and stage on the second row. -->
                     <div class="overview-section">
-                        <h3 class="overview-section-title">Project Information</h3>
                         <div class="overview-details">
                             <div class="overview-detail-item">
                                 <label class="detail-label" for="projectEditStartDate">Start Date</label>
@@ -2176,18 +2169,6 @@ function assetUrl(string $path): string
                     </div>
                 </div>
                 <div class="modal-footer ov-footer">
-                    <button type="button" class="btn btn-secondary ov-delete-btn" id="deleteProjectOverviewBtn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="3.5" y="4" width="17" height="4.5" rx="1"/><path d="M5 8.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V8.5"/><path d="M10 12.5h4"/>
-                        </svg>
-                        Archive
-                    </button>
-                    <button type="button" class="btn btn-secondary" id="editProjectBtn" data-ov="view">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/>
-                        </svg>
-                        Edit
-                    </button>
                     <button type="button" class="btn btn-secondary" id="cancelProjectEditBtn" data-ov="edit">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveProjectEditBtn" data-ov="edit">Save</button>
                 </div>
@@ -2216,12 +2197,23 @@ function assetUrl(string $path): string
                             <p class="overview-edited" id="todoDetailEdited"></p>
                         </div>
                     </div>
-                    <button type="button" class="modal-close" id="closeTodoDetail">&times;</button>
+                    <!-- On a new to-do the assignee is applied right after it
+                         is created (saveTodoEdit in app.js). -->
+                    <div class="ov-head-actions">
+                        <div class="ov-head-assignee" id="todoDetailAssignee"></div>
+                        <button type="button" class="ov-icon-btn ov-done-btn" id="toggleTodoDetailDoneBtn" data-ov="view" title="Mark as done" aria-label="Mark as done">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                        </button>
+                        <button type="button" class="ov-icon-btn" id="editTodoDetailBtn" data-ov="view" title="Edit" aria-label="Edit">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
+                        </button>
+                        <button type="button" class="ov-icon-btn ov-icon-danger ov-delete-btn" id="deleteTodoDetailBtn" data-ov="view" title="Delete" aria-label="Delete">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
+                        </button>
+                        <button type="button" class="modal-close" id="closeTodoDetail" aria-label="Close">&times;</button>
+                    </div>
                 </div>
                 <div class="modal-body overview-body">
-                    <!-- On a new to-do the choice is applied right after it
-                         is created (saveTodoEdit in app.js). -->
-                    <div id="todoDetailAssignee"></div>
 
                     <!-- Proposals from Claude about this to-do (review.js) -->
                     <div class="review-record-slot" id="todoDetailReview" hidden></div>
@@ -2276,19 +2268,6 @@ function assetUrl(string $path): string
                     </div>
                 </div>
                 <div class="modal-footer ov-footer">
-                    <button type="button" class="btn btn-secondary ov-delete-btn" id="deleteTodoDetailBtn">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/>
-                        </svg>
-                        Delete
-                    </button>
-                    <button type="button" class="btn btn-secondary" id="toggleTodoDetailDoneBtn" data-ov="view">Mark as done</button>
-                    <button type="button" class="btn btn-secondary" id="editTodoDetailBtn" data-ov="view">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/>
-                        </svg>
-                        Edit
-                    </button>
                     <button type="button" class="btn btn-secondary" id="cancelTodoEditBtn" data-ov="edit">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveTodoEditBtn" data-ov="edit">Save</button>
                 </div>
@@ -2308,7 +2287,10 @@ function assetUrl(string $path): string
                     <div class="overview-header-info">
                         <div class="overview-title-info" id="esheetHead"></div>
                     </div>
-                    <button type="button" class="modal-close" data-esheet="close" aria-label="Close">&times;</button>
+                    <div class="ov-head-actions">
+                        <div class="ov-head-icons" id="esheetActions"></div>
+                        <button type="button" class="modal-close" data-esheet="close" aria-label="Close">&times;</button>
+                    </div>
                 </div>
                 <div class="modal-body overview-body" id="esheetBody"></div>
                 <div class="modal-footer ov-footer" id="esheetFoot"></div>
