@@ -1426,7 +1426,8 @@
 
         const time = name => (f.all_day ? '' : `<input type="time" class="form-input" data-ef="${name}_time" value="${esc(f[name + '_time'])}" step="900" aria-label="${name === 'start' ? 'Start time' : 'End time'}">`);
         const rows = [];
-        rows.push(`<label class="esheet-check"><input type="checkbox" data-ef="all_day"${f.all_day ? ' checked' : ''}${series ? ' disabled' : ''}> All day</label>`);
+        rows.push(`<div class="esheet-types"><button type="button" class="esheet-type${f.all_day ? ' is-on' : ''}" data-ef-allday aria-pressed="${f.all_day}"${series ? ' disabled title="A series keeps its all-day setting"' : ''}>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/></svg><span>All day</span></button></div>`);
         rows.push(`<div class="esheet-pair">
                 <label class="esheet-field"><span>${f.all_day ? 'From' : 'Starts'}</span><span class="esheet-dt">
                     <input type="date" class="form-input" data-ef="start_date" value="${esc(f.start_date)}" aria-label="Start date">${time('start')}</span></label>
@@ -1450,9 +1451,22 @@
         // whole series) - offered when its own calendar is one of the choices.
         const movable = isNew || (calendars.length > 1 && calendars.some(c => c.key === (d.calendar.key || d.calendar.email)));
         if (movable) {
-            rows.push(`<label class="esheet-field"><span>Calendar</span><select class="form-select" data-ef="organizer">
-                    ${calendars.map(c => `<option value="${esc(c.key)}"${c.key === f.organizer ? ' selected' : ''}>${esc(c.name)}${c.mine && !c.private ? ' (you)' : ''}</option>`).join('')}
-                </select></label>`);
+            // Whose calendar, then - for your own - Public (work) or Private.
+            const owner = calendarEmail(f.organizer);
+            const owners = [];
+            calendars.forEach(c => { if (!owners.some(o => o.email === c.email)) owners.push(c); });
+            const hasPrivate = calendars.some(c => c.private && c.email === owner);
+            const hasWork = calendars.some(c => !c.private && c.email === owner);
+            const personName = c => (state.data.people.find(p => p.email === c.email) || {}).name || c.name.replace(/ – Private$/, '');
+            rows.push(`<div class="esheet-field"><span>Calendar</span><div class="esheet-calendar">
+                    <select class="form-select" data-ef="cal_owner" aria-label="Whose calendar">
+                        ${owners.map(c => `<option value="${esc(c.email)}"${c.email === owner ? ' selected' : ''}>${esc(personName(c))}${c.mine ? ' (you)' : ''}</option>`).join('')}
+                    </select>
+                    ${hasPrivate && hasWork ? `<div class="segmented esheet-cal-kind" role="group" aria-label="Which of the calendars">
+                        <button type="button" class="segmented-btn${privateCal ? '' : ' active'}" data-ef-cal-kind="work" aria-pressed="${!privateCal}">Public</button>
+                        <button type="button" class="segmented-btn${privateCal ? ' active' : ''}" data-ef-cal-kind="private" aria-pressed="${privateCal}">Private</button>
+                    </div>` : ''}
+                </div></div>`);
         }
         // A private appointment is yours alone: nobody from the team in it.
         if (privateCal) {
@@ -1546,6 +1560,30 @@
             reminder: f.reminder === '' || f.reminder === 'custom' ? null : Number(f.reminder),
             type: f.type || null,
         };
+    }
+
+    /** The calendar the sheet's appointment goes into (a calendar key). */
+    function setSheetCalendar(key) {
+        const f = sheet.form;
+        const calendars = (state.data.me && state.data.me.calendars) || [];
+        // A person without a work calendar here: their private one.
+        if (!calendars.some(c => c.key === key)) {
+            const fallback = calendars.find(c => c.email === calendarEmail(key));
+            if (!fallback) return;
+            key = fallback.key;
+        }
+        const previous = calendarEmail(f.organizer);
+        f.organizer = key;
+        const now = calendarEmail(key);
+        f.attendees.delete(now);
+        // Moving an appointment to someone else's calendar keeps whoever was
+        // in it - the one whose calendar it was included.
+        const d = sheet.data;
+        if (sheet.mode === 'edit' && d && previous !== now
+            && (previous === d.calendar.email || d.attendees.some(a => a.email === previous))) {
+            f.attendees.add(previous);
+        }
+        renderSheet();
     }
 
     /** Calendar choices are keyed by the owner's address, "private:" in front for a private one. */
@@ -2528,8 +2566,20 @@
 
     if (els.sheet) {
         els.sheet.addEventListener('click', event => {
-            const target = event.target.closest('[data-esheet], [data-esheet-answer], [data-esheet-link], [data-esheet-unlink], [data-esheet-open], [data-ef-type]');
+            const target = event.target.closest('[data-esheet], [data-esheet-answer], [data-esheet-link], [data-esheet-unlink], [data-esheet-open], [data-ef-type], [data-ef-allday], [data-ef-cal-kind]');
             if (!target || sheet.busy) return;
+            if (target.matches('[data-ef-allday]') && sheet.form) {
+                const f = sheet.form;
+                f.all_day = !f.all_day;
+                if (f.end_date < f.start_date) f.end_date = f.start_date;
+                renderSheet();
+                return;
+            }
+            if (target.dataset.efCalKind && sheet.form) {
+                const owner = calendarEmail(sheet.form.organizer);
+                setSheetCalendar(target.dataset.efCalKind === 'private' ? 'private:' + owner : owner);
+                return;
+            }
             if (target.dataset.efType && sheet.form) {
                 // A second click on the chosen type takes it away again.
                 sheet.form.type = sheet.form.type === target.dataset.efType ? '' : target.dataset.efType;
@@ -2671,19 +2721,9 @@
                 renderSheet();
             } else if (field === 'until' || field === 'reminder') {
                 f[field] = target.value;
-            } else if (field === 'organizer') {
-                const previous = calendarEmail(f.organizer);
-                f.organizer = target.value;
-                const now = calendarEmail(f.organizer);
-                f.attendees.delete(now);
-                // Moving an appointment to someone else's calendar keeps
-                // whoever was in it - the one whose calendar it was included.
-                const d = sheet.data;
-                if (sheet.mode === 'edit' && d && previous !== now
-                    && (previous === d.calendar.email || d.attendees.some(a => a.email === previous))) {
-                    f.attendees.add(previous);
-                }
-                renderSheet();
+            } else if (field === 'cal_owner') {
+                // Another person: their (work) calendar.
+                setSheetCalendar(target.value);
             } else if (['title', 'location', 'url', 'description'].includes(field)) {
                 f[field] = target.value;
             }

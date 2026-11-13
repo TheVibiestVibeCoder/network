@@ -2684,3 +2684,32 @@ button.tcal-dayhead:hover {
     line-height: 1.5;
     color: var(--c-ink-3);
 }
+
+/* Calendar: whose, then - for your own - Public or Private beside it. */
+.esheet-calendar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.esheet-calendar .form-select {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.esheet-cal-kind.segmented {
+    flex: none;
+    padding: 4px;
+    background: var(--c-tint-2);
+}
+
+.esheet-cal-kind .segmented-btn {
+    height: 38px;
+    padding: 0 16px;
+}
+
+.esheet-type:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
