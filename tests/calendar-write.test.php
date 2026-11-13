@@ -342,6 +342,16 @@ check('an appointment hidden from the viewer is not listed for them', !in_array(
     && !in_array('Zahnarzt', array_column($forAnnaLivio['upcoming'], 'title'), true));
 check('the link picker finds contacts and projects', count(CalendarLinks::targets('alpen')) === 2, CalendarLinks::targets('alpen'));
 
+section('Why read only');
+$own = $events->sheet('zahnarzt', null, $vivian);
+check('own private appointment: no edit, and the sheet says why', !$own['can']['edit'] && str_contains((string) $own['can']['reason'], 'private calendar'), $own['can']);
+$server->put($work['livio'], 'from-outside.ics', "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:from-outside\nDTSTAMP:20260101T000000Z\nDTSTART:" . str_replace('-', '', day(5)) . "T090000Z\nDTEND:" . str_replace('-', '', day(5)) . "T100000Z\n"
+    . "SUMMARY:Einladung von aussen\nORGANIZER:mailto:someone@example.org\nATTENDEE;PARTSTAT=ACCEPTED:mailto:" . LIVIO . "\nEND:VEVENT\nEND:VCALENDAR\n");
+sync();
+$outside = $events->sheet('from-outside', null, $livio);
+check('organized outside the team: no edit, and the sheet says who can', !$outside['can']['edit'] && str_contains((string) $outside['can']['reason'], 'outside the team'), $outside['can']);
+check('an appointment that can be changed carries no reason', $events->sheet($uid, null, $livio)['can']['reason'] === null);
+
 section('Another calendar');
 $alone = $events->create(['title' => 'Nur ich', 'start' => day(4) . 'T09:00', 'end' => day(4) . 'T10:00'], $livio);
 $puts = $server->puts;

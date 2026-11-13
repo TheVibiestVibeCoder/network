@@ -166,6 +166,7 @@ final class CalendarEvents
             }
         }
         $can = $this->permissions($original, $viewer, $myAnswer !== null);
+        $can['reason'] = $can['edit'] ? null : $this->readOnlyReason($original, $visible, $organizerEmail, $team, $viewer);
         $calendarOwner = strtolower((string) ($original ?? $visible)['owner_email']);
 
         return [
@@ -585,6 +586,32 @@ final class CalendarEvents
         $stmt->execute(['uid' => $uid]);
         $rid = $stmt->fetchColumn();
         return $rid === false ? null : $rid;
+    }
+
+    /**
+     * Why $viewer may not change this appointment, in a sentence for the
+     * sheet - so a missing Edit is never a riddle.
+     */
+    private function readOnlyReason(?array $original, array $visible, string $organizerEmail, array $team, array $viewer): string
+    {
+        $name = static function (string $email) use ($team): string {
+            return isset($team[$email]) ? $team[$email]['name'] : $email;
+        };
+        if ($original === null) {
+            return isset($team[$organizerEmail])
+                ? 'Its original is in ' . $name($organizerEmail) . "'s work calendar, which the CRM cannot see - shared with the calendar account, to read and write, it can be changed here."
+                : 'Organized by someone outside the team - only they can change it.';
+        }
+        if ($original['kind'] !== 'work') {
+            return 'In a private calendar - private calendars are read only here.';
+        }
+        if ((int) $original['writable'] !== 1) {
+            return $name(strtolower((string) $original['owner_email'])) . "'s work calendar is shared to read only - shared to read and write, it can be changed here.";
+        }
+        if (!$this->store->reaches((string) $original['source_href'])) {
+            return 'The calendar it is in cannot be reached right now.';
+        }
+        return 'Only the organizer, or someone allowed to edit the team calendar, can change it.';
     }
 
     /** @return array{edit: bool, cancel: bool, respond: bool, link: bool} */

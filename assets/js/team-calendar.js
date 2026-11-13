@@ -1341,6 +1341,10 @@
         facts.push(iconFact('calendar', 'Calendar', esc(d.calendar.name)));
         if (d.reminder !== null || d.reminder_custom) facts.push(iconFact('reminder', 'Reminder', esc(reminderText(d))));
         parts.push(`<div class="overview-section esheet-facts">${facts.join('')}</div>`);
+        // No Edit or Delete above: say why, in one quiet line.
+        if (d.can && !d.can.edit && d.can.reason) {
+            parts.push(`<p class="esheet-readonly">${esc(d.can.reason)}</p>`);
+        }
         parts.push(linksHtml(d.links, d.suggestions, d.can.link));
         return parts.join('');
     }

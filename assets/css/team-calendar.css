@@ -2654,3 +2654,14 @@ button.tcal-dayhead:hover {
 .esheet-fact-icon .tcal-type-icon.is-office {
     color: var(--c-ink);
 }
+
+/* Why an appointment cannot be changed here: one quiet line. */
+.esheet-readonly {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    color: var(--c-ink-3);
+}
