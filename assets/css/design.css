@@ -4054,8 +4054,11 @@ input[type="checkbox"] {
         align-items: stretch;
         height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
         padding: 0 4px env(safe-area-inset-bottom);
-        background: var(--c-surface);
-        border-top: 1px solid var(--c-line);
+        /* As on iOS: a frosted bar with a hairline on top. */
+        background: color-mix(in srgb, var(--c-surface) 82%, transparent);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+        border-top: 0.5px solid var(--c-line-strong);
         z-index: 80;
     }
 
@@ -4075,19 +4078,20 @@ input[type="checkbox"] {
         border: 0;
         border-radius: 0;
         background: transparent;
-        color: var(--c-ink-3);
-        font: 500 11px/1.1 var(--font);
+        color: var(--c-ink-4);
+        font: 500 10px/1.1 var(--font);
+        letter-spacing: 0.01em;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* Icon over label, nothing behind them - as Apple's tab bars. */
     .tabbar .tab-item svg {
         box-sizing: content-box;
-        width: 22px;
-        height: 22px;
-        padding: 3px 14px;
-        border-radius: var(--r-full);
-        transition: background-color var(--dur-2) var(--ease);
+        width: 25px;
+        height: 25px;
+        padding: 0;
+        transition: color var(--dur-1) var(--ease);
     }
 
     .tabbar .tab-item span:not(.tab-badge) {
@@ -4097,21 +4101,31 @@ input[type="checkbox"] {
         max-width: 100%;
     }
 
+    /* The open tab: icon and label in the accent colour, the icon filled
+       in softly (iOS shows the filled symbol); the others stay grey. */
     .tabbar .tab-item.active,
-    .tabbar .tab-item.toggle-btn.active {
+    .tabbar .tab-item.toggle-btn.active,
+    .tabbar .tab-item[aria-expanded="true"] {
         background: transparent;
-        color: var(--c-ink);
-        font-weight: 600;
+        color: var(--c-accent);
     }
 
-    /* The active tab wears a soft pill behind its icon. */
-    .tabbar .tab-item.active svg {
-        background: var(--c-tint);
+    .tabbar .tab-item.active svg,
+    .tabbar .tab-item[aria-expanded="true"] svg {
+        fill: color-mix(in srgb, currentColor 16%, transparent);
         stroke-width: 2;
     }
 
-    .tabbar .tab-item[aria-expanded="true"] {
-        color: var(--c-ink);
+    /* Claude's mark is a filled shape: a little smaller, so it weighs the
+       same as the outlined icons beside it. */
+    .tabbar .tab-item[data-view="review"] svg {
+        width: 21px;
+        height: 21px;
+        padding: 2px;
+    }
+
+    .tabbar .tab-item[data-view="review"].active svg {
+        fill: currentColor;
     }
 
     .tabbar .tab-badge,
@@ -4270,7 +4284,8 @@ input[type="checkbox"] {
     }
 
     .tabbar .tab-item svg {
-        padding: 3px 10px;
+        width: 23px;
+        height: 23px;
     }
 }
 
