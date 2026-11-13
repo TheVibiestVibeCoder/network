@@ -964,8 +964,14 @@
         const { item, seg } = block;
         const label = durationLabel(item.buffer) + ' travel';
         const across = blockGeometry(block).replace(/;z-index:\d+/, '');
-        const band = (from, to, side) => (to > from
-            ? `<div class="tcal-buffer is-${side}" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;${across}" title="${esc(label)}" aria-hidden="true"></div>` : '');
+        // A thin line to the appointment, in its middle how long, when there is room.
+        const band = (from, to, side) => {
+            if (to <= from) return '';
+            const height = (to - from) * hourPx / 60;
+            const tag = height >= 26
+                ? `<span class="tcal-buffer-tag">${typeIcon('external', 11)}${esc(durationLabel(item.buffer))}</span>` : '';
+            return `<div class="tcal-buffer is-${side}" style="top:${from * hourPx / 60}px;height:${height}px;${across}" title="${esc(label)}" aria-hidden="true">${tag}</div>`;
+        };
         // Only where the appointment starts and ends on this day.
         const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start, 'before') : '';
         const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer), 'after') : '';

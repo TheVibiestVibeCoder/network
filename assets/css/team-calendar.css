@@ -1136,32 +1136,38 @@ button.tcal-dayhead:hover {
     pointer-events: none;
 }
 
-/* Travel time: four lines in the appointment's lane, the one nearest the
-   appointment the thickest, the outermost the thinnest - on the way there
-   above it, on the way back below. (Hatching means private.) */
+/* Travel time: a thin line from the appointment, on it how long - on the
+   way there above the appointment, on the way back below. */
 .tcal-buffer {
-    --buf: color-mix(in srgb, var(--c-accent) 45%, transparent);
-    background-repeat: no-repeat;
+    display: grid;
+    place-items: center;
 }
 
-.tcal-buffer.is-before {
-    background-image:
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf));
-    background-size: calc(100% - 16px) 1px, calc(100% - 16px) 1.5px, calc(100% - 16px) 2px, calc(100% - 16px) 3px;
-    background-position: 8px 12.5%, 8px 37.5%, 8px 62.5%, 8px 87.5%;
+.tcal-buffer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1.5px;
+    margin-left: -0.75px;
+    background: color-mix(in srgb, var(--c-accent) 45%, transparent);
 }
 
-.tcal-buffer.is-after {
-    background-image:
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf)),
-        linear-gradient(var(--buf), var(--buf));
-    background-size: calc(100% - 16px) 3px, calc(100% - 16px) 2px, calc(100% - 16px) 1.5px, calc(100% - 16px) 1px;
-    background-position: 8px 12.5%, 8px 37.5%, 8px 62.5%, 8px 87.5%;
+.tcal-buffer-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 30%, transparent);
+    color: var(--c-accent);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 /* With the right to add appointments, a found slot is booked by a click. */
