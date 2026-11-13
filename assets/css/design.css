@@ -12621,6 +12621,14 @@ textarea.form-input:focus,
     border-right: 0;
 }
 
+/* On a phone it is a drawer over the content: it needs the page's ground
+   under it, or the content shows through. */
+@media (max-width: 768px) {
+    .sidebar {
+        background: var(--c-bg);
+    }
+}
+
 .sidebar .nav-item:hover {
     background: color-mix(in srgb, var(--c-surface) 55%, transparent);
 }
