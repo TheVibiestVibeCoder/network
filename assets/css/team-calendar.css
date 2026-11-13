@@ -65,7 +65,6 @@
 }
 
 .tcal-toolbar,
-.tcal-subbar,
 .tcal-search,
 .tcal-free {
     flex: none;
@@ -266,18 +265,169 @@
     letter-spacing: -0.02em;
 }
 
-/* ---- People and sync ---------------------------------------------------- */
+/* ---- Whose calendars: a button with their faces, the list below it ----- */
 
-.tcal-subbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 16px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
+.tcal-who {
+    position: relative;
 }
 
-.tcal-people,
+.tcal-who-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--tcal-ctl);
+    padding: 0 8px 0 6px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: var(--ctl, var(--c-surface));
+    color: var(--c-ink-3);
+    font: inherit;
+    cursor: pointer;
+}
+
+.tcal-who-btn:hover,
+.tcal-who-btn.is-open {
+    background: var(--ctl-hover, var(--c-tint-3));
+    color: var(--c-ink);
+}
+
+.tcal-who-btn:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+.tcal-who-faces {
+    display: inline-flex;
+    align-items: center;
+}
+
+.tcal-who-faces .tcal-face {
+    --face: 24px;
+    --face-ring: var(--c-surface);
+}
+
+.tcal-who-faces .tcal-face + .tcal-face {
+    margin-left: -6px;
+}
+
+.tcal-who-faces .tcal-face--more {
+    width: auto;
+    min-width: 24px;
+    padding: 0 5px;
+    border-radius: 12px;
+    font-size: 10px;
+}
+
+.tcal-who-none {
+    padding: 0 4px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.tcal-who-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    width: 240px;
+    max-width: calc(100vw - 32px);
+    padding: 6px;
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    box-shadow: var(--e-3);
+}
+
+.tcal-who-menu[hidden] {
+    display: none;
+}
+
+.tcal-who-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-ink-3);
+    font: inherit;
+    font-size: var(--t-sm);
+    text-align: left;
+    cursor: pointer;
+}
+
+.tcal-who-item:hover,
+.tcal-who-item:focus-visible {
+    background: var(--c-tint-3);
+    outline: none;
+}
+
+.tcal-who-item .tcal-face {
+    --face: 24px;
+    --face-ring: transparent;
+}
+
+.tcal-who-item:not(.is-on) .tcal-face {
+    filter: grayscale(1);
+    opacity: 0.5;
+}
+
+.tcal-who-item.is-on {
+    color: var(--c-ink);
+    font-weight: 500;
+}
+
+.tcal-who-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tcal-who-you {
+    margin-left: 4px;
+    font-size: var(--t-xs);
+    font-weight: 400;
+    color: var(--c-ink-4);
+}
+
+.tcal-who-tick {
+    display: inline-flex;
+    width: 16px;
+    color: var(--c-accent);
+    visibility: hidden;
+}
+
+.tcal-who-item.is-on .tcal-who-tick {
+    visibility: visible;
+}
+
+.tcal-who-all {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px;
+    border: 0;
+    border-top: 1px solid var(--c-line-2);
+    border-radius: 0 0 var(--r-sm) var(--r-sm);
+    background: transparent;
+    color: var(--c-accent);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tcal-who-all:hover {
+    background: var(--c-tint-3);
+}
+
+/* ---- Sync, beside the date ---- */
+
 .tcal-picks {
     display: flex;
     flex-wrap: wrap;
@@ -338,7 +488,8 @@
 .tcal-sync {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    margin-left: 4px;
     font-size: var(--t-xs);
     color: var(--c-ink-4);
 }
@@ -2394,6 +2545,8 @@ button.tcal-dayhead:hover {
     .tcal-free-btn { grid-area: 2 / 3; }
     .tcal-new-btn { grid-area: 2 / 4; }
     .tcal-settings-btn { grid-area: 2 / 5; }
+    .tcal-who { grid-area: 3 / 1; justify-self: start; }
+    .tcal-sync { grid-area: 3 / 2 / 4 / 6; justify-self: end; }
 
     .tcal-result-open {
         grid-template-columns: minmax(0, 1fr) auto;
@@ -2404,26 +2557,9 @@ button.tcal-dayhead:hover {
         grid-column: 1 / -1;
     }
 
-    /* People in one row that scrolls, the sync button at its end. */
-    .tcal-subbar {
-        flex-wrap: nowrap;
-        gap: 8px;
-    }
-
-    .tcal-people {
-        flex: 1 1 auto;
-        min-width: 0;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .tcal-pick {
-        flex: none;
-    }
-
-    .tcal-sync {
-        flex: none;
+    .tcal-who-menu {
+        left: 0;
+        right: auto;
     }
 
     .tcal-set-person {
@@ -2510,4 +2646,11 @@ button.tcal-dayhead:hover {
 
 .tcal-cal.can-create .tcal-daycol {
     user-select: none;
+}
+
+/* The office mark in the CRM's dark blue wherever it stands on white;
+   on an appointment it takes the appointment's text colour. */
+.esheet-type .tcal-type-icon.is-office,
+.esheet-fact-icon .tcal-type-icon.is-office {
+    color: var(--c-ink);
 }

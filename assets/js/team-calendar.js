@@ -56,6 +56,8 @@
         body: document.getElementById('tcalBody'),
         date: document.getElementById('tcalDate'),
         people: document.getElementById('tcalPeople'),
+        whoFaces: document.getElementById('tcalWhoFaces'),
+        whoBtn: root.querySelector('[data-tcal="who"]'),
         sync: document.getElementById('tcalSync'),
         free: document.getElementById('tcalFree'),
         settings: document.getElementById('tcalSettings'),
@@ -177,6 +179,7 @@
         slots: [],
         free: { open: false, people: null, minutes: 60, range: 'week', results: null, busy: false, error: null, searched: null },
         search: { open: false, q: '', data: null, busy: false, error: null, seq: 0, timer: null },
+        whoOpen: false,
         settings: null,
         scrollMode: null,
         refreshTimer: null,
@@ -304,9 +307,12 @@
     // =========================================================================
 
     const TYPES = [
-        ['online', 'Online', '<rect x="3.5" y="5" width="17" height="11" rx="1.5"/><path d="M2 19.5h20"/>'],
-        ['external', 'External', '<path d="M4 16.5v-3.4l1.8-4.2A1.5 1.5 0 0 1 7.2 8h9.6a1.5 1.5 0 0 1 1.4.9l1.8 4.2v3.4z"/><path d="M4.5 13h15"/><circle cx="7.8" cy="16.6" r="1.6"/><circle cx="16.2" cy="16.6" r="1.6"/>'],
-        ['office', 'Office', '<path d="M4.5 20.5V5.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M14.5 9.5h4a1 1 0 0 1 1 1v10M3 20.5h18M8 8h3M8 11.5h3M8 15h3"/>'],
+        // A video call
+        ['online', 'Online', '<rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/>'],
+        // Out of the door: somewhere else
+        ['external', 'External', '<path d="M9 9V4.5A1.5 1.5 0 0 1 10.5 3h8A1.5 1.5 0 0 1 20 4.5v15a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 9 19.5V15"/><path d="M15.5 3.75h2.75a1 1 0 0 1 1 1v14.5a1 1 0 0 1-1 1H15.5z" fill="currentColor" stroke="none"/><path d="M14 12H3.5M7 8.5 3.5 12 7 15.5"/>'],
+        // At ours: the Disinfo Consulting mark
+        ['office', 'Office', '<path d="M2.3 4H9a7 7 0 0 1 7 7v8H9.3a7 7 0 0 1-7-7z" fill="currentColor" stroke="none"/><path d="M15.8 5.7h6v4.5a6.3 6.3 0 0 1-4.2 6.2V11a8.6 8.6 0 0 0-1.8-5.3z" fill="currentColor" stroke="none"/>'],
     ];
 
     function typeOf(key) {
@@ -317,7 +323,7 @@
         const t = typeOf(key);
         if (!t) return '';
         const px = size || 13;
-        return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t[2]}</svg>`;
+        return `<svg class="tcal-type-icon is-${t[0]}" viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t[2]}</svg>`;
     }
 
     /** The small type mark on an appointment in the grid. */
@@ -491,7 +497,25 @@
 
     function renderPeople() {
         const people = state.data ? state.data.people : [];
-        els.people.innerHTML = people.map(p => personToggle(p, !state.hidden.has(p.email), 'data-tcal-person')).join('');
+        // The button: the faces of everyone shown (up to four, then "+n").
+        const shown = people.filter(p => !state.hidden.has(p.email));
+        const head = shown.length > 4 ? shown.slice(0, 3) : shown;
+        const more = shown.length - head.length;
+        els.whoFaces.innerHTML = shown.length
+            ? head.map(face).join('') + (more ? `<span class="tcal-face tcal-face--more">+${more}</span>` : '')
+            : '<span class="tcal-who-none">Nobody</span>';
+        els.whoBtn.title = shown.length ? 'Showing: ' + shown.map(p => p.name).join(', ') : 'Nobody shown';
+        // The list: everyone, a tick at those shown.
+        const tick = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+        els.people.innerHTML = people.map(p => {
+            const on = !state.hidden.has(p.email);
+            return `<button type="button" class="tcal-who-item${on ? ' is-on' : ''}" data-tcal-person="${esc(p.email)}" aria-pressed="${on}">
+                    ${face(p)}<span class="tcal-who-name">${esc(p.name)}${p.is_me ? ' <span class="tcal-who-you">you</span>' : ''}</span><span class="tcal-who-tick">${tick}</span>
+                </button>`;
+        }).join('') + (state.hidden.size && people.length > 1
+            ? '<button type="button" class="tcal-who-all" data-tcal="who-all">Show everyone</button>' : '');
+        els.people.hidden = !state.whoOpen;
+        els.whoBtn.setAttribute('aria-expanded', state.whoOpen ? 'true' : 'false');
     }
 
     /**
@@ -499,6 +523,17 @@
      * a tick or a cross - the name comes on hover. The same in the calendar
      * and in "Find a free slot".
      */
+    function toggleWho(open) {
+        state.whoOpen = open === undefined ? !state.whoOpen : open;
+        els.people.hidden = !state.whoOpen;
+        els.whoBtn.setAttribute('aria-expanded', state.whoOpen ? 'true' : 'false');
+        els.whoBtn.classList.toggle('is-open', state.whoOpen);
+        if (state.whoOpen) {
+            const first = els.people.querySelector('.tcal-who-item');
+            if (first) first.focus();
+        }
+    }
+
     function personToggle(p, on, attribute) {
         const name = p.name + (p.is_me ? ' (you)' : '');
         const mark = on
@@ -762,7 +797,8 @@
         els.body.querySelectorAll('.tcal-daycol').forEach(col => {
             const above = [];
             const below = [];
-            col.querySelectorAll('.tcal-ev').forEach(ev => {
+            // Only appointments of mine: taking part or invited.
+            col.querySelectorAll('.tcal-ev.is-mine, .tcal-ev.is-pending').forEach(ev => {
                 const from = ev.offsetTop;
                 const to = from + ev.offsetHeight;
                 // Barely peeking in at the edge counts as out of view.
@@ -1270,7 +1306,7 @@
     function iconFact(icon, label, value) {
         const paths = FACT_ICONS[icon] || (typeOf(icon) || [])[2] || '';
         return `<div class="esheet-fact"><span class="esheet-fact-icon" title="${esc(label)}" aria-label="${esc(label)}" role="img">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>
+                <svg class="${typeOf(icon) ? 'tcal-type-icon is-' + icon : ''}" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>
             </span><div class="esheet-fact-value">${value}</div></div>`;
     }
 
@@ -2284,6 +2320,20 @@
         document.addEventListener('pointerup', onDragUp);
     });
 
+    // The people list closes on a click beside it and on Escape.
+    document.addEventListener('click', event => {
+        // A person just switched is redrawn, so its button is gone from the
+        // page by now - that was a click inside the list, not beside it.
+        if (state.whoOpen && event.target.isConnected && !event.target.closest('.tcal-who')) toggleWho(false);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && state.whoOpen) {
+            event.stopPropagation();
+            toggleWho(false);
+            els.whoBtn.focus();
+        }
+    }, true);
+
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && drag) {
             event.stopPropagation();
@@ -2390,6 +2440,12 @@
             case 'new': openNewEvent({}); break;
             case 'free': toggleFree(); break;
             case 'search': toggleSearch(); break;
+            case 'who': toggleWho(); break;
+            case 'who-all':
+                state.hidden.clear();
+                savePrefs();
+                render();
+                break;
             case 'search-close': toggleSearch(false); break;
             case 'free-search': searchFree(); break;
             case 'free-clear':

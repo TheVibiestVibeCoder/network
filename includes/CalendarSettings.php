@@ -258,6 +258,14 @@ final class CalendarSettings
                 if ((int) $exists->fetchColumn() === 0) {
                     throw new InvalidArgumentException('No such CRM account.');
                 }
+                // One account, one person: else both carry that account's
+                // name, and whoever signs in with it is both of them.
+                $taken = $db->prepare("SELECT COALESCE(NULLIF(name, ''), email) FROM calendar_people WHERE user_id = :id AND email <> :email LIMIT 1");
+                $taken->execute(['id' => $userId, 'email' => $email]);
+                $other = $taken->fetchColumn();
+                if ($other !== false) {
+                    throw new InvalidArgumentException('That account already belongs to ' . $other . '.');
+                }
             }
             $changes['user_id'] = $userId;
         }

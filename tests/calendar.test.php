@@ -228,6 +228,13 @@ $namedAdmin = array_column(CalendarSettings::people(), 'name', 'email');
 check('a linked person carries the CRM account\'s name', ($named[MARKUS] ?? null) === 'Markus S.' && ($namedAdmin[MARKUS] ?? null) === 'Markus S.', $named);
 $db->exec("UPDATE users SET name = 'Markus Schwinghammer' WHERE email = '" . MARKUS . "'");
 $db->exec("UPDATE calendar_people SET name = 'Markus Schwinghammer' WHERE email = '" . MARKUS . "'");
+$livioAccount = (int) $db->query("SELECT user_id FROM calendar_people WHERE email = '" . LIVIO . "'")->fetchColumn();
+try {
+    CalendarSettings::updatePerson(MARKUS, ['user_id' => $livioAccount]);
+    check('one CRM account cannot belong to two people', false);
+} catch (InvalidArgumentException $e) {
+    check('one CRM account cannot belong to two people', str_contains($e->getMessage(), 'already belongs'), $e->getMessage());
+}
 check('person colours from the palette', array_column($people, 'color') === array_slice(CalendarSync::PALETTE, 0, 3), array_column($people, 'color'));
 $defaults = $db->query("SELECT kind, visibility FROM calendar_sources ORDER BY id")->fetchAll();
 check('work calendars default to details, private ones to private', array_reduce($defaults, static function (bool $ok, array $row): bool {

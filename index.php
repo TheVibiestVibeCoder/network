@@ -1010,8 +1010,17 @@ function assetUrl(string $path): string
                                     </button>
                                 </div>
                                 <h2 class="tcal-date" id="tcalDate"></h2>
+                                <div class="tcal-sync" id="tcalSync"></div>
                             </div>
                             <div class="tcal-toolbar-right">
+                                <!-- Whose calendars: their faces at a glance, the list on a click -->
+                                <div class="tcal-who">
+                                    <button type="button" class="tcal-who-btn" data-tcal="who" aria-haspopup="true" aria-expanded="false" aria-controls="tcalPeople" title="Whose calendars to show">
+                                        <span class="tcal-who-faces" id="tcalWhoFaces"></span>
+                                        <svg class="tcal-who-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg>
+                                    </button>
+                                    <div class="tcal-who-menu" id="tcalPeople" role="group" aria-label="Whose calendars to show" hidden></div>
+                                </div>
                                 <div class="tcal-mode" role="group" aria-label="View">
                                     <button type="button" class="tcal-mode-btn is-active" data-tcal-mode="day" aria-pressed="true">Day</button>
                                     <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
@@ -1029,10 +1038,6 @@ function assetUrl(string $path): string
                                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
                                 </button>
                             </div>
-                        </div>
-                        <div class="tcal-subbar">
-                            <div class="tcal-people" id="tcalPeople" role="group" aria-label="Show or hide people"></div>
-                            <div class="tcal-sync" id="tcalSync"></div>
                         </div>
                         <div class="tcal-search" id="tcalSearch" role="search" hidden>
                             <svg class="tcal-search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
