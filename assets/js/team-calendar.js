@@ -601,6 +601,8 @@
         else if (isPending(item)) classes.push('is-pending');
         else if (item.transparent) classes.push('is-free');
         else if (item.mine) classes.push('is-mine');
+        // From a private calendar: the same colour, finely hatched.
+        if (!item.masked && item.private_calendar) classes.push('is-private-cal');
         if (isPast(item)) classes.push('is-past');
         return classes;
     }

@@ -1353,6 +1353,19 @@ button.tcal-dayhead:hover {
     background: repeating-linear-gradient(135deg, var(--ev-private-a) 0 6px, var(--ev-private-b) 6px 12px);
 }
 
+/* From a private calendar - mine, but private: the appointment's own
+   colour with the fine hatch that means "private" everywhere else. */
+.tcal-ev.is-private-cal,
+.tcal-bar.is-private-cal {
+    --ev-hatch: rgba(28, 50, 88, 0.07);
+    background-image: repeating-linear-gradient(135deg, var(--ev-hatch) 0 6px, transparent 6px 12px);
+}
+
+.tcal-ev.is-mine.is-private-cal,
+.tcal-bar.is-mine.is-private-cal {
+    --ev-hatch: rgba(255, 255, 255, 0.07);
+}
+
 /* Over: the same colours, only the text quieter. */
 .tcal-ev.is-past,
 .tcal-bar.is-past {

@@ -350,6 +350,10 @@ $server->put($work['livio'], 'from-outside.ics', "BEGIN:VCALENDAR\nVERSION:2.0\n
 sync();
 $outside = $events->sheet('from-outside', null, $livio);
 check('organized outside the team: no edit, and the sheet says who can', !$outside['can']['edit'] && str_contains((string) $outside['can']['reason'], 'outside the team'), $outside['can']);
+$ownItems = items($vivian, day(2), day(3));
+$dentist = find($ownItems, 'Zahnarzt');
+check('own private-calendar appointment is marked as such, a work one is not', ($dentist['private_calendar'] ?? null) === true
+    && (find(items($livio, day(0), day(7)), 'Projektmeeting (Raum 2)')['private_calendar'] ?? null) === false, $dentist);
 check('an appointment that can be changed carries no reason', $events->sheet($uid, null, $livio)['can']['reason'] === null);
 
 section('Another calendar');

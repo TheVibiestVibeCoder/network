@@ -524,6 +524,9 @@ final class CalendarView
             'attendees'   => $list,
             'externals'   => $externals,
             'transparent' => (int) $main['transparent'] === 1,
+            // From a private calendar (shown in full only to its owner):
+            // hatched like private appointments, in the appointment's colour.
+            'private_calendar' => ($main['kind'] ?? '') === 'private',
         ];
     }
 
