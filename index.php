@@ -1584,80 +1584,160 @@ function assetUrl(string $path): string
         </div>
 
         <!-- Contact Modal -->
-        <div class="modal" id="contactModal">
+        <!-- Contact Overview Modal -->
+        <div class="modal" id="overviewModal">
             <div class="modal-backdrop"></div>
-            <div class="modal-content">
+            <div class="modal-content modal-large">
                 <div class="modal-header">
-                    <h2 id="modalTitle">Add Contact</h2>
-                    <button type="button" class="modal-close" id="closeModal">&times;</button>
+                    <div class="overview-header-info">
+                        <div class="overview-title-info">
+                            <h2 id="overviewName" data-ov="view"></h2>
+                            <input type="text" id="contactEditName" class="form-input ov-edit-title" data-ov="edit" aria-label="Name" placeholder="Name" maxlength="255" required>
+                            <p class="overview-company" id="overviewCompany" data-ov="view"></p>
+                            <input type="text" id="contactEditCompany" class="form-input ov-edit-sub" data-ov="edit" aria-label="Company" placeholder="Company" maxlength="255">
+                            <p class="overview-edited" id="overviewEdited"></p>
+                        </div>
+                    </div>
+                    <!-- Who is responsible, then the actions, as icons -->
+                    <div class="ov-head-actions">
+                        <div class="ov-head-assignee" id="overviewAssignee"></div>
+                        <button type="button" class="ov-icon-btn" id="editContactBtn" data-ov="view" title="Edit" aria-label="Edit">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
+                        </button>
+                        <button type="button" class="ov-icon-btn ov-icon-danger ov-delete-btn" id="deleteContactBtn" data-ov="view" title="Delete" aria-label="Delete">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7h15"/><path d="M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/></svg>
+                        </button>
+                        <button type="button" class="modal-close" id="closeOverviewModal" aria-label="Close">&times;</button>
+                    </div>
                 </div>
-                <form id="contactForm">
-                    <input type="hidden" id="contactId" name="id">
+                <div class="modal-body overview-body">
 
-                    <div class="modal-body">
-                        <!-- Required Fields -->
-                        <div class="form-section">
-                            <h3>Basic Information</h3>
+                    <!-- Proposals from Claude about this contact (review.js) -->
+                    <div class="review-record-slot" id="overviewReview" hidden></div>
 
-                            <div class="form-group">
-                                <label for="contactName">Name *</label>
-                                <input type="text" id="contactName" name="name" required class="form-input">
+                    <!-- The contact's details: a value while reading, its field while
+                         editing, in the same place (app.js renderOverviewDetails). -->
+                    <div class="overview-section">
+                        <div class="overview-details ov-details-2" id="overviewDetails">
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="contactEditEmail">Email</label>
+                                <span class="detail-value" id="overviewEmail" data-ov="view"></span>
+                                <input type="email" id="contactEditEmail" class="form-input ov-field" data-ov="edit" autocomplete="off" maxlength="255">
                             </div>
-
-                            <div class="form-group">
-                                <label for="contactCompany">Company</label>
-                                <input type="text" id="contactCompany" name="company" class="form-input">
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="contactEditPhone">Phone</label>
+                                <span class="detail-value" id="overviewPhone" data-ov="view"></span>
+                                <input type="tel" id="contactEditPhone" class="form-input ov-field" data-ov="edit" autocomplete="off" maxlength="50">
                             </div>
-
-                            <div class="form-group">
-                                <label for="contactLocation">Location</label>
-                                <input type="text" id="contactLocation" name="location" class="form-input" placeholder="City, Country or Address">
-                                <small class="form-hint">Enter a location to show this contact on the map</small>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="contactEditLocation">Location <span class="geocode-warning" id="overviewGeoWarning" title="This place could not be found on the map" hidden>(!)</span></label>
+                                <span class="detail-value" id="overviewLocation" data-ov="view"></span>
+                                <input type="text" id="contactEditLocation" class="form-input ov-field" data-ov="edit" placeholder="City, country" autocomplete="off" maxlength="255">
                             </div>
-
-                            <div class="form-group">
-                                <label for="contactNote">Note</label>
-                                <textarea id="contactNote" name="note" class="form-input" rows="3"></textarea>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="contactEditWebsite">Website</label>
+                                <span class="detail-value" id="overviewWebsite" data-ov="view"></span>
+                                <input type="text" id="contactEditWebsite" class="form-input ov-field" data-ov="edit" placeholder="www.example.com" autocomplete="off" maxlength="255">
+                            </div>
+                            <div class="overview-detail-item full-width">
+                                <label class="detail-label" for="contactEditAddress">Address</label>
+                                <span class="detail-value" id="overviewAddress" data-ov="view"></span>
+                                <textarea id="contactEditAddress" class="form-input ov-field" data-ov="edit" rows="2" maxlength="1000"></textarea>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Expandable Additional Fields -->
-                        <div class="form-section expandable">
-                            <button type="button" class="expand-toggle" id="expandToggle">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="expand-icon"><path d="M12 5v14M5 12h14"/></svg>
-                                Add More Details
+                    <div class="overview-section ov-section ov-text-section">
+                        <label class="overview-section-title" for="contactEditNote">About</label>
+                        <span class="detail-value" id="overviewNote" data-ov="view"></span>
+                        <textarea id="contactEditNote" class="form-input ov-field" data-ov="edit" rows="3" placeholder="Who this is, how you know them"></textarea>
+                    </div>
+
+                    <!-- Tags: the field opens from "Add" (Enter adds, a suggestion too) -->
+                    <div class="overview-section ov-section ov-saved-only">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Tags</h3>
+                            <button type="button" class="ov-add-btn" id="openContactTagBtn" aria-expanded="false" aria-controls="contactTagPicker">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                Add
                             </button>
-
-                            <div class="expandable-content" id="expandableFields">
-                                <div class="form-group">
-                                    <label for="contactEmail">Email</label>
-                                    <input type="email" id="contactEmail" name="email" class="form-input">
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="contactPhone">Phone</label>
-                                    <input type="tel" id="contactPhone" name="phone" class="form-input">
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="contactWebsite">Website</label>
-                                    <input type="text" id="contactWebsite" name="website" class="form-input" placeholder="www.example.com">
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="contactAddress">Full Address</label>
-                                    <textarea id="contactAddress" name="address" class="form-input" rows="2"></textarea>
-                                </div>
+                        </div>
+                        <div class="ov-picker add-tag-form" id="contactTagPicker" hidden>
+                            <div class="tag-input-wrapper">
+                                <input type="text" id="newTagInput" class="form-input" placeholder="Find or create a tag…" autocomplete="off">
+                                <div class="tag-suggestions" id="tagSuggestions"></div>
                             </div>
+                            <button type="button" class="btn btn-secondary btn-small" id="addTagBtn">Add</button>
+                        </div>
+                        <div class="tags-container" id="contactTags">
+                            <!-- Tags will be populated by JS -->
                         </div>
                     </div>
 
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
-                        <button type="button" class="btn btn-danger" id="deleteBtn" style="display: none;">Delete</button>
-                        <button type="submit" class="btn btn-primary" id="saveBtn">Save Contact</button>
+                    <!-- Related projects -->
+                    <div class="overview-section ov-section ov-saved-only">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Projects</h3>
+                        </div>
+                        <div class="contact-projects-list" id="contactProjects">
+                            <!-- Projects will be populated by JS -->
+                        </div>
                     </div>
-                </form>
+
+                    <!-- The contact's to-dos -->
+                    <div class="overview-section ov-section ov-saved-only">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">To-dos</h3>
+                            <button type="button" class="ov-add-btn" id="addContactTodoBtn">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                New
+                            </button>
+                        </div>
+                        <div class="todo-list" id="contactTodosList">
+                            <!-- To-dos will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <?php if ($canCalendar): ?>
+                    <!-- Appointments linked to this contact (team calendar,
+                         assets/js/team-calendar.js renderLinked). -->
+                    <div class="overview-section ov-section ov-saved-only">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Appointments</h3>
+                            <button type="button" class="ov-add-btn" data-tcal-new-for="contact" hidden>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                New
+                            </button>
+                        </div>
+                        <div class="tcal-linked" id="contactAppointments"></div>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Notes, newest first; "Add note" opens the field -->
+                    <div class="overview-section ov-section ov-saved-only">
+                        <div class="ov-section-head">
+                            <h3 class="overview-section-title">Notes</h3>
+                            <button type="button" class="ov-add-btn" id="openContactNoteBtn" aria-expanded="false" aria-controls="contactNoteForm">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                Add note
+                            </button>
+                        </div>
+                        <div class="add-note-form ov-note-form" id="contactNoteForm" hidden>
+                            <textarea id="newNoteContent" class="form-input" placeholder="Write a note…" rows="3"></textarea>
+                            <div class="ov-note-form-actions">
+                                <button type="button" class="btn btn-secondary btn-small" id="cancelContactNoteBtn">Cancel</button>
+                                <button type="button" class="btn btn-primary btn-small" id="addNoteBtn">Add note</button>
+                            </div>
+                        </div>
+                        <div class="notes-timeline" id="notesTimeline">
+                            <!-- Notes will be populated by JS -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer ov-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelContactEditBtn" data-ov="edit">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveContactEditBtn" data-ov="edit">Save</button>
+                </div>
             </div>
         </div>
 
@@ -1676,114 +1756,6 @@ function assetUrl(string $path): string
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
                     <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Contact Overview Modal -->
-        <div class="modal" id="overviewModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <div class="overview-header-info">
-                        <div class="overview-title-info">
-                            <h2 id="overviewName"></h2>
-                            <p class="overview-company" id="overviewCompany"></p>
-                            <p class="overview-edited" id="overviewEdited"></p>
-                        </div>
-                    </div>
-                    <!-- Who is responsible, then the actions, as icons -->
-                    <div class="ov-head-actions">
-                        <div class="ov-head-assignee" id="overviewAssignee"></div>
-                        <button type="button" class="ov-icon-btn" id="editContactBtn" title="Edit" aria-label="Edit">
-                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
-                        </button>
-                        <button type="button" class="modal-close" id="closeOverviewModal" aria-label="Close">&times;</button>
-                    </div>
-                </div>
-                <div class="modal-body overview-body">
-
-                    <!-- Proposals from Claude about this contact (review.js) -->
-                    <div class="review-record-slot" id="overviewReview" hidden></div>
-
-                    <!-- Contact Details Section -->
-                    <div class="overview-section">
-                        <div class="overview-details" id="overviewDetails">
-                            <!-- Details will be populated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Tags Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Tags</h3>
-                        <div class="tags-container" id="contactTags">
-                            <!-- Tags will be populated by JS -->
-                        </div>
-                        <div class="add-tag-form">
-                            <div class="tag-input-wrapper">
-                                <input type="text" id="newTagInput" class="form-input" placeholder="Add or create tag..." autocomplete="off">
-                                <div class="tag-suggestions" id="tagSuggestions"></div>
-                            </div>
-                            <button type="button" class="btn btn-secondary" id="addTagBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                Add
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Related Projects Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Related Projects</h3>
-                        <div class="contact-projects-list" id="contactProjects">
-                            <!-- Projects will be populated by JS -->
-                        </div>
-                    </div>
-
-                    <!-- Contact To-Dos Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">To-Dos</h3>
-                        <div class="todo-list" id="contactTodosList">
-                            <!-- To-dos will be populated by JS -->
-                        </div>
-                        <div class="add-note-form">
-                            <button type="button" class="btn btn-secondary" id="addContactTodoBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                New To-Do
-                            </button>
-                        </div>
-                    </div>
-
-                    <?php if ($canCalendar): ?>
-                    <!-- Appointments linked to this contact (team calendar,
-                         assets/js/team-calendar.js renderLinked). -->
-                    <div class="overview-section ov-section">
-                        <div class="ov-section-head">
-                            <h3 class="overview-section-title">Appointments</h3>
-                            <button type="button" class="ov-add-btn" data-tcal-new-for="contact" hidden>
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                                New
-                            </button>
-                        </div>
-                        <div class="tcal-linked" id="contactAppointments"></div>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- Notes Timeline Section -->
-                    <div class="overview-section">
-                        <h3 class="overview-section-title">Notes Timeline</h3>
-                        <div class="notes-timeline" id="notesTimeline">
-                            <!-- Notes will be populated by JS -->
-                        </div>
-
-                        <!-- Add Note Form -->
-                        <div class="add-note-form">
-                            <textarea id="newNoteContent" class="form-input" placeholder="Add a note..." rows="3"></textarea>
-                            <button type="button" class="btn btn-primary" id="addNoteBtn">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                                Add Note
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -2011,34 +1983,20 @@ function assetUrl(string $path): string
                     <!-- Proposals from Claude about this project (review.js) -->
                     <div class="review-record-slot" id="projectOverviewReview" hidden></div>
 
-                    <!-- Project Details Section. Start and Est. Completion side by side,
-                         then budget; chance and stage on the second row. -->
+                    <!-- The facts, three to a row: dates and stage, then budget
+                         (min - max in one field) and success chance. Reading
+                         shows each value where its field is when editing. -->
                     <div class="overview-section">
                         <div class="overview-details">
                             <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditStartDate">Start Date</label>
+                                <label class="detail-label" for="projectEditStartDate">Start date</label>
                                 <span class="detail-value" id="projectOverviewStartDate" data-ov="view"></span>
                                 <input type="date" id="projectEditStartDate" class="form-input ov-field" data-ov="edit" required>
                             </div>
                             <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditEstCompletion">Est. Completion</label>
+                                <label class="detail-label" for="projectEditEstCompletion">Est. completion</label>
                                 <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
                                 <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
-                            </div>
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditBudgetMin">Budget</label>
-                                <span class="detail-value" id="projectOverviewBudget" data-ov="view"></span>
-                                <!-- "3 expected payments", what is still open (project-payments.js) -->
-                                <div class="ppay-summary" id="projectOverviewPayments" data-ov="view" hidden></div>
-                                <div class="ov-field-pair" data-ov="edit">
-                                    <input type="text" id="projectEditBudgetMin" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Min" aria-label="Budget min">
-                                    <input type="text" id="projectEditBudgetMax" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Max" aria-label="Budget max">
-                                </div>
-                            </div>
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditSuccessChance">Success Chance</label>
-                                <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
-                                <input type="number" id="projectEditSuccessChance" class="form-input ov-field" data-ov="edit" min="0" max="100" placeholder="0-100 %">
                             </div>
                             <div class="overview-detail-item">
                                 <label class="detail-label" for="projectEditStage">Stage</label>
@@ -2051,24 +2009,47 @@ function assetUrl(string $path): string
                                     <option value="Lead">Lead</option>
                                 </select>
                             </div>
-                            <!-- Expected payments: the list while reading (opened from the
-                                 budget), the editor while editing (project-payments.js) -->
+                            <div class="overview-detail-item ov-span-2">
+                                <label class="detail-label" for="projectEditBudgetMin">Budget</label>
+                                <span class="detail-value" id="projectOverviewBudget" data-ov="view"></span>
+                                <!-- "3 expected payments", what is still open (project-payments.js) -->
+                                <div class="ppay-summary" id="projectOverviewPayments" data-ov="view" hidden></div>
+                                <div class="ov-field-pair ov-field-box" data-ov="edit">
+                                    <input type="text" id="projectEditBudgetMin" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Min" aria-label="Budget min">
+                                    <span class="ov-field-sep" aria-hidden="true">–</span>
+                                    <input type="text" id="projectEditBudgetMax" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Max" aria-label="Budget max">
+                                    <span class="ov-field-unit" aria-hidden="true">€</span>
+                                </div>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditSuccessChance">Success chance</label>
+                                <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
+                                <div class="ov-field-box" data-ov="edit">
+                                    <input type="number" id="projectEditSuccessChance" class="form-input ov-field" min="0" max="100" placeholder="0–100">
+                                    <span class="ov-field-unit" aria-hidden="true">%</span>
+                                </div>
+                            </div>
+                            <!-- Expected payments while reading (opened from the budget) -->
                             <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
-                            <div class="overview-detail-item full-width ppay-panel" data-ov="edit">
-                                <span class="detail-label" id="projectPaymentsLabel">Payments</span>
-                                <div class="ppay-editor" id="projectPaymentsEditor" role="group" aria-labelledby="projectPaymentsLabel"></div>
-                            </div>
-                            <div class="overview-detail-item full-width">
-                                <label class="detail-label" for="projectEditDescription">Description</label>
-                                <span class="detail-value" id="projectOverviewDescription" data-ov="view"></span>
-                                <textarea id="projectEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="What the project is about" required></textarea>
-                            </div>
-                            <?php if ($summaryEnabled): ?>
-                            <!-- Claude's summary of the description and all notes,
-                                 kept up to date by assets/js/project-summary.js -->
-                            <div class="overview-detail-item full-width ov-claude-summary" id="projectSummaryItem" data-ov="view" hidden></div>
-                            <?php endif; ?>
                         </div>
+                    </div>
+
+                    <!-- Expected payments while editing (project-payments.js); the
+                         partial / in full switch sits on the right of the heading. -->
+                    <div class="overview-section ov-section ppay-section" data-ov="edit">
+                        <h3 class="overview-section-title" id="projectPaymentsLabel">Payments</h3>
+                        <div class="ppay-editor" id="projectPaymentsEditor" role="group" aria-labelledby="projectPaymentsLabel"></div>
+                    </div>
+
+                    <div class="overview-section ov-section ov-text-section">
+                        <label class="overview-section-title" for="projectEditDescription">Description</label>
+                        <span class="detail-value" id="projectOverviewDescription" data-ov="view"></span>
+                        <textarea id="projectEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="What the project is about" required></textarea>
+                        <?php if ($summaryEnabled): ?>
+                        <!-- Claude's summary of the description and all notes,
+                             kept up to date by assets/js/project-summary.js -->
+                        <div class="overview-detail-item ov-claude-summary" id="projectSummaryItem" data-ov="view" hidden></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Tags: hidden on projects for now (contacts keep theirs).
@@ -2093,7 +2074,7 @@ function assetUrl(string $path): string
                     <!-- Assigned Contacts Section -->
                     <div class="overview-section ov-section">
                         <div class="ov-section-head">
-                            <h3 class="overview-section-title">Assigned Contacts</h3>
+                            <h3 class="overview-section-title">Assigned contacts</h3>
                             <button type="button" class="ov-add-btn" id="addProjectContactBtn" aria-expanded="false" aria-controls="projectContactPicker">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 Add
@@ -2112,7 +2093,7 @@ function assetUrl(string $path): string
                          until opened. -->
                     <div class="overview-section ov-section">
                         <div class="ov-section-head">
-                            <h3 class="overview-section-title">To-Dos</h3>
+                            <h3 class="overview-section-title">To-dos</h3>
                             <button type="button" class="ov-add-btn" id="addProjectTodoBtn">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 New
@@ -2193,7 +2174,7 @@ function assetUrl(string $path): string
                     <div class="overview-header-info">
                         <div class="overview-title-info">
                             <h2 id="todoDetailTitle" data-ov="view">To-Do</h2>
-                            <input type="text" id="todoEditTitle" class="form-input ov-edit-title" data-ov="edit" aria-label="Title" placeholder="What needs doing" maxlength="255" required>
+                            <input type="text" id="todoEditTitle" class="form-input ov-edit-title" data-ov="edit" aria-label="Title" placeholder="Title" maxlength="255" required>
                             <p class="overview-company" id="todoDetailContext" data-ov="view"></p>
                             <div class="ov-field-pair ov-edit-context" data-ov="edit">
                                 <select id="todoEditAssignType" class="form-select" aria-label="Belongs to">
@@ -2247,12 +2228,13 @@ function assetUrl(string $path): string
                                     <option value="low">Low</option>
                                 </select>
                             </div>
-                            <div class="overview-detail-item full-width">
-                                <label class="detail-label" for="todoEditDescription">Description</label>
-                                <span class="detail-value tdetail-description" id="todoDetailDescription" data-ov="view"></span>
-                                <textarea id="todoEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="Optional details"></textarea>
-                            </div>
                         </div>
+                    </div>
+
+                    <div class="overview-section ov-section ov-text-section">
+                        <label class="overview-section-title" for="todoEditDescription">Description</label>
+                        <span class="detail-value tdetail-description" id="todoDetailDescription" data-ov="view"></span>
+                        <textarea id="todoEditDescription" class="form-input ov-field" data-ov="edit" rows="3" placeholder="Optional details"></textarea>
                     </div>
 
                     <div class="overview-section ov-section">

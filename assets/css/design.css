@@ -11984,6 +11984,458 @@ details.import-instructions p {
 }
 
 /* --------------------------------------------------------------------------
+   32. Sheets: one look
+   --------------------------------------------------------------------------
+   Livio's design of 13.11.2026, for every sheet - contact, project, to-do,
+   appointment, proposal: the name large in the header with the company
+   under it, the assignee as a face with a small arrow beside the icons.
+   Facts are a label over a grey field while editing and over the value
+   while reading, in the same place, three to a row. Every section sits
+   under a hairline, its heading on the left and its one action on the
+   right. No boxes around anything.
+   -------------------------------------------------------------------------- */
+
+/* ---- The contact sheet reads, edits and creates like the others ---- */
+
+#overviewModal:not(.is-editing) [data-ov="edit"],
+#overviewModal.is-editing [data-ov="view"] {
+    display: none !important;
+}
+
+#overviewModal:not(.is-editing) .ov-footer {
+    display: none;
+}
+
+#overviewModal.is-new .ov-saved-only,
+#overviewModal.is-new #overviewEdited,
+#overviewModal.is-new #overviewReview,
+#overviewModal.is-new .ov-delete-btn {
+    display: none !important;
+}
+
+#overviewModal.is-editing .overview-header-info,
+#overviewModal.is-editing .overview-title-info {
+    flex: 1;
+}
+
+#overviewModal:not(.is-editing) .overview-detail-item:has(> .detail-value.detail-empty[data-ov="view"]) {
+    display: none;
+}
+
+/* Nothing filled in at all: no empty section either. */
+#overviewModal:not(.is-editing) .overview-section:has(> #overviewDetails):not(:has(.detail-value[data-ov="view"]:not(.detail-empty))) {
+    display: none;
+}
+
+#overviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"] {
+    margin-left: -6px;
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    cursor: text;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+#overviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"]:hover {
+    background: var(--c-tint-3);
+}
+
+/* A description or "About" with nothing in it is not shown while reading. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal):not(.is-editing) .ov-text-section:has(> .detail-value.detail-empty[data-ov="view"]):not(:has(.ov-claude-summary:not([hidden]))) {
+    display: none;
+}
+
+/* ---- Header ---- */
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header {
+    padding: 26px 28px 8px;
+    border-bottom: 0;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-title-info h2 {
+    font-size: var(--t-2xl);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-company {
+    margin-top: 6px;
+    font-size: var(--t-md);
+    color: var(--c-ink-3);
+}
+
+/* The name and the company are written where they are read: no frame. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-edit-title {
+    width: calc(100% + 10px);
+    height: 40px;
+    margin-left: -10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    box-shadow: none;
+    font-size: var(--t-2xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--c-ink);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) :is(.ov-edit-company .form-input, .ov-edit-sub) {
+    width: calc(100% + 10px);
+    height: 32px;
+    margin-left: -10px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    box-shadow: none;
+    font-size: var(--t-md);
+    color: var(--c-ink-2);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-edit-company {
+    margin: 4px 0 0;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-edit-company .form-input {
+    width: calc(100% + 10px);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) :is(.ov-edit-title, .ov-edit-sub, .ov-edit-company .form-input)::placeholder {
+    color: var(--c-ink-4);
+    opacity: 1;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) :is(.ov-edit-title, .ov-edit-sub, .ov-edit-company .form-input):is(:hover, :focus) {
+    background: var(--c-tint-3);
+    box-shadow: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-edit-title.is-invalid {
+    box-shadow: inset 0 -2px 0 var(--c-danger);
+}
+
+/* A to-do's contact or project: two small grey selects under the title. */
+#todoDetailModal .ov-edit-context {
+    margin: 8px 0 0;
+    gap: 6px;
+}
+
+#todoDetailModal .ov-edit-context .form-select {
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background-color: var(--c-tint-3);
+    font-size: var(--t-sm);
+}
+
+/* The assignee: a face and a small arrow in a pill; the select lies on top. */
+.assignee-bar-chevron {
+    display: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-assignee .assignee-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px 3px 3px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    transition: border-color var(--dur-1) var(--ease);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-assignee .assignee-bar:is(:hover, :focus-within) {
+    border-color: var(--c-accent);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-assignee .assignee-bar-face,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-assignee .assignee-bar:is(:hover, :focus-within) .assignee-bar-face {
+    width: 30px;
+    height: 30px;
+    box-shadow: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-assignee .assignee-bar-chevron {
+    display: block;
+    flex: none;
+    color: var(--c-ink-3);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-head-actions {
+    gap: 4px;
+}
+
+/* ---- Body: sections under hairlines ---- */
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-body {
+    padding: 10px 28px 28px;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 20px 0;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section ~ .overview-section {
+    border-top: 1px solid var(--c-line-2);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section:last-child {
+    padding-bottom: 4px;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section > :empty:not(textarea, input, select),
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section > :has(> .empty-hint:only-child),
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section > .tcal-linked:has(> .tcal-linked-empty:only-child) {
+    display: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-section-title {
+    margin: 0;
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--c-ink);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-section-head {
+    margin: 0;
+}
+
+/* ---- Facts: label over field (editing) or value (reading) ---- */
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-details,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal).is-editing .overview-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px 16px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-details.ov-details-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-detail-item {
+    gap: 8px;
+    padding: 0;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-detail-item.ov-span-2 {
+    grid-column: span 2;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .detail-label {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .detail-value {
+    font-size: var(--t-md);
+    font-weight: 500;
+    color: var(--c-ink);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-text-section > .detail-value {
+    font-weight: 400;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+/* The fields: grey and frameless until focused. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background-color: var(--c-tint-3);
+    box-shadow: none;
+    font-size: var(--t-md);
+    font-weight: 500;
+    color: var(--c-ink);
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) textarea.ov-field {
+    height: auto;
+    min-height: 104px;
+    padding: 12px 14px;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) select.ov-field {
+    padding-right: 36px;
+    background-position: right 14px center;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field::placeholder {
+    color: var(--c-ink-4);
+    font-weight: 400;
+    opacity: 1;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field:focus,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box:focus-within {
+    border-color: var(--c-accent);
+    background-color: var(--c-surface);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+    outline: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field.is-invalid,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box:has(.is-invalid) {
+    border-color: var(--c-danger);
+    box-shadow: 0 0 0 3px var(--c-danger-soft);
+}
+
+/* One field with its parts inside: "Min – Max €", "0-100 %". */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box .ov-field,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box .ov-field:focus,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box .ov-field.is-invalid {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box input[type="number"]::-webkit-inner-spin-button,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-field-box input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.ov-field-sep,
+.ov-field-unit {
+    flex: none;
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.ov-field-unit {
+    color: var(--c-ink-2);
+}
+
+/* Payments: the partial / in full switch on the right of the heading. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ppay-section {
+    position: relative;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ppay-section .ppay-mode.segmented {
+    position: absolute;
+    top: 12px;
+    right: 0;
+}
+
+/* ---- Footer ---- */
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-footer {
+    padding: 16px 28px;
+    border-top-color: var(--c-line-2);
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-footer .btn {
+    min-height: 44px;
+    padding-left: 20px;
+    padding-right: 20px;
+    border-radius: var(--r-md);
+}
+
+/* ---- The appointment's form: the same grey fields ---- */
+
+#eventSheet .esheet-field > span:first-child {
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+#eventSheet .esheet-form :is(.form-input, .form-select) {
+    height: 46px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background-color: var(--c-tint-3);
+    font-size: var(--t-md);
+}
+
+#eventSheet .esheet-form textarea.form-input {
+    height: auto;
+    min-height: 104px;
+    padding-top: 12px;
+}
+
+#eventSheet .esheet-form :is(.form-input, .form-select):focus {
+    border-color: var(--c-accent);
+    background-color: var(--c-surface);
+    box-shadow: 0 0 0 3px var(--c-accent-soft);
+}
+
+#eventSheet .esheet-form :is(.form-input, .form-select)::placeholder {
+    color: var(--c-ink-4);
+}
+
+/* ---- Phones ---- */
+
+@media (max-width: 768px) {
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header {
+        padding: 26px 18px 6px;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-title-info h2,
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ov-edit-title {
+        font-size: 22px !important;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-body {
+        padding: 6px 18px 22px;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-footer {
+        padding: 12px 18px;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-details,
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal).is-editing .overview-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-detail-item.ov-span-2 {
+        grid-column: 1 / -1;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .ppay-section .ppay-mode.segmented {
+        position: static;
+        align-self: flex-start;
+    }
+}
+
+/* --------------------------------------------------------------------------
    Phones and tablets: iOS zooms the page into any text field written smaller
    than 16px. Every field is 16px on a touch screen instead - the big title
    fields of the sheets are larger already and stay as they are.

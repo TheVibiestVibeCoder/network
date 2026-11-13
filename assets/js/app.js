@@ -149,18 +149,24 @@
         tagSuggestions: document.getElementById('tagSuggestions'),
         addTagBtn: document.getElementById('addTagBtn'),
 
-        // Contact modal
-        contactModal: document.getElementById('contactModal'),
-        modalTitle: document.getElementById('modalTitle'),
-        contactForm: document.getElementById('contactForm'),
-        contactId: document.getElementById('contactId'),
+        // A contact: read, changed and created in its sheet (#overviewModal)
         addContactBtn: document.getElementById('addContactBtn'),
-        closeModal: document.getElementById('closeModal'),
-        cancelBtn: document.getElementById('cancelBtn'),
-        deleteBtn: document.getElementById('deleteBtn'),
-        saveBtn: document.getElementById('saveBtn'),
-        expandToggle: document.getElementById('expandToggle'),
-        expandableFields: document.getElementById('expandableFields'),
+        contactEditName: document.getElementById('contactEditName'),
+        contactEditCompany: document.getElementById('contactEditCompany'),
+        contactEditEmail: document.getElementById('contactEditEmail'),
+        contactEditPhone: document.getElementById('contactEditPhone'),
+        contactEditLocation: document.getElementById('contactEditLocation'),
+        contactEditWebsite: document.getElementById('contactEditWebsite'),
+        contactEditAddress: document.getElementById('contactEditAddress'),
+        contactEditNote: document.getElementById('contactEditNote'),
+        cancelContactEditBtn: document.getElementById('cancelContactEditBtn'),
+        saveContactEditBtn: document.getElementById('saveContactEditBtn'),
+        deleteContactBtn: document.getElementById('deleteContactBtn'),
+        openContactTagBtn: document.getElementById('openContactTagBtn'),
+        contactTagPicker: document.getElementById('contactTagPicker'),
+        openContactNoteBtn: document.getElementById('openContactNoteBtn'),
+        contactNoteForm: document.getElementById('contactNoteForm'),
+        cancelContactNoteBtn: document.getElementById('cancelContactNoteBtn'),
 
         // Delete modal
         deleteModal: document.getElementById('deleteModal'),
@@ -1717,17 +1723,15 @@
 
         try {
             const result = await api.getTodos({ contact_id: contactId, status: 'all' });
-            if (result.success) {
-                renderTodoCollection(elements.contactTodosList, result.data || [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet'
-                });
-            } else {
-                renderTodoCollection(elements.contactTodosList, [], {
-                    showContext: false,
-                    emptyMessage: 'No to-dos yet'
-                });
-            }
+            const todos = result.success ? (result.data || []) : [];
+            // One line each, as in the project sheet; a click opens the to-do.
+            // Open ones first, the completed ones after them, struck through.
+            const open = todos.filter(todo => Number(todo.is_completed) !== 1);
+            const done = todos.filter(todo => Number(todo.is_completed) === 1);
+            const shown = open.concat(done);
+            elements.contactTodosList.innerHTML = shown.length
+                ? `<div class="ptodo-card">${shown.map(todo => createProjectTodoMarkup(todo, { opensSheet: true })).join('')}</div>`
+                : '';
         } catch (error) {
             console.error('Error loading contact to-dos:', error);
         }
@@ -2935,57 +2939,19 @@
     // Modal Functions
     // ============================================
 
+    /** Old entry point, kept for callers: a contact to change, or a new one. */
     function openContactModal(contact = null) {
-        state.editingContactId = contact ? contact.id : null;
-
-        // Reset form
-        elements.contactForm.reset();
-        elements.expandableFields.classList.remove('expanded');
-        elements.expandToggle.querySelector('.expand-icon').style.transform = '';
-
-        if (contact) {
-            // Editing existing contact
-            elements.modalTitle.textContent = 'Edit Contact';
-            elements.deleteBtn.style.display = 'block';
-
-            // Fill form fields
-            elements.contactId.value = contact.id;
-            document.getElementById('contactName').value = contact.name || '';
-            document.getElementById('contactCompany').value = contact.company || '';
-            document.getElementById('contactLocation').value = contact.location || '';
-            document.getElementById('contactNote').value = contact.note || '';
-            document.getElementById('contactEmail').value = contact.email || '';
-            document.getElementById('contactPhone').value = contact.phone || '';
-            document.getElementById('contactWebsite').value = contact.website || '';
-            document.getElementById('contactAddress').value = contact.address || '';
-
-            // Expand additional fields if any are filled
-            if (contact.email || contact.phone || contact.website || contact.address) {
-                elements.expandableFields.classList.add('expanded');
-                elements.expandToggle.querySelector('.expand-icon').style.transform = 'rotate(45deg)';
-            }
+        if (contact && contact.id) {
+            openOverviewModal(contact.id, { edit: true });
         } else {
-            // Adding new contact
-            elements.modalTitle.textContent = 'Add Contact';
-            elements.deleteBtn.style.display = 'none';
-            elements.contactId.value = '';
+            openNewContact();
         }
-
-        // Show modal
-        elements.contactModal.classList.add('active');
-        document.getElementById('contactName').focus();
-    }
-
-    function closeContactModal() {
-        elements.contactModal.classList.remove('active');
-        state.editingContactId = null;
     }
 
     function openDeleteModal() {
-        const contact = state.contacts.find(c => c.id === state.editingContactId) ||
-                       state.mapContacts.find(c => c.id === state.editingContactId);
-
+        const contact = state.viewingContact;
         if (contact) {
+            state.editingContactId = contact.id;
             elements.deleteContactName.textContent = contact.name;
             elements.deleteModal.classList.add('active');
         }
@@ -2999,7 +2965,7 @@
     // Overview Modal Functions
     // ============================================
 
-    async function openOverviewModal(contactId) {
+    async function openOverviewModal(contactId, { edit = false } = {}) {
         try {
             const result = await api.getContact(contactId);
 
@@ -3011,6 +2977,9 @@
             const contact = result.data;
             state.viewingContactId = contactId;
             state.viewingContact = contact;
+            elements.overviewModal.classList.remove('is-new');
+            exitContactEdit();
+            closeContactPickers();
 
             // Populate header
             elements.overviewName.textContent = contact.name;
@@ -3046,6 +3015,7 @@
 
             // Show modal
             elements.overviewModal.classList.add('active');
+            if (edit) enterContactEdit();
 
         } catch (error) {
             console.error('Error opening overview:', error);
@@ -3053,87 +3023,144 @@
         }
     }
 
+    /** The contact's details while reading; an empty one is not shown (CSS). */
     function renderOverviewDetails(contact) {
-        let html = '<div class="detail-grid">';
+        const link = (node, href, text, external) => {
+            if (!text) {
+                setDetailValue(node, null);
+                return;
+            }
+            node.classList.remove('detail-empty');
+            node.innerHTML = `<a class="detail-link" href="${escapeHtml(href)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ''}>${escapeHtml(text)}</a>`;
+        };
+        link(document.getElementById('overviewEmail'), 'mailto:' + (contact.email || ''), contact.email, false);
+        link(document.getElementById('overviewPhone'), 'tel:' + (contact.phone || ''), contact.phone, false);
+        link(document.getElementById('overviewWebsite'), contact.website ? normalizeUrl(contact.website) : '', contact.website, true);
+        setDetailValue(document.getElementById('overviewLocation'), contact.location);
+        setDetailValue(document.getElementById('overviewAddress'), contact.address);
+        setDetailValue(document.getElementById('overviewNote'), contact.note);
+        // Somewhere given that the map could not find.
+        const warning = document.getElementById('overviewGeoWarning');
+        if (warning) warning.hidden = !(contact.location || contact.address) || !!(contact.latitude && contact.longitude);
+    }
 
-        if (contact.location) {
-            const hasCoords = contact.latitude && contact.longitude;
-            const geoWarning = !hasCoords ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
-            html += `
-                <div class="detail-item">
-                    <div class="detail-content">
-                        <span class="detail-label">Location ${geoWarning}</span>
-                        <span class="detail-value">${escapeHtml(contact.location)}</span>
-                    </div>
-                </div>
-            `;
+    // ---- Changing and creating a contact in its sheet -----------------------
+
+    const CONTACT_FIELDS = ['name', 'company', 'email', 'phone', 'location', 'website', 'address', 'note'];
+
+    function contactField(key) {
+        return elements['contactEdit' + key.charAt(0).toUpperCase() + key.slice(1)];
+    }
+
+    function isEditingContact() {
+        return elements.overviewModal.classList.contains('is-editing');
+    }
+
+    function isNewContact() {
+        return elements.overviewModal.classList.contains('is-new');
+    }
+
+    function enterContactEdit() {
+        const contact = state.viewingContact;
+        if (!contact) return;
+        CONTACT_FIELDS.forEach(key => { contactField(key).value = contact[key] || ''; });
+        contactField('name').classList.remove('is-invalid');
+        elements.saveContactEditBtn.textContent = 'Save';
+        elements.overviewModal.classList.add('is-editing');
+        contactField('name').focus();
+    }
+
+    function exitContactEdit() {
+        elements.overviewModal.classList.remove('is-editing');
+    }
+
+    /** A new contact: the sheet in edit mode with empty fields; the rest comes once it is saved. */
+    function openNewContact() {
+        if (elements.overviewModal.classList.contains('active')) closeOverviewModal();
+        state.viewingContactId = null;
+        state.viewingContact = null;
+        elements.overviewName.textContent = 'New contact';
+        setEditedLine(elements.overviewEdited, null);
+        // No record yet: the choice is applied right after it is created.
+        elements.overviewAssignee.innerHTML = assigneeControl('contact', null);
+        elements.overviewAssignee.style.display = '';
+        const review = document.getElementById('overviewReview');
+        if (review) review.hidden = true;
+        closeContactPickers();
+        CONTACT_FIELDS.forEach(key => { contactField(key).value = ''; });
+        contactField('name').classList.remove('is-invalid');
+        elements.saveContactEditBtn.textContent = 'Create contact';
+        elements.overviewModal.classList.add('active', 'is-editing', 'is-new');
+        elements.overviewModal.querySelector('.modal-body').scrollTop = 0;
+        contactField('name').focus();
+    }
+
+    /** Cancel leaves edit mode; a contact not yet created closes. */
+    function cancelContactEdit() {
+        if (isNewContact()) {
+            closeOverviewModal();
+        } else {
+            exitContactEdit();
+        }
+    }
+
+    async function saveContact() {
+        if (!isEditingContact()) return;
+        const creating = isNewContact();
+        const contactId = state.viewingContactId;
+        if (!creating && !contactId) return;
+
+        const data = {};
+        CONTACT_FIELDS.forEach(key => { data[key] = contactField(key).value.trim(); });
+        const nameField = contactField('name');
+        nameField.classList.toggle('is-invalid', !data.name);
+        if (!data.name) {
+            nameField.focus();
+            return;
         }
 
-        if (contact.email) {
-            html += `
-                <div class="detail-item">
-                    <div class="detail-content">
-                        <span class="detail-label">Email</span>
-                        <a href="mailto:${escapeHtml(contact.email)}" class="detail-value detail-link">${escapeHtml(contact.email)}</a>
-                    </div>
-                </div>
-            `;
+        elements.saveContactEditBtn.disabled = true;
+        try {
+            const result = creating ? await api.createContact(data) : await api.updateContact(contactId, data);
+            if (!result.success) {
+                alert(result.error || 'Error saving contact');
+                return;
+            }
+            const savedId = creating ? Number(result.data && result.data.id) : contactId;
+            if (creating && savedId) {
+                const assignSelect = elements.overviewAssignee.querySelector('select.assignee-select');
+                if (assignSelect && assignSelect.value) {
+                    try {
+                        const saved = await saveAssignment('contact', savedId, assignSelect.value);
+                        showAssignmentToast(saved.assigned_to_name);
+                        if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
+                    } catch (error) {
+                        alert('The contact was created, but the assignment could not be saved: ' + error.message);
+                    }
+                }
+            }
+            refreshData();
+            updateContactCount();
+            if (savedId) {
+                await openOverviewModal(savedId);
+            } else {
+                closeOverviewModal();
+            }
+        } catch (error) {
+            console.error('Error saving contact:', error);
+            alert(error.message || 'Error saving contact');
+        } finally {
+            elements.saveContactEditBtn.disabled = false;
         }
+    }
 
-        if (contact.phone) {
-            html += `
-                <div class="detail-item">
-                    <div class="detail-content">
-                        <span class="detail-label">Phone</span>
-                        <a href="tel:${escapeHtml(contact.phone)}" class="detail-value detail-link">${escapeHtml(contact.phone)}</a>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.website) {
-            html += `
-                <div class="detail-item">
-                    <div class="detail-content">
-                        <span class="detail-label">Website</span>
-                        <a href="${escapeHtml(normalizeUrl(contact.website))}" target="_blank" class="detail-value detail-link">${escapeHtml(contact.website)}</a>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.address) {
-            const hasCoords = contact.latitude && contact.longitude;
-            const addressGeoWarning = (!hasCoords && !contact.location) ? `<span class="geocode-warning" title="This address could not be found on the map">(!)</span>` : '';
-            html += `
-                <div class="detail-item detail-item-full">
-                    <div class="detail-content">
-                        <span class="detail-label">Address ${addressGeoWarning}</span>
-                        <span class="detail-value">${escapeHtml(contact.address).replace(/\n/g, '<br>')}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (contact.note) {
-            html += `
-                <div class="detail-item detail-item-full">
-                    <div class="detail-content">
-                        <span class="detail-label">Note</span>
-                        <span class="detail-value">${escapeHtml(contact.note)}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        html += '</div>';
-
-        // Show empty state if no details
-        if (!contact.location && !contact.email && !contact.phone && !contact.website && !contact.address && !contact.note) {
-            html = '<p class="empty-hint">No contact details yet</p>';
-        }
-
-        elements.overviewDetails.innerHTML = html;
+    function closeContactPickers() {
+        if (elements.contactTagPicker) elements.contactTagPicker.hidden = true;
+        if (elements.openContactTagBtn) elements.openContactTagBtn.setAttribute('aria-expanded', 'false');
+        if (elements.contactNoteForm) elements.contactNoteForm.hidden = true;
+        if (elements.openContactNoteBtn) elements.openContactNoteBtn.setAttribute('aria-expanded', 'false');
+        if (elements.newNoteContent) elements.newNoteContent.value = '';
+        if (elements.newTagInput) elements.newTagInput.value = '';
     }
 
     async function loadNotes(contactId) {
@@ -3214,7 +3241,7 @@
             const result = await api.createNote(state.viewingContactId, content);
 
             if (result.success) {
-                elements.newNoteContent.value = '';
+                closeContactPickers();
                 await loadNotes(state.viewingContactId);
             } else {
                 alert(result.error || 'Error adding note');
@@ -3224,10 +3251,7 @@
             alert('Error adding note');
         } finally {
             elements.addNoteBtn.disabled = false;
-            elements.addNoteBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                Add Note
-            `;
+            elements.addNoteBtn.textContent = 'Add note';
         }
     }
 
@@ -3283,7 +3307,8 @@
     }
 
     function closeOverviewModal() {
-        elements.overviewModal.classList.remove('active');
+        elements.overviewModal.classList.remove('active', 'is-editing', 'is-new');
+        closeContactPickers();
         state.viewingContactId = null;
         state.viewingContact = null;
         elements.newNoteContent.value = '';
@@ -3293,11 +3318,7 @@
     }
 
     function openEditFromOverview() {
-        if (state.viewingContact) {
-            const contact = state.viewingContact;
-            closeOverviewModal();
-            openContactModal(contact);
-        }
+        if (state.viewingContact) enterContactEdit();
     }
 
     // ============================================
@@ -3788,66 +3809,7 @@
     // ============================================
 
     async function editContact(id) {
-        try {
-            const result = await api.getContact(id);
-
-            if (result.success) {
-                openContactModal(result.data);
-            } else {
-                alert('Error loading contact');
-            }
-        } catch (error) {
-            console.error('Error loading contact:', error);
-            alert('Error loading contact');
-        }
-    }
-
-    async function saveContact(event) {
-        event.preventDefault();
-
-        const formData = {
-            name: document.getElementById('contactName').value.trim(),
-            company: document.getElementById('contactCompany').value.trim(),
-            location: document.getElementById('contactLocation').value.trim(),
-            note: document.getElementById('contactNote').value.trim(),
-            email: document.getElementById('contactEmail').value.trim(),
-            phone: document.getElementById('contactPhone').value.trim(),
-            website: document.getElementById('contactWebsite').value.trim(),
-            address: document.getElementById('contactAddress').value.trim()
-        };
-
-        if (!formData.name) {
-            alert('Name is required');
-            return;
-        }
-
-        // Show loading state
-        elements.saveBtn.disabled = true;
-        elements.saveBtn.textContent = 'Saving...';
-
-        try {
-            let result;
-
-            if (state.editingContactId) {
-                result = await api.updateContact(state.editingContactId, formData);
-            } else {
-                result = await api.createContact(formData);
-            }
-
-            if (result.success) {
-                closeContactModal();
-                refreshData();
-                updateContactCount();
-            } else {
-                alert(result.error || 'Error saving contact');
-            }
-        } catch (error) {
-            console.error('Error saving contact:', error);
-            alert(error.message || 'Error saving contact');
-        } finally {
-            elements.saveBtn.disabled = false;
-            elements.saveBtn.textContent = 'Save Contact';
-        }
+        await openOverviewModal(id, { edit: true });
     }
 
     async function deleteContact() {
@@ -3861,7 +3823,7 @@
 
             if (result.success) {
                 closeDeleteModal();
-                closeContactModal();
+                closeOverviewModal();
                 refreshData();
                 updateContactCount();
             } else {
@@ -5143,7 +5105,7 @@
         }
 
         elements.projectOverviewModal.querySelectorAll('.is-invalid').forEach(node => node.classList.remove('is-invalid'));
-        elements.saveProjectEditBtn.textContent = 'Create';
+        elements.saveProjectEditBtn.textContent = 'Create project';
         elements.projectOverviewModal.classList.add('active', 'is-editing', 'is-new');
         elements.projectOverviewModal.querySelector('.modal-body').scrollTop = 0;
         elements.projectEditName.focus();
@@ -5873,6 +5835,7 @@
         return `
             <div class="assignee-bar">
                 <span class="assignee-bar-face${url ? ' has-photo' : ''}${name ? '' : ' is-empty'}">${face}</span>
+                <svg class="assignee-bar-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg>
                 <div class="assignee-bar-body">
                     <span class="assignee-bar-label">Assigned to</span>
                     <select class="form-select assignee-select"
@@ -6313,23 +6276,33 @@
             elements.themeToggleBtn.addEventListener('click', toggleTheme);
         }
 
-        // Modal close buttons
-        elements.closeModal.addEventListener('click', closeContactModal);
-        elements.cancelBtn.addEventListener('click', closeContactModal);
-        elements.contactModal.querySelector('.modal-backdrop').addEventListener('click', closeContactModal);
-
-        // Expandable fields toggle
-        elements.expandToggle.addEventListener('click', () => {
-            elements.expandableFields.classList.toggle('expanded');
-            const isExpanded = elements.expandableFields.classList.contains('expanded');
-            elements.expandToggle.querySelector('.expand-icon').style.transform = isExpanded ? 'rotate(45deg)' : '';
+        // The contact sheet's own form: Save / Cancel, Enter saves from a one-line field
+        elements.saveContactEditBtn.addEventListener('click', saveContact);
+        elements.cancelContactEditBtn.addEventListener('click', cancelContactEdit);
+        elements.overviewModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && isEditingContact() && e.target.matches('input.form-input')) {
+                e.preventDefault();
+                saveContact();
+            }
         });
-
-        // Contact form submission
-        elements.contactForm.addEventListener('submit', saveContact);
-
-        // Delete button
-        elements.deleteBtn.addEventListener('click', openDeleteModal);
+        elements.deleteContactBtn.addEventListener('click', openDeleteModal);
+        elements.openContactTagBtn.addEventListener('click', () => {
+            const open = elements.contactTagPicker.hidden;
+            elements.contactTagPicker.hidden = !open;
+            elements.openContactTagBtn.setAttribute('aria-expanded', String(open));
+            if (open) elements.newTagInput.focus();
+        });
+        elements.openContactNoteBtn.addEventListener('click', () => {
+            const open = elements.contactNoteForm.hidden;
+            elements.contactNoteForm.hidden = !open;
+            elements.openContactNoteBtn.setAttribute('aria-expanded', String(open));
+            if (open) elements.newNoteContent.focus();
+        });
+        elements.cancelContactNoteBtn.addEventListener('click', () => {
+            elements.contactNoteForm.hidden = true;
+            elements.openContactNoteBtn.setAttribute('aria-expanded', 'false');
+            elements.newNoteContent.value = '';
+        });
 
         // Delete modal
         elements.closeDeleteModal.addEventListener('click', closeDeleteModal);
@@ -6339,14 +6312,13 @@
 
         // Overview modal
         elements.closeOverviewModal.addEventListener('click', closeOverviewModal);
-        elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', closeOverviewModal);
-        elements.editContactBtn.addEventListener('click', openEditFromOverview);
-        // Click a detail (not its mail, phone or web link) to change it.
-        elements.overviewDetails.addEventListener('click', (e) => {
-            if (e.target.closest('a, button')) return;
-            if (String(window.getSelection ? window.getSelection() : '').trim()) return;
-            if (e.target.closest('.detail-item, .empty-hint')) openEditFromOverview();
+        // The backdrop does not throw away what is being typed.
+        elements.overviewModal.querySelector('.modal-backdrop').addEventListener('click', () => {
+            if (!isEditingContact()) closeOverviewModal();
         });
+        elements.editContactBtn.addEventListener('click', openEditFromOverview);
+        // Click a value (not its mail, phone or web link) to change it.
+        bindClickToEdit(elements.overviewModal, elements.editContactBtn, isEditingContact, async () => enterContactEdit());
         elements.addNoteBtn.addEventListener('click', addNote);
         if (elements.addContactTodoBtn) {
             elements.addContactTodoBtn.addEventListener('click', () => {
@@ -6801,9 +6773,11 @@
                 } else if (elements.companyNotesModal.classList.contains('active')) {
                     closeCompanyNotesModal();
                 } else if (elements.overviewModal.classList.contains('active')) {
-                    closeOverviewModal();
-                } else if (elements.contactModal.classList.contains('active')) {
-                    closeContactModal();
+                    if (isEditingContact()) {
+                        cancelContactEdit();
+                    } else {
+                        closeOverviewModal();
+                    }
                 }
             }
 

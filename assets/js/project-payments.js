@@ -422,8 +422,8 @@
     };
 
     const MODES = [
-        { key: 'partial', label: 'Partial payments', hint: 'Several payments, each in a month of the project' },
-        { key: 'full', label: 'Payment in full', hint: 'The whole project in one payment - also after it has ended' }
+        { key: 'partial', label: 'Partial', hint: 'Several payments, each in a month of the project' },
+        { key: 'full', label: 'In full', hint: 'The whole project in one payment - also after it has ended' }
     ];
 
     function context() {
