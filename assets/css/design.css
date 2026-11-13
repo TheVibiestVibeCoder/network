@@ -11982,3 +11982,17 @@ details.import-instructions p {
         white-space: normal;
     }
 }
+
+/* --------------------------------------------------------------------------
+   Phones and tablets: iOS zooms the page into any text field written smaller
+   than 16px. Every field is 16px on a touch screen instead - the big title
+   fields of the sheets are larger already and stay as they are.
+   -------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.ov-edit-title):not(.compose-input),
+    select,
+    textarea:not(.compose-input) {
+        font-size: 16px !important;
+    }
+}
