@@ -663,13 +663,17 @@
         if (cluster.length) flush();
     }
 
-    // Overlapping appointments as a cascade: the first of a group takes the
+    // Overlapping appointments side by side where the day is wide enough;
+    // otherwise as a cascade: the first of a group takes the
     // whole width, each later one that overlaps it one step further in (20px),
     // right edge aligned, lying on top. More than three steps, or too little
     // room left, and the group goes back to side-by-side lanes.
     const CASCADE_STEP = 20;
     const CASCADE_LEVELS = 3;
     const CASCADE_MIN_WIDTH = 110;
+    // Wide enough that each of them gets this much side by side (a day on a
+    // wide window): no cascade, they stand next to each other.
+    const SIDE_BY_SIDE_WIDTH = 240;
 
     function layoutDay(blocks, colWidth) {
         blocks.sort((a, b) => a.seg.start - b.seg.start || b.seg.end - a.seg.end);
@@ -688,13 +692,18 @@
         if (group.length) groups.push(group);
 
         groups.forEach(list => {
+            assignLanes(list);
+            const lanes = list.reduce((max, block) => Math.max(max, block.lanes || 1), 1);
+            if (lanes > 1 && colWidth / lanes >= SIDE_BY_SIDE_WIDTH) {
+                list.forEach(block => { block.mode = 'lanes'; });
+                return;
+            }
             list.forEach((block, i) => {
                 const under = list.slice(0, i).filter(other => overlaps(other.seg, block.seg));
                 block.level = under.length ? Math.max(...under.map(other => other.level)) + 1 : 0;
             });
             const deepest = Math.max(...list.map(block => block.level));
             if (deepest >= CASCADE_LEVELS || colWidth - 8 - deepest * CASCADE_STEP < CASCADE_MIN_WIDTH) {
-                assignLanes(list);
                 list.forEach(block => { block.mode = 'lanes'; });
             } else {
                 list.forEach(block => { block.mode = 'cascade'; });
