@@ -964,13 +964,15 @@
         const { item, seg } = block;
         const label = durationLabel(item.buffer) + ' travel';
         const across = blockGeometry(block).replace(/;z-index:\d+/, '');
-        // A thin line to the appointment, in its middle how long, when there is room.
+        // A soft area behind the appointment over all the time it binds; it
+        // runs a little under the appointment, so it reads as one piece.
+        const OVERLAP = 10;
         const band = (from, to, side) => {
             if (to <= from) return '';
             const height = (to - from) * hourPx / 60;
-            const tag = height >= 26
-                ? `<span class="tcal-buffer-tag">${typeIcon('external', 11)}${esc(durationLabel(item.buffer))}</span>` : '';
-            return `<div class="tcal-buffer is-${side}" style="top:${from * hourPx / 60}px;height:${height}px;${across}" title="${esc(label)}" aria-hidden="true">${tag}</div>`;
+            const top = from * hourPx / 60 - (side === 'after' ? OVERLAP : 0);
+            const tag = height >= 22 ? `<span class="tcal-buffer-tag">${esc(durationLabel(item.buffer))}</span>` : '';
+            return `<div class="tcal-buffer is-${side}" style="top:${top}px;height:${height + OVERLAP}px;${across}" title="${esc(label)}" aria-hidden="true">${tag}</div>`;
         };
         // Only where the appointment starts and ends on this day.
         const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start, 'before') : '';

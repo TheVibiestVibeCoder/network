@@ -1136,37 +1136,32 @@ button.tcal-dayhead:hover {
     pointer-events: none;
 }
 
-/* Travel time: a thin line from the appointment, on it how long - on the
-   way there above the appointment, on the way back below. */
+/* Travel time: a soft area behind the appointment over all the time it
+   binds, "45 min" at its outer ends - on the way there above, back below.
+   Paler than anyone's appointment, so it never reads as one. */
 .tcal-buffer {
-    display: grid;
-    place-items: center;
+    display: flex;
+    padding: 0 8px;
+    background: color-mix(in srgb, var(--c-accent) 7%, var(--c-surface));
 }
 
-.tcal-buffer::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 1.5px;
-    margin-left: -0.75px;
-    background: color-mix(in srgb, var(--c-accent) 45%, transparent);
+.tcal-buffer.is-before {
+    align-items: flex-start;
+    padding-top: 4px;
+    border-radius: 10px 10px 0 0;
+}
+
+.tcal-buffer.is-after {
+    align-items: flex-end;
+    padding-bottom: 4px;
+    border-radius: 0 0 10px 10px;
 }
 
 .tcal-buffer-tag {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: var(--r-full);
-    background: var(--c-surface);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-accent) 30%, transparent);
-    color: var(--c-accent);
     font-size: 10px;
     font-weight: 600;
-    line-height: 1.4;
+    line-height: 1.3;
+    color: var(--c-accent);
     white-space: nowrap;
 }
 
