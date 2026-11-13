@@ -1133,11 +1133,19 @@ button.tcal-dayhead:hover {
 .tcal-buffer {
     position: absolute;
     z-index: 0;
-    border-radius: 4px;
-    background: repeating-linear-gradient(135deg,
-        color-mix(in srgb, var(--tcal-main) 14%, transparent) 0 2px,
-        transparent 2px 7px);
     pointer-events: none;
+}
+
+/* Travel time: a soft tint that fades away from the appointment - on the
+   way there above it, on the way back below. (Hatching means private.) */
+.tcal-buffer.is-before {
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c-accent) 18%, transparent));
+}
+
+.tcal-buffer.is-after {
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(to top, transparent, color-mix(in srgb, var(--c-accent) 18%, transparent));
 }
 
 /* With the right to add appointments, a found slot is booked by a click. */
@@ -2712,4 +2720,40 @@ button.tcal-dayhead:hover {
 .esheet-type:disabled {
     opacity: 0.5;
     cursor: default;
+}
+
+/* A chosen participant who is busy then: a red ring on the face and a line
+   under the people saying when. */
+#eventSheet .esheet-choose-person.has-clash .tcal-face {
+    box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-danger);
+}
+
+.esheet-clashes:empty {
+    display: none;
+}
+
+.esheet-clashes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.esheet-clash {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 1.4;
+    color: var(--c-danger-ink);
+}
+
+.esheet-clash svg {
+    flex: none;
+    margin-top: 2px;
+}
+
+.esheet-clash strong {
+    font-weight: 600;
 }

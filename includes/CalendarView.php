@@ -383,7 +383,7 @@ final class CalendarView
      * @param list<string> $emails
      * @return array<string, list<array{0: int, 1: int, 2: ?string}>> email => [[start, end] unix seconds, type]
      */
-    public static function busy(array $emails, string $fromDate, string $toDate): array
+    public static function busy(array $emails, string $fromDate, string $toDate, ?string $excludeUid = null): array
     {
         $zone = new DateTimeZone(CALENDAR_TIMEZONE);
         $types = CalendarTypes::all();
@@ -391,6 +391,10 @@ final class CalendarView
         foreach (self::instances($fromDate, $toDate) as $row) {
             $owner = strtolower((string) $row['owner_email']);
             if (!isset($busy[$owner]) || (int) $row['transparent'] === 1) {
+                continue;
+            }
+            // The appointment being edited is not in its own way.
+            if ($excludeUid !== null && $excludeUid !== '' && (string) $row['uid'] === $excludeUid) {
                 continue;
             }
             if ((int) $row['all_day'] === 1) {

@@ -431,6 +431,11 @@ $events->update($visit['uid'], null, 'series', ['type' => 'office'], $livio);
 check('changing only the type never writes to the server', $server->puts === $puts && CalendarTypes::of($visit['uid']) === 'office');
 $events->update($visit['uid'], null, 'series', ['type' => 'external'], $livio);
 
+$at = static fn (string $time) => (new DateTimeImmutable(day(6) . ' ' . $time, $zone))->getTimestamp();
+$clash = CalendarAvailability::conflicts([VIVIAN, MARKUS], $at('12:30'), $at('13:30'));
+check('a participant who is busy then is found, with the time; one who is free is not', count($clash[VIVIAN] ?? []) === 1 && !isset($clash[MARKUS]), $clash);
+check('... the appointment being edited does not clash with itself', CalendarAvailability::conflicts([VIVIAN], $at('12:30'), $at('13:30'), $visit['uid']) === []);
+check('... and touching is not overlapping', CalendarAvailability::conflicts([VIVIAN], $at('13:00'), $at('14:00')) === []);
 CalendarSettings::setWorkingHours(['days' => [1, 2, 3, 4, 5, 6, 7], 'start' => '08:00', 'end' => '18:00', 'buffer' => 0, 'external_buffer' => 45]);
 $slots = CalendarAvailability::freeSlots([VIVIAN], 30, day(6), day(7), CalendarSettings::workingHours(), 0);
 $local = array_map(static fn ($s) => (new DateTimeImmutable($s['start']))->setTimezone($zone)->format('H:i') . '-' . (new DateTimeImmutable($s['end']))->setTimezone($zone)->format('H:i'), $slots);

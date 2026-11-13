@@ -318,6 +318,37 @@ final class CalendarAvailability
     public const MAX_DAYS = 31;
 
     /**
+     * What already fills these people's time between $from and $to (unix
+     * seconds) - times only, as for free slots, never what it is. The
+     * appointment being edited ($uid) does not count.
+     *
+     * @param list<string> $emails
+     * @return array<string, list<array{start: string, end: string, all_day: bool}>> email => ISO UTC
+     */
+    public static function conflicts(array $emails, int $from, int $to, ?string $uid = null): array
+    {
+        $zone = new DateTimeZone(CALENDAR_TIMEZONE);
+        $fromDate = (new DateTimeImmutable('@' . $from))->setTimezone($zone)->format('Y-m-d');
+        $toDate = (new DateTimeImmutable('@' . $to))->setTimezone($zone)->modify('+1 day')->format('Y-m-d');
+        $found = [];
+        foreach (CalendarView::busy($emails, $fromDate, $toDate, $uid) as $email => $intervals) {
+            $seen = [];
+            foreach ($intervals as [$start, $end]) {
+                if ($start >= $to || $end <= $from || isset($seen[$start . '-' . $end])) {
+                    continue;
+                }
+                $seen[$start . '-' . $end] = true;
+                $found[$email][] = [
+                    'start'   => gmdate('Y-m-d\TH:i:s\Z', $start),
+                    'end'     => gmdate('Y-m-d\TH:i:s\Z', $end),
+                    'all_day' => $end - $start >= 86400,
+                ];
+            }
+        }
+        return $found;
+    }
+
+    /**
      * @param list<string> $emails
      * @return list<array{start: string, end: string, minutes: int}> ISO UTC
      */

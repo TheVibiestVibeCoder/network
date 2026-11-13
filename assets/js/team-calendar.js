@@ -964,11 +964,11 @@
         const { item, seg } = block;
         const label = durationLabel(item.buffer) + ' travel';
         const across = blockGeometry(block).replace(/;z-index:\d+/, '');
-        const band = (from, to) => (to > from
-            ? `<div class="tcal-buffer" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;${across}" title="${esc(label)}" aria-hidden="true"></div>` : '');
+        const band = (from, to, side) => (to > from
+            ? `<div class="tcal-buffer is-${side}" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;${across}" title="${esc(label)}" aria-hidden="true"></div>` : '');
         // Only where the appointment starts and ends on this day.
-        const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start) : '';
-        const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer)) : '';
+        const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start, 'before') : '';
+        const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer), 'after') : '';
         return before + after;
     }
 
@@ -1116,6 +1116,10 @@
         sheet.conflict = null;
         sheet.pendingLinks = [];
         sheet.picker = { open: false, query: '', results: [], seq: 0, timer: null };
+        sheet.clashes = {};
+        sheet.clashKey = '';
+        sheet.clashSeq = (sheet.clashSeq || 0) + 1;
+        clearTimeout(sheet.clashTimer);
     }
 
     function showSheet() {
@@ -1279,6 +1283,10 @@
         els.sheetBody.innerHTML = (sheet.conflict ? conflictHtml() : '') + (editing ? formHtml() : viewHtml());
         renderFoot();
         if (focused) focusField(focused);
+        if (editing) {
+            paintClashes();
+            queueClashes();
+        }
     }
 
     /** Edit and delete sit in the header as icons; the footer only holds
@@ -1495,7 +1503,7 @@
                 ${team.length ? team.map(p => `<label class="esheet-choose-person${f.attendees.has(p.email) ? ' is-on' : ''}">
                     <input type="checkbox" data-ef-person="${esc(p.email)}"${f.attendees.has(p.email) ? ' checked' : ''}>${face(p)}<span>${esc(p.name)}</span></label>`).join('')
                     : '<span class="esheet-empty">Nobody else in the team has a calendar here yet.</span>'}
-            </div></div>`);
+            </div><div class="esheet-clashes" data-esheet-clashes aria-live="polite"></div></div>`);
         rows.push(`<div class="esheet-field"><span>Type</span><div class="esheet-types" role="group" aria-label="Type">
                 ${TYPES.map(([key, label]) => `<button type="button" class="esheet-type${f.type === key ? ' is-on' : ''}" data-ef-type="${key}" aria-pressed="${f.type === key}">${typeIcon(key, 15)}<span>${label}</span></button>`).join('')}
             </div></div>`);
@@ -1580,6 +1588,71 @@
             reminder: f.reminder === '' || f.reminder === 'custom' ? null : Number(f.reminder),
             type: f.type || null,
         };
+    }
+
+    // ---- Participants who have something else on then -----------------------
+    // Asked of the server whenever the people or the times change (times
+    // only, as for free slots); the appointment itself does not count.
+
+    function queueClashes() {
+        const f = sheet.form;
+        if (!f || !(sheet.mode === 'edit' || sheet.mode === 'new')) return;
+        const people = isPrivateKey(f.organizer) ? [] : Array.from(f.attendees).sort();
+        const times = formTimes(f);
+        const key = [people.join(','), times.start, times.end, f.all_day ? 1 : 0].join('|');
+        if (key === sheet.clashKey) return;
+        sheet.clashKey = key;
+        clearTimeout(sheet.clashTimer);
+        const seq = ++sheet.clashSeq;
+        if (!people.length || !times.start || !times.end) {
+            sheet.clashes = {};
+            paintClashes();
+            return;
+        }
+        sheet.clashTimer = setTimeout(async () => {
+            try {
+                const data = await api({
+                    action: 'conflicts', people: people.join(','), start: times.start, end: times.end,
+                    all_day: f.all_day ? '1' : '0', uid: (sheet.data && sheet.data.uid) || '',
+                });
+                if (seq !== sheet.clashSeq) return;
+                sheet.clashes = data || {};
+                paintClashes();
+            } catch (e) {
+                // Only a hint: without it the sheet works as before.
+            }
+        }, 250);
+    }
+
+    function clashText(list) {
+        return list.map(c => {
+            if (c.all_day) return 'all day';
+            const sameDay = wall(new Date(c.start)).key === wall(new Date(c.end)).key;
+            return sameDay ? `${fmtTime(c.start)}–${fmtTime(c.end)}`
+                : `${shortDayFmt.format(keyDate(wall(new Date(c.start)).key))} ${fmtTime(c.start)} – ${shortDayFmt.format(keyDate(wall(new Date(c.end)).key))} ${fmtTime(c.end)}`;
+        }).join(', ');
+    }
+
+    /** A mark on each chosen person who is busy then, and a line saying when. */
+    function paintClashes() {
+        if (!els.sheet || !sheet.form) return;
+        const lines = [];
+        els.sheet.querySelectorAll('[data-ef-person]').forEach(box => {
+            const email = box.dataset.efPerson;
+            const list = sheet.form.attendees.has(email) ? (sheet.clashes[email] || []) : [];
+            const chip = box.closest('.esheet-choose-person');
+            if (chip) {
+                chip.classList.toggle('has-clash', list.length > 0);
+                chip.title = list.length ? `Busy then: ${clashText(list)}` : '';
+            }
+            if (list.length) {
+                const p = person(email);
+                const first = p && p.name ? p.name.split(/\s+/)[0] : email;
+                lines.push(`<p class="esheet-clash"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V13M12 16.5v.01"/></svg><span><strong>${esc(first)}</strong> has something else on then: ${esc(clashText(list))}</span></p>`);
+            }
+        });
+        const box = els.sheet.querySelector('[data-esheet-clashes]');
+        if (box) box.innerHTML = lines.join('');
     }
 
     /** The calendar the sheet's appointment goes into (a calendar key). */
@@ -2714,6 +2787,8 @@
                 if (target.checked) sheet.form.attendees.add(target.dataset.efPerson); else sheet.form.attendees.delete(target.dataset.efPerson);
                 const chip = target.closest('.esheet-choose-person');
                 if (chip) chip.classList.toggle('is-on', target.checked);
+                paintClashes();
+                queueClashes();
                 return;
             }
             const field = target.dataset.ef;
@@ -2736,6 +2811,7 @@
                 renderSheet();
             } else if (field === 'end_date' || field === 'end_time') {
                 f[field] = target.value;
+                queueClashes();
             } else if (field === 'freq') {
                 f.freq = target.value;
                 renderSheet();

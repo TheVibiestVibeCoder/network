@@ -8,6 +8,8 @@
  *   POST   ?action=sync                             sync now, at most every
  *                                                   CALENDAR_OPEN_SYNC_SECONDS
  *   GET    ?action=free_slots&people=a,b&minutes=60&from=…&to=…
+ *   GET    ?action=conflicts&people=a,b&start=…&end=…[&all_day=1&uid=…]
+ *                                                   what already fills their time
  *   GET    ?action=search&q=…                       appointments by title, place,
  *                                                   notes, people, type, linked
  *                                                   contact or project
@@ -80,6 +82,9 @@ try {
             break;
         case 'GET free_slots':
             handleFreeSlots($viewer);
+            break;
+        case 'GET conflicts':
+            handleConflicts($viewer);
             break;
         case 'GET search':
             calendarRespond(200, ['success' => true, 'data' => CalendarView::search(mb_substr((string) ($_GET['q'] ?? ''), 0, 100), $viewer)]);
@@ -234,6 +239,37 @@ function handleFreeSlots(array $viewer): void
         'people' => $emails,
         'slots'  => CalendarAvailability::freeSlots($emails, $minutes, $from, $to, CalendarSettings::workingHours()),
     ]]);
+}
+
+/**
+ * Who of these people already has something on at that time - for the
+ * appointment sheet, while choosing participants. Times only.
+ */
+function handleConflicts(array $viewer): void
+{
+    $zone = new DateTimeZone(CALENDAR_TIMEZONE);
+    $allDay = ($_GET['all_day'] ?? '') === '1';
+    $start = (string) ($_GET['start'] ?? '');
+    $end = (string) ($_GET['end'] ?? '');
+    $from = $allDay ? DateTimeImmutable::createFromFormat('!Y-m-d', substr($start, 0, 10), $zone)
+                    : DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', substr($start, 0, 16), $zone);
+    $to = $allDay ? DateTimeImmutable::createFromFormat('!Y-m-d', substr($end, 0, 10), $zone)
+                  : DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', substr($end, 0, 16), $zone);
+    if ($from === false || $to === false) {
+        calendarRespond(422, ['error' => 'start and end must be local times.']);
+    }
+    if ($allDay) {
+        $to = $to->modify('+1 day');
+    }
+    if ($to <= $from || $to->getTimestamp() - $from->getTimestamp() > 62 * 86400) {
+        calendarRespond(200, ['success' => true, 'data' => []]);
+    }
+    $known = array_column(CalendarView::people($viewer), 'email');
+    $emails = array_values(array_intersect($known, array_map('strtolower', array_map('trim', explode(',', (string) ($_GET['people'] ?? ''))))));
+    $uid = trim((string) ($_GET['uid'] ?? ''));
+    calendarRespond(200, ['success' => true, 'data' => $emails
+        ? CalendarAvailability::conflicts($emails, $from->getTimestamp(), $to->getTimestamp(), $uid !== '' ? $uid : null)
+        : []]);
 }
 
 function handleSettings(array $viewer): void
