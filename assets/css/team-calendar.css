@@ -1905,10 +1905,11 @@ button.tcal-dayhead:hover {
     color: var(--c-ink);
 }
 
-.esheet-type.is-on {
+.esheet-type.is-on,
+.esheet-type.is-on:hover {
     border-color: transparent;
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
+    background: var(--c-accent);
+    color: var(--pick-ink, #FFFFFF);
     font-weight: 600;
 }
 
@@ -1947,14 +1948,18 @@ button.tcal-dayhead:hover {
     opacity: 0.5;
 }
 
-.esheet-choose-person.is-on {
-    background: var(--c-accent-soft);
-    color: var(--c-ink);
+/* Chosen: the accent blue, white name, the face with a white ring. */
+.esheet-choose-person.is-on,
+.esheet-choose-person.is-on:hover {
+    background: var(--c-accent);
+    color: var(--pick-ink, #FFFFFF);
+    font-weight: 600;
 }
 
 #eventSheet .esheet-choose-person.is-on .tcal-face {
     filter: none;
     opacity: 1;
+    box-shadow: 0 0 0 2px #FFFFFF;
 }
 
 .esheet-choose-person:focus-within {
@@ -2756,4 +2761,20 @@ button.tcal-dayhead:hover {
 
 .esheet-clash strong {
     font-weight: 600;
+}
+
+/* A chosen pill keeps its office mark in the pill's text colour. */
+.esheet-type.is-on .tcal-type-icon.is-office {
+    color: inherit;
+}
+
+/* On the lighter dark-mode accent, dark text reads better than white. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) #eventSheet {
+        --pick-ink: #0B111C;
+    }
+}
+
+:root[data-theme="dark"] #eventSheet {
+    --pick-ink: #0B111C;
 }
