@@ -19,6 +19,9 @@
  *   - Into another calendar: the appointment is written into the new
  *     organizer's work calendar and leaves the old one - unless its owner
  *     stays in it, then theirs becomes a copy.
+ *   - A private calendar: only its owner writes in it - adds, changes,
+ *     deletes, moves in and out - and nobody from the team takes part in
+ *     its appointments (copies are a work-calendar matter).
  *   - Its type (online, external, office) lives in the CRM only
  *     (CalendarTypes); changing just that never touches the server.
  *   - In a series: the whole series, or one occurrence.
@@ -167,7 +170,9 @@ final class CalendarEvents
         }
         $can = $this->permissions($original, $viewer, $myAnswer !== null);
         $can['reason'] = $can['edit'] ? null : $this->readOnlyReason($original, $visible, $organizerEmail, $team, $viewer);
-        $calendarOwner = strtolower((string) ($original ?? $visible)['owner_email']);
+        $calendarRow = $original ?? $visible;
+        $calendarOwner = strtolower((string) $calendarRow['owner_email']);
+        $calendarKey = self::calendarKey($calendarOwner, (string) $calendarRow['kind']);
 
         return [
             'uid'             => $uid,
@@ -185,7 +190,8 @@ final class CalendarEvents
             'organizer'       => $organizerEmail !== ''
                 ? ['email' => $organizerEmail, 'name' => isset($team[$organizerEmail]) ? $team[$organizerEmail]['name'] : ($organizer['name'] ?? null), 'team' => isset($team[$organizerEmail])]
                 : null,
-            'calendar'        => ['email' => $calendarOwner, 'name' => isset($team[$calendarOwner]) ? $team[$calendarOwner]['name'] : $calendarOwner],
+            'calendar'        => ['email' => $calendarOwner, 'key' => $calendarKey, 'private' => $calendarRow['kind'] === 'private',
+                                  'name' => (isset($team[$calendarOwner]) ? $team[$calendarOwner]['name'] : $calendarOwner) . ($calendarRow['kind'] === 'private' ? ' – Private' : '')],
             'attendees'       => $attendees,
             'guests'          => $guests,
             'series'          => $details['series'],
@@ -218,13 +224,25 @@ final class CalendarEvents
     {
         $list = [];
         $work = $this->workCalendars();
+        $private = $this->privateCalendars();
         foreach (CalendarView::people($viewer) as $person) {
             $source = $work[$person['email']] ?? null;
             if ($source !== null && (int) $source['writable'] === 1 && $this->store->reaches((string) $source['href'])) {
-                $list[] = ['email' => $person['email'], 'name' => $person['name'], 'mine' => $person['is_me']];
+                $list[] = ['key' => $person['email'], 'email' => $person['email'], 'name' => $person['name'], 'mine' => $person['is_me'], 'private' => false];
+            }
+            // Your own private calendar - yours only.
+            $own = $private[$person['email']] ?? null;
+            if ($own !== null && $person['is_me'] && (int) $own['writable'] === 1 && $this->store->reaches((string) $own['href'])) {
+                $list[] = ['key' => self::calendarKey($person['email'], 'private'), 'email' => $person['email'], 'name' => $person['name'] . ' – Private', 'mine' => true, 'private' => true];
             }
         }
         return $list;
+    }
+
+    /** How the sheet names a calendar: the owner's address, "private:" in front for a private one. */
+    private static function calendarKey(string $email, string $kind): string
+    {
+        return ($kind === 'private' ? 'private:' : '') . strtolower($email);
     }
 
     // =========================================================================
@@ -252,7 +270,16 @@ final class CalendarEvents
                 }
             }
         }
-        $source = $this->targetCalendar($organizer, $team, $work);
+        $isPrivate = strncmp($organizer, 'private:', 8) === 0;
+        if ($isPrivate) {
+            $organizer = substr($organizer, 8);
+            $source = $this->ownPrivateCalendar($organizer, $viewer);
+            if ($this->attendees((array) ($input['attendees'] ?? []), $team, $organizer)) {
+                throw new InvalidArgumentException('A private appointment is just for you - add people in your work calendar.');
+            }
+        } else {
+            $source = $this->targetCalendar($organizer, $team, $work);
+        }
         $type = CalendarTypes::valid($input['type'] ?? null);
 
         $fields = $this->fields($input, true);
@@ -268,7 +295,7 @@ final class CalendarEvents
             'description' => $fields['description'],
             'url'         => $fields['url'],
             'organizer'   => ['email' => $organizer, 'name' => $team[$organizer]['name']],
-            'attendees'   => $this->attendees((array) ($input['attendees'] ?? []), $team, $organizer),
+            'attendees'   => $isPrivate ? [] : $this->attendees((array) ($input['attendees'] ?? []), $team, $organizer),
             'repeat'      => $repeat,
             'reminder'    => $fields['reminder'] ?? null,
         ]);
@@ -278,7 +305,7 @@ final class CalendarEvents
             throw new RuntimeException('The calendar already holds an appointment at that address; nothing was saved.');
         }
         $this->write($source, $href, $ics);
-        $warnings = $this->copies->push($uid, $ics, $organizer, $href);
+        $warnings = $isPrivate ? [] : $this->copies->push($uid, $ics, $organizer, $href);
         if ($type !== null) {
             CalendarTypes::set($uid, $type, $viewer['user_id']);
         }
@@ -307,8 +334,12 @@ final class CalendarEvents
         [$original, $source, $organizer] = $this->editable($uid, $viewer);
         $setType = array_key_exists('type', $input);
         $type = $setType ? CalendarTypes::valid($input['type']) : null;
-        $newOrganizer = strtolower(trim((string) ($input['organizer'] ?? '')));
-        $moving = $newOrganizer !== '' && $newOrganizer !== $organizer;
+        $fromPrivate = $source['kind'] === 'private';
+        $currentKey = self::calendarKey($organizer, (string) $source['kind']);
+        $newKey = strtolower(trim((string) ($input['organizer'] ?? '')));
+        $moving = $newKey !== '' && $newKey !== $currentKey;
+        $toPrivate = $moving ? strncmp($newKey, 'private:', 8) === 0 : $fromPrivate;
+        $newOrganizer = $moving ? ($toPrivate ? substr($newKey, 8) : $newKey) : $organizer;
         if (!$moving && !array_diff(array_keys($input), ['base', 'type', 'organizer'])) {
             // Only the type: the CRM's, nothing goes to the server.
             if ($setType) {
@@ -318,11 +349,15 @@ final class CalendarEvents
         }
         $target = null;
         if ($moving) {
-            if (!$viewer['can_edit']) {
-                throw new DomainException('You may not put appointments into somebody else\'s calendar.');
-            }
             $team = $this->team($viewer);
-            $target = $this->targetCalendar($newOrganizer, $team, $this->workCalendars());
+            if ($toPrivate) {
+                $target = $this->ownPrivateCalendar($newOrganizer, $viewer);
+            } else {
+                if (!$viewer['can_edit'] && !in_array($newOrganizer, $viewer['emails'], true)) {
+                    throw new DomainException('You may not put appointments into somebody else\'s calendar.');
+                }
+                $target = $this->targetCalendar($newOrganizer, $team, $this->workCalendars());
+            }
             if ($this->store->isLocal((string) $original['href']) !== $this->store->isLocal((string) $target['href'])) {
                 throw new InvalidArgumentException('An appointment cannot move between a made-up test calendar and a real one.');
             }
@@ -335,6 +370,21 @@ final class CalendarEvents
             throw new InvalidArgumentException('Another calendar is for the whole series, not one occurrence.');
         }
         $fields = $this->fields($input, false);
+        // Nobody from the team in a private appointment: copies are a work
+        // calendar's business.
+        if ($toPrivate) {
+            $team = $this->team($viewer);
+            $wanted = array_key_exists('attendees', $input)
+                ? (array) $input['attendees']
+                : array_keys(CalendarIcsWriter::people($fresh)['attendees']);
+            $others = array_filter($wanted, static function ($email) use ($team, $newOrganizer): bool {
+                $email = strtolower(trim((string) $email));
+                return isset($team[$email]) && $email !== $newOrganizer;
+            });
+            if ($others) {
+                throw new InvalidArgumentException('A private appointment is just for you - take the others out first, or keep it in a work calendar.');
+            }
+        }
 
         $changes = [];
         foreach (['title', 'location', 'description', 'url', 'reminder'] as $key) {
@@ -370,9 +420,12 @@ final class CalendarEvents
                 $team = $this->team($viewer);
                 // Not said who takes part: everyone as before, the previous
                 // organizer included.
-                $emails = array_key_exists('attendees', $input)
+                $emails = $toPrivate ? [] : (array_key_exists('attendees', $input)
                     ? (array) $input['attendees']
-                    : array_merge(array_keys(CalendarIcsWriter::people($fresh)['attendees']), [$organizer]);
+                    : array_merge(array_keys(CalendarIcsWriter::people($fresh)['attendees']), [$organizer]));
+                if ($newOrganizer === $organizer) {
+                    $emails = array_diff(array_map('strtolower', $emails), [$organizer]);
+                }
                 $changes['attendees'] = $this->attendees(array_filter($emails, static function ($email) use ($team): bool {
                     return isset($team[strtolower(trim((string) $email))]);
                 }), $team, $newOrganizer);
@@ -390,10 +443,10 @@ final class CalendarEvents
         }
 
         if ($target !== null) {
-            $warnings = $this->move($uid, $original, $source, $target, $ics, $organizer, $newOrganizer);
+            $warnings = $this->move($uid, $original, $source, $target, $ics, $organizer, $newOrganizer, $toPrivate);
         } else {
             $this->write($source, (string) $original['href'], $ics);
-            $warnings = $this->copies->push($uid, $ics, $organizer, (string) $original['href']);
+            $warnings = $fromPrivate ? [] : $this->copies->push($uid, $ics, $organizer, (string) $original['href']);
         }
         if ($setType) {
             CalendarTypes::set($uid, $type, $viewer['user_id']);
@@ -408,7 +461,7 @@ final class CalendarEvents
      *
      * @return list<string> warnings
      */
-    private function move(string $uid, array $original, array $source, array $target, string $ics, string $from, string $to): array
+    private function move(string $uid, array $original, array $source, array $target, string $ics, string $from, string $to, bool $toPrivate = false): array
     {
         $stmt = $this->db->prepare("SELECT href FROM calendar_events WHERE source_id = :source AND uid = :uid AND archived = 0 ORDER BY id LIMIT 1");
         $stmt->execute(['source' => $target['id'], 'uid' => $uid]);
@@ -422,7 +475,9 @@ final class CalendarEvents
         $this->db->prepare("DELETE FROM calendar_copies WHERE uid = :uid AND email = :email")->execute(['uid' => $uid, 'email' => $to]);
 
         $warnings = [];
-        if (!array_key_exists($from, CalendarIcsWriter::people($ics)['attendees'])) {
+        // Out of the old calendar - unless its owner takes part (then theirs
+        // becomes a copy). Moving between one's own calendars, always out.
+        if ($from === $to || !array_key_exists($from, CalendarIcsWriter::people($ics)['attendees'])) {
             try {
                 $this->store->delete((string) $original['href']);
                 $this->cache->forget((int) $source['id'], (string) $original['href']);
@@ -431,7 +486,33 @@ final class CalendarEvents
                 $warnings[] = 'It is in the new calendar, but could not be taken out of the old one; delete it there.';
             }
         }
-        return array_merge($warnings, $this->copies->push($uid, $ics, $to, $href));
+        return $toPrivate ? $warnings : array_merge($warnings, $this->copies->push($uid, $ics, $to, $href));
+    }
+
+    /** Your own private calendar, when it may be written to. */
+    private function ownPrivateCalendar(string $email, array $viewer): array
+    {
+        $email = strtolower($email);
+        $source = $this->privateCalendars()[$email] ?? null;
+        if (!in_array($email, $viewer['emails'], true)) {
+            throw new DomainException('Only its owner can put appointments into a private calendar.');
+        }
+        if ($source === null || (int) $source['writable'] !== 1 || !$this->store->reaches((string) $source['href'])) {
+            throw new InvalidArgumentException('Your private calendar is shared to read only - shared to read and write, appointments can go into it.');
+        }
+        return $source;
+    }
+
+    /** @return array<string, array> address => that person's private calendar */
+    private function privateCalendars(): array
+    {
+        $rows = $this->db->query("SELECT * FROM calendar_sources WHERE enabled = 1 AND kind = 'private' ORDER BY writable DESC, id")->fetchAll();
+        $private = [];
+        foreach ($rows as $row) {
+            $email = strtolower((string) $row['owner_email']);
+            $private[$email] = $private[$email] ?? $row;
+        }
+        return $private;
     }
 
     /** A team member's work calendar the shared account may write into. */
@@ -602,8 +683,14 @@ final class CalendarEvents
                 ? 'Its original is in ' . $name($organizerEmail) . "'s work calendar, which the CRM cannot see - shared with the calendar account, to read and write, it can be changed here."
                 : 'Organized by someone outside the team - only they can change it.';
         }
-        if ($original['kind'] !== 'work') {
-            return 'In a private calendar - private calendars are read only here.';
+        if ($original['kind'] === 'private') {
+            $owner = strtolower((string) $original['owner_email']);
+            if (!in_array($owner, $viewer['emails'], true)) {
+                return 'In ' . $name($owner) . "'s private calendar - only they can change it.";
+            }
+            if ((int) $original['writable'] !== 1) {
+                return 'Your private calendar is shared to read only - shared to read and write, you can change it here.';
+            }
         }
         if ((int) $original['writable'] !== 1) {
             return $name(strtolower((string) $original['owner_email'])) . "'s work calendar is shared to read only - shared to read and write, it can be changed here.";
@@ -617,11 +704,12 @@ final class CalendarEvents
     /** @return array{edit: bool, cancel: bool, respond: bool, link: bool} */
     private function permissions(?array $original, array $viewer, bool $invited): array
     {
-        $writable = $original !== null && (int) $original['writable'] === 1 && $original['kind'] === 'work'
+        $writable = $original !== null && (int) $original['writable'] === 1
             && $this->store->reaches((string) $original['source_href']);
         $isOrganizer = $original !== null && in_array(strtolower((string) $original['owner_email']), $viewer['emails'], true);
-        $edit = $writable && ($viewer['can_edit'] || $isOrganizer);
-        return ['edit' => $edit, 'cancel' => $edit, 'respond' => $writable && $invited, 'link' => true];
+        // A private calendar: its owner alone - not even the edit right.
+        $edit = $writable && ($original['kind'] === 'private' ? $isOrganizer : ($viewer['can_edit'] || $isOrganizer));
+        return ['edit' => $edit, 'cancel' => $edit, 'respond' => $writable && $invited && $original['kind'] === 'work', 'link' => true];
     }
 
     /**

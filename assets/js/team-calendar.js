@@ -1185,7 +1185,7 @@
             sheetLoading('There is no calendar you may add appointments to.');
             return;
         }
-        const organizer = (calendars.find(c => c.email === p.organizer) || calendars.find(c => c.mine) || calendars[0]).email;
+        const organizer = (calendars.find(c => c.key === p.organizer) || calendars.find(c => c.mine && !c.private) || calendars[0]).key;
         const start = p.start || defaultStart();
         const end = p.end && p.end > start ? p.end : addMinutes(start, 60);
         sheet.form = {
@@ -1195,7 +1195,7 @@
             end_date: end.slice(0, 10), end_time: end.slice(11, 16) || '10:00',
             freq: 'NONE', until: '',
             organizer,
-            attendees: new Set((p.attendees || []).filter(email => email !== organizer)),
+            attendees: new Set((p.attendees || []).filter(email => email !== calendarEmail(organizer))),
             location: '', url: '', reminder: '', description: '',
             type: p.type || '',
         };
@@ -1215,7 +1215,7 @@
             end_date: ed, end_time: et || '10:00',
             freq: d.repeat ? d.repeat.freq : 'NONE',
             until: d.repeat && d.repeat.until ? d.repeat.until : '',
-            organizer: d.calendar.email,
+            organizer: d.calendar.key || d.calendar.email,
             attendees: new Set(d.attendees.filter(a => !a.organizer).map(a => a.email)),
             location: d.location || '',
             url: d.url || '',
@@ -1420,7 +1420,8 @@
         const isNew = sheet.mode === 'new';
         const series = !!(d && d.series);
         const calendars = (state.data.me && state.data.me.calendars) || [];
-        const team = state.data.people.filter(p => p.email !== f.organizer);
+        const team = state.data.people.filter(p => p.email !== calendarEmail(f.organizer));
+        const privateCal = isPrivateKey(f.organizer);
         const repeatLocked = !!(d && d.repeat_custom);
 
         const time = name => (f.all_day ? '' : `<input type="time" class="form-input" data-ef="${name}_time" value="${esc(f[name + '_time'])}" step="900" aria-label="${name === 'start' ? 'Start time' : 'End time'}">`);
@@ -1447,13 +1448,16 @@
         }
         // New: where it goes. Later: another calendar moves it there (the
         // whole series) - offered when its own calendar is one of the choices.
-        const movable = isNew || (calendars.length > 1 && calendars.some(c => c.email === d.calendar.email));
+        const movable = isNew || (calendars.length > 1 && calendars.some(c => c.key === (d.calendar.key || d.calendar.email)));
         if (movable) {
             rows.push(`<label class="esheet-field"><span>Calendar</span><select class="form-select" data-ef="organizer">
-                    ${calendars.map(c => `<option value="${esc(c.email)}"${c.email === f.organizer ? ' selected' : ''}>${esc(c.name)}${c.mine ? ' (you)' : ''}</option>`).join('')}
+                    ${calendars.map(c => `<option value="${esc(c.key)}"${c.key === f.organizer ? ' selected' : ''}>${esc(c.name)}${c.mine && !c.private ? ' (you)' : ''}</option>`).join('')}
                 </select></label>`);
         }
-        rows.push(`<div class="esheet-field"><span>Participants</span><div class="esheet-choose">
+        // A private appointment is yours alone: nobody from the team in it.
+        if (privateCal) {
+            rows.push('<p class="esheet-note">A private appointment is just for you - others see only that you are busy.</p>');
+        } else rows.push(`<div class="esheet-field"><span>Participants</span><div class="esheet-choose">
                 ${team.length ? team.map(p => `<label class="esheet-choose-person${f.attendees.has(p.email) ? ' is-on' : ''}">
                     <input type="checkbox" data-ef-person="${esc(p.email)}"${f.attendees.has(p.email) ? ' checked' : ''}>${face(p)}<span>${esc(p.name)}</span></label>`).join('')
                     : '<span class="esheet-empty">Nobody else in the team has a calendar here yet.</span>'}
@@ -1537,11 +1541,20 @@
         return {
             title: f.title.trim(), all_day: f.all_day, start: times.start, end: times.end,
             location: f.location.trim(), url: f.url.trim(), description: f.description,
-            attendees: Array.from(f.attendees),
+            attendees: isPrivateKey(f.organizer) ? [] : Array.from(f.attendees),
             repeat: f.freq === 'NONE' ? null : { freq: f.freq, until: f.until || null },
             reminder: f.reminder === '' || f.reminder === 'custom' ? null : Number(f.reminder),
             type: f.type || null,
         };
+    }
+
+    /** Calendar choices are keyed by the owner's address, "private:" in front for a private one. */
+    function isPrivateKey(key) {
+        return String(key || '').startsWith('private:');
+    }
+
+    function calendarEmail(key) {
+        return isPrivateKey(key) ? String(key).slice(8) : String(key || '');
     }
 
     /** Only what the person changed - so a change made meanwhile elsewhere survives in every other field. */
@@ -1560,9 +1573,9 @@
         const before = d.attendees.filter(a => !a.organizer).map(a => a.email).sort().join(',');
         const after = Array.from(f.attendees).sort().join(',');
         if (before !== after) body.attendees = Array.from(f.attendees);
-        if (f.organizer !== d.calendar.email) {
+        if (f.organizer !== (d.calendar.key || d.calendar.email)) {
             body.organizer = f.organizer;
-            body.attendees = Array.from(f.attendees);
+            body.attendees = isPrivateKey(f.organizer) ? [] : Array.from(f.attendees);
         }
         if ((f.type || null) !== (d.type || null)) body.type = f.type || null;
         if (!d.repeat_custom) {
@@ -2653,13 +2666,15 @@
             } else if (field === 'until' || field === 'reminder') {
                 f[field] = target.value;
             } else if (field === 'organizer') {
-                const previous = f.organizer;
+                const previous = calendarEmail(f.organizer);
                 f.organizer = target.value;
-                f.attendees.delete(f.organizer);
+                const now = calendarEmail(f.organizer);
+                f.attendees.delete(now);
                 // Moving an appointment to someone else's calendar keeps
                 // whoever was in it - the one whose calendar it was included.
                 const d = sheet.data;
-                if (sheet.mode === 'edit' && d && (previous === d.calendar.email || d.attendees.some(a => a.email === previous))) {
+                if (sheet.mode === 'edit' && d && previous !== now
+                    && (previous === d.calendar.email || d.attendees.some(a => a.email === previous))) {
                     f.attendees.add(previous);
                 }
                 renderSheet();

@@ -161,6 +161,16 @@ Der Mailserver wertet `If-Match` nicht aus (Phase 0), deshalb prüft das CRM sel
   - Private Termine anderer werden nie über das gefunden, was sie verbergen.
   - Externe Gäste, die später aus dem CRM eingeladen werden (Phase 4), sind automatisch mit durchsucht, weil sie als Teilnehmer im Termin stehen.
 
+## Nachträge (13.11.2026, später)
+
+- **Private Kalender bearbeitbar, nur vom Besitzer:** Livio hat entschieden, private Kalender mit kalender@ zum Lesen und Schreiben zu teilen. Die Spezifikation sah sie bisher nur lesend vor.
+  - Schreiben darf nur der Besitzer selbst: anlegen, ändern, löschen, zwischen Arbeits- und privatem Kalender verschieben. Auch das Bearbeitungsrecht für den Teamkalender oder Admin-Rechte erlauben es anderen nicht.
+  - In privaten Terminen ist niemand aus dem Team Teilnehmer, weil Kopien nur über Arbeitskalender laufen. Ein gemeinsamer Termin kann nicht in einen privaten Kalender verschoben werden.
+  - Andere sehen weiterhin nur „Private“ und die Zeit.
+  - Ist der private Kalender nur lesend geteilt, bleibt er nur lesbar, und die Karte sagt warum.
+- **Begründung statt fehlender Knöpfe:** Kann ein Termin nicht geändert werden, steht in der Karte eine kurze Zeile, warum.
+- **Private Termine des Besitzers** sind in seiner Farbe fein schraffiert.
+
 ## Offen
 
 - **T3:** Sobald Markus und Vivian ihre Kalender für kalender@ freigegeben haben, ist zu prüfen:
