@@ -8,6 +8,7 @@
  *   POST   ?action=sync                             sync now, at most every
  *                                                   CALENDAR_OPEN_SYNC_SECONDS
  *   GET    ?action=free_slots&people=a,b&minutes=60&from=…&to=…
+ *   GET    ?action=invitations                      appointments I have not answered yet
  *   GET    ?action=conflicts&people=a,b&start=…&end=…[&all_day=1&uid=…]
  *                                                   what already fills their time
  *   GET    ?action=search&q=…                       appointments by title, place,
@@ -82,6 +83,10 @@ try {
             break;
         case 'GET free_slots':
             handleFreeSlots($viewer);
+            break;
+        case 'GET invitations':
+            $list = CalendarEvents::fromConfig()->invitations($viewer);
+            calendarRespond(200, ['success' => true, 'data' => ['count' => count($list), 'items' => $list, 'people' => CalendarView::people($viewer)]]);
             break;
         case 'GET conflicts':
             handleConflicts($viewer);

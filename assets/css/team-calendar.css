@@ -2595,7 +2595,8 @@ button.tcal-dayhead:hover {
     .tcal-new-btn { grid-area: 2 / 4; }
     .tcal-settings-btn { grid-area: 2 / 5; }
     .tcal-who { grid-area: 3 / 1; justify-self: start; }
-    .tcal-sync { grid-area: 3 / 2 / 4 / 6; justify-self: end; }
+    .tcal-invites-btn { grid-area: 3 / 2; }
+    .tcal-sync { grid-area: 3 / 3 / 4 / 6; justify-self: end; }
 
     .tcal-result-open {
         grid-template-columns: minmax(0, 1fr) auto;
@@ -2794,4 +2795,85 @@ button.tcal-dayhead:hover {
 
 :root[data-theme="dark"] #eventSheet {
     --pick-ink: #0B111C;
+}
+
+/* ---- Invitations to answer ---- */
+
+.tcal-invites-btn {
+    position: relative;
+}
+
+.tcal-invites-btn[hidden] {
+    display: none;
+}
+
+.tcal-invites-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--c-accent);
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--c-bg);
+}
+
+.tcal-invites-btn.is-active {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.tcal-invites-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 900px;
+    padding: 18px 0 0;
+}
+
+.tcal-invites-head h3 {
+    margin: 0;
+    font-size: var(--t-md);
+    font-weight: 600;
+}
+
+.tcal-invites-head .tcal-search-close {
+    position: static;
+}
+
+.tcal-invite {
+    align-items: center;
+}
+
+.tcal-invite .tcal-result-open {
+    padding-right: 14px;
+}
+
+.tcal-invite-answers {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    padding-right: 12px;
+}
+
+@media (max-width: 640px) {
+    .tcal-invite {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tcal-invite-answers {
+        padding: 0 14px 12px;
+    }
+
+    .tcal-invite-answers .esheet-answer-btn {
+        flex: 1;
+    }
 }

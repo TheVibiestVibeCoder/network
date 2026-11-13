@@ -208,6 +208,52 @@ final class CalendarEvents
         ];
     }
 
+    /**
+     * Invitations $viewer has not answered yet: appointments from now on
+     * that list them as a participant without an answer, organized by
+     * someone else, and answerable here. A series once, at its next
+     * occurrence; soonest first.
+     *
+     * @return list<array> items as CalendarView sends them
+     */
+    public function invitations(array $viewer): array
+    {
+        $zone = new DateTimeZone(CALENDAR_TIMEZONE);
+        $from = (new DateTimeImmutable('today', $zone))->format('Y-m-d');
+        $to = (new DateTimeImmutable('today', $zone))->modify('+' . CALENDAR_FUTURE_MONTHS . ' months')->format('Y-m-d');
+        $now = time();
+        $found = [];
+        foreach (CalendarView::range($from, $to, $viewer) as $item) {
+            if ($item['masked'] || isset($found[$item['uid']])) {
+                continue;
+            }
+            $ends = $item['all_day'] ? (new DateTimeImmutable($item['end'], $zone))->getTimestamp() : strtotime($item['end']);
+            if ($ends <= $now) {
+                continue;
+            }
+            $organizer = strtolower((string) ($item['organizer']['email'] ?? ''));
+            if ($organizer !== '' && in_array($organizer, $viewer['emails'], true)) {
+                continue;
+            }
+            $open = false;
+            foreach ($item['attendees'] as $attendee) {
+                if (in_array($attendee['email'], $viewer['emails'], true) && ($attendee['partstat'] ?? 'NEEDS-ACTION') === 'NEEDS-ACTION') {
+                    $open = true;
+                }
+            }
+            if (!$open) {
+                continue;
+            }
+            // Only what can be answered here (the original is reachable).
+            $original = $this->original($this->rows($item['uid']));
+            if (!$this->permissions($original, $viewer, true)['respond']) {
+                continue;
+            }
+            $found[$item['uid']] = $item;
+        }
+        return array_values($found);
+    }
+
     /** Whether $viewer may see this appointment in full (and so link it). */
     public function visible(string $uid, array $viewer): bool
     {

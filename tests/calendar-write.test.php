@@ -419,6 +419,15 @@ sync();
 $ro = $events->sheet('ro-private', null, $livio);
 check('shared to read only again: mine, but not to change - and it says so', !$ro['can']['edit'] && str_contains((string) $ro['can']['reason'], 'read only'), $ro['can']);
 
+section('Open invitations');
+$invite = $events->create(['title' => 'Bitte zusagen', 'start' => day(4) . 'T18:00', 'end' => day(4) . 'T19:00', 'attendees' => [VIVIAN]], $livio);
+$open = array_column($events->invitations($vivian), 'title');
+check('Vivian sees the invitation she has not answered', in_array('Bitte zusagen', $open, true), $open);
+check('... the organizer does not', !in_array('Bitte zusagen', array_column($events->invitations($livio), 'title'), true));
+$events->respond($invite['uid'], 'tentative', $vivian);
+check('once answered (even maybe), it is no longer open', !in_array('Bitte zusagen', array_column($events->invitations($vivian), 'title'), true));
+$events->cancel($invite['uid'], null, 'series', null, $livio);
+
 section('Types and travel time');
 $visit = $events->create(['title' => 'Termin bei Alpenbank', 'type' => 'external', 'organizer' => VIVIAN, 'start' => day(6) . 'T12:00', 'end' => day(6) . 'T13:00'], $livio);
 check('the type is kept in the CRM, not on the server', CalendarTypes::of($visit['uid']) === 'external' && !str_contains((string) $server->object($work['vivian'] . $visit['uid'] . '.ics'), 'external'));

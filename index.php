@@ -813,6 +813,8 @@ function assetUrl(string $path): string
                             <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
                         </svg>
                         <span class="nav-label">Calendar</span>
+                        <!-- Invitations not answered yet (team-calendar.js) -->
+                        <span class="toggle-badge nav-count nav-count--alert" data-calendar-badge title="Invitations to answer" hidden>0</span>
                     </button>
                     <?php endif; ?>
                     <?php if ($isAdmin): ?>
@@ -1025,6 +1027,10 @@ function assetUrl(string $path): string
                                     <button type="button" class="tcal-mode-btn is-active" data-tcal-mode="day" aria-pressed="true">Day</button>
                                     <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
                                 </div>
+                                <button type="button" class="btn btn-icon tcal-invites-btn" data-tcal="invites" aria-expanded="false" title="Invitations to answer" aria-label="Invitations to answer" hidden>
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 13.5 6 6.2A1.5 1.5 0 0 1 7.4 5h9.2A1.5 1.5 0 0 1 18 6.2l2.5 7.3V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/></svg>
+                                    <span class="tcal-invites-count" data-calendar-badge>0</span>
+                                </button>
                                 <button type="button" class="btn btn-icon tcal-search-btn" data-tcal="search" aria-expanded="false" aria-controls="tcalSearch" title="Search appointments" aria-label="Search appointments">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
                                 </button>

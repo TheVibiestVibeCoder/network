@@ -65,6 +65,7 @@
         settingsBtn: root.querySelector('[data-tcal="settings"]'),
         freeBtn: root.querySelector('[data-tcal="free"]'),
         searchBtn: root.querySelector('[data-tcal="search"]'),
+        invitesBtn: root.querySelector('[data-tcal="invites"]'),
         searchBar: document.getElementById('tcalSearch'),
         searchInput: document.getElementById('tcalSearchInput'),
         newBtn: root.querySelector('[data-tcal="new"]'),
@@ -180,6 +181,7 @@
         free: { open: false, people: null, minutes: 60, range: 'week', results: null, busy: false, error: null, searched: null },
         search: { open: false, q: '', data: null, busy: false, error: null, seq: 0, timer: null },
         whoOpen: false,
+        invites: { open: false, items: [], count: 0, busy: {} },
         settings: null,
         scrollMode: null,
         refreshTimer: null,
@@ -403,6 +405,7 @@
             state.data.sync = { last_sync_at: result.last_sync_at, error: result.error };
             if (result.changed > 0) {
                 await load({ skipSync: true });
+                refreshInvites();
             }
         } catch (e) {
             if (force) toast(e.message, true);
@@ -449,6 +452,8 @@
             els.body.innerHTML = emptyState('No calendars yet.',
                 'Each person shares their calendars with the calendar account in webmail: the work calendar to read and write, the private one to read only.'
                 + (state.data.me.is_admin ? ' Then look for them in the calendar settings.' : ''));
+        } else if (state.invites.open) {
+            renderInvites();
         } else if (searching()) {
             renderSearch();
         } else if (!visiblePeople().length) {
@@ -1741,6 +1746,7 @@
     function afterChange() {
         if (state.data) load({ skipSync: true });
         refreshLinked();
+        refreshInvites();
     }
 
     async function submit(request, done, context) {
@@ -2077,6 +2083,105 @@
             const scroll = els.body.querySelector('.tcal-scroll');
             if (scroll) scroll.scrollTop = Math.max(0, wall(new Date(slot.start)).minutes - 45) * hourPx / 60;
         });
+    }
+
+    // =========================================================================
+    // Invitations not answered yet: a count in the sidebar and the toolbar,
+    // a list in the grid's place to answer them all from one spot
+    // =========================================================================
+
+    const INVITES_EVERY_MS = 5 * 60 * 1000;
+
+    async function refreshInvites() {
+        try {
+            const data = await api({ action: 'invitations' });
+            state.invites.items = data.items || [];
+            state.invites.count = data.count || 0;
+            state.invites.people = data.people || [];
+        } catch (e) {
+            return;
+        }
+        paintInviteBadges();
+        if (state.invites.open && state.data) render();
+    }
+
+    function paintInviteBadges() {
+        const n = state.invites.count;
+        document.querySelectorAll('[data-calendar-badge]').forEach(badge => {
+            badge.textContent = String(n);
+            if (!badge.closest('[data-tcal="invites"]')) badge.hidden = n === 0;
+        });
+        if (els.invitesBtn) {
+            els.invitesBtn.hidden = n === 0 && !state.invites.open;
+            els.invitesBtn.classList.toggle('is-active', state.invites.open);
+            els.invitesBtn.setAttribute('aria-expanded', state.invites.open ? 'true' : 'false');
+            const label = n ? `${n} invitation${n > 1 ? 's' : ''} to answer` : 'No invitations to answer';
+            els.invitesBtn.title = label;
+            els.invitesBtn.setAttribute('aria-label', label);
+        }
+    }
+
+    function toggleInvites(open) {
+        state.invites.open = open === undefined ? !state.invites.open : open;
+        if (state.invites.open && state.search.open) toggleSearch(false);
+        paintInviteBadges();
+        render();
+    }
+
+    function renderInvites() {
+        const list = state.invites.items;
+        const head = `<div class="tcal-invites-head"><h3>Invitations to answer</h3>
+                <button type="button" class="tcal-search-close" data-tcal="invites-close" title="Back to the calendar" aria-label="Back to the calendar">&times;</button></div>`;
+        if (!list.length) {
+            els.body.innerHTML = `<div class="tcal-results">${head}<p class="tcal-results-note">Nothing to answer - all done.</p></div>`;
+            return;
+        }
+        state.search.items = list;
+        const days = new Map();
+        list.forEach((item, index) => {
+            const key = item.all_day ? item.start : wall(new Date(item.start)).key;
+            if (!days.has(key)) days.set(key, []);
+            days.get(key).push({ item, index });
+        });
+        const answer = (item, value, labelText) => `<button type="button" class="esheet-answer-btn" data-tcal-invite="${esc(item.uid)}" data-answer="${value}"${state.invites.busy[item.uid] ? ' disabled' : ''}>${labelText}</button>`;
+        els.body.innerHTML = `<div class="tcal-results">${head}
+            ${Array.from(days.entries()).map(([key, rows]) => `<div class="tcal-results-day">
+                <div class="tcal-results-dayhead">${esc(dayTitleFmt.format(keyDate(key)))}</div>
+                <div class="tcal-results-list">${rows.map(({ item, index }) => {
+                    const time = item.all_day ? 'All day' : `${fmtTime(item.start)}–${fmtTime(item.end)}`;
+                    const from = item.organizer && item.organizer.email ? (person(item.organizer.email) || {}).name || item.organizer.name || item.organizer.email : '';
+                    return `<div class="tcal-result tcal-invite">
+                        <button type="button" class="tcal-result-open" data-tcal-result="${index}">
+                            <span class="tcal-result-time">${esc(time)}</span>
+                            <span class="tcal-result-main">
+                                <span class="tcal-result-title"${TITLE_LANG}>${typeMark(item)}${esc(item.title)}</span>
+                                ${from ? `<span class="tcal-result-meta">from ${esc(from)}${item.location && !/^https?:\/\//i.test(item.location) ? ' · ' + esc(item.location) : ''}</span>` : ''}
+                            </span>
+                            ${faces(item, 4)}
+                        </button>
+                        <div class="tcal-invite-answers" role="group" aria-label="Your answer">${answer(item, 'ACCEPTED', 'Yes')}${answer(item, 'TENTATIVE', 'Maybe')}${answer(item, 'DECLINED', 'No')}</div>
+                    </div>`;
+                }).join('')}</div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    async function answerInvite(uid, value) {
+        state.invites.busy[uid] = true;
+        render();
+        try {
+            await api({ action: 'respond', uid }, { method: 'POST', body: JSON.stringify({ answer: value }) });
+            toast(value === 'ACCEPTED' ? 'Accepted.' : value === 'DECLINED' ? 'Declined.' : 'Answered maybe.');
+            state.invites.items = state.invites.items.filter(item => item.uid !== uid);
+            state.invites.count = state.invites.items.length;
+            paintInviteBadges();
+            if (state.data) load({ skipSync: true });
+        } catch (e) {
+            toast(e.message, true);
+        } finally {
+            delete state.invites.busy[uid];
+            render();
+        }
     }
 
     // =========================================================================
@@ -2493,6 +2598,13 @@
         document.addEventListener('pointerup', onDragUp);
     });
 
+    // Escape leaves the invitations list (a sheet open on top goes first).
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && state.invites.open && !sheetOpen() && els.panel && els.panel.classList.contains('active')) {
+            toggleInvites(false);
+        }
+    });
+
     // The people list closes on a click beside it and on Escape.
     document.addEventListener('click', event => {
         // A person just switched is redrawn, so its button is gone from the
@@ -2519,7 +2631,7 @@
             swallowClick = false;
             return;
         }
-        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-more], [data-tcal-col], [data-tcal-result], [data-tcal-result-show]');
+        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-more], [data-tcal-col], [data-tcal-result], [data-tcal-result-show], [data-tcal-invite]');
         if (!target || !root.contains(target)) return;
 
         if (target.dataset.tcalMore) {
@@ -2535,6 +2647,10 @@
             return;
         }
 
+        if (target.dataset.tcalInvite) {
+            answerInvite(target.dataset.tcalInvite, target.dataset.answer);
+            return;
+        }
         if (target.dataset.tcalResult !== undefined || target.dataset.tcalResultShow !== undefined) {
             const item = (state.search.items || [])[Number(target.dataset.tcalResult ?? target.dataset.tcalResultShow)];
             if (!item) return;
@@ -2613,6 +2729,8 @@
             case 'new': openNewEvent({}); break;
             case 'free': toggleFree(); break;
             case 'search': toggleSearch(); break;
+            case 'invites': toggleInvites(); break;
+            case 'invites-close': toggleInvites(false); break;
             case 'who': toggleWho(); break;
             case 'who-all':
                 state.hidden.clear();
@@ -2929,6 +3047,7 @@
 
     function open() {
         startRefresh();
+        refreshInvites();
         if (!state.data || Date.now() - state.loadedAt > 60 * 1000) {
             load();
         } else {
@@ -2937,5 +3056,11 @@
         }
     }
 
-    window.CRMCalendar = { open, openEvent, openNewEvent, renderLinked };
+    // The count is wanted on every page (the sidebar), not only in the calendar.
+    refreshInvites();
+    setInterval(() => {
+        if (!document.hidden) refreshInvites();
+    }, INVITES_EVERY_MS);
+
+    window.CRMCalendar = { open, openEvent, openNewEvent, renderLinked, refreshInvites };
 })();
