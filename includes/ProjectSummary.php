@@ -16,7 +16,8 @@
  *
  * On while ANTHROPIC_API_KEY is set in .env, like the meeting assistant;
  * PROJECT_SUMMARY=off switches it off. SUMMARY_MODEL and SUMMARY_EFFORT
- * choose the model and how hard it thinks.
+ * choose the model and how hard it thinks. A short summary of what the notes
+ * say needs no big model: Haiku by default, about a fortieth of Opus' price.
  */
 
 class ProjectSummary
@@ -50,7 +51,13 @@ class ProjectSummary
     private static function model(): string
     {
         $model = trim((string) ($_ENV['SUMMARY_MODEL'] ?? ''));
-        return $model !== '' ? $model : 'claude-opus-5-5';
+        return $model !== '' ? $model : 'claude-haiku-5-5';
+    }
+
+    /** Haiku has no server-side fallback for a declined request; the others do. */
+    private static function hasFallback(): bool
+    {
+        return strpos(self::model(), 'claude-haiku') !== 0;
     }
 
     /** A summary needs little thought; 'low' keeps the wait short. */
@@ -215,7 +222,6 @@ class ProjectSummary
         $request = [
             'model' => self::model(),
             'max_tokens' => 16000,
-            'fallbacks' => 'default',
             'output_config' => ['effort' => self::effort()],
             'system' => self::systemPrompt(),
             'messages' => [[
@@ -229,8 +235,11 @@ class ProjectSummary
             'Content-Type: application/json',
             'x-api-key: ' . self::apiKey(),
             'anthropic-version: ' . self::API_VERSION,
-            'anthropic-beta: ' . self::FALLBACK_BETA,
         ];
+        if (self::hasFallback()) {
+            $request['fallbacks'] = 'default';
+            $headers[] = 'anthropic-beta: ' . self::FALLBACK_BETA;
+        }
         if (self::workspaceId() !== '') {
             $headers[] = 'anthropic-workspace-id: ' . self::workspaceId();
         }
@@ -293,6 +302,8 @@ class ProjectSummary
         return <<<'PROMPT'
 You write the summary at the top of a project in the CRM of a small consulting team. You get the project's description and all of its notes (<project>), oldest first. Someone opening the project should be up to date after reading your summary alone.
 
+Write the summary in the language the notes and the description are written in - German notes get a German summary - never in the language of these instructions.
+
 Write:
 - First, two or three sentences: what the project is, for whom, and where it stands now.
 - Then up to five lines starting with "- ": the most important current facts - decisions, agreements, open questions, next steps and who does them, dates and amounts that matter.
@@ -300,7 +311,6 @@ Write:
 Rules:
 - Use only what the description and the notes say. Do not add anything.
 - Where notes disagree, the newest one counts; leave out what has been overtaken.
-- Write in the language most of the notes and the description are written in.
 - Plain text only: no headings, no bold, no Markdown other than the "- " lines. Keep it under 150 words.
 - If there is very little to go on, say what there is in one or two sentences.
 PROMPT;
