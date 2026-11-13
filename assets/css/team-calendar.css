@@ -49,6 +49,14 @@
     flex-direction: column;
 }
 
+/* The card reaches nearly to the window's bottom edge: the page's usual
+   bottom margin is for pages that scroll, this one does not. */
+@media (min-width: 769px) {
+    #calendarView.active {
+        padding-bottom: 16px;
+    }
+}
+
 .tcal {
     position: relative;
     flex: 1 0 auto;
@@ -939,8 +947,8 @@ button.tcal-dayhead:hover {
     min-width: 0;
     border-left: 1px solid var(--c-line-2);
     background:
-        linear-gradient(to bottom, var(--c-line-2) 1px, transparent 1px) 0 0 / 100% 48px,
-        linear-gradient(to bottom, color-mix(in srgb, var(--c-line-2) 55%, transparent) 1px, transparent 1px) 0 24px / 100% 48px;
+        linear-gradient(to bottom, var(--c-line-2) 1px, transparent 1px) 0 0 / 100% var(--hour, 48px),
+        linear-gradient(to bottom, color-mix(in srgb, var(--c-line-2) 55%, transparent) 1px, transparent 1px) 0 calc(var(--hour, 48px) / 2) / 100% var(--hour, 48px);
 }
 
 .tcal-daycol.is-today {
@@ -2307,4 +2315,51 @@ button.tcal-dayhead:hover {
     .tcal-set-person {
         grid-template-columns: minmax(0, 1fr);
     }
+}
+
+/* ---- Appointments out of view: an arrow at the day's top or bottom ----
+   Earlier or later than the hours on screen; a click scrolls to it. */
+.tcal-more {
+    position: absolute;
+    left: 50%;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 24px;
+    min-width: 30px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--tcal-main);
+    color: #FFFFFF;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    justify-content: center;
+    box-shadow: var(--e-2);
+    transform: translateX(-50%);
+    cursor: pointer;
+}
+
+.tcal-more[hidden] {
+    display: none;
+}
+
+.tcal-more:hover {
+    background: var(--tcal-mine);
+}
+
+.tcal-more:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.tcal-more-count:empty {
+    display: none;
+}
+
+:root[data-theme="dark"] .tcal-more {
+    color: #0B111C;
 }

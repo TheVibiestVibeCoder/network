@@ -31,7 +31,13 @@
 
     const API = 'api/calendar.php';
     const TZ = root.dataset.tz || 'Europe/Vienna';
-    const HOUR_PX = 48;
+    // An hour's height: the working hours fill the visible grid (fitHours),
+    // never less than MIN_HOUR_PX - then the grid scrolls.
+    const MIN_HOUR_PX = 40;
+    const MAX_HOUR_PX = 140;
+    let hourPx = 48;
+    // Room above the first and below the last working hour, so their labels show.
+    const EDGE_PX = 12;
     const GUTTER_PX = 52;
     // Narrowest a day may get before the week scrolls sideways (days off: less).
     const COL_PX = 92;
@@ -402,7 +408,7 @@
         // Stay at the same time of day while moving through weeks and days.
         const scroller = els.body.querySelector('.tcal-scroll');
         const keep = scroller && state.scrollMode === state.mode
-            ? { top: scroller.scrollTop, left: scroller.scrollLeft } : null;
+            ? { minutes: scroller.scrollTop / hourPx * 60, left: scroller.scrollLeft } : null;
 
         if (!state.data.configured) {
             els.body.innerHTML = emptyState('The team calendar is not connected yet.',
@@ -416,16 +422,28 @@
         } else if (!visiblePeople().length) {
             els.body.innerHTML = emptyState('Everyone is hidden.', 'Pick a person above to show their calendar.');
         } else {
+            // The working hours fill the height; the day headings' height is
+            // known once drawn, so a second pass corrects the first guess.
+            fitHours(state.headHeight || 64);
             renderGrid();
+            const head = els.body.querySelector('.tcal-head');
+            if (head && Math.abs(head.offsetHeight - (state.headHeight || 64)) > 1) {
+                state.headHeight = head.offsetHeight;
+                const before = hourPx;
+                fitHours(state.headHeight);
+                if (hourPx !== before) renderGrid();
+            }
             const scroll = els.body.querySelector('.tcal-scroll');
             if (scroll) {
                 if (keep) {
-                    scroll.scrollTop = keep.top;
+                    scroll.scrollTop = keep.minutes * hourPx / 60;
                     scroll.scrollLeft = keep.left;
                 } else {
-                    scroll.scrollTop = Math.max(0, (workingMinutes()[0] - 30) * HOUR_PX / 60);
+                    scroll.scrollTop = workingMinutes()[0] * hourPx / 60 - EDGE_PX;
                 }
                 state.scrollMode = state.mode;
+                scroll.addEventListener('scroll', queueMore, { passive: true });
+                updateMore();
             }
         }
         if (state.free.open) {
@@ -634,6 +652,65 @@
         return [toMinutes(state.data.working_hours.start), toMinutes(state.data.working_hours.end)];
     }
 
+    /** An hour's height so the working hours take the whole visible grid. */
+    function fitHours(headHeight) {
+        const [start, end] = workingMinutes();
+        const hours = Math.max(1, (end - start) / 60);
+        const available = els.body.clientHeight - headHeight - 1 - 2 * EDGE_PX;
+        hourPx = Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, Math.floor(available / hours)));
+    }
+
+    // ---- Appointments out of view: an arrow at the day's top or bottom ----
+
+    let moreFrame = 0;
+
+    function queueMore() {
+        if (moreFrame) return;
+        moreFrame = requestAnimationFrame(() => {
+            moreFrame = 0;
+            updateMore();
+        });
+    }
+
+    /** Per day: is there an appointment above or below what is visible? */
+    function updateMore() {
+        const scroll = els.body.querySelector('.tcal-scroll');
+        const head = els.body.querySelector('.tcal-head');
+        if (!scroll || !head) return;
+        const top = scroll.scrollTop;
+        const bottom = top + scroll.clientHeight - head.offsetHeight;
+        els.body.querySelectorAll('.tcal-daycol').forEach(col => {
+            const above = [];
+            const below = [];
+            col.querySelectorAll('.tcal-ev').forEach(ev => {
+                const from = ev.offsetTop;
+                const to = from + ev.offsetHeight;
+                // Barely peeking in at the edge counts as out of view.
+                if (to <= top + 24) above.push(ev);
+                else if (from >= bottom - 24) below.push(ev);
+            });
+            placeMore(col.querySelector('[data-tcal-more="up"]'), above, top + 6, true);
+            placeMore(col.querySelector('[data-tcal-more="down"]'), below, bottom - 6, false);
+        });
+    }
+
+    function placeMore(button, events, edge, up) {
+        if (!button) return;
+        button.hidden = !events.length;
+        if (!events.length) return;
+        // The nearest one is where a click takes you.
+        const near = up
+            ? events.reduce((a, b) => (b.offsetTop + b.offsetHeight > a.offsetTop + a.offsetHeight ? b : a))
+            : events.reduce((a, b) => (b.offsetTop < a.offsetTop ? b : a));
+        const times = events.map(ev => ev.querySelector('.tcal-ev-time')).filter(Boolean).map(t => t.textContent.trim().slice(0, 5));
+        const label = `${events.length} ${up ? 'earlier' : 'later'} appointment${events.length > 1 ? 's' : ''}${times.length ? ' (' + times.join(', ') + ')' : ''}`;
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.dataset.target = up ? String(Math.max(0, near.offsetTop - 16)) : String(near.offsetTop + near.offsetHeight + 16);
+        button.querySelector('.tcal-more-count').textContent = events.length > 1 ? String(events.length) : '';
+        button.style.top = up ? `${edge}px` : `${edge - button.offsetHeight}px`;
+    }
+
     /** Free slots found by the search that fall on this day, in minutes, with their place in the list. */
     function slotsOn(day) {
         return state.slots.map((slot, index) => ({ seg: segment({ start: slot.start, end: slot.end }, day), index }))
@@ -682,7 +759,7 @@
                 ${days.map((day, i) => `<div class="tcal-allday-cell${workingDay(day) ? '' : ' is-off'}" style="grid-column:${i + 2};grid-row: 2 / span ${rows}"></div>`).join('')}
                 ${bars.map(barHtml).join('')}` : '';
 
-        const hours = Array.from({ length: 24 }, (_, h) => `<div class="tcal-hour" style="top:${h * HOUR_PX}px"><span>${pad(h)}:00</span></div>`).join('');
+        const hours = Array.from({ length: 24 }, (_, h) => `<div class="tcal-hour" style="top:${h * hourPx}px"><span>${pad(h)}:00</span></div>`).join('');
         const now = wall(new Date()).minutes;
         const create = canCreate();
         const columns = days.map((day, i) => {
@@ -694,14 +771,16 @@
             const buffers = blocks.filter(block => block.item.buffer > 0).map(bufferHtml).join('');
             // Behind the appointments: outside working hours, found free slots.
             const off = workingDay(day)
-                ? `<div class="tcal-offhours" style="top:0;height:${workStart * HOUR_PX / 60}px"></div><div class="tcal-offhours" style="top:${workEnd * HOUR_PX / 60}px;bottom:0"></div>`
+                ? `<div class="tcal-offhours" style="top:0;height:${workStart * hourPx / 60}px"></div><div class="tcal-offhours" style="top:${workEnd * hourPx / 60}px;bottom:0"></div>`
                 : '<div class="tcal-offhours" style="top:0;bottom:0"></div>';
             const slots = slotsOn(day).map(({ seg, index }) => `<button type="button" class="tcal-slot" data-tcal-slot-mark="${index}"
-                    style="top:${seg.start * HOUR_PX / 60}px;height:${(seg.end - seg.start) * HOUR_PX / 60}px"${create ? ' title="Book this time"' : ' tabindex="-1"'}>
+                    style="top:${seg.start * hourPx / 60}px;height:${(seg.end - seg.start) * hourPx / 60}px"${create ? ' title="Book this time"' : ' tabindex="-1"'}>
                     <span>Free ${minutesLabel(seg.start)}–${minutesLabel(seg.end)}</span></button>`).join('');
             const line = day === today
-                ? `<div class="tcal-now" style="top:${now * HOUR_PX / 60}px"></div><div class="tcal-now-dot" style="top:${now * HOUR_PX / 60}px"></div>` : '';
-            return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${buffers}${blocks.map(eventHtml).join('')}${line}</div>`;
+                ? `<div class="tcal-now" style="top:${now * hourPx / 60}px"></div><div class="tcal-now-dot" style="top:${now * hourPx / 60}px"></div>` : '';
+            const more = dir => `<button type="button" class="tcal-more is-${dir}" data-tcal-more="${dir}" hidden>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === 'up' ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'}"/></svg><span class="tcal-more-count"></span></button>`;
+            return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${buffers}${blocks.map(eventHtml).join('')}${line}${more('up')}${more('down')}</div>`;
         }).join('');
 
         // The head scrolls sideways with the grid and sticks to the top, so the
@@ -713,7 +792,7 @@
                         ${heads}
                         ${allDay}
                     </div>
-                    <div class="tcal-grid" style="${template};height:${24 * HOUR_PX}px">
+                    <div class="tcal-grid" style="${template};height:${24 * hourPx}px;--hour:${hourPx}px">
                         <div class="tcal-gutter">${hours}</div>
                         ${columns}
                     </div>
@@ -740,7 +819,7 @@
         const width = block.span / block.lanes * 100;
         const label = durationLabel(item.buffer) + ' travel';
         const band = (from, to) => (to > from
-            ? `<div class="tcal-buffer" style="top:${from * HOUR_PX / 60}px;height:${(to - from) * HOUR_PX / 60}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(label)}" aria-hidden="true"></div>` : '');
+            ? `<div class="tcal-buffer" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(label)}" aria-hidden="true"></div>` : '');
         // Only where the appointment starts and ends on this day.
         const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start) : '';
         const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer)) : '';
@@ -749,8 +828,8 @@
 
     function eventHtml(block) {
         const { item, seg } = block;
-        const top = seg.start * HOUR_PX / 60;
-        const height = Math.max(18, (seg.end - seg.start) * HOUR_PX / 60 - 2);
+        const top = seg.start * hourPx / 60;
+        const height = Math.max(18, (seg.end - seg.start) * hourPx / 60 - 2);
         const left = block.lane / block.lanes * 100;
         const width = block.span / block.lanes * 100;
         const geometry = `top:${top}px;height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)`;
@@ -1720,7 +1799,7 @@
         state.date = wall(new Date(slot.start)).key;
         load({ skipSync: true }).then(() => {
             const scroll = els.body.querySelector('.tcal-scroll');
-            if (scroll) scroll.scrollTop = Math.max(0, wall(new Date(slot.start)).minutes - 45) * HOUR_PX / 60;
+            if (scroll) scroll.scrollTop = Math.max(0, wall(new Date(slot.start)).minutes - 45) * hourPx / 60;
         });
     }
 
@@ -1841,7 +1920,7 @@
         state.date = item.all_day ? item.start : wall(new Date(item.start)).key;
         load({ skipSync: true }).then(() => {
             const scroll = els.body.querySelector('.tcal-scroll');
-            if (scroll && !item.all_day) scroll.scrollTop = Math.max(0, wall(new Date(item.start)).minutes - 45) * HOUR_PX / 60;
+            if (scroll && !item.all_day) scroll.scrollTop = Math.max(0, wall(new Date(item.start)).minutes - 45) * hourPx / 60;
         });
     }
 
@@ -2050,8 +2129,21 @@
     }
 
     root.addEventListener('click', event => {
-        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-col], [data-tcal-result], [data-tcal-result-show]');
+        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-more], [data-tcal-col], [data-tcal-result], [data-tcal-result-show]');
         if (!target || !root.contains(target)) return;
+
+        if (target.dataset.tcalMore) {
+            // To the appointment out of view: it comes in at the edge.
+            const scroll = els.body.querySelector('.tcal-scroll');
+            const head = els.body.querySelector('.tcal-head');
+            if (scroll && head) {
+                const y = Number(target.dataset.target);
+                const visible = scroll.clientHeight - head.offsetHeight;
+                const top = target.dataset.tcalMore === 'up' ? y : y - visible;
+                scroll.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            }
+            return;
+        }
 
         if (target.dataset.tcalResult !== undefined || target.dataset.tcalResultShow !== undefined) {
             const item = (state.search.items || [])[Number(target.dataset.tcalResult ?? target.dataset.tcalResultShow)];
@@ -2093,7 +2185,7 @@
             // An empty spot in a day: a new appointment there, on the half hour.
             if (!canCreate()) return;
             const rect = target.getBoundingClientRect();
-            const minutes = Math.max(0, Math.min(23 * 60 + 30, Math.floor((event.clientY - rect.top) / HOUR_PX * 2) * 30));
+            const minutes = Math.max(0, Math.min(23 * 60 + 30, Math.floor((event.clientY - rect.top) / hourPx * 2) * 30));
             const start = target.dataset.tcalCol + 'T' + minutesLabel(minutes);
             openNewEvent({ start, end: addMinutes(start, 60) });
             return;
@@ -2414,6 +2506,15 @@
 
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !els.settings.hidden) closeSettings();
+    });
+
+    // A taller or shorter window: the working hours fill it again.
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (state.data && els.panel && els.panel.classList.contains('active') && els.body.querySelector('.tcal-scroll')) render();
+        }, 150);
     });
 
     document.addEventListener('visibilitychange', () => {
