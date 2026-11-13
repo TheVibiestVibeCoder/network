@@ -776,7 +776,7 @@ function assetUrl(string $path): string
                 <nav class="sidebar-nav">
                     <button type="button" class="toggle-btn nav-item active" data-view="workload" title="Home">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/>
+                            <path d="M3.5 10.5 12 3.5l8.5 7" fill="none"/><path d="M5.5 9.2 12 3.9l6.5 5.3v10.3a1 1 0 0 1-1 1H14v-6h-4v6H6.5a1 1 0 0 1-1-1z"/>
                         </svg>
                         <span class="nav-label">Home</span>
                         <span class="toggle-badge nav-count nav-count--alert" id="workloadBadge" data-workload-badge hidden>0</span>
@@ -1560,7 +1560,7 @@ function assetUrl(string $path): string
             <nav class="tabbar" aria-label="Main navigation">
                 <button type="button" class="toggle-btn tab-item active" data-view="workload">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/>
+                        <path d="M3.5 10.5 12 3.5l8.5 7" fill="none"/><path d="M5.5 9.2 12 3.9l6.5 5.3v10.3a1 1 0 0 1-1 1H14v-6h-4v6H6.5a1 1 0 0 1-1-1z"/>
                     </svg>
                     <span>Home</span>
                     <span class="toggle-badge tab-badge" data-workload-badge hidden>0</span>
