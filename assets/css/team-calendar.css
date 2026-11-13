@@ -1136,16 +1136,32 @@ button.tcal-dayhead:hover {
     pointer-events: none;
 }
 
-/* Travel time: a soft tint that fades away from the appointment - on the
-   way there above it, on the way back below. (Hatching means private.) */
+/* Travel time: four lines in the appointment's lane, the one nearest the
+   appointment the thickest, the outermost the thinnest - on the way there
+   above it, on the way back below. (Hatching means private.) */
+.tcal-buffer {
+    --buf: color-mix(in srgb, var(--c-accent) 45%, transparent);
+    background-repeat: no-repeat;
+}
+
 .tcal-buffer.is-before {
-    border-radius: 8px 8px 0 0;
-    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c-accent) 18%, transparent));
+    background-image:
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf));
+    background-size: calc(100% - 16px) 1px, calc(100% - 16px) 1.5px, calc(100% - 16px) 2px, calc(100% - 16px) 3px;
+    background-position: 8px 12.5%, 8px 37.5%, 8px 62.5%, 8px 87.5%;
 }
 
 .tcal-buffer.is-after {
-    border-radius: 0 0 8px 8px;
-    background: linear-gradient(to top, transparent, color-mix(in srgb, var(--c-accent) 18%, transparent));
+    background-image:
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf)),
+        linear-gradient(var(--buf), var(--buf));
+    background-size: calc(100% - 16px) 3px, calc(100% - 16px) 2px, calc(100% - 16px) 1.5px, calc(100% - 16px) 1px;
+    background-position: 8px 12.5%, 8px 37.5%, 8px 62.5%, 8px 87.5%;
 }
 
 /* With the right to add appointments, a found slot is booked by a click. */
