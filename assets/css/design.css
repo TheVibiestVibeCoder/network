@@ -644,19 +644,11 @@ h1, h2, h3, h4 {
     pointer-events: none;
 }
 
-.sidebar .nav-item.active .nav-count {
-    background: var(--c-surface);
-}
-
 /* The Home count is things waiting on you - the one count worth colour. */
 .sidebar .nav-count--alert,
 .sidebar .toggle-badge.nav-count--alert {
     background: var(--c-accent);
     color: #fff;
-}
-
-.sidebar .nav-item.active .nav-count--alert {
-    background: var(--c-accent);
 }
 
 .sidebar .nav-count--claude,
@@ -12637,10 +12629,6 @@ textarea.form-input:focus,
 .sidebar .nav-item.toggle-btn.active {
     background: var(--c-surface);
     box-shadow: var(--e-1);
-}
-
-.sidebar .nav-item.active .nav-count {
-    background: var(--c-tint-2);
 }
 
 .sidebar-collapse-btn:hover {
