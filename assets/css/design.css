@@ -9576,8 +9576,8 @@ details.import-instructions p {
 }
 
 .home-check svg {
-    width: 12px;
-    height: 12px;
+    width: 13px;
+    height: 13px;
 }
 
 .home-check:hover:not(.is-done) {
