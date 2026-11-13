@@ -35,7 +35,7 @@
     const GUTTER_PX = 52;
     // Narrowest a day may get before the week scrolls sideways (days off: less).
     const COL_PX = 92;
-    const COL_OFF_PX = 56;
+    const COL_OFF_PX = 40;
     const DAY_MS = 24 * 60 * 60 * 1000;
     // The team writes its appointments in German: hyphenate titles that way
     // when a narrow card has to break them, instead of mid-word anywhere.
@@ -202,7 +202,7 @@
     function toast(message, isError) {
         const el = document.getElementById('bkToast');
         if (!el) {
-            if (isError) window.alert(message);
+            if (isError) window.CRMDialog.alert(message);
             return;
         }
         el.textContent = message;
@@ -664,7 +664,7 @@
         // columns line up even when a phone scrolls the week sideways.
         const narrow = days.map(day => week && !workingDay(day));
         const template = `grid-template-columns: ${GUTTER_PX}px `
-            + narrow.map(off => (off ? `minmax(${COL_OFF_PX}px, 0.55fr)` : `minmax(${COL_PX}px, 1fr)`)).join(' ')
+            + narrow.map(off => (off ? `minmax(${COL_OFF_PX}px, 0.4fr)` : `minmax(${COL_PX}px, 1fr)`)).join(' ')
             + `;min-width:${GUTTER_PX + narrow.reduce((sum, off) => sum + (off ? COL_OFF_PX : COL_PX), 0)}px;`;
 
         const heads = days.map((day, i) => {

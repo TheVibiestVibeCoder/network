@@ -47,7 +47,7 @@
     function showToast(message, isError = false) {
         const toast = $('bkToast');
         if (!toast) {
-            if (isError) window.alert(message);
+            if (isError) window.CRMDialog.alert(message);
             return;
         }
         toast.textContent = message;

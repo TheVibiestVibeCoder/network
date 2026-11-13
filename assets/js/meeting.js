@@ -240,11 +240,11 @@
         try {
             state.projects = (await request(`${API}?action=projects`)).data || [];
         } catch (error) {
-            alert(error.message);
+            CRMDialog.alert(error.message);
             return;
         }
         if (state.projects.length === 0) {
-            alert('There are no open projects to go through.');
+            CRMDialog.alert('There are no open projects to go through.');
             return;
         }
 
@@ -469,7 +469,7 @@
         } catch (error) {
             if (row) row.classList.remove('todo-completed');
             checkbox.checked = false;
-            alert(error.message);
+            CRMDialog.alert(error.message);
             return;
         }
         // A moment to see it ticked before it leaves the open list.
@@ -478,14 +478,14 @@
 
     async function removeContact(host, contactId, name) {
         const project = host.project;
-        if (!project || !confirm(`Remove ${name} from ${project.name}?`)) return;
+        if (!project || !(await CRMDialog.confirm(`Remove ${name} from ${project.name}?`, { confirm: 'Remove', danger: true }))) return;
         try {
             await request('api/projects.php?action=unassign-contact', {
                 method: 'DELETE',
                 json: { project_id: project.id, contact_id: contactId }
             });
         } catch (error) {
-            alert(error.message);
+            CRMDialog.alert(error.message);
             return;
         }
         host.refresh();

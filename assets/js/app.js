@@ -168,12 +168,6 @@
         contactNoteForm: document.getElementById('contactNoteForm'),
         cancelContactNoteBtn: document.getElementById('cancelContactNoteBtn'),
 
-        // Delete modal
-        deleteModal: document.getElementById('deleteModal'),
-        deleteContactName: document.getElementById('deleteContactName'),
-        closeDeleteModal: document.getElementById('closeDeleteModal'),
-        cancelDeleteBtn: document.getElementById('cancelDeleteBtn'),
-        confirmDeleteBtn: document.getElementById('confirmDeleteBtn'),
 
         // Overview modal
         overviewModal: document.getElementById('overviewModal'),
@@ -230,11 +224,6 @@
         addProjectBtn: document.getElementById('addProjectBtn'),
 
         // Delete project modal
-        deleteProjectModal: document.getElementById('deleteProjectModal'),
-        deleteProjectName: document.getElementById('deleteProjectName'),
-        closeDeleteProjectModal: document.getElementById('closeDeleteProjectModal'),
-        cancelDeleteProjectBtn: document.getElementById('cancelDeleteProjectBtn'),
-        confirmDeleteProjectBtn: document.getElementById('confirmDeleteProjectBtn'),
 
         // Project overview modal
         projectOverviewModal: document.getElementById('projectOverviewModal'),
@@ -2224,17 +2213,17 @@
                 return true;
             }
 
-            alert(result.error || 'Error updating to-do');
+            CRMDialog.alert(result.error || 'Error updating to-do');
             return false;
         } catch (error) {
             console.error('Error updating to-do:', error);
-            alert('Error updating to-do');
+            CRMDialog.alert('Error updating to-do');
             return false;
         }
     }
 
     async function removeTodo(todoId) {
-        if (!confirm('Delete this to-do?')) {
+        if (!(await CRMDialog.confirm('Delete this to-do?', { confirm: 'Delete', danger: true }))) {
             return false;
         }
 
@@ -2245,11 +2234,11 @@
                 return true;
             }
 
-            alert(result.error || 'Error deleting to-do');
+            CRMDialog.alert(result.error || 'Error deleting to-do');
             return false;
         } catch (error) {
             console.error('Error deleting to-do:', error);
-            alert('Error deleting to-do');
+            CRMDialog.alert('Error deleting to-do');
             return false;
         }
     }
@@ -2269,7 +2258,7 @@
         try {
             const result = await api.getTodo(todoId);
             if (!result.success) {
-                alert(result.error || 'Error loading to-do');
+                CRMDialog.alert(result.error || 'Error loading to-do');
                 return;
             }
 
@@ -2287,7 +2276,7 @@
             }
         } catch (error) {
             console.error('Error opening to-do:', error);
-            alert('Error loading to-do');
+            CRMDialog.alert('Error loading to-do');
         }
     }
 
@@ -2534,7 +2523,7 @@
                 ? await api.createTodo(payload)
                 : await api.updateTodo(todoId, payload);
             if (!result.success) {
-                alert(result.error || (creating ? 'Error creating to-do' : 'Error updating to-do'));
+                CRMDialog.alert(result.error || (creating ? 'Error creating to-do' : 'Error updating to-do'));
                 return;
             }
 
@@ -2553,7 +2542,7 @@
                         if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
                     } catch (error) {
                         // The to-do itself was created; only the assignment failed.
-                        alert('The to-do was created, but it could not be assigned: ' + error.message);
+                        CRMDialog.alert('The to-do was created, but it could not be assigned: ' + error.message);
                     }
                 }
 
@@ -2571,7 +2560,7 @@
                 }
                 state.newTodoLinks = [];
                 if (failedLinks.length > 0) {
-                    alert('The to-do was created, but these links could not be added:\n' + failedLinks.join('\n'));
+                    CRMDialog.alert('The to-do was created, but these links could not be added:\n' + failedLinks.join('\n'));
                 }
 
                 // A created to-do opens as itself, with its links.
@@ -2585,7 +2574,7 @@
             await refreshVisibleTodoLists();
         } catch (error) {
             console.error(creating ? 'Error creating to-do:' : 'Error updating to-do:', error);
-            alert(creating ? 'Error creating to-do' : 'Error updating to-do');
+            CRMDialog.alert(creating ? 'Error creating to-do' : 'Error updating to-do');
         } finally {
             elements.saveTodoEditBtn.disabled = false;
         }
@@ -2631,11 +2620,11 @@
                 await refreshVisibleTodoLists();
             } else {
                 elements.todoLinkUrl.classList.add('is-invalid');
-                alert(result.error || 'Error adding link');
+                CRMDialog.alert(result.error || 'Error adding link');
             }
         } catch (error) {
             console.error('Error adding link:', error);
-            alert('Error adding link');
+            CRMDialog.alert('Error adding link');
         } finally {
             elements.saveTodoLinkBtn.disabled = false;
             elements.saveTodoLinkBtn.textContent = 'Add link';
@@ -2688,18 +2677,18 @@
     }
 
     async function deleteTodoLink(linkId) {
-        if (!confirm('Remove this link?')) return;
+        if (!(await CRMDialog.confirm('Remove this link?', { confirm: 'Remove', danger: true }))) return;
 
         try {
             const result = await api.deleteTodoLink(linkId);
             if (result.success) {
                 await refreshVisibleTodoLists();
             } else {
-                alert(result.error || 'Error removing link');
+                CRMDialog.alert(result.error || 'Error removing link');
             }
         } catch (error) {
             console.error('Error removing link:', error);
-            alert('Error removing link');
+            CRMDialog.alert('Error removing link');
         }
     }
 
@@ -2948,17 +2937,13 @@
         }
     }
 
-    function openDeleteModal() {
+    async function openDeleteModal() {
         const contact = state.viewingContact;
-        if (contact) {
-            state.editingContactId = contact.id;
-            elements.deleteContactName.textContent = contact.name;
-            elements.deleteModal.classList.add('active');
-        }
-    }
-
-    function closeDeleteModal() {
-        elements.deleteModal.classList.remove('active');
+        if (!contact) return;
+        const ok = await CRMDialog.confirm(`Delete ${contact.name}?`, { text: 'This cannot be undone.', confirm: 'Delete', danger: true });
+        if (!ok) return;
+        state.editingContactId = contact.id;
+        await deleteContact();
     }
 
     // ============================================
@@ -2970,7 +2955,7 @@
             const result = await api.getContact(contactId);
 
             if (!result.success) {
-                alert('Error loading contact');
+                CRMDialog.alert('Error loading contact');
                 return;
             }
 
@@ -3019,7 +3004,7 @@
 
         } catch (error) {
             console.error('Error opening overview:', error);
-            alert('Error loading contact');
+            CRMDialog.alert('Error loading contact');
         }
     }
 
@@ -3123,7 +3108,7 @@
         try {
             const result = creating ? await api.createContact(data) : await api.updateContact(contactId, data);
             if (!result.success) {
-                alert(result.error || 'Error saving contact');
+                CRMDialog.alert(result.error || 'Error saving contact');
                 return;
             }
             const savedId = creating ? Number(result.data && result.data.id) : contactId;
@@ -3135,7 +3120,7 @@
                         showAssignmentToast(saved.assigned_to_name);
                         if (window.CRMWorkload) window.CRMWorkload.refreshBadge();
                     } catch (error) {
-                        alert('The contact was created, but the assignment could not be saved: ' + error.message);
+                        CRMDialog.alert('The contact was created, but the assignment could not be saved: ' + error.message);
                     }
                 }
             }
@@ -3148,7 +3133,7 @@
             }
         } catch (error) {
             console.error('Error saving contact:', error);
-            alert(error.message || 'Error saving contact');
+            CRMDialog.alert(error.message || 'Error saving contact');
         } finally {
             elements.saveContactEditBtn.disabled = false;
         }
@@ -3244,11 +3229,11 @@
                 closeContactPickers();
                 await loadNotes(state.viewingContactId);
             } else {
-                alert(result.error || 'Error adding note');
+                CRMDialog.alert(result.error || 'Error adding note');
             }
         } catch (error) {
             console.error('Error adding note:', error);
-            alert('Error adding note');
+            CRMDialog.alert('Error adding note');
         } finally {
             elements.addNoteBtn.disabled = false;
             elements.addNoteBtn.textContent = 'Add note';
@@ -3256,7 +3241,7 @@
     }
 
     async function deleteNote(noteId) {
-        if (!confirm('Delete this note?')) {
+        if (!(await CRMDialog.confirm('Delete this note?', { confirm: 'Delete', danger: true }))) {
             return;
         }
 
@@ -3266,11 +3251,11 @@
             if (result.success) {
                 await loadNotes(state.viewingContactId);
             } else {
-                alert(result.error || 'Error deleting note');
+                CRMDialog.alert(result.error || 'Error deleting note');
             }
         } catch (error) {
             console.error('Error deleting note:', error);
-            alert('Error deleting note');
+            CRMDialog.alert('Error deleting note');
         }
     }
 
@@ -3524,7 +3509,7 @@
     }
 
     async function confirmDeleteTag(tagId, tagName) {
-        if (!confirm(`Delete the tag "${tagName}"?\n\nIt is removed from every contact.`)) {
+        if (!(await CRMDialog.confirm(`Delete the tag "${tagName}"?`, { text: 'It is removed from every contact.', confirm: 'Delete', danger: true }))) {
             return;
         }
 
@@ -3635,7 +3620,7 @@
         const isValid = validExtensions.some(ext => fileName.endsWith(ext));
 
         if (!isValid) {
-            alert('Please select an Excel file (.xlsx or .xls)');
+            CRMDialog.alert('Please select an Excel file (.xlsx or .xls)');
             return;
         }
 
@@ -3668,7 +3653,7 @@
             window.location.href = 'api/import-export.php?action=export';
         } catch (error) {
             console.error('Error exporting contacts:', error);
-            alert('Error exporting contacts');
+            CRMDialog.alert('Error exporting contacts');
         } finally {
             // Reset button after a short delay
             setTimeout(() => {
@@ -3687,7 +3672,7 @@
 
     async function importContacts() {
         if (!state.selectedImportFile) {
-            alert('Please select a file first');
+            CRMDialog.alert('Please select a file first');
             return;
         }
 
@@ -3814,27 +3799,20 @@
 
     async function deleteContact() {
         if (!state.editingContactId) return;
-
-        elements.confirmDeleteBtn.disabled = true;
-        elements.confirmDeleteBtn.textContent = 'Deleting...';
-
         try {
             const result = await api.deleteContact(state.editingContactId);
-
             if (result.success) {
-                closeDeleteModal();
                 closeOverviewModal();
                 refreshData();
                 updateContactCount();
             } else {
-                alert(result.error || 'Error deleting contact');
+                CRMDialog.alert(result.error || 'Error deleting contact');
             }
         } catch (error) {
             console.error('Error deleting contact:', error);
-            alert('Error deleting contact');
+            CRMDialog.alert('Error deleting contact');
         } finally {
-            elements.confirmDeleteBtn.disabled = false;
-            elements.confirmDeleteBtn.textContent = 'Delete';
+            state.editingContactId = null;
         }
     }
 
@@ -4233,7 +4211,7 @@
             if (!restore && !purge) return;
 
             const button = restore || purge;
-            if (purge && !confirm(`Delete "${purge.dataset.name}" permanently? Its to-dos, notes and documents are gone for good.`)) {
+            if (purge && !(await CRMDialog.confirm(`Delete "${purge.dataset.name}" permanently?`, { text: 'Its to-dos, notes and documents are gone for good.', confirm: 'Delete', danger: true }))) {
                 return;
             }
 
@@ -4243,7 +4221,7 @@
                     ? await api.restoreProject(Number(restore.dataset.deletedRestore))
                     : await api.purgeProject(Number(purge.dataset.deletedPurge));
                 if (!result.success) {
-                    alert(result.error || 'Something went wrong');
+                    CRMDialog.alert(result.error || 'Something went wrong');
                     button.disabled = false;
                     return;
                 }
@@ -4253,7 +4231,7 @@
                 }
             } catch (error) {
                 console.error('Error with archived project:', error);
-                alert('Something went wrong');
+                CRMDialog.alert('Something went wrong');
                 button.disabled = false;
             }
         });
@@ -4577,25 +4555,20 @@
         return `<span class="project-card-assignee${chip ? '' : ' is-empty'}">${chip}${button}</span>`;
     }
 
-    function closeDeleteProjectModal() {
-        elements.deleteProjectModal.classList.remove('active');
-    }
-
     async function deleteProject() {
         try {
             const result = await api.deleteProject(state.editingProjectId);
 
             if (result.success) {
-                closeDeleteProjectModal();
                 state.editingProjectId = null;
                 loadProjects();
                 refreshHome();
             } else {
-                alert('Error: ' + result.error);
+                CRMDialog.alert('Error: ' + result.error);
             }
         } catch (error) {
             console.error('Error archiving project:', error);
-            alert('An error occurred while archiving the project');
+            CRMDialog.alert('An error occurred while archiving the project');
         }
     }
 
@@ -4639,11 +4612,11 @@
                 elements.projectOverviewModal.classList.add('active');
                 if (edit) enterProjectEdit();
             } else {
-                alert('Error: ' + projectResult.error);
+                CRMDialog.alert('Error: ' + projectResult.error);
             }
         } catch (error) {
             console.error('Error opening project overview:', error);
-            alert('An error occurred while loading the project');
+            CRMDialog.alert('An error occurred while loading the project');
         }
     }
 
@@ -4908,11 +4881,11 @@
                 await loadProjectNotes(state.viewingProjectId);
                 if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
             } else {
-                alert(result.error || 'Error adding note');
+                CRMDialog.alert(result.error || 'Error adding note');
             }
         } catch (error) {
             console.error('Error adding project note:', error);
-            alert('Error adding note');
+            CRMDialog.alert('Error adding note');
         } finally {
             if (elements.addProjectNoteBtn) {
                 elements.addProjectNoteBtn.disabled = false;
@@ -4928,7 +4901,7 @@
             return;
         }
 
-        if (!confirm('Delete this note?')) {
+        if (!(await CRMDialog.confirm('Delete this note?', { confirm: 'Delete', danger: true }))) {
             return;
         }
 
@@ -4940,11 +4913,11 @@
                     if (window.CRMProjectSummary) window.CRMProjectSummary.show(state.viewingProjectId);
                 }
             } else {
-                alert(result.error || 'Error deleting note');
+                CRMDialog.alert(result.error || 'Error deleting note');
             }
         } catch (error) {
             console.error('Error deleting project note:', error);
-            alert('Error deleting note');
+            CRMDialog.alert('Error deleting note');
         }
     }
 
@@ -5206,7 +5179,7 @@
                 if (creating) {
                     const problems = await applyProjectDraft(Number(savedId));
                     if (problems.length > 0) {
-                        alert('The project was created, but not everything could be added:\n\n' + problems.join('\n'));
+                        CRMDialog.alert('The project was created, but not everything could be added:\n\n' + problems.join('\n'));
                     }
                 }
                 exitProjectEdit();
@@ -5220,11 +5193,11 @@
                 }
                 await openProjectOverview(savedId);
             } else {
-                alert('Error: ' + result.error);
+                CRMDialog.alert('Error: ' + result.error);
             }
         } catch (error) {
             console.error('Error saving project:', error);
-            alert('An error occurred while saving the project');
+            CRMDialog.alert('An error occurred while saving the project');
         } finally {
             elements.saveProjectEditBtn.disabled = false;
         }
@@ -5403,7 +5376,7 @@
             // First, create or get the tag
             const tagResult = await api.createTag(tagName);
             if (!tagResult.success) {
-                alert('Error: ' + tagResult.error);
+                CRMDialog.alert('Error: ' + tagResult.error);
                 return;
             }
 
@@ -5420,7 +5393,7 @@
                 elements.projectTagSuggestions.style.display = 'none';
                 elements.newProjectTagInput.focus();
             } else {
-                alert('Error: ' + assignResult.error);
+                CRMDialog.alert('Error: ' + assignResult.error);
             }
         } catch (error) {
             console.error('Error adding tag to project:', error);
@@ -5443,7 +5416,7 @@
                     renderProjectTags(tagsResult.data);
                 }
             } else {
-                alert('Error: ' + result.error);
+                CRMDialog.alert('Error: ' + result.error);
             }
         } catch (error) {
             console.error('Error removing tag from project:', error);
@@ -5468,7 +5441,7 @@
                 elements.projectContactSuggestions.style.display = 'none';
                 elements.newProjectContactInput.focus();
             } else {
-                alert('Error: ' + result.error);
+                CRMDialog.alert('Error: ' + result.error);
             }
         } catch (error) {
             console.error('Error assigning contact to project:', error);
@@ -5491,7 +5464,7 @@
                     renderProjectContacts(contactsResult.data);
                 }
             } else {
-                alert('Error: ' + result.error);
+                CRMDialog.alert('Error: ' + result.error);
             }
         } catch (error) {
             console.error('Error removing contact from project:', error);
@@ -5833,12 +5806,12 @@
         }
 
         return `
-            <div class="assignee-bar">
+            <div class="assignee-bar" tabindex="0" role="button" aria-haspopup="listbox" aria-label="${escapeHtml(name ? 'Assigned to ' + name : 'Unassigned')} - change">
                 <span class="assignee-bar-face${url ? ' has-photo' : ''}${name ? '' : ' is-empty'}">${face}</span>
                 <svg class="assignee-bar-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg>
                 <div class="assignee-bar-body">
                     <span class="assignee-bar-label">Assigned to</span>
-                    <select class="form-select assignee-select"
+                    <select class="form-select assignee-select" tabindex="-1" aria-hidden="true"
                             data-previous="${escapeHtml(current)}"
                             title="${escapeHtml(name ? 'Assigned to ' + name : 'Unassigned')}"
                             data-assign-type="${escapeHtml(type)}"
@@ -5896,7 +5869,123 @@
      * per control would mean rebinding on every render - and inline handlers
      * are blocked by the Content-Security-Policy anyway.
      */
+    // ---- Choosing who: a list with everyone's picture ------------------------
+    // The pill opens the same kind of list as "Waiting on" in Bookkeeping.
+    // The select stays underneath as the value; picking sets it and fires its
+    // change, so saving works as before (bindAssignmentControls).
+
+    const ICON_MENU_TICK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+
+    function closeAssigneeMenu() {
+        const open = document.getElementById('assigneeMenu');
+        if (!open) return;
+        const bar = open._bar;
+        open.remove();
+        if (bar) {
+            bar.classList.remove('is-open');
+            bar.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function openAssigneeMenu(bar) {
+        const wasOpen = bar.classList.contains('is-open');
+        closeAssigneeMenu();
+        if (wasOpen) return;
+        const select = bar.querySelector('select.assignee-select');
+        if (!select || select.disabled) return;
+
+        const items = Array.from(select.options).map(option => {
+            const key = option.value;
+            const name = option.textContent;
+            const url = key && window.CRMPeople ? window.CRMPeople.avatarFor(key, name) : null;
+            const face = !key
+                ? `<span class="bk-menu-face is-none">${ASSIGN_EMPTY_ICON}</span>`
+                : (url
+                    ? `<span class="bk-menu-face has-photo"><img src="${escapeHtml(url)}" alt=""></span>`
+                    : `<span class="bk-menu-face">${escapeHtml(getInitials(name))}</span>`);
+            const on = key === select.value;
+            return `<button type="button" class="bk-rowmenu-item bk-rowmenu-option${on ? ' is-current' : ''}" role="option" aria-selected="${on}" data-assignee-pick="${escapeHtml(key)}">
+                    <span class="bk-rowmenu-item-icon">${face}</span>
+                    <span class="bk-rowmenu-item-label">${escapeHtml(name)}</span>
+                    <span class="bk-rowmenu-item-tick">${on ? ICON_MENU_TICK : ''}</span>
+                </button>`;
+        });
+
+        const panel = document.createElement('div');
+        panel.className = 'bk-rowmenu bk-rowmenu-sub assignee-menu';
+        panel.id = 'assigneeMenu';
+        panel.setAttribute('role', 'listbox');
+        panel.setAttribute('aria-label', 'Assigned to');
+        panel.innerHTML = `<p class="bk-rowmenu-subhead">Assigned to</p>${items.join('')}`;
+        panel._bar = bar;
+        document.body.appendChild(panel);
+
+        const r = bar.getBoundingClientRect();
+        const left = Math.min(Math.max(8, r.right - panel.offsetWidth), window.innerWidth - panel.offsetWidth - 8);
+        const below = r.bottom + 6;
+        const top = below + panel.offsetHeight > window.innerHeight - 8 ? Math.max(8, r.top - panel.offsetHeight - 6) : below;
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        bar.classList.add('is-open');
+        bar.setAttribute('aria-expanded', 'true');
+
+        panel.addEventListener('click', event => {
+            const pick = event.target.closest('[data-assignee-pick]');
+            if (!pick) return;
+            closeAssigneeMenu();
+            bar.focus({ preventScroll: true });
+            if (pick.dataset.assigneePick === select.value) return;
+            select.value = pick.dataset.assigneePick;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        const current = panel.querySelector('.is-current') || panel.querySelector('.bk-rowmenu-item');
+        if (current) current.focus();
+    }
+
+    function bindAssigneeMenu() {
+        document.addEventListener('click', event => {
+            const bar = event.target.closest('.assignee-bar');
+            if (bar) {
+                event.preventDefault();
+                openAssigneeMenu(bar);
+                return;
+            }
+            if (!event.target.closest('#assigneeMenu')) closeAssigneeMenu();
+        });
+        // Before the sheets' own Escape: only the list closes.
+        document.addEventListener('keydown', event => {
+            const menu = document.getElementById('assigneeMenu');
+            const bar = event.target.closest && event.target.closest('.assignee-bar');
+            if (!menu && bar && (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown')) {
+                event.preventDefault();
+                openAssigneeMenu(bar);
+                return;
+            }
+            if (!menu) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                const owner = menu._bar;
+                closeAssigneeMenu();
+                if (owner) owner.focus({ preventScroll: true });
+            } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                const options = Array.from(menu.querySelectorAll('[data-assignee-pick]'));
+                const i = options.indexOf(document.activeElement);
+                const next = options[(i + (event.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length];
+                if (next) next.focus();
+            } else if (event.key === 'Tab') {
+                closeAssigneeMenu();
+            }
+        }, true);
+        window.addEventListener('resize', closeAssigneeMenu);
+        document.addEventListener('scroll', event => {
+            if (!(event.target.closest && event.target.closest('#assigneeMenu'))) closeAssigneeMenu();
+        }, true);
+    }
+
     function bindAssignmentControls() {
+        bindAssigneeMenu();
         document.addEventListener('change', async function (event) {
             const select = event.target.closest('select.assignee-select');
             if (!select) return;
@@ -5948,7 +6037,7 @@
                 }
             } catch (error) {
                 select.value = previous;
-                alert(error.message);
+                CRMDialog.alert(error.message);
             } finally {
                 select.disabled = false;
             }
@@ -6304,11 +6393,6 @@
             elements.newNoteContent.value = '';
         });
 
-        // Delete modal
-        elements.closeDeleteModal.addEventListener('click', closeDeleteModal);
-        elements.cancelDeleteBtn.addEventListener('click', closeDeleteModal);
-        elements.deleteModal.querySelector('.modal-backdrop').addEventListener('click', closeDeleteModal);
-        elements.confirmDeleteBtn.addEventListener('click', deleteContact);
 
         // Overview modal
         elements.closeOverviewModal.addEventListener('click', closeOverviewModal);
@@ -6435,18 +6519,6 @@
         }
 
         // Delete project modal
-        if (elements.closeDeleteProjectModal) {
-            elements.closeDeleteProjectModal.addEventListener('click', closeDeleteProjectModal);
-        }
-        if (elements.cancelDeleteProjectBtn) {
-            elements.cancelDeleteProjectBtn.addEventListener('click', closeDeleteProjectModal);
-        }
-        if (elements.deleteProjectModal) {
-            elements.deleteProjectModal.querySelector('.modal-backdrop').addEventListener('click', closeDeleteProjectModal);
-        }
-        if (elements.confirmDeleteProjectBtn) {
-            elements.confirmDeleteProjectBtn.addEventListener('click', deleteProject);
-        }
 
         // Project overview modal
         if (elements.closeProjectOverviewModal) {
@@ -6523,15 +6595,18 @@
 
         // Delete from overview — opens the same confirmation modal
         if (elements.deleteProjectOverviewBtn) {
-            elements.deleteProjectOverviewBtn.addEventListener('click', () => {
-                if (state.viewingProject) {
-                    const project = state.viewingProject;
-                    // Set editingProjectId so deleteProject() knows which to delete
-                    state.editingProjectId = project.id;
-                    elements.deleteProjectName.textContent = project.name;
-                    closeProjectOverview();
-                    elements.deleteProjectModal.classList.add('active');
-                }
+            elements.deleteProjectOverviewBtn.addEventListener('click', async () => {
+                const project = state.viewingProject;
+                if (!project) return;
+                const ok = await CRMDialog.confirm(`Archive ${project.name}?`, {
+                    text: 'It moves to "Archived projects" at the bottom of the Projects page, where it can be restored with everything in it.',
+                    confirm: 'Archive', danger: true
+                });
+                if (!ok) return;
+                // Set editingProjectId so deleteProject() knows which to archive
+                state.editingProjectId = project.id;
+                closeProjectOverview();
+                await deleteProject();
             });
         }
 
@@ -6751,11 +6826,7 @@
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
             if (e.key === 'Escape') {
-                if (elements.deleteModal.classList.contains('active')) {
-                    closeDeleteModal();
-                } else if (elements.deleteProjectModal.classList.contains('active')) {
-                    closeDeleteProjectModal();
-                } else if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
+                if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
                     // The to-do sheet opens on top of the project and contact sheets.
                     if (isEditingTodo()) {
                         cancelTodoEdit();

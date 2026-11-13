@@ -428,7 +428,7 @@
     async function remove(id) {
         const doc = findDocument(id);
         if (!doc) return;
-        if (!window.confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
+        if (!(await window.CRMDialog.confirm(`Delete "${doc.name}"?`, { text: 'This cannot be undone.', confirm: 'Delete', danger: true }))) return;
 
         try {
             await postJson('delete', { id: doc.id });

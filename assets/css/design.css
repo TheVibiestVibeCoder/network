@@ -7301,7 +7301,22 @@ details.import-instructions p {
     padding: 0;
     border: 0;
     opacity: 0;
+    pointer-events: none;
+}
+
+/* The people list opens above the sheets. */
+.assignee-menu {
+    z-index: 1300;
+}
+
+/* The pill opens the people list (app.js openAssigneeMenu). */
+.ov-head-assignee .assignee-bar {
     cursor: pointer;
+}
+
+.ov-head-assignee .assignee-bar:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
 }
 
 /* Empty is not shown: no "No notes yet", no "—". Where something can be
@@ -12433,6 +12448,203 @@ details.import-instructions p {
         position: static;
         align-self: flex-start;
     }
+}
+
+/* --------------------------------------------------------------------------
+   33. No frames: buttons, fields and the sidebar
+   --------------------------------------------------------------------------
+   Livio, 13.11.2026: buttons and fields carry no border. On the grey page
+   they are white; on anything white (cards, sheets, dialogs, menus) they
+   are light grey - set once per surface through --ctl. The sidebar lies on
+   the page itself; only the open page is a white pill.
+   -------------------------------------------------------------------------- */
+
+:root {
+    --ctl: var(--c-surface);
+    --ctl-hover: var(--c-tint-3);
+}
+
+/* White surfaces: their controls are grey. */
+.modal-content,
+.tcal-drawer,
+.tcal-free-card,
+.tcal-cal,
+.tcal-results-list,
+.view-panel .todos-list,
+.view-panel .contacts-list,
+.group-card,
+.project-rows,
+.deleted-projects-list,
+.empty-state,
+.users-page,
+.login-box,
+.profile-pop,
+.profile-photo-menu,
+.fin-card,
+.fin-kpi,
+.fin-balance-form,
+.rf-card,
+.rf-adjust,
+.compose-card,
+.review-list-card,
+.log-day-list,
+.bk-rowmenu,
+#projectsView .project-card,
+#workloadView .home-card,
+#workloadView .home-news,
+#workloadView .workload-list,
+#bookkeepingView .bk-dropzone {
+    --ctl: var(--c-tint-3);
+    --ctl-hover: var(--c-tint-2);
+}
+
+/* ---- Buttons ---- */
+
+.btn-secondary,
+.btn-icon,
+.tcal-nav,
+.tcal-search-input {
+    background: var(--ctl);
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-icon:hover:not(:disabled) {
+    background: var(--ctl-hover);
+    border-color: transparent;
+}
+
+.btn-icon.btn-quiet {
+    background: transparent;
+}
+
+/* Icon buttons in a sheet's header: the page's rounded square, not a circle. */
+.ov-icon-btn,
+.modal-close {
+    border-radius: var(--r-md);
+}
+
+/* Bookkeeping's own buttons and search, Calendar's paging and people. */
+.bk-btn:not(.bk-btn-primary):not(.bk-btn-danger),
+.bk-search-input,
+.bk-selection-bar,
+.bk-menu,
+.bk-rowmenu,
+.tcal-pick {
+    border-color: transparent;
+}
+
+.bk-btn:not(.bk-btn-primary):not(.bk-btn-danger),
+.bk-search-input {
+    background: var(--ctl);
+}
+
+.bk-btn:not(.bk-btn-primary):not(.bk-btn-danger):hover:not(:disabled) {
+    background: var(--ctl-hover);
+    border-color: transparent;
+}
+
+.bk-search-input:hover {
+    border-color: transparent;
+}
+
+.bk-search-input:focus {
+    border-color: var(--c-accent);
+    background: var(--c-surface);
+}
+
+.tcal-nav-btn + .tcal-nav-btn {
+    border-left: 0;
+}
+
+.tcal-pick.is-on,
+.tcal-pick:hover {
+    border-color: transparent;
+}
+
+/* Menus float above everything: a soft shadow is their edge. */
+.bk-menu,
+.bk-rowmenu {
+    background: var(--c-surface);
+    box-shadow: var(--e-3);
+}
+
+/* ---- Fields ---- */
+
+.form-input,
+.form-select,
+textarea.form-input,
+.view-panel .search-input {
+    border-color: transparent;
+    background-color: var(--ctl);
+}
+
+.form-input:hover,
+.form-select:hover,
+.view-panel .search-input:hover {
+    border-color: transparent;
+}
+
+.form-input:focus,
+.form-select:focus,
+textarea.form-input:focus,
+.view-panel .search-input:focus {
+    border-color: var(--c-accent);
+    background-color: var(--c-surface);
+}
+
+/* ---- "Are you sure?" and messages (dialog.js), Bookkeeping's too ---- */
+
+:is(.crm-dialog, #bkConfirmModal) .modal-header,
+:is(.crm-dialog, #bkConfirmModal) .modal-footer {
+    border: 0;
+}
+
+:is(.crm-dialog, #bkConfirmModal) .modal-header {
+    padding-bottom: 6px;
+}
+
+:is(.crm-dialog, #bkConfirmModal) .modal-header h2 {
+    font-size: var(--t-lg);
+    line-height: 1.35;
+}
+
+:is(.crm-dialog, #bkConfirmModal) .modal-body {
+    padding-top: 0;
+    padding-bottom: 6px;
+    color: var(--c-ink-2);
+    line-height: 1.5;
+}
+
+.crm-dialog-text {
+    margin: 0;
+    white-space: pre-line;
+}
+
+/* ---- Sidebar: on the page, the open page a white pill ---- */
+
+.sidebar {
+    background: transparent;
+    border-right: 0;
+}
+
+.sidebar .nav-item:hover {
+    background: color-mix(in srgb, var(--c-surface) 55%, transparent);
+}
+
+.sidebar .nav-item.active,
+.sidebar .nav-item.toggle-btn.active {
+    background: var(--c-surface);
+    box-shadow: var(--e-1);
+}
+
+.sidebar .nav-item.active .nav-count {
+    background: var(--c-tint-2);
+}
+
+.sidebar-collapse-btn:hover {
+    background: color-mix(in srgb, var(--c-surface) 55%, transparent);
 }
 
 /* --------------------------------------------------------------------------

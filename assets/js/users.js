@@ -62,7 +62,7 @@
     function showToast(message, isError = false) {
         const toast = $('bkToast');
         if (!toast) {
-            if (isError) window.alert(message);
+            if (isError) window.CRMDialog.alert(message);
             return;
         }
         toast.textContent = message;
@@ -393,10 +393,10 @@
     }
 
     async function remove(userId, userName) {
-        const confirmed = window.confirm(
-            'Delete ' + userName + '?\n\n' +
-            'They lose access immediately. Everything they created stays, and keeps their name.'
-        );
+        const confirmed = await window.CRMDialog.confirm('Delete ' + userName + '?', {
+            text: 'They lose access immediately. Everything they created stays, and keeps their name.',
+            confirm: 'Delete', danger: true
+        });
         if (!confirmed) return;
 
         try {

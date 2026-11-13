@@ -1741,25 +1741,6 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- Delete Confirmation Modal -->
-        <div class="modal" id="deleteModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-small">
-                <div class="modal-header">
-                    <h2>Delete Contact</h2>
-                    <button type="button" class="modal-close" id="closeDeleteModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete <strong id="deleteContactName"></strong>?</p>
-                    <p class="text-muted">This action cannot be undone.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Company Notes Modal -->
         <div class="modal" id="companyNotesModal">
             <div class="modal-backdrop"></div>
@@ -1921,25 +1902,6 @@ function assetUrl(string $path): string
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="closeImportExportBtn">Close</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Archive Project Confirmation Modal -->
-        <div class="modal" id="deleteProjectModal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-small">
-                <div class="modal-header">
-                    <h2>Archive Project</h2>
-                    <button type="button" class="modal-close" id="closeDeleteProjectModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p>Archive <strong id="deleteProjectName"></strong>?</p>
-                    <p class="text-muted">It moves to &ldquo;Archived projects&rdquo; at the bottom of the Projects page, where it can be restored with everything in it.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelDeleteProjectBtn">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteProjectBtn">Archive</button>
                 </div>
             </div>
         </div>
@@ -2527,6 +2489,7 @@ function assetUrl(string $path): string
 
         <!-- Application JS -->
         <script src="<?= assetUrl('assets/js/amount-input.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/dialog.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/format.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
         <?php if ($isAdmin): ?>

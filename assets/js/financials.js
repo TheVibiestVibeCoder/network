@@ -1175,7 +1175,7 @@
     }
 
     async function deleteDebt(id) {
-        if (!confirm('Delete this debt?')) return;
+        if (!(await CRMDialog.confirm('Delete this debt?', { confirm: 'Delete', danger: true }))) return;
         try {
             const result = await post('delete-debt', { id });
             state.overview = result.data;
@@ -1431,7 +1431,7 @@
     }
 
     async function deleteCost(id) {
-        if (!confirm('Delete this cost?')) return;
+        if (!(await CRMDialog.confirm('Delete this cost?', { confirm: 'Delete', danger: true }))) return;
         try {
             const result = await post('delete-cost', { id });
             state.overview = result.data;
@@ -1502,7 +1502,7 @@
     }
 
     async function deleteBalance(id) {
-        if (!confirm('Delete this balance entry?')) return;
+        if (!(await CRMDialog.confirm('Delete this balance entry?', { confirm: 'Delete', danger: true }))) return;
         try {
             const result = await post('delete-balance', { id });
             state.overview = result.data;
