@@ -779,7 +779,7 @@
             const line = day === today
                 ? `<div class="tcal-now" style="top:${now * hourPx / 60}px"></div><div class="tcal-now-dot" style="top:${now * hourPx / 60}px"></div>` : '';
             const more = dir => `<button type="button" class="tcal-more is-${dir}" data-tcal-more="${dir}" hidden>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === 'up' ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'}"/></svg><span class="tcal-more-count"></span></button>`;
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === 'up' ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'}"/></svg><span class="tcal-more-count"></span></button>`;
             return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${buffers}${blocks.map(eventHtml).join('')}${line}${more('up')}${more('down')}</div>`;
         }).join('');
 

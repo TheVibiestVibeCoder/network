@@ -2323,21 +2323,15 @@ button.tcal-dayhead:hover {
     position: absolute;
     left: 50%;
     z-index: 5;
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    height: 24px;
-    min-width: 30px;
-    padding: 0 7px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
     border: 0;
-    border-radius: var(--r-full);
-    background: var(--tcal-main);
+    border-radius: 50%;
+    background: var(--c-accent);
     color: #FFFFFF;
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    justify-content: center;
     box-shadow: var(--e-2);
     transform: translateX(-50%);
     cursor: pointer;
@@ -2348,7 +2342,25 @@ button.tcal-dayhead:hover {
 }
 
 .tcal-more:hover {
-    background: var(--tcal-mine);
+    background: var(--c-accent-2);
+}
+
+/* How many: a small number on the circle's edge, only when more than one. */
+.tcal-more-count {
+    position: absolute;
+    top: -5px;
+    right: -7px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: var(--r-full);
+    background: var(--c-surface);
+    color: var(--c-accent);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    box-shadow: 0 0 0 1px var(--c-line);
 }
 
 .tcal-more:focus-visible {
@@ -2360,6 +2372,4 @@ button.tcal-dayhead:hover {
     display: none;
 }
 
-:root[data-theme="dark"] .tcal-more {
-    color: #0B111C;
-}
+
