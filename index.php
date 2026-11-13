@@ -1016,6 +1016,9 @@ function assetUrl(string $path): string
                                     <button type="button" class="tcal-mode-btn is-active" data-tcal-mode="day" aria-pressed="true">Day</button>
                                     <button type="button" class="tcal-mode-btn" data-tcal-mode="week" aria-pressed="false">Week</button>
                                 </div>
+                                <button type="button" class="btn btn-icon tcal-search-btn" data-tcal="search" aria-expanded="false" aria-controls="tcalSearch" title="Search appointments" aria-label="Search appointments">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
+                                </button>
                                 <button type="button" class="btn btn-icon tcal-free-btn" data-tcal="free" aria-expanded="false" aria-controls="tcalFree" title="Find a free slot" aria-label="Find a free slot">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11V6.5A1.5 1.5 0 0 0 18.5 5h-13A1.5 1.5 0 0 0 4 6.5v12A1.5 1.5 0 0 0 5.5 20H11"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/><circle cx="16.5" cy="16.5" r="3"/><path d="m21 21-2.4-2.4"/></svg>
                                 </button>
@@ -1030,6 +1033,11 @@ function assetUrl(string $path): string
                         <div class="tcal-subbar">
                             <div class="tcal-people" id="tcalPeople" role="group" aria-label="Show or hide people"></div>
                             <div class="tcal-sync" id="tcalSync"></div>
+                        </div>
+                        <div class="tcal-search" id="tcalSearch" role="search" hidden>
+                            <svg class="tcal-search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
+                            <input type="search" class="tcal-search-input" id="tcalSearchInput" placeholder="Title, person, project, contact…" aria-label="Search appointments" autocomplete="off" maxlength="100">
+                            <button type="button" class="tcal-search-close" data-tcal="search-close" title="Close search" aria-label="Close search">&times;</button>
                         </div>
                         <div class="tcal-free" id="tcalFree" hidden></div>
                         <div class="tcal-body" id="tcalBody"></div>

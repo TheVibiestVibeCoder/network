@@ -22,15 +22,17 @@ require_once APP_ROOT . '/includes/CalendarView.php';
 final class CalendarSettings
 {
     private const WORKING_HOURS_KEY = 'calendar.working_hours';
-    public const DEFAULT_WORKING_HOURS = ['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00', 'buffer' => 30];
+    public const DEFAULT_WORKING_HOURS = ['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00', 'buffer' => 30, 'external_buffer' => 45];
     /** Minutes "find a free slot" keeps clear before and after appointments. */
     public const BUFFERS = [0, 10, 15, 30, 45, 60];
+    /** The same around external appointments (travel), shown in the grid too. */
+    public const EXTERNAL_BUFFERS = [0, 15, 30, 45, 60, 90, 120];
 
     // =========================================================================
     // Working hours
     // =========================================================================
 
-    /** @return array{days: list<int>, start: string, end: string, buffer: int} ISO weekdays, 1 = Monday. */
+    /** @return array{days: list<int>, start: string, end: string, buffer: int, external_buffer: int} ISO weekdays, 1 = Monday. */
     public static function workingHours(): array
     {
         $stmt = Database::getInstance()->prepare("SELECT value FROM app_settings WHERE key = :key");
@@ -43,7 +45,7 @@ final class CalendarSettings
     {
         $hours = self::validWorkingHours($input);
         if ($hours === null) {
-            throw new InvalidArgumentException('Working hours need at least one day, a start before the end (HH:MM) and a buffer of ' . implode(', ', self::BUFFERS) . ' minutes.');
+            throw new InvalidArgumentException('Working hours need at least one day, a start before the end (HH:MM), a buffer of ' . implode(', ', self::BUFFERS) . ' minutes and one of ' . implode(', ', self::EXTERNAL_BUFFERS) . ' around external appointments.');
         }
         Database::getInstance()->prepare("
             INSERT INTO app_settings (key, value, updated_at) VALUES (:key, :value, CURRENT_TIMESTAMP)
@@ -61,13 +63,15 @@ final class CalendarSettings
         $start = (string) ($input['start'] ?? '');
         $end = (string) ($input['end'] ?? '');
         $time = '/^([01]\d|2[0-3]):[0-5]\d$/';
-        // Stored before there was a buffer: the default.
+        // Stored before there were buffers: the defaults.
         $buffer = array_key_exists('buffer', $input) ? $input['buffer'] : self::DEFAULT_WORKING_HOURS['buffer'];
+        $external = array_key_exists('external_buffer', $input) ? $input['external_buffer'] : self::DEFAULT_WORKING_HOURS['external_buffer'];
         if (!$days || !preg_match($time, $start) || !preg_match($time, $end) || $start >= $end
-            || !is_numeric($buffer) || !in_array((int) $buffer, self::BUFFERS, true)) {
+            || !is_numeric($buffer) || !in_array((int) $buffer, self::BUFFERS, true)
+            || !is_numeric($external) || !in_array((int) $external, self::EXTERNAL_BUFFERS, true)) {
             return null;
         }
-        return ['days' => $days, 'start' => $start, 'end' => $end, 'buffer' => (int) $buffer];
+        return ['days' => $days, 'start' => $start, 'end' => $end, 'buffer' => (int) $buffer, 'external_buffer' => (int) $external];
     }
 
     // =========================================================================
@@ -294,7 +298,8 @@ final class CalendarSettings
 /**
  * Common free time of several people, inside working hours, keeping the
  * buffer (working hours "buffer", in minutes) clear before and after every
- * appointment.
+ * appointment - around external ones the longer of it and "external_buffer"
+ * (travel).
  *
  * Reads every calendar of each person, hidden ones included, but hands back
  * only the gaps - never what fills the rest.
@@ -316,10 +321,12 @@ final class CalendarAvailability
         $earliest = (int) (ceil($now / 900) * 900);
 
         $buffer = max(0, (int) ($workingHours['buffer'] ?? 0)) * 60;
+        $external = max($buffer, (int) ($workingHours['external_buffer'] ?? 0) * 60);
         $busy = [];
         foreach (CalendarView::busy($emails, $fromDate, $toDate) as $intervals) {
-            foreach ($intervals as [$start, $end]) {
-                $busy[] = [$start - $buffer, $end + $buffer];
+            foreach ($intervals as [$start, $end, $type]) {
+                $around = $type === 'external' ? $external : $buffer;
+                $busy[] = [$start - $around, $end + $around];
             }
         }
         $busy = self::merge($busy);

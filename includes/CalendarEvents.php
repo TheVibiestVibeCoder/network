@@ -16,6 +16,11 @@
  *     gets the new version and decides (CalendarConflict).
  *   - Moving and cancelling: the organizer, or anyone with the "edit" right
  *     (spec, section 3). Answering: the team members invited.
+ *   - Into another calendar: the appointment is written into the new
+ *     organizer's work calendar and leaves the old one - unless its owner
+ *     stays in it, then theirs becomes a copy.
+ *   - Its type (online, external, office) lives in the CRM only
+ *     (CalendarTypes); changing just that never touches the server.
  *   - In a series: the whole series, or one occurrence.
  *
  * Guests from outside the team (phase 4) are not invited from here; those a
@@ -36,6 +41,7 @@ require_once APP_ROOT . '/includes/CalendarStore.php';
 require_once APP_ROOT . '/includes/CalendarCopies.php';
 require_once APP_ROOT . '/includes/CalendarIcsWriter.php';
 require_once APP_ROOT . '/includes/CalendarLinks.php';
+require_once APP_ROOT . '/includes/CalendarTypes.php';
 
 /** Somebody else changed or deleted the appointment while it was being edited. */
 final class CalendarConflict extends RuntimeException
@@ -173,6 +179,7 @@ final class CalendarEvents
             'location'        => $instance['location'],
             'description'     => $instance['description'],
             'url'             => $instance['url'],
+            'type'            => CalendarTypes::of($uid),
             'video_url'       => CalendarIcs::videoLink($instance['location'], $instance['url'], $instance['description']),
             'organizer'       => $organizerEmail !== ''
                 ? ['email' => $organizerEmail, 'name' => isset($team[$organizerEmail]) ? $team[$organizerEmail]['name'] : ($organizer['name'] ?? null), 'team' => isset($team[$organizerEmail])]
@@ -244,10 +251,8 @@ final class CalendarEvents
                 }
             }
         }
-        $source = $work[$organizer] ?? null;
-        if ($source === null || !isset($team[$organizer]) || (int) $source['writable'] !== 1 || !$this->store->reaches((string) $source['href'])) {
-            throw new InvalidArgumentException('Choose a calendar the appointment can go into.');
-        }
+        $source = $this->targetCalendar($organizer, $team, $work);
+        $type = CalendarTypes::valid($input['type'] ?? null);
 
         $fields = $this->fields($input, true);
         $repeat = array_key_exists('repeat', $fields) ? $fields['repeat'] : null;
@@ -273,6 +278,9 @@ final class CalendarEvents
         }
         $this->write($source, $href, $ics);
         $warnings = $this->copies->push($uid, $ics, $organizer, $href);
+        if ($type !== null) {
+            CalendarTypes::set($uid, $type, $viewer['user_id']);
+        }
 
         foreach ((array) ($input['links'] ?? []) as $link) {
             if (is_array($link) && isset($link['type'], $link['target_id'])) {
@@ -296,10 +304,35 @@ final class CalendarEvents
     public function update(string $uid, ?string $occurrence, string $scope, array $input, array $viewer): array
     {
         [$original, $source, $organizer] = $this->editable($uid, $viewer);
+        $setType = array_key_exists('type', $input);
+        $type = $setType ? CalendarTypes::valid($input['type']) : null;
+        $newOrganizer = strtolower(trim((string) ($input['organizer'] ?? '')));
+        $moving = $newOrganizer !== '' && $newOrganizer !== $organizer;
+        if (!$moving && !array_diff(array_keys($input), ['base', 'type', 'organizer'])) {
+            // Only the type: the CRM's, nothing goes to the server.
+            if ($setType) {
+                CalendarTypes::set($uid, $type, $viewer['user_id']);
+            }
+            return ['uid' => $uid, 'occurrence' => $occurrence, 'warnings' => []];
+        }
+        $target = null;
+        if ($moving) {
+            if (!$viewer['can_edit']) {
+                throw new DomainException('You may not put appointments into somebody else\'s calendar.');
+            }
+            $team = $this->team($viewer);
+            $target = $this->targetCalendar($newOrganizer, $team, $this->workCalendars());
+            if ($this->store->isLocal((string) $original['href']) !== $this->store->isLocal((string) $target['href'])) {
+                throw new InvalidArgumentException('An appointment cannot move between a made-up test calendar and a real one.');
+            }
+        }
         $fresh = $this->current($original, $source, $input['base'] ?? null);
         $fresh = $this->copies->mergeAnswers($uid, $fresh, $organizer);
         $details = CalendarIcsWriter::details($fresh);
         $single = $details['series'] && $occurrence !== null && $scope === 'occurrence';
+        if ($moving && $single) {
+            throw new InvalidArgumentException('Another calendar is for the whole series, not one occurrence.');
+        }
         $fields = $this->fields($input, false);
 
         $changes = [];
@@ -332,7 +365,21 @@ final class CalendarEvents
             if (array_key_exists('repeat', $fields)) {
                 $changes['repeat'] = $fields['repeat'];
             }
-            if (array_key_exists('attendees', $input)) {
+            if ($moving) {
+                $team = $this->team($viewer);
+                // Not said who takes part: everyone as before, the previous
+                // organizer included.
+                $emails = array_key_exists('attendees', $input)
+                    ? (array) $input['attendees']
+                    : array_merge(array_keys(CalendarIcsWriter::people($fresh)['attendees']), [$organizer]);
+                $changes['attendees'] = $this->attendees(array_filter($emails, static function ($email) use ($team): bool {
+                    return isset($team[strtolower(trim((string) $email))]);
+                }), $team, $newOrganizer);
+                $changes['organizer'] = ['email' => $newOrganizer, 'name' => $team[$newOrganizer]['name'] ?? $newOrganizer];
+                $changes['team'] = $this->teamEmails();
+                $changes['reassign'] = true;
+                $changes['previous'] = $organizer;
+            } elseif (array_key_exists('attendees', $input)) {
                 $team = $this->team($viewer);
                 $changes['attendees'] = $this->attendees((array) $input['attendees'], $team, $organizer);
                 $changes['organizer'] = ['email' => $organizer, 'name' => $team[$organizer]['name'] ?? $organizer];
@@ -341,9 +388,59 @@ final class CalendarEvents
             $ics = CalendarIcsWriter::update($fresh, $changes, null, $origin);
         }
 
-        $this->write($source, (string) $original['href'], $ics);
-        $warnings = $this->copies->push($uid, $ics, $organizer, (string) $original['href']);
+        if ($target !== null) {
+            $warnings = $this->move($uid, $original, $source, $target, $ics, $organizer, $newOrganizer);
+        } else {
+            $this->write($source, (string) $original['href'], $ics);
+            $warnings = $this->copies->push($uid, $ics, $organizer, (string) $original['href']);
+        }
+        if ($setType) {
+            CalendarTypes::set($uid, $type, $viewer['user_id']);
+        }
         return ['uid' => $uid, 'occurrence' => $occurrence, 'warnings' => $warnings];
+    }
+
+    /**
+     * Into another calendar: written there first (over the new organizer's
+     * copy, if they had one), then out of the old one - unless its owner
+     * still takes part; then the copies bring theirs in line.
+     *
+     * @return list<string> warnings
+     */
+    private function move(string $uid, array $original, array $source, array $target, string $ics, string $from, string $to): array
+    {
+        $stmt = $this->db->prepare("SELECT href FROM calendar_events WHERE source_id = :source AND uid = :uid AND archived = 0 ORDER BY id LIMIT 1");
+        $stmt->execute(['source' => $target['id'], 'uid' => $uid]);
+        $copyHref = $stmt->fetchColumn();
+        $href = is_string($copyHref) && $copyHref !== '' ? $copyHref : CalendarCopies::hrefFor((string) $target['href'], $uid);
+        if ($copyHref === false && $this->store->get($href) !== null) {
+            throw new RuntimeException('The other calendar already holds an appointment at that address; nothing was saved.');
+        }
+        $this->write($target, $href, $ics);
+        // Theirs is the original now, not a copy.
+        $this->db->prepare("DELETE FROM calendar_copies WHERE uid = :uid AND email = :email")->execute(['uid' => $uid, 'email' => $to]);
+
+        $warnings = [];
+        if (!array_key_exists($from, CalendarIcsWriter::people($ics)['attendees'])) {
+            try {
+                $this->store->delete((string) $original['href']);
+                $this->cache->forget((int) $source['id'], (string) $original['href']);
+            } catch (Throwable $e) {
+                error_log('Calendar events: removing the moved appointment from calendar ' . $source['id'] . ' failed');
+                $warnings[] = 'It is in the new calendar, but could not be taken out of the old one; delete it there.';
+            }
+        }
+        return array_merge($warnings, $this->copies->push($uid, $ics, $to, $href));
+    }
+
+    /** A team member's work calendar the shared account may write into. */
+    private function targetCalendar(string $email, array $team, array $work): array
+    {
+        $source = $work[$email] ?? null;
+        if ($source === null || !isset($team[$email]) || (int) $source['writable'] !== 1 || !$this->store->reaches((string) $source['href'])) {
+            throw new InvalidArgumentException('Choose a calendar the appointment can go into.');
+        }
+        return $source;
     }
 
     /**
@@ -368,6 +465,7 @@ final class CalendarEvents
         $this->cache->forget((int) $source['id'], (string) $original['href']);
         $warnings = $this->copies->removeAll($uid, $organizer);
         CalendarLinks::removeForEvent($uid);
+        CalendarTypes::remove($uid);
         return ['uid' => $uid, 'cancelled' => 'series', 'warnings' => $warnings];
     }
 

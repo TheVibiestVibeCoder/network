@@ -816,6 +816,19 @@ class Database
             )
         ");
 
+        // What kind of appointment it is: online, external (somewhere else,
+        // so travel time before and after) or at the office. Only in the CRM,
+        // keyed by UID like the links: a phone editing the appointment cannot
+        // lose it, and every copy of a shared meeting has the same one.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS calendar_event_types (
+                uid VARCHAR(512) PRIMARY KEY,
+                type VARCHAR(16) NOT NULL,
+                updated_by INTEGER,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
         // "Busy" was a second way of hiding a calendar, the same as Private
         // but for its label. Only Private is left.
         $db->exec("UPDATE calendar_sources SET visibility = 'private' WHERE visibility NOT IN ('details', 'private')");

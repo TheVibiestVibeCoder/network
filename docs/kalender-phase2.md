@@ -141,6 +141,26 @@ Der Mailserver wertet `If-Match` nicht aus (Phase 0), deshalb prüft das CRM sel
 - **Volle Fläche:** Das Raster reicht von der Seitenleiste bis zum rechten und unteren Fensterrand.
 - **Vergangene Termine:** Sie sind blass, aber deckend. Die Stundenlinien scheinen nicht mehr durch.
 
+## Nachträge (13.11.2026, Livios Wünsche)
+
+- **Kalender nachträglich ändern:** Beim Bearbeiten gibt es die Auswahl „Calendar“ auch für bestehende Termine.
+  - Ein anderer Kalender heißt: Der Termin wird in den Arbeitskalender dieser Person geschrieben und sie wird Organisator. Danach wird er aus dem alten Kalender entfernt.
+  - Wer bisher drin war, bleibt Teilnehmer, die bisherige Besitzerin oder der bisherige Besitzer als zugesagt. Das Formular hakt sie oder ihn beim Wechsel automatisch an, abwählbar.
+  - Bleibt die Person drin, wird ihr Termin zur Kopie statt gelöscht und neu angelegt.
+  - Gilt immer für die ganze Serie. Echte und Test-Kalender („demo:“) werden nicht gemischt.
+- **Terminarten:** Online, External oder Office, oder keine. Gewählt wird sie im Termin, ein zweiter Klick nimmt sie wieder weg.
+  - Gespeichert wird die Art nur im CRM (`calendar_event_types`, nach UID), nicht auf dem Mailserver. Ein iPhone kann sie beim Bearbeiten also nicht verlieren. Wer nur die Art ändert, schreibt nichts auf den Server.
+  - **External** zeigt im Raster eine schraffierte Fahrzeit vor und nach dem Termin, standardmäßig 45 Minuten.
+  - „Find a free slot“ hält diese Zeit frei: den längeren der beiden Puffer, also den allgemeinen oder den für External.
+  - Einstellbar unter „Working hours“ → „External“ (keiner, 15, 30, 45, 60, 90 oder 120 Minuten).
+  - Bei privaten Terminen sehen andere nur die Fahrzeit, nicht die Art.
+- **Suche:** Die Lupe in der Kalenderleiste öffnet ein Suchfeld. Die Treffer ersetzen das Raster, solange etwas eingegeben ist.
+  - Gesucht wird in Titel, Ort, Notizen, Teilnehmern (Team und Gäste, Name oder Adresse), der Art und den verknüpften Kontakten und Projekten.
+  - Jedes Wort muss vorkommen. Groß- und Kleinschreibung spielt keine Rolle, auch nicht bei Umlauten.
+  - Die Treffer sind getrennt in „Coming up“ und „Earlier“ und nach Tagen gruppiert. Eine Serie erscheint einmal mit dem nächsten und einmal mit dem letzten Termin.
+  - Private Termine anderer werden nie über das gefunden, was sie verbergen.
+  - Externe Gäste, die später aus dem CRM eingeladen werden (Phase 4), sind automatisch mit durchsucht, weil sie als Teilnehmer im Termin stehen.
+
 ## Offen
 
 - **T3:** Sobald Markus und Vivian ihre Kalender für kalender@ freigegeben haben, ist zu prüfen:

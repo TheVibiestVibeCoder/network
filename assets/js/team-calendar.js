@@ -56,6 +56,9 @@
         scrim: document.getElementById('tcalScrim'),
         settingsBtn: root.querySelector('[data-tcal="settings"]'),
         freeBtn: root.querySelector('[data-tcal="free"]'),
+        searchBtn: root.querySelector('[data-tcal="search"]'),
+        searchBar: document.getElementById('tcalSearch'),
+        searchInput: document.getElementById('tcalSearchInput'),
         newBtn: root.querySelector('[data-tcal="new"]'),
         panel: document.getElementById('calendarView'),
         sheet: document.getElementById('eventSheet'),
@@ -167,6 +170,7 @@
         lastSyncTry: 0,
         slots: [],
         free: { open: false, people: null, minutes: 60, range: 'week', results: null, busy: false, error: null, searched: null },
+        search: { open: false, q: '', data: null, busy: false, error: null, seq: 0, timer: null },
         settings: null,
         scrollMode: null,
         refreshTimer: null,
@@ -284,6 +288,33 @@
     }
 
     // =========================================================================
+    // Types of appointment: online, external (travel before and after), office
+    // =========================================================================
+
+    const TYPES = [
+        ['online', 'Online', '<rect x="3.5" y="5" width="17" height="11" rx="1.5"/><path d="M2 19.5h20"/>'],
+        ['external', 'External', '<path d="M4 16.5v-3.4l1.8-4.2A1.5 1.5 0 0 1 7.2 8h9.6a1.5 1.5 0 0 1 1.4.9l1.8 4.2v3.4z"/><path d="M4.5 13h15"/><circle cx="7.8" cy="16.6" r="1.6"/><circle cx="16.2" cy="16.6" r="1.6"/>'],
+        ['office', 'Office', '<path d="M4.5 20.5V5.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15"/><path d="M14.5 9.5h4a1 1 0 0 1 1 1v10M3 20.5h18M8 8h3M8 11.5h3M8 15h3"/>'],
+    ];
+
+    function typeOf(key) {
+        return TYPES.find(t => t[0] === key) || null;
+    }
+
+    function typeIcon(key, size) {
+        const t = typeOf(key);
+        if (!t) return '';
+        const px = size || 13;
+        return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t[2]}</svg>`;
+    }
+
+    /** The small type mark on an appointment in the grid. */
+    function typeMark(item) {
+        const t = !item.masked && typeOf(item.type);
+        return t ? `<span class="tcal-type" title="${esc(t[1])}" aria-label="${esc(t[1])}">${typeIcon(t[0])}</span>` : '';
+    }
+
+    // =========================================================================
     // Loading and syncing
     // =========================================================================
 
@@ -380,6 +411,8 @@
             els.body.innerHTML = emptyState('No calendars yet.',
                 'Each person shares their calendars with the calendar account in webmail: the work calendar to read and write, the private one to read only.'
                 + (state.data.me.is_admin ? ' Then look for them in the calendar settings.' : ''));
+        } else if (searching()) {
+            renderSearch();
         } else if (!visiblePeople().length) {
             els.body.innerHTML = emptyState('Everyone is hidden.', 'Pick a person above to show their calendar.');
         } else {
@@ -499,7 +532,8 @@
     }
 
     function tooltip(item) {
-        return [whenLabel(item), item.title, peopleIn(item).map(p => p.name).join(', ')].filter(Boolean).join(' · ');
+        const t = !item.masked && typeOf(item.type);
+        return [whenLabel(item), item.title, t ? t[1] : null, peopleIn(item).map(p => p.name).join(', ')].filter(Boolean).join(' · ');
     }
 
     /** The part of a timed appointment on one local day, in minutes. */
@@ -656,6 +690,8 @@
                 .map(item => ({ item, seg: segment(item, day) }))
                 .filter(block => block.seg);
             assignLanes(blocks);
+            // Travel time around external appointments, behind them.
+            const buffers = blocks.filter(block => block.item.buffer > 0).map(bufferHtml).join('');
             // Behind the appointments: outside working hours, found free slots.
             const off = workingDay(day)
                 ? `<div class="tcal-offhours" style="top:0;height:${workStart * HOUR_PX / 60}px"></div><div class="tcal-offhours" style="top:${workEnd * HOUR_PX / 60}px;bottom:0"></div>`
@@ -665,7 +701,7 @@
                     <span>Free ${minutesLabel(seg.start)}–${minutesLabel(seg.end)}</span></button>`).join('');
             const line = day === today
                 ? `<div class="tcal-now" style="top:${now * HOUR_PX / 60}px"></div><div class="tcal-now-dot" style="top:${now * HOUR_PX / 60}px"></div>` : '';
-            return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${blocks.map(eventHtml).join('')}${line}</div>`;
+            return `<div class="tcal-daycol${day === today ? ' is-today' : ''}" data-tcal-col="${day}" style="grid-column:${i + 2}">${off}${slots}${buffers}${blocks.map(eventHtml).join('')}${line}</div>`;
         }).join('');
 
         // The head scrolls sideways with the grid and sticks to the top, so the
@@ -697,6 +733,20 @@
                 </button>`;
     }
 
+    /** The buffer before and after an external appointment, in its lane. */
+    function bufferHtml(block) {
+        const { item, seg } = block;
+        const left = block.lane / block.lanes * 100;
+        const width = block.span / block.lanes * 100;
+        const label = durationLabel(item.buffer) + ' travel';
+        const band = (from, to) => (to > from
+            ? `<div class="tcal-buffer" style="top:${from * HOUR_PX / 60}px;height:${(to - from) * HOUR_PX / 60}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(label)}" aria-hidden="true"></div>` : '');
+        // Only where the appointment starts and ends on this day.
+        const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start) : '';
+        const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer)) : '';
+        return before + after;
+    }
+
     function eventHtml(block) {
         const { item, seg } = block;
         const top = seg.start * HOUR_PX / 60;
@@ -715,7 +765,7 @@
                 </button>`;
         }
         if (height >= 66) classes.push('is-tall');
-        const extras = item.masked ? '' : (item.video_url ? videoIcon() : '') + guestsBadge(item);
+        const extras = item.masked ? '' : typeMark(item) + (item.video_url && item.type !== 'online' ? videoIcon() : '') + guestsBadge(item);
         const place = !item.masked && item.location && height >= 66 && !/^https?:\/\//i.test(item.location)
             ? `<span class="tcal-ev-place">${esc(item.location)}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" ${attrs}>
@@ -948,6 +998,7 @@
             organizer,
             attendees: new Set((p.attendees || []).filter(email => email !== organizer)),
             location: '', url: '', reminder: '', description: '',
+            type: p.type || '',
         };
         sheet.pendingLinks = (p.links || []).slice();
         renderSheet();
@@ -971,6 +1022,7 @@
             url: d.url || '',
             description: d.description || '',
             reminder: d.reminder_custom ? 'custom' : (d.reminder === null ? '' : String(d.reminder)),
+            type: d.type || '',
         };
         sheet.mode = 'edit';
         sheet.confirm = null;
@@ -1064,8 +1116,9 @@
     };
 
     function iconFact(icon, label, value) {
+        const paths = FACT_ICONS[icon] || (typeOf(icon) || [])[2] || '';
         return `<div class="esheet-fact"><span class="esheet-fact-icon" title="${esc(label)}" aria-label="${esc(label)}" role="img">
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FACT_ICONS[icon]}</svg>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>
             </span><div class="esheet-fact-value">${value}</div></div>`;
     }
 
@@ -1082,6 +1135,12 @@
 
         // One line per fact, an icon in front instead of a label.
         const facts = [];
+        const type = typeOf(d.type);
+        if (type) {
+            const travel = d.type === 'external' && state.data && state.data.working_hours.external_buffer
+                ? ` <span class="esheet-muted">· ${esc(durationLabel(state.data.working_hours.external_buffer))} travel before &amp; after</span>` : '';
+            facts.push(iconFact(type[0], 'Type', esc(type[1]) + travel));
+        }
         // A place that is only the video link is said once, by the button.
         if (d.location && d.location.trim() !== d.video_url) facts.push(iconFact('place', 'Where', linkify(d.location)));
         if (d.video_url) {
@@ -1183,7 +1242,10 @@
                     ${f.freq !== 'NONE' ? `<label class="esheet-field"><span>Until (optional)</span><input type="date" class="form-input" data-ef="until" value="${esc(f.until)}"></label>` : '<span></span>'}
                 </div>`);
         }
-        if (isNew) {
+        // New: where it goes. Later: another calendar moves it there (the
+        // whole series) - offered when its own calendar is one of the choices.
+        const movable = isNew || (calendars.length > 1 && calendars.some(c => c.email === d.calendar.email));
+        if (movable) {
             rows.push(`<label class="esheet-field"><span>Calendar</span><select class="form-select" data-ef="organizer">
                     ${calendars.map(c => `<option value="${esc(c.email)}"${c.email === f.organizer ? ' selected' : ''}>${esc(c.name)}${c.mine ? ' (you)' : ''}</option>`).join('')}
                 </select></label>`);
@@ -1192,6 +1254,9 @@
                 ${team.length ? team.map(p => `<label class="esheet-choose-person${f.attendees.has(p.email) ? ' is-on' : ''}">
                     <input type="checkbox" data-ef-person="${esc(p.email)}"${f.attendees.has(p.email) ? ' checked' : ''}>${face(p)}<span>${esc(p.name)}</span></label>`).join('')
                     : '<span class="esheet-empty">Nobody else in the team has a calendar here yet.</span>'}
+            </div></div>`);
+        rows.push(`<div class="esheet-field"><span>Type</span><div class="esheet-types" role="group" aria-label="Type">
+                ${TYPES.map(([key, label]) => `<button type="button" class="esheet-type${f.type === key ? ' is-on' : ''}" data-ef-type="${key}" aria-pressed="${f.type === key}">${typeIcon(key, 15)}<span>${label}</span></button>`).join('')}
             </div></div>`);
         rows.push(`<div class="esheet-pair">
                 <label class="esheet-field"><span>Where</span><input type="text" class="form-input" data-ef="location" value="${esc(f.location)}" maxlength="500" placeholder="Office, address…"></label>
@@ -1272,6 +1337,7 @@
             attendees: Array.from(f.attendees),
             repeat: f.freq === 'NONE' ? null : { freq: f.freq, until: f.until || null },
             reminder: f.reminder === '' || f.reminder === 'custom' ? null : Number(f.reminder),
+            type: f.type || null,
         };
     }
 
@@ -1291,6 +1357,11 @@
         const before = d.attendees.filter(a => !a.organizer).map(a => a.email).sort().join(',');
         const after = Array.from(f.attendees).sort().join(',');
         if (before !== after) body.attendees = Array.from(f.attendees);
+        if (f.organizer !== d.calendar.email) {
+            body.organizer = f.organizer;
+            body.attendees = Array.from(f.attendees);
+        }
+        if ((f.type || null) !== (d.type || null)) body.type = f.type || null;
         if (!d.repeat_custom) {
             const was = d.repeat ? d.repeat.freq + '|' + (d.repeat.until || '') : 'NONE|';
             const now = f.freq === 'NONE' ? 'NONE|' : f.freq + '|' + (f.until || '');
@@ -1366,7 +1437,8 @@
         }
         const d = sheet.data;
         if (d.series && !scope) {
-            if (body.attendees || 'repeat' in body) {
+            // The type, the people and the calendar belong to the whole series.
+            if (body.attendees || 'repeat' in body || body.organizer || Object.keys(body).every(key => key === 'type')) {
                 scope = 'series';
             } else {
                 sheet.confirm = 'save-scope';
@@ -1527,8 +1599,9 @@
     // =========================================================================
 
     const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    /** As CalendarSettings::BUFFERS. */
+    /** As CalendarSettings::BUFFERS and EXTERNAL_BUFFERS. */
     const BUFFERS = [0, 10, 15, 30, 45, 60];
+    const EXTERNAL_BUFFERS = [0, 15, 30, 45, 60, 90, 120];
 
     function freeRange() {
         const today = todayKey();
@@ -1600,7 +1673,8 @@
     /** Working hours and buffer in one line; admins can change them right there. */
     function freeHint() {
         const wh = state.data.working_hours;
-        const buffer = wh.buffer ? `${esc(durationLabel(wh.buffer))} buffer before &amp; after appointments` : 'no buffer';
+        const buffer = (wh.buffer ? `${esc(durationLabel(wh.buffer))} buffer before &amp; after appointments` : 'no buffer')
+            + (wh.external_buffer > wh.buffer ? `, ${esc(durationLabel(wh.external_buffer))} around external ones` : '');
         const change = state.data.me && state.data.me.is_admin
             ? ' <button type="button" class="tcal-free-change" data-tcal="change-hours">Change</button>' : '';
         return `<p class="tcal-free-hint">Working hours: ${esc(wh.start)}–${esc(wh.end)}; ${buffer}.${change}</p>`;
@@ -1647,6 +1721,127 @@
         load({ skipSync: true }).then(() => {
             const scroll = els.body.querySelector('.tcal-scroll');
             if (scroll) scroll.scrollTop = Math.max(0, wall(new Date(slot.start)).minutes - 45) * HOUR_PX / 60;
+        });
+    }
+
+    // =========================================================================
+    // Search: the results take the grid's place while there is a query
+    // =========================================================================
+
+    function searching() {
+        return state.search.open && state.search.q.trim().length >= 2;
+    }
+
+    function toggleSearch(open) {
+        state.search.open = open === undefined ? !state.search.open : open;
+        els.searchBar.hidden = !state.search.open;
+        if (els.searchBtn) {
+            els.searchBtn.setAttribute('aria-expanded', state.search.open ? 'true' : 'false');
+            els.searchBtn.classList.toggle('is-active', state.search.open);
+        }
+        if (state.search.open) {
+            els.searchInput.focus();
+            els.searchInput.select();
+        } else {
+            clearTimeout(state.search.timer);
+            state.search.seq++;
+            state.search.q = '';
+            state.search.data = null;
+            state.search.busy = false;
+            els.searchInput.value = '';
+        }
+        render();
+    }
+
+    function queueSearch(value) {
+        state.search.q = value;
+        clearTimeout(state.search.timer);
+        if (!searching()) {
+            state.search.data = null;
+            state.search.seq++;
+            render();
+            return;
+        }
+        state.search.busy = true;
+        state.search.timer = setTimeout(runSearch, 220);
+    }
+
+    async function runSearch() {
+        const seq = ++state.search.seq;
+        const q = state.search.q.trim();
+        try {
+            const data = await api({ action: 'search', q });
+            if (seq !== state.search.seq) return;
+            state.search.data = data;
+            state.search.error = null;
+        } catch (e) {
+            if (seq !== state.search.seq) return;
+            state.search.error = e.message;
+        }
+        state.search.busy = false;
+        render();
+    }
+
+    function renderSearch() {
+        const s = state.search;
+        let html;
+        if (s.error) {
+            html = `<p class="tcal-results-note is-error">${esc(s.error)}</p>`;
+        } else if (!s.data) {
+            html = '<p class="tcal-results-note">Searching…</p>';
+        } else if (!s.data.upcoming.length && !s.data.past.length) {
+            html = '<p class="tcal-results-note">Nothing found.</p>';
+        } else {
+            s.items = s.data.upcoming.concat(s.data.past);
+            let index = 0;
+            const group = (label, list) => {
+                if (!list.length) return '';
+                const days = new Map();
+                list.forEach(item => {
+                    const key = item.all_day ? item.start : wall(new Date(item.start)).key;
+                    if (!days.has(key)) days.set(key, []);
+                    days.get(key).push({ item, index: index++ });
+                });
+                return `<section class="tcal-results-group"><h3 class="tcal-results-label">${label}</h3>
+                    ${Array.from(days.entries()).map(([key, rows]) => `<div class="tcal-results-day">
+                        <div class="tcal-results-dayhead">${esc(dayTitleFmt.format(keyDate(key)))}</div>
+                        <div class="tcal-results-list">${rows.map(resultRow).join('')}</div>
+                    </div>`).join('')}
+                </section>`;
+            };
+            html = group('Coming up', s.data.upcoming) + group('Earlier', s.data.past)
+                + (s.data.more ? '<p class="tcal-results-note">More found - add a word to narrow it down.</p>' : '');
+        }
+        els.body.innerHTML = `<div class="tcal-results${s.busy && s.data ? ' is-busy' : ''}" aria-live="polite">${html}</div>`;
+    }
+
+    function resultRow({ item, index }) {
+        const time = item.all_day ? 'All day' : `${fmtTime(item.start)}–${fmtTime(item.end)}`;
+        const links = (item.links || []).map(link => `<span class="tcal-result-link">${linkIcon(link.type)}<span>${esc(link.name)}</span></span>`).join('');
+        const place = item.location && !/^https?:\/\//i.test(item.location) ? `<span class="tcal-result-place">${esc(item.location)}</span>` : '';
+        const type = typeMark(item);
+        return `<div class="tcal-result${item.mine ? ' is-mine' : ''}${isPast(item) ? ' is-past' : ''}">
+                <button type="button" class="tcal-result-open" data-tcal-result="${index}">
+                    <span class="tcal-result-time">${esc(time)}</span>
+                    <span class="tcal-result-main">
+                        <span class="tcal-result-title"${TITLE_LANG}>${type}${esc(item.title)}</span>
+                        ${place || links ? `<span class="tcal-result-meta">${links}${place}</span>` : ''}
+                    </span>
+                    ${faces(item, 4)}
+                </button>
+                <button type="button" class="tcal-result-show" data-tcal-result-show="${index}" title="Show in the calendar" aria-label="Show in the calendar">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FACT_ICONS.calendar}</svg>
+                </button>
+            </div>`;
+    }
+
+    /** From a result to its week (or day) in the grid, scrolled to it. */
+    function showResult(item) {
+        toggleSearch(false);
+        state.date = item.all_day ? item.start : wall(new Date(item.start)).key;
+        load({ skipSync: true }).then(() => {
+            const scroll = els.body.querySelector('.tcal-scroll');
+            if (scroll && !item.all_day) scroll.scrollTop = Math.max(0, wall(new Date(item.start)).minutes - 45) * HOUR_PX / 60;
         });
     }
 
@@ -1752,7 +1947,10 @@
                         <input type="time" class="form-input tcal-set-select" data-tcal-hours="start" value="${esc(wh.start)}" step="900" aria-label="From">
                         <span class="tcal-set-dash">–</span>
                         <input type="time" class="form-input tcal-set-select" data-tcal-hours="end" value="${esc(wh.end)}" step="900" aria-label="To">
+                    </div>
+                    <div class="tcal-set-times">
                         <label class="tcal-set-buffer"><span>Buffer</span>${select('data-tcal-hours="buffer"', BUFFERS.map(m => [String(m), m ? durationLabel(m) : 'None']), String(wh.buffer), 'Buffer before and after appointments')}</label>
+                        <label class="tcal-set-buffer"><span>External</span>${select('data-tcal-hours="external_buffer"', EXTERNAL_BUFFERS.map(m => [String(m), m ? durationLabel(m) : 'None']), String(wh.external_buffer), 'Travel time before and after external appointments')}</label>
                     </div>
                 </section>`;
         }
@@ -1806,8 +2004,9 @@
         const start = els.settings.querySelector('[data-tcal-hours="start"]').value;
         const end = els.settings.querySelector('[data-tcal-hours="end"]').value;
         const buffer = Number(els.settings.querySelector('[data-tcal-hours="buffer"]').value);
+        const external = Number(els.settings.querySelector('[data-tcal-hours="external_buffer"]').value);
         try {
-            await api({ action: 'working_hours' }, { method: 'PATCH', body: JSON.stringify({ days, start, end, buffer }) });
+            await api({ action: 'working_hours' }, { method: 'PATCH', body: JSON.stringify({ days, start, end, buffer, external_buffer: external }) });
             state.settings = await api({ action: 'settings' });
             renderSettings();
             load({ skipSync: true });
@@ -1851,8 +2050,15 @@
     }
 
     root.addEventListener('click', event => {
-        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-col]');
+        const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-col], [data-tcal-result], [data-tcal-result-show]');
         if (!target || !root.contains(target)) return;
+
+        if (target.dataset.tcalResult !== undefined || target.dataset.tcalResultShow !== undefined) {
+            const item = (state.search.items || [])[Number(target.dataset.tcalResult ?? target.dataset.tcalResultShow)];
+            if (!item) return;
+            if (target.dataset.tcalResultShow !== undefined) showResult(item); else openEvent(item.uid, item.occurrence);
+            return;
+        }
 
         if (target.dataset.tcalFreePerson) {
             const email = target.dataset.tcalFreePerson;
@@ -1924,6 +2130,8 @@
             case 'sync': maybeSync(true); break;
             case 'new': openNewEvent({}); break;
             case 'free': toggleFree(); break;
+            case 'search': toggleSearch(); break;
+            case 'search-close': toggleSearch(false); break;
             case 'free-search': searchFree(); break;
             case 'free-clear':
                 state.slots = [];
@@ -1934,6 +2142,16 @@
             case 'settings': openSettings(); break;
             case 'change-hours': openSettings('hours'); break;
             default: break;
+        }
+    });
+
+    els.searchInput.addEventListener('input', () => queueSearch(els.searchInput.value));
+    els.searchInput.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleSearch(false);
+            if (els.searchBtn) els.searchBtn.focus();
         }
     });
 
@@ -1961,8 +2179,18 @@
 
     if (els.sheet) {
         els.sheet.addEventListener('click', event => {
-            const target = event.target.closest('[data-esheet], [data-esheet-answer], [data-esheet-link], [data-esheet-unlink], [data-esheet-open]');
+            const target = event.target.closest('[data-esheet], [data-esheet-answer], [data-esheet-link], [data-esheet-unlink], [data-esheet-open], [data-ef-type]');
             if (!target || sheet.busy) return;
+            if (target.dataset.efType && sheet.form) {
+                // A second click on the chosen type takes it away again.
+                sheet.form.type = sheet.form.type === target.dataset.efType ? '' : target.dataset.efType;
+                els.sheet.querySelectorAll('[data-ef-type]').forEach(btn => {
+                    const on = btn.dataset.efType === sheet.form.type;
+                    btn.classList.toggle('is-on', on);
+                    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                });
+                return;
+            }
             if (target.dataset.esheetAnswer) {
                 answer(target.dataset.esheetAnswer);
                 return;
@@ -2095,8 +2323,15 @@
             } else if (field === 'until' || field === 'reminder') {
                 f[field] = target.value;
             } else if (field === 'organizer') {
+                const previous = f.organizer;
                 f.organizer = target.value;
                 f.attendees.delete(f.organizer);
+                // Moving an appointment to someone else's calendar keeps
+                // whoever was in it - the one whose calendar it was included.
+                const d = sheet.data;
+                if (sheet.mode === 'edit' && d && (previous === d.calendar.email || d.attendees.some(a => a.email === previous))) {
+                    f.attendees.add(previous);
+                }
                 renderSheet();
             } else if (['title', 'location', 'url', 'description'].includes(field)) {
                 f[field] = target.value;

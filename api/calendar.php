@@ -8,6 +8,9 @@
  *   POST   ?action=sync                             sync now, at most every
  *                                                   CALENDAR_OPEN_SYNC_SECONDS
  *   GET    ?action=free_slots&people=a,b&minutes=60&from=…&to=…
+ *   GET    ?action=search&q=…                       appointments by title, place,
+ *                                                   notes, people, type, linked
+ *                                                   contact or project
  *   GET    ?action=settings                         calendars, people, hours
  *   PATCH  ?action=source&id=N                      visibility (owner, admin),
  *                                                   kind / enabled (admin)
@@ -21,7 +24,10 @@
  *   POST   ?action=event                            new appointment
  *   PATCH  ?action=event&uid=…[&occurrence=…&scope=occurrence|series]
  *                                                   change it; 409 when it
- *                                                   changed meanwhile ("base")
+ *                                                   changed meanwhile ("base");
+ *                                                   "organizer" moves it to
+ *                                                   another calendar, "type"
+ *                                                   is online|external|office
  *   DELETE ?action=event&uid=…[&occurrence=…&scope=…&base=…]   cancel it
  *   POST   ?action=respond&uid=…                    answer an invitation
  *   POST   ?action=link / DELETE ?action=link&id=N  link a contact or project
@@ -74,6 +80,9 @@ try {
             break;
         case 'GET free_slots':
             handleFreeSlots($viewer);
+            break;
+        case 'GET search':
+            calendarRespond(200, ['success' => true, 'data' => CalendarView::search(mb_substr((string) ($_GET['q'] ?? ''), 0, 100), $viewer)]);
             break;
         case 'GET settings':
             handleSettings($viewer);

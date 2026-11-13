@@ -499,7 +499,13 @@ try {
 }
 $db->prepare("INSERT INTO app_settings (key, value) VALUES ('calendar.working_hours', :v) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     ->execute(['v' => json_encode(['days' => [1, 2, 3], 'start' => '09:00', 'end' => '17:00'])]);
-check('hours saved before there was a buffer get 30 minutes', CalendarSettings::workingHours() === ['days' => [1, 2, 3], 'start' => '09:00', 'end' => '17:00', 'buffer' => 30], CalendarSettings::workingHours());
+check('hours saved before there were buffers get 30 minutes, 45 around external ones', CalendarSettings::workingHours() === ['days' => [1, 2, 3], 'start' => '09:00', 'end' => '17:00', 'buffer' => 30, 'external_buffer' => 45], CalendarSettings::workingHours());
+try {
+    CalendarSettings::setWorkingHours(['days' => [1], 'start' => '08:00', 'end' => '18:00', 'buffer' => 30, 'external_buffer' => 50]);
+    check('the external buffer is one of the offered lengths', false);
+} catch (InvalidArgumentException $e) {
+    check('the external buffer is one of the offered lengths', true);
+}
 $saved = CalendarSettings::setWorkingHours(['days' => [1, 2, 3, 4, 5], 'start' => '08:00', 'end' => '18:00', 'buffer' => 0]);
 check('a buffer can be switched off', $saved['buffer'] === 0 && CalendarSettings::workingHours()['buffer'] === 0, $saved);
 

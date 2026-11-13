@@ -104,6 +104,12 @@ final class CalendarIcsWriter
      *                                       list<{email, name}>; with
      *                                       organizer {email, name} and team
      *                                       (every team address)
+     *   reassign                            with attendees: organizer is a
+     *                                       new one (the appointment moves
+     *                                       to their calendar); previous is
+     *                                       whose it was - listed in
+     *                                       attendees, they stay in it as
+     *                                       having accepted
      *   repeat                              {freq, until} or null (stop)
      *   reminder                            minutes before, or null
      *
@@ -158,6 +164,9 @@ final class CalendarIcsWriter
             }
             if (array_key_exists('attendees', $changes)) {
                 foreach (array_merge([$master], $overrides) as $event) {
+                    if (!empty($changes['reassign'])) {
+                        self::reassign($event, $changes['organizer'], $changes['previous'] ?? null, $changes['attendees']);
+                    }
                     self::setTeam($event, $changes['organizer'] ?? null, $changes['attendees'], $changes['team'] ?? []);
                 }
                 $touched = array_merge($touched, $overrides);
@@ -794,6 +803,40 @@ final class CalendarIcsWriter
                 'RSVP'           => 'TRUE',
                 'SCHEDULE-AGENT' => 'CLIENT',
             ]);
+        }
+    }
+
+    /**
+     * A new organizer: the old one's ORGANIZER and both their ATTENDEE lines
+     * go, so setTeam writes them afresh - the new one as chair, the previous
+     * one (if still in it) as a participant who has accepted.
+     *
+     * @param list<array{email: string, name: string}> $attendees
+     */
+    private static function reassign(VEvent $event, array $organizer, ?string $previous, array $attendees): void
+    {
+        $new = strtolower($organizer['email']);
+        $old = isset($event->ORGANIZER) ? self::address((string) $event->ORGANIZER->getValue()) : null;
+        $previous = $previous !== null ? strtolower($previous) : $old;
+        $names = [];
+        foreach ($event->select('ATTENDEE') as $line) {
+            $email = self::address((string) $line->getValue());
+            if ($email === $new || $email === $old || $email === $previous) {
+                $names[$email] = (string) ($line['CN'] ?? '');
+                $event->remove($line);
+            }
+        }
+        unset($event->ORGANIZER);
+        foreach ($attendees as $attendee) {
+            $email = strtolower($attendee['email']);
+            if ($email !== $new && ($email === $previous || $email === $old)) {
+                $event->add('ATTENDEE', 'mailto:' . $email, [
+                    'CN'             => $attendee['name'] ?? ($names[$email] ?: $email),
+                    'ROLE'           => 'REQ-PARTICIPANT',
+                    'PARTSTAT'       => 'ACCEPTED',
+                    'SCHEDULE-AGENT' => 'CLIENT',
+                ]);
+            }
         }
     }
 

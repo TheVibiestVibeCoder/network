@@ -14,7 +14,9 @@
  *
  * Appointments with the same UID in several calendars (a shared meeting) are
  * shown once. Masked occurrences are never merged: putting two people's
- * "Private" blocks together by UID would tell who meets whom.
+ * "Private" blocks together by UID would tell who meets whom. Of an
+ * appointment's type (CalendarTypes) a masked one carries only the travel
+ * buffer around it - that is time, too - never the type itself.
  */
 
 // ---------------------------------------------------------------------------
@@ -26,6 +28,8 @@ if (!defined('APP_ROOT')) {
 }
 
 require_once APP_ROOT . '/includes/CalendarIcs.php';
+require_once APP_ROOT . '/includes/CalendarTypes.php';
+require_once APP_ROOT . '/includes/CalendarSettings.php';
 
 final class CalendarView
 {
@@ -158,6 +162,168 @@ final class CalendarView
         return self::items($stmt->fetchAll(), $viewer);
     }
 
+    /**
+     * Appointments matching a search, as $viewer may see them: every word
+     * has to turn up in the title, place, notes, someone taking part (team
+     * or guest, name or address), the type, or a linked contact or project.
+     *
+     * Only what $viewer sees in full is searched and returned - a Private
+     * appointment is never found by what it hides. A series shows up once
+     * coming up (its next occurrence) and once earlier (its last).
+     *
+     * @return array{upcoming: list<array>, past: list<array>, more: bool}
+     */
+    public static function search(string $query, array $viewer, int $limit = 30): array
+    {
+        $words = array_values(array_filter(preg_split('/\s+/u', mb_strtolower(trim($query))) ?: [], static function (string $w): bool {
+            return $w !== '';
+        }));
+        $none = ['upcoming' => [], 'past' => [], 'more' => false];
+        if (!$words || mb_strlen(implode('', $words)) < 2) {
+            return $none;
+        }
+        $words = array_slice($words, 0, 6);
+        usort($words, static function (string $a, string $b): int {
+            return mb_strlen($b) <=> mb_strlen($a);
+        });
+
+        // Candidates by the longest word; the exact check follows on what
+        // the viewer may see. SQLite's LIKE ignores case for A-Z only, so
+        // umlauts are tried as typed, capitalised and in capitals too.
+        $probe = $words[0];
+        $variants = array_values(array_unique([$probe, mb_convert_case($probe, MB_CASE_TITLE), mb_strtoupper($probe)]));
+        $likes = array_map(static function (string $v): string {
+            return '%' . strtr($v, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
+        }, $variants);
+        $db = Database::getInstance();
+
+        $columns = ['i.summary', 'i.location', 'i.description', 'i.attendees', 'i.organizer'];
+        $where = [];
+        $params = [];
+        foreach ($likes as $like) {
+            foreach ($columns as $column) {
+                $where[] = $column . " LIKE ? ESCAPE '\\'";
+                $params[] = $like;
+            }
+        }
+        $stmt = $db->prepare("
+            SELECT DISTINCT i.uid FROM calendar_instances i
+            JOIN calendar_sources s ON s.id = i.source_id
+            WHERE s.enabled = 1 AND i.uid IS NOT NULL AND i.uid <> ''
+              AND (i.status IS NULL OR i.status <> 'CANCELLED')
+              AND (" . implode(' OR ', $where) . ")
+            LIMIT 400
+        ");
+        $stmt->execute($params);
+        $uids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $where = [];
+        $params = [];
+        foreach ($likes as $like) {
+            foreach (['c.name', 'c.company', 'p.name', 'p.company'] as $column) {
+                $where[] = $column . " LIKE ? ESCAPE '\\'";
+                $params[] = $like;
+            }
+        }
+        $stmt = $db->prepare("
+            SELECT DISTINCT l.uid FROM calendar_links l
+            LEFT JOIN contacts c ON c.id = l.contact_id
+            LEFT JOIN projects p ON p.id = l.project_id
+            WHERE " . implode(' OR ', $where) . "
+            LIMIT 400
+        ");
+        $stmt->execute($params);
+        $uids = array_values(array_unique(array_merge($uids, $stmt->fetchAll(PDO::FETCH_COLUMN))));
+
+        // An appointment matching by a type ("external") is found by it too.
+        foreach (CalendarTypes::all() as $uid => $type) {
+            if (mb_strpos(mb_strtolower(CalendarTypes::LABELS[$type] ?? ''), $probe) !== false) {
+                $uids[] = $uid;
+            }
+        }
+        $uids = array_slice(array_values(array_unique($uids)), 0, 400);
+        if (!$uids) {
+            return $none;
+        }
+
+        $links = self::linkNames($uids);
+        $now = time();
+        $upcoming = [];
+        $past = [];
+        foreach (self::forUids($uids, $viewer) as $item) {
+            if ($item['masked']) {
+                continue;
+            }
+            $text = [$item['title'], $item['location'], $item['description'], CalendarTypes::LABELS[$item['type'] ?? ''] ?? null];
+            foreach ($item['attendees'] as $attendee) {
+                $text[] = $attendee['name'];
+                $text[] = $attendee['email'];
+            }
+            if ($item['organizer']) {
+                $text[] = $item['organizer']['name'];
+                $text[] = $item['organizer']['email'];
+            }
+            foreach ($links[$item['uid']] ?? [] as $link) {
+                $text[] = $link['name'];
+                $text[] = $link['detail'];
+            }
+            $haystack = mb_strtolower(implode("\n", array_filter($text, 'is_string')));
+            foreach ($words as $word) {
+                if (mb_strpos($haystack, $word) === false) {
+                    continue 2;
+                }
+            }
+            $item['links'] = array_map(static function (array $link): array {
+                return ['type' => $link['type'], 'name' => $link['name']];
+            }, $links[$item['uid']] ?? []);
+            $ends = $item['all_day']
+                ? (new DateTimeImmutable($item['end'], new DateTimeZone(CALENDAR_TIMEZONE)))->getTimestamp()
+                : strtotime($item['end']);
+            $uid = $item['uid'];
+            if ($ends > $now) {
+                // forUids comes sorted by start: the first one is the next.
+                $upcoming[$uid] = $upcoming[$uid] ?? $item;
+            } else {
+                $past[$uid] = $item;
+            }
+        }
+        $upcoming = array_values($upcoming);
+        $past = array_values($past);
+        usort($past, static function (array $a, array $b): int {
+            return [$b['start'], $b['end']] <=> [$a['start'], $a['end']];
+        });
+        return [
+            'upcoming' => array_slice($upcoming, 0, $limit),
+            'past'     => array_slice($past, 0, $limit),
+            'more'     => count($upcoming) > $limit || count($past) > $limit,
+        ];
+    }
+
+    /** @return array<string, list<array{type: string, name: string, detail: ?string}>> uid => linked contacts and projects */
+    private static function linkNames(array $uids): array
+    {
+        $names = [];
+        foreach (array_chunk($uids, 300) as $chunk) {
+            $stmt = Database::getInstance()->prepare("
+                SELECT l.uid, c.name AS contact_name, c.company AS contact_company, p.name AS project_name, p.company AS project_company
+                FROM calendar_links l
+                LEFT JOIN contacts c ON c.id = l.contact_id
+                LEFT JOIN projects p ON p.id = l.project_id
+                WHERE l.uid IN (" . implode(',', array_fill(0, count($chunk), '?')) . ")
+                ORDER BY l.id
+            ");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll() as $row) {
+                if ($row['project_name'] !== null) {
+                    $names[$row['uid']][] = ['type' => 'project', 'name' => (string) $row['project_name'], 'detail' => $row['project_company']];
+                } elseif ($row['contact_name'] !== null) {
+                    $names[$row['uid']][] = ['type' => 'contact', 'name' => (string) $row['contact_name'], 'detail' => $row['contact_company']];
+                }
+            }
+        }
+        return $names;
+    }
+
     /** Filter, mask and merge raw occurrences for $viewer. */
     private static function items(array $rows, array $viewer): array
     {
@@ -182,18 +348,24 @@ final class CalendarView
             $groups[$key][] = $row;
         }
 
+        $types = CalendarTypes::all();
+        $hours = CalendarSettings::workingHours();
         $items = [];
         foreach ($groups as $group) {
             $item = self::merged($group, $team);
             // Yours: in your calendar, or you take part (and did not decline).
             $item['mine'] = (bool) array_intersect(array_merge($item['owners'], $item['people']), $viewer['emails']);
+            $item['type'] = $types[$item['uid']] ?? null;
+            $item['buffer'] = $item['all_day'] ? 0 : CalendarTypes::buffer($item['type'], $hours);
             $items[] = $item;
         }
         // A hidden copy of an appointment the viewer already sees in full -
         // someone's own copy of a shared meeting - would only show it twice.
         foreach ($hidden as [$key, $row, $owner]) {
             if (!isset($groups[$key])) {
-                $items[] = self::masked($row, $owner);
+                $item = self::masked($row, $owner);
+                $item['buffer'] = $item['all_day'] ? 0 : CalendarTypes::buffer($types[(string) $row['uid']] ?? null, $hours);
+                $items[] = $item;
             }
         }
 
@@ -205,14 +377,16 @@ final class CalendarView
 
     /**
      * Busy intervals per person, for finding free time. Uses every calendar
-     * of the person, hidden ones included - but returns times only.
+     * of the person, hidden ones included - but returns times only, and the
+     * type (for the travel buffer around external appointments).
      *
      * @param list<string> $emails
-     * @return array<string, list<array{0: int, 1: int}>> email => [[start, end] unix seconds]
+     * @return array<string, list<array{0: int, 1: int, 2: ?string}>> email => [[start, end] unix seconds, type]
      */
     public static function busy(array $emails, string $fromDate, string $toDate): array
     {
         $zone = new DateTimeZone(CALENDAR_TIMEZONE);
+        $types = CalendarTypes::all();
         $busy = array_fill_keys($emails, []);
         foreach (self::instances($fromDate, $toDate) as $row) {
             $owner = strtolower((string) $row['owner_email']);
@@ -226,7 +400,7 @@ final class CalendarView
                 $start = (new DateTimeImmutable($row['starts_at'], new DateTimeZone('UTC')))->getTimestamp();
                 $end = (new DateTimeImmutable($row['ends_at'], new DateTimeZone('UTC')))->getTimestamp();
             }
-            $busy[$owner][] = [$start, max($start, $end)];
+            $busy[$owner][] = [$start, max($start, $end), (int) $row['all_day'] === 1 ? null : ($types[(string) $row['uid']] ?? null)];
         }
         return $busy;
     }

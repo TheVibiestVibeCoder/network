@@ -342,5 +342,70 @@ check('an appointment hidden from the viewer is not listed for them', !in_array(
     && !in_array('Zahnarzt', array_column($forAnnaLivio['upcoming'], 'title'), true));
 check('the link picker finds contacts and projects', count(CalendarLinks::targets('alpen')) === 2, CalendarLinks::targets('alpen'));
 
+section('Another calendar');
+$alone = $events->create(['title' => 'Nur ich', 'start' => day(4) . 'T09:00', 'end' => day(4) . 'T10:00'], $livio);
+$puts = $server->puts;
+$events->update($alone['uid'], null, 'series', ['organizer' => VIVIAN, 'attendees' => [], 'base' => $events->sheet($alone['uid'], null, $livio)['base']], $livio);
+$there = (string) $server->object($work['vivian'] . $alone['uid'] . '.ics');
+check('a plain appointment moves into Vivian\'s calendar and out of Livio\'s', $there !== '' && $server->object($work['livio'] . $alone['uid'] . '.ics') === null);
+check('... still plain: no organizer, nobody invited', !str_contains($there, 'ORGANIZER') && !str_contains($there, 'ATTENDEE'));
+check('... the sheet says whose calendar it is now', $events->sheet($alone['uid'], null, $livio)['calendar']['email'] === VIVIAN);
+
+$handover = $events->create(['title' => 'Übergabe', 'start' => day(4) . 'T11:00', 'end' => day(4) . 'T12:00', 'attendees' => [MARKUS]], $livio);
+$hu = $handover['uid'];
+$events->update($hu, null, 'series', ['organizer' => MARKUS, 'attendees' => [LIVIO], 'base' => $events->sheet($hu, null, $livio)['base']], $livio);
+$markusIcs = str_replace(["\r\n ", "\n "], '', (string) $server->object($work['markus'] . $hu . '.ics'));
+$livioIcs = (string) $server->object($work['livio'] . $hu . '.ics');
+check('moved to Markus with Livio still in it: Markus\'s is the original, organized by him',
+    (bool) preg_match('/^ORGANIZER;[^\r\n]*:mailto:' . preg_quote(MARKUS, '/') . '/m', $markusIcs) && copyRecord($hu, MARKUS) === null);
+check('... Livio takes part, accepted, and his is now a copy', CalendarIcsWriter::partstat($markusIcs, LIVIO) === 'ACCEPTED'
+    && $livioIcs === (string) $server->object($work['markus'] . $hu . '.ics') && (copyRecord($hu, LIVIO)['state'] ?? null) === 'active');
+check('... nobody chair but Markus, no SCHEDULE-AGENT on him', substr_count($markusIcs, 'ROLE=CHAIR') === 1
+    && !preg_match('/^ATTENDEE;[^\r\n]*SCHEDULE-AGENT[^\r\n]*:mailto:' . preg_quote(MARKUS, '/') . '/m', $markusIcs));
+$item = find(items($livio, day(0), day(7)), 'Übergabe');
+check('... shown once with both of them', $item !== null && $item['people'] === [LIVIO, MARKUS], $item);
+$puts = $server->puts;
+sync();
+check('... and the next sync leaves it as it is', $server->puts === $puts && $server->object($work['livio'] . $hu . '.ics') === $livioIcs);
+check('without the edit right nobody moves it', str_contains((string) attempt(fn () => $events->update($hu, null, 'series', ['organizer' => VIVIAN], $markus)), 'DomainException'));
+
+section('Types and travel time');
+$visit = $events->create(['title' => 'Termin bei Alpenbank', 'type' => 'external', 'organizer' => VIVIAN, 'start' => day(6) . 'T12:00', 'end' => day(6) . 'T13:00'], $livio);
+check('the type is kept in the CRM, not on the server', CalendarTypes::of($visit['uid']) === 'external' && !str_contains((string) $server->object($work['vivian'] . $visit['uid'] . '.ics'), 'external'));
+check('... the sheet has it', $events->sheet($visit['uid'], null, $livio)['type'] === 'external');
+$item = find(items($livio, day(0), day(7)), 'Termin bei Alpenbank');
+check('... the grid gets it with 45 minutes of travel around it', $item !== null && $item['type'] === 'external' && $item['buffer'] === 45, $item);
+check('only online, external or office', str_contains((string) attempt(fn () => $events->create(['title' => 'X', 'type' => 'somewhere', 'start' => day(6) . 'T15:00', 'end' => day(6) . 'T16:00'], $livio)), 'InvalidArgument'));
+$puts = $server->puts;
+$events->update($visit['uid'], null, 'series', ['type' => 'office'], $livio);
+check('changing only the type never writes to the server', $server->puts === $puts && CalendarTypes::of($visit['uid']) === 'office');
+$events->update($visit['uid'], null, 'series', ['type' => 'external'], $livio);
+
+CalendarSettings::setWorkingHours(['days' => [1, 2, 3, 4, 5, 6, 7], 'start' => '08:00', 'end' => '18:00', 'buffer' => 0, 'external_buffer' => 45]);
+$slots = CalendarAvailability::freeSlots([VIVIAN], 30, day(6), day(7), CalendarSettings::workingHours(), 0);
+$local = array_map(static fn ($s) => (new DateTimeImmutable($s['start']))->setTimezone($zone)->format('H:i') . '-' . (new DateTimeImmutable($s['end']))->setTimezone($zone)->format('H:i'), $slots);
+check('"Find a free slot" keeps 45 minutes clear around an external appointment', $local === ['08:00-11:15', '13:45-18:00'], $local);
+
+$db->exec("UPDATE calendar_sources SET visibility = 'private' WHERE href = '" . $work['vivian'] . "'");
+$masked = null;
+foreach (items($markus, day(6), day(7)) as $candidate) {
+    if ($candidate['masked']) {
+        $masked = $candidate;
+    }
+}
+check('a Private one shows its travel time to others, not its type', $masked !== null && $masked['buffer'] === 45 && !array_key_exists('type', $masked), $masked);
+$db->exec("UPDATE calendar_sources SET visibility = 'details' WHERE href = '" . $work['vivian'] . "'");
+
+section('Search');
+$titles = static fn (array $found) => array_column(array_merge($found['upcoming'], $found['past']), 'title');
+check('by title, whatever the case, umlauts too', $titles(CalendarView::search('ÜBERGABE', $livio)) === ['Übergabe'], $titles(CalendarView::search('ÜBERGABE', $livio)));
+check('by a guest\'s name, every word has to match', $titles(CalendarView::search('call anna', $livio)) === ['Call mit Anna'] && $titles(CalendarView::search('call bernd', $livio)) === []);
+CalendarLinks::add($hu, 'project', $projectId, null);
+$byProject = CalendarView::search('relaunch', $livio);
+check('by a linked project, which the result names', $titles($byProject) === ['Übergabe'] && ($byProject['upcoming'][0]['links'][0]['name'] ?? null) === 'Relaunch', $byProject);
+check('by type', in_array('Termin bei Alpenbank', $titles(CalendarView::search('external', $livio)), true));
+check('never by what a Private appointment hides', $titles(CalendarView::search('zahnarzt', $livio)) === [] && $titles(CalendarView::search('zahnarzt', $vivian)) === ['Zahnarzt']);
+check('one letter is not a search', $titles(CalendarView::search('a', $livio)) === []);
+
 echo "\n" . ($failures === 0 ? "All {$passes} checks passed." : "{$failures} of " . ($passes + $failures) . " checks FAILED.") . "\n";
 exit($failures === 0 ? 0 : 1);
