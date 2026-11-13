@@ -33,7 +33,7 @@
     const TZ = root.dataset.tz || 'Europe/Vienna';
     // An hour's height: the working hours fill the visible grid (fitHours),
     // never less than MIN_HOUR_PX - then the grid scrolls.
-    const MIN_HOUR_PX = 40;
+    const MIN_HOUR_PX = 56;
     const MAX_HOUR_PX = 140;
     let hourPx = 48;
     // Room above the first and below the last working hour, so their labels show.
@@ -282,14 +282,20 @@
         return state.data.people.filter(p => emails.includes(p.email));
     }
 
-    /** Up to `max` faces, the rest as "+n". */
+    /**
+     * Up to `max` faces; whoever else takes part - team members beyond them
+     * and guests from outside - as one "+n" at the end of the stack.
+     */
     function faces(item, max) {
         const list = peopleIn(item);
-        if (!list.length) return '';
+        const guests = item.masked ? 0 : (item.externals || 0);
+        if (!list.length && !guests) return '';
         const shown = list.length > max ? list.slice(0, max - 1) : list;
         const rest = list.slice(shown.length);
-        const more = rest.length
-            ? `<span class="tcal-face tcal-face--more" title="${esc(rest.map(p => p.name).join(', '))}">+${rest.length}</span>` : '';
+        const extra = rest.length + guests;
+        const tip = rest.map(p => p.name)
+            .concat(guests ? [guests + (guests > 1 ? ' guests' : ' guest') + ' from outside'] : []).join(', ');
+        const more = extra ? `<span class="tcal-face tcal-face--more" title="${esc(tip)}">+${extra}</span>` : '';
         return `<span class="tcal-faces">${shown.map(face).join('')}${more}</span>`;
     }
 
@@ -540,11 +546,26 @@
         return item.all_day ? item.end <= todayKey() : Date.parse(item.end) <= Date.now();
     }
 
+    /** Invited and not answered yet (the organizer is never asked). */
+    function isPending(item) {
+        if (item.masked || !state.data || !state.data.me) return false;
+        const me = state.data.me.emails || [];
+        const organizer = item.organizer && item.organizer.email ? String(item.organizer.email).toLowerCase() : '';
+        if (organizer && me.includes(organizer)) return false;
+        return (item.attendees || []).some(a => me.includes(a.email) && (a.partstat || 'NEEDS-ACTION') === 'NEEDS-ACTION');
+    }
+
+    /**
+     * One look per state, from the signed-in person's point of view: private
+     * (hatched), not answered yet (dashed), free time (paler), taking part
+     * (dark blue), everyone else's (light blue).
+     */
     function itemClasses(item) {
         const classes = [];
         if (item.masked) classes.push('is-masked');
+        else if (isPending(item)) classes.push('is-pending');
+        else if (item.transparent) classes.push('is-free');
         else if (item.mine) classes.push('is-mine');
-        if (item.transparent) classes.push('is-free');
         if (isPast(item)) classes.push('is-past');
         return classes;
     }
@@ -605,6 +626,65 @@
             clusterEnd = Math.max(clusterEnd, block.seg.end);
         });
         if (cluster.length) flush();
+    }
+
+    // Overlapping appointments as a cascade: the first of a group takes the
+    // whole width, each later one that overlaps it one step further in (20px),
+    // right edge aligned, lying on top. More than three steps, or too little
+    // room left, and the group goes back to side-by-side lanes.
+    const CASCADE_STEP = 20;
+    const CASCADE_LEVELS = 3;
+    const CASCADE_MIN_WIDTH = 110;
+
+    function layoutDay(blocks, colWidth) {
+        blocks.sort((a, b) => a.seg.start - b.seg.start || b.seg.end - a.seg.end);
+        const groups = [];
+        let group = [];
+        let groupEnd = -1;
+        blocks.forEach(block => {
+            if (group.length && block.seg.start >= groupEnd) {
+                groups.push(group);
+                group = [];
+                groupEnd = -1;
+            }
+            group.push(block);
+            groupEnd = Math.max(groupEnd, block.seg.end);
+        });
+        if (group.length) groups.push(group);
+
+        groups.forEach(list => {
+            list.forEach((block, i) => {
+                const under = list.slice(0, i).filter(other => overlaps(other.seg, block.seg));
+                block.level = under.length ? Math.max(...under.map(other => other.level)) + 1 : 0;
+            });
+            const deepest = Math.max(...list.map(block => block.level));
+            if (deepest >= CASCADE_LEVELS || colWidth - 8 - deepest * CASCADE_STEP < CASCADE_MIN_WIDTH) {
+                assignLanes(list);
+                list.forEach(block => { block.mode = 'lanes'; });
+            } else {
+                list.forEach(block => { block.mode = 'cascade'; });
+            }
+        });
+    }
+
+    /** Where a block sits across its day: cascade step or lane. */
+    function blockGeometry(block) {
+        if (block.mode === 'cascade') {
+            return `left:${4 + block.level * CASCADE_STEP}px;right:4px;z-index:${1 + block.level}`;
+        }
+        const left = block.lane / block.lanes * 100;
+        const width = block.span / block.lanes * 100;
+        return `left:calc(${left}% + 2px);width:calc(${width}% - 4px)`;
+    }
+
+    /** A day column's width as the grid will lay it out (for the cascade). */
+    function columnWidth(index) {
+        const days = viewDays();
+        const week = state.mode === 'week';
+        const weights = days.map(day => (week && !workingDay(day) ? 0.4 : 1));
+        const available = Math.max(0, els.body.clientWidth - GUTTER_PX);
+        const per = available / weights.reduce((a, b) => a + b, 0);
+        return Math.max(weights[index] < 1 ? COL_OFF_PX : COL_PX, weights[index] * per);
     }
 
     /** Bars above the grid: first and last column, and a row each without overlaps. */
@@ -766,7 +846,7 @@
             const blocks = items.filter(item => !isBar(item))
                 .map(item => ({ item, seg: segment(item, day) }))
                 .filter(block => block.seg);
-            assignLanes(blocks);
+            layoutDay(blocks, columnWidth(i));
             // Travel time around external appointments, behind them.
             const buffers = blocks.filter(block => block.item.buffer > 0).map(bufferHtml).join('');
             // Behind the appointments: outside working hours, found free slots.
@@ -815,11 +895,10 @@
     /** The buffer before and after an external appointment, in its lane. */
     function bufferHtml(block) {
         const { item, seg } = block;
-        const left = block.lane / block.lanes * 100;
-        const width = block.span / block.lanes * 100;
         const label = durationLabel(item.buffer) + ' travel';
+        const across = blockGeometry(block).replace(/;z-index:\d+/, '');
         const band = (from, to) => (to > from
-            ? `<div class="tcal-buffer" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)" title="${esc(label)}" aria-hidden="true"></div>` : '');
+            ? `<div class="tcal-buffer" style="top:${from * hourPx / 60}px;height:${(to - from) * hourPx / 60}px;${across}" title="${esc(label)}" aria-hidden="true"></div>` : '');
         // Only where the appointment starts and ends on this day.
         const before = seg.start > 0 ? band(Math.max(0, seg.start - item.buffer), seg.start) : '';
         const after = seg.end < 1440 ? band(seg.end, Math.min(1440, seg.end + item.buffer)) : '';
@@ -828,24 +907,25 @@
 
     function eventHtml(block) {
         const { item, seg } = block;
-        const top = seg.start * hourPx / 60;
+        // A pixel of air above and below, so back-to-back ones stay apart.
+        const top = seg.start * hourPx / 60 + 1;
         const height = Math.max(18, (seg.end - seg.start) * hourPx / 60 - 2);
-        const left = block.lane / block.lanes * 100;
-        const width = block.span / block.lanes * 100;
-        const geometry = `top:${top}px;height:${height}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px)`;
+        const geometry = `top:${top}px;height:${height}px;${blockGeometry(block)}`;
         const classes = ['tcal-ev'].concat(itemClasses(item));
+        if (block.mode === 'cascade' && block.level > 0) classes.push('is-stacked');
         const attrs = `data-tcal-item="${esc(item.id)}" style="${geometry}" title="${esc(tooltip(item))}"`;
 
-        // Under three quarters of an hour: one line.
-        if (height < 38) {
+        // Too short for title and people on two lines: one line.
+        if (height < 46) {
             classes.push('is-compact');
             return `<button type="button" class="${classes.join(' ')}" ${attrs}>
                     ${faces(item, 3)}<span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span><span class="tcal-ev-time">${esc(fmtTime(item.start))}</span>
                 </button>`;
         }
-        if (height >= 66) classes.push('is-tall');
-        const extras = item.masked ? '' : typeMark(item) + (item.video_url && item.type !== 'online' ? videoIcon() : '') + guestsBadge(item);
-        const place = !item.masked && item.location && height >= 66 && !/^https?:\/\//i.test(item.location)
+        // Room for a second title line.
+        if (height >= 68) classes.push('is-tall');
+        const extras = item.masked ? '' : typeMark(item) + (item.video_url && item.type !== 'online' ? videoIcon() : '');
+        const place = !item.masked && item.location && height >= 74 && !/^https?:\/\//i.test(item.location)
             ? `<span class="tcal-ev-place">${esc(item.location)}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" ${attrs}>
                 <span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span>
@@ -855,16 +935,9 @@
     }
 
     function videoIcon() {
-        return '<span class="tcal-video" title="Video call" aria-label="Video call"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/></svg></span>';
+        return '<span class="tcal-video" title="Video call" aria-label="Video call"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/></svg></span>';
     }
 
-
-    /** How many people from outside the team are invited. */
-    function guestsBadge(item) {
-        if (!item.externals) return '';
-        const label = item.externals + (item.externals > 1 ? ' guests' : ' guest') + ' from outside';
-        return `<span class="tcal-guests" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>${item.externals}</span>`;
-    }
 
     // =========================================================================
     // The appointment sheet - view, edit and new in one (#eventSheet)
@@ -2128,7 +2201,101 @@
         load();
     }
 
+    // ---- Drag in an empty spot: a new appointment from there to there ------
+    // Snapped to quarter hours. Mouse and pen only - on a touch screen a
+    // drag scrolls, and a tap still makes a one-hour appointment.
+
+    const DRAG_STEP = 15;
+    let drag = null;
+    let swallowClick = false;
+
+    /** Where the pointer is in a day, on the quarter hour (round, or the one it is in). */
+    function dragMinutes(col, clientY, floor) {
+        const rect = col.getBoundingClientRect();
+        const minutes = (clientY - rect.top) / hourPx * 60 / DRAG_STEP;
+        return Math.max(0, Math.min(1440, (floor ? Math.floor(minutes) : Math.round(minutes)) * DRAG_STEP));
+    }
+
+    function dragRange() {
+        const a = drag.from;
+        const b = drag.to;
+        const start = Math.min(a, b);
+        const end = Math.max(start + DRAG_STEP, Math.max(a, b));
+        return [Math.min(start, 1440 - DRAG_STEP), Math.min(1440, end)];
+    }
+
+    function paintDrag() {
+        const [start, end] = dragRange();
+        drag.ghost.style.top = `${start * hourPx / 60}px`;
+        drag.ghost.style.height = `${(end - start) * hourPx / 60}px`;
+        drag.ghost.querySelector('span').textContent = `${minutesLabel(start)}–${minutesLabel(end)}`;
+    }
+
+    function endDrag(cancel) {
+        if (!drag) return;
+        const { col, ghost, moved } = drag;
+        const range = moved ? dragRange() : null;
+        ghost.remove();
+        drag = null;
+        document.removeEventListener('pointermove', onDragMove);
+        document.removeEventListener('pointerup', onDragUp);
+        // The click that ends a drag (or follows a cancelled one) is not a click.
+        if (moved) swallowClick = true;
+        if (cancel || !range) return;
+        const day = col.dataset.tcalCol;
+        const start = day + 'T' + minutesLabel(range[0]);
+        openNewEvent({ start, end: addMinutes(start, range[1] - range[0]) });
+    }
+
+    function onDragMove(event) {
+        if (!drag) return;
+        if (!drag.moved && Math.abs(event.clientY - drag.y) < 5) return;
+        drag.moved = true;
+        drag.to = dragMinutes(drag.col, event.clientY);
+        drag.ghost.hidden = false;
+        paintDrag();
+        // Near the top or bottom edge, the hours scroll along.
+        const scroll = els.body.querySelector('.tcal-scroll');
+        if (scroll) {
+            const rect = scroll.getBoundingClientRect();
+            if (event.clientY > rect.bottom - 24) scroll.scrollTop += 12;
+            else if (event.clientY < rect.top + 80) scroll.scrollTop -= 12;
+        }
+    }
+
+    function onDragUp() {
+        endDrag(false);
+    }
+
+    root.addEventListener('pointerdown', event => {
+        swallowClick = false;
+        if (event.button !== 0 || event.pointerType === 'touch' || !canCreate()) return;
+        const col = event.target.closest('[data-tcal-col]');
+        if (!col || event.target.closest('.tcal-ev, .tcal-slot, .tcal-more, button')) return;
+        event.preventDefault();
+        const from = dragMinutes(col, event.clientY, true);
+        const ghost = document.createElement('div');
+        ghost.className = 'tcal-drag';
+        ghost.hidden = true;
+        ghost.innerHTML = '<span></span>';
+        col.appendChild(ghost);
+        drag = { col, ghost, from: Math.min(from, 1440 - DRAG_STEP), to: from + DRAG_STEP, y: event.clientY, moved: false };
+        document.addEventListener('pointermove', onDragMove);
+        document.addEventListener('pointerup', onDragUp);
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && drag) {
+            event.stopPropagation();
+            endDrag(true);
+        }
+    }, true);
+
     root.addEventListener('click', event => {
+        if (swallowClick) {
+            swallowClick = false;
+            return;
+        }
         const target = event.target.closest('[data-tcal], [data-tcal-mode], [data-tcal-person], [data-tcal-free-person], [data-tcal-item], [data-tcal-day], [data-tcal-slot], [data-tcal-slot-mark], [data-tcal-more], [data-tcal-col], [data-tcal-result], [data-tcal-result-show]');
         if (!target || !root.contains(target)) return;
 

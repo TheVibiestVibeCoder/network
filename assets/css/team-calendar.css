@@ -1044,19 +1044,105 @@ button.tcal-dayhead:hover {
     pointer-events: none;
 }
 
-/* ---- Appointments and bars ---------------------------------------------- */
+/* ---- Appointments and bars ----------------------------------------------
+   docs: KALENDER.md (Livio, 13.11.2026). The colour is the signed-in
+   person's point of view - people have no colours of their own:
+     taking part      dark blue, white title
+     everyone else's  light blue, dark title
+     not answered     white, dashed
+     private          hatched grey
+   Secondary text keeps at least 4.5:1 against its background, also when
+   the appointment is over (then only the text gets quieter). */
 
+#calendarView,
+#eventSheet,
+.tcal-linked {
+    --ev-mine-bg: #1C3258;
+    --ev-mine-hover: #24406E;
+    --ev-mine-ink: #FFFFFF;
+    --ev-mine-ink-2: #C9D4E6;
+    --ev-mine-past: #C9D4E6;
+    --ev-mine-past-2: #9FB0CC;
+    --ev-mine-face: #DDE4F0;
+    --ev-other-bg: #E4EBF6;
+    --ev-other-hover: #D9E2F1;
+    --ev-other-ink: #1C3258;
+    --ev-other-ink-2: #4A5670;
+    --ev-other-past: #4A5670;
+    --ev-other-past-2: #5C6A84;
+    --ev-free-bg: #F1F5FA;
+    --ev-pending-bg: #FFFFFF;
+    --ev-pending-hover: #F5F8FC;
+    --ev-pending-line: #8FA6CC;
+    --ev-private-a: #F3F4F6;
+    --ev-private-b: #E9EBEF;
+    --ev-private-ink: #4A5670;
+    --ev-light-face: #FFFFFF;
+    --ev-plus: #30599D;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) :is(#calendarView, #eventSheet, .tcal-linked) {
+        --ev-mine-bg: #3A5F9E;
+        --ev-mine-hover: #4469A8;
+        --ev-mine-ink-2: #DCE5F5;
+        --ev-mine-past: #DCE5F5;
+        --ev-mine-past-2: #C4D1E8;
+        --ev-mine-face: #DDE4F0;
+        --ev-other-bg: #1E2C43;
+        --ev-other-hover: #24354F;
+        --ev-other-ink: #EEEEEE;
+        --ev-other-ink-2: #B8C1D0;
+        --ev-other-past: #B8C1D0;
+        --ev-other-past-2: #9AA6BA;
+        --ev-free-bg: #172235;
+        --ev-pending-bg: #101928;
+        --ev-pending-hover: #152032;
+        --ev-pending-line: #5F7BAA;
+        --ev-private-a: #151E2E;
+        --ev-private-b: #1B2638;
+        --ev-private-ink: #9AA6BA;
+        --ev-light-face: #2A3A55;
+        --ev-plus: #6C92D2;
+    }
+}
+
+:root[data-theme="dark"] :is(#calendarView, #eventSheet, .tcal-linked) {
+    --ev-mine-bg: #3A5F9E;
+    --ev-mine-hover: #4469A8;
+    --ev-mine-ink-2: #DCE5F5;
+    --ev-mine-past: #DCE5F5;
+    --ev-mine-past-2: #C4D1E8;
+    --ev-mine-face: #DDE4F0;
+    --ev-other-bg: #1E2C43;
+    --ev-other-hover: #24354F;
+    --ev-other-ink: #EEEEEE;
+    --ev-other-ink-2: #B8C1D0;
+    --ev-other-past: #B8C1D0;
+    --ev-other-past-2: #9AA6BA;
+    --ev-free-bg: #172235;
+    --ev-pending-bg: #101928;
+    --ev-pending-hover: #152032;
+    --ev-pending-line: #5F7BAA;
+    --ev-private-a: #151E2E;
+    --ev-private-b: #1B2638;
+    --ev-private-ink: #9AA6BA;
+    --ev-light-face: #2A3A55;
+    --ev-plus: #6C92D2;
+}
+
+/* Everyone else's: light blue, dark text. */
 .tcal-ev,
 .tcal-bar {
-    --ev-bg: var(--tcal-other);
-    --ev-hover: var(--tcal-other-hover);
-    --ev-line: var(--tcal-other-line);
-    --ev-ink: var(--c-ink);
-    --ev-ink-2: var(--c-ink-3);
+    --ev-bg: var(--ev-other-bg);
+    --ev-hover: var(--ev-other-hover);
+    --ev-ink: var(--ev-other-ink);
+    --ev-ink-2: var(--ev-other-ink-2);
+    --ev-face-bg: var(--ev-light-face);
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--ev-line);
-    border-radius: var(--r-xs);
+    border: 0;
+    border-radius: 8px;
     background: var(--ev-bg);
     color: var(--ev-ink);
     font: inherit;
@@ -1077,69 +1163,99 @@ button.tcal-dayhead:hover {
     outline-offset: 1px;
 }
 
-/* Yours - alone or with others: the accent blue. */
+/* Taking part - alone or with others: dark blue, white title. */
 .tcal-ev.is-mine,
 .tcal-bar.is-mine {
-    --ev-bg: var(--tcal-mine);
-    --ev-hover: var(--tcal-mine-hover);
-    --ev-line: var(--tcal-mine);
-    --ev-ink: var(--tcal-mine-ink);
-    --ev-ink-2: var(--tcal-mine-ink-2);
+    --ev-bg: var(--ev-mine-bg);
+    --ev-hover: var(--ev-mine-hover);
+    --ev-ink: var(--ev-mine-ink);
+    --ev-ink-2: var(--ev-mine-ink-2);
+    --ev-face-bg: var(--ev-mine-face);
 }
 
-/* Private: neutral grey with a faint hatch, nothing to read but
-   the time - set apart from the light cards that do have something. */
-.tcal-ev.is-masked,
-.tcal-bar.is-masked {
-    --ev-bg: var(--c-tint-3);
-    --ev-hover: var(--c-tint-2);
-    --ev-line: var(--c-line);
-    --ev-ink: var(--c-ink-3);
-    --ev-ink-2: var(--c-ink-4);
-    background-image: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--c-ink-4) 13%, transparent) 6px 7px);
+/* Invited, not answered yet: white and dashed. */
+.tcal-ev.is-pending,
+.tcal-bar.is-pending {
+    --ev-bg: var(--ev-pending-bg);
+    --ev-hover: var(--ev-pending-hover);
+    outline: 1.5px dashed var(--ev-pending-line);
+    outline-offset: -1.5px;
 }
 
-/* Marked as free time in the calendar app. */
+.tcal-ev.is-pending:focus-visible,
+.tcal-bar.is-pending:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 1px;
+}
+
+/* Free time (as marked in the calendar app): paler than everyone else's. */
 .tcal-ev.is-free,
 .tcal-bar.is-free {
-    --ev-bg: var(--c-surface);
-    border-style: dashed;
+    --ev-bg: var(--ev-free-bg);
 }
 
-.tcal-ev.is-mine.is-free,
-.tcal-bar.is-mine.is-free {
-    --ev-bg: color-mix(in srgb, var(--tcal-mine) 8%, var(--c-surface));
-    --ev-hover: color-mix(in srgb, var(--tcal-mine) 16%, var(--c-surface));
-    --ev-ink: var(--c-accent);
-    --ev-ink-2: var(--c-accent);
+/* Private: hatched grey, nothing to read but the time. */
+.tcal-ev.is-masked,
+.tcal-bar.is-masked {
+    --ev-ink: var(--ev-private-ink);
+    --ev-ink-2: var(--ev-private-ink);
+    background: repeating-linear-gradient(135deg, var(--ev-private-a) 0 6px, var(--ev-private-b) 6px 12px);
 }
 
-/* Past: washed out, but solid - the hour lines never show through. */
+/* Over: the same colours, only the text quieter. */
 .tcal-ev.is-past,
 .tcal-bar.is-past {
-    border-color: color-mix(in srgb, var(--ev-line) 55%, var(--c-surface));
+    --ev-ink: var(--ev-other-past);
+    --ev-ink-2: var(--ev-other-past-2);
 }
 
-.tcal-ev.is-past::after,
-.tcal-bar.is-past::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--c-surface);
-    opacity: 0.45;
-    pointer-events: none;
+.tcal-ev.is-mine.is-past,
+.tcal-bar.is-mine.is-past {
+    --ev-ink: var(--ev-mine-past);
+    --ev-ink-2: var(--ev-mine-past-2);
 }
 
+.tcal-ev.is-masked.is-past,
+.tcal-bar.is-masked.is-past {
+    --ev-ink: var(--ev-private-ink);
+    --ev-ink-2: var(--ev-private-ink);
+}
+
+/* People: 18px, overlapping, a ring in the appointment's colour. */
 .tcal-ev .tcal-face,
 .tcal-bar .tcal-face {
-    --face: 16px;
+    --face: 18px;
     --face-ring: var(--ev-bg);
+    background: var(--ev-face-bg);
+    color: #1C3258;
 }
 
-/* On the blue a light outline, so a photo never melts into the card. */
-.tcal-ev.is-mine:not(.is-free) .tcal-face,
-.tcal-bar.is-mine:not(.is-free) .tcal-face {
-    --face-ring: rgba(255, 255, 255, 0.85);
+.tcal-ev .tcal-face.has-photo,
+.tcal-bar .tcal-face.has-photo {
+    background: transparent;
+}
+
+.tcal-ev .tcal-faces .tcal-face + .tcal-face,
+.tcal-bar .tcal-faces .tcal-face + .tcal-face {
+    margin-left: -4px;
+}
+
+.tcal-ev.is-masked .tcal-face,
+.tcal-bar.is-masked .tcal-face {
+    --face-ring: var(--ev-private-a);
+}
+
+/* Whoever else takes part, guests included: "+n" at the end of the stack. */
+.tcal-ev .tcal-face--more,
+.tcal-bar .tcal-face--more {
+    width: auto;
+    min-width: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: var(--ev-plus);
+    color: #FFFFFF;
+    font-size: 9px;
+    font-weight: 600;
 }
 
 .tcal-ev {
@@ -1148,15 +1264,22 @@ button.tcal-dayhead:hover {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 2px;
-    padding: 3px 6px 3px 7px;
+    gap: 5px;
+    padding: 6px 8px;
     /* Narrow cards (overlaps, a phone's week) drop the time, see below. */
     container-type: inline-size;
 }
 
-.tcal-ev:hover,
-.tcal-ev:focus-visible {
-    z-index: 2;
+/* A later one lying over an earlier one: a white edge sets it apart. */
+.tcal-ev.is-stacked {
+    box-shadow: 0 0 0 1.5px var(--c-surface);
+}
+
+.tcal-ev.is-stacked:hover {
+    box-shadow: 0 0 0 1.5px var(--c-surface), 0 3px 10px rgba(28, 50, 88, 0.16);
+}
+
+.tcal-ev:not(.is-stacked):hover {
     box-shadow: 0 3px 10px rgba(28, 50, 88, 0.16);
 }
 
@@ -1170,11 +1293,13 @@ button.tcal-dayhead:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--t-xs);
+    font-size: 12px;
     font-weight: 600;
     line-height: 1.3;
+    color: var(--ev-ink);
 }
 
+/* Room for it: the title takes up to two lines. */
 .tcal-ev.is-tall .tcal-ev-title {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -1187,7 +1312,7 @@ button.tcal-dayhead:hover {
 .tcal-ev-meta {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     min-width: 0;
     color: var(--ev-ink-2);
 }
@@ -1205,25 +1330,22 @@ button.tcal-dayhead:hover {
     font-variant-numeric: tabular-nums;
 }
 
-/* A short one on one line: who, what, when. */
+/* A short one on one line: people, title, start. */
 .tcal-ev.is-compact {
     flex-direction: row;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     padding-top: 0;
     padding-bottom: 0;
 }
 
-.tcal-ev.is-compact .tcal-face {
-    --face: 14px;
-}
-
 .tcal-ev.is-compact .tcal-ev-title {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
 }
 
 .tcal-ev.is-compact .tcal-ev-time {
     flex: none;
+    margin-left: auto;
 }
 
 /* Too narrow for title and time: the title wins, the grid shows the time
@@ -1232,14 +1354,6 @@ button.tcal-dayhead:hover {
     .tcal-ev-time {
         display: none;
     }
-}
-
-.tcal-cal--day .tcal-ev .tcal-face {
-    --face: 18px;
-}
-
-.tcal-cal--day .tcal-ev.is-compact .tcal-face {
-    --face: 15px;
 }
 
 .tcal-video,
@@ -1259,10 +1373,10 @@ button.tcal-dayhead:hover {
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 5px;
-    height: 24px;
+    gap: 6px;
+    height: 26px;
     margin: 2px 3px;
-    padding: 0 8px 0 3px;
+    padding: 0 8px 0 4px;
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -2372,4 +2486,28 @@ button.tcal-dayhead:hover {
     display: none;
 }
 
+/* ---- Dragging out a new appointment (quarter hours) ---- */
+.tcal-drag {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    z-index: 6;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+    outline: 1.5px solid var(--c-accent);
+    outline-offset: -1.5px;
+    color: var(--c-accent-2);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
 
+.tcal-drag[hidden] {
+    display: none;
+}
+
+.tcal-cal.can-create .tcal-daycol {
+    user-select: none;
+}
