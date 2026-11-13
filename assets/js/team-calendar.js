@@ -286,10 +286,30 @@
     }
 
     /**
+     * What an appointment is called on screen. Someone else's private one
+     * carries their first name instead of a title ("Markus (private)").
+     */
+    function displayTitle(item) {
+        if (!item.masked) return item.title;
+        const owner = person(item.owners[0]);
+        const first = owner && owner.name ? owner.name.split(/\s+/)[0] : '';
+        return first ? `${first} (private)` : 'Private';
+    }
+
+    /**
+     * No faces on private ones: someone else's says whose it is in its title,
+     * and your own you know by its look.
+     */
+    function showsFaces(item) {
+        return !item.masked && !(item.private_calendar && item.mine);
+    }
+
+    /**
      * Up to `max` faces; whoever else takes part - team members beyond them
      * and guests from outside - as one "+n" at the end of the stack.
      */
     function faces(item, max) {
+        if (!showsFaces(item)) return '';
         const list = peopleIn(item);
         const guests = item.masked ? 0 : (item.externals || 0);
         if (!list.length && !guests) return '';
@@ -609,7 +629,7 @@
 
     function tooltip(item) {
         const t = !item.masked && typeOf(item.type);
-        return [whenLabel(item), item.title, t ? t[1] : null, peopleIn(item).map(p => p.name).join(', ')].filter(Boolean).join(' · ');
+        return [whenLabel(item), displayTitle(item), t ? t[1] : null, item.masked ? null : peopleIn(item).map(p => p.name).join(', ')].filter(Boolean).join(' · ');
     }
 
     /** The part of a timed appointment on one local day, in minutes. */
@@ -935,7 +955,7 @@
         const time = !item.all_day && !bar.cutStart ? `<span class="tcal-bar-time">${esc(fmtTime(item.start))}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" data-tcal-item="${esc(item.id)}"
                     style="grid-column:${bar.from + 2} / ${bar.to + 3};grid-row:${bar.row + 2}" title="${esc(tooltip(item))}">
-                    ${faces(item, 3)}${time}<span class="tcal-bar-title"${TITLE_LANG}>${esc(item.title)}</span>
+                    ${faces(item, 3)}${time}<span class="tcal-bar-title"${TITLE_LANG}>${esc(displayTitle(item))}</span>
                 </button>`;
     }
 
@@ -966,7 +986,7 @@
         if (height < 46) {
             classes.push('is-compact');
             return `<button type="button" class="${classes.join(' ')}" ${attrs}>
-                    ${faces(item, 3)}<span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span><span class="tcal-ev-time">${esc(fmtTime(item.start))}</span>
+                    ${faces(item, 3)}<span class="tcal-ev-title"${TITLE_LANG}>${esc(displayTitle(item))}</span><span class="tcal-ev-time">${esc(fmtTime(item.start))}</span>
                 </button>`;
         }
         // Room for a second title line.
@@ -975,7 +995,7 @@
         const place = !item.masked && item.location && height >= 74 && !/^https?:\/\//i.test(item.location)
             ? `<span class="tcal-ev-place">${esc(item.location)}</span>` : '';
         return `<button type="button" class="${classes.join(' ')}" ${attrs}>
-                <span class="tcal-ev-title"${TITLE_LANG}>${esc(item.title)}</span>
+                <span class="tcal-ev-title"${TITLE_LANG}>${esc(displayTitle(item))}</span>
                 <span class="tcal-ev-meta">${faces(item, 3)}<span class="tcal-ev-time">${esc(fmtTime(item.start))}–${esc(fmtTime(item.end))}</span>${extras}</span>
                 ${place}
             </button>`;
@@ -1245,9 +1265,9 @@
 
         if (sheet.mode === 'masked') {
             const item = sheet.data;
-            const owner = person(item.owners[0]);
-            els.sheetHead.innerHTML = `<h2 id="esheetTitle">${esc(item.title)}</h2><p class="overview-company esheet-when">${esc(whenLabel(item))}</p>`;
-            els.sheetBody.innerHTML = owner ? `<p class="esheet-owner">${face(owner)}<span>${esc(owner.name)}</span></p>` : '';
+            // Whose it is, is in the title; there is nothing else to show.
+            els.sheetHead.innerHTML = `<h2 id="esheetTitle">${esc(displayTitle(item))}</h2><p class="overview-company esheet-when">${esc(whenLabel(item))}</p>`;
+            els.sheetBody.innerHTML = '';
             els.sheetFoot.innerHTML = '';
             els.sheetActions.innerHTML = '';
             return;
