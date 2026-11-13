@@ -2299,12 +2299,18 @@ button.tcal-dayhead:hover {
     color: var(--c-ink-4);
 }
 
-.tcal-discover.is-busy svg {
-    animation: tcal-pulse 0.9s ease-in-out infinite alternate;
+.tcal-set-discover {
+    padding-top: 4px;
 }
 
-@keyframes tcal-pulse {
-    to { opacity: 0.35; }
+.tcal-set-discover .tcal-discover {
+    width: 100%;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tcal-discover.is-busy svg {
+    animation: tcal-spin 1s linear infinite;
 }
 
 /* Compact fields, one height for all of them. */

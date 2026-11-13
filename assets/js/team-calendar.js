@@ -2172,14 +2172,17 @@
         }
 
         const discoverBtn = admin
-            ? `<button type="button" class="ov-icon-btn tcal-discover" data-tcal="discover" title="Look for new shares (also once a day by itself)" aria-label="Look for new shares">
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
-                </button>`
+            ? `<section class="tcal-set-section tcal-set-discover">
+                    <button type="button" class="btn btn-secondary tcal-discover" data-tcal="discover" title="Also happens once a day by itself">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>
+                        <span>Look for new calendars</span>
+                    </button>
+                </section>`
             : '';
 
         els.settings.innerHTML = `<div class="tcal-drawer-head">
                 <h3>Calendar settings</h3>
-                <div class="ov-head-actions">${discoverBtn}<button type="button" class="modal-close" data-tcal="close-settings" aria-label="Close">&times;</button></div>
+                <div class="ov-head-actions"><button type="button" class="modal-close" data-tcal="close-settings" aria-label="Close">&times;</button></div>
             </div>
             <div class="tcal-drawer-body">
                 <section class="tcal-set-section">
@@ -2187,6 +2190,7 @@
                     ${calendars}
                 </section>
                 ${adminSections}
+                ${discoverBtn}
             </div>`;
     }
 
@@ -2236,6 +2240,8 @@
         if (button) {
             button.disabled = true;
             button.classList.add('is-busy');
+            const label = button.querySelector('span');
+            if (label) label.textContent = 'Looking…';
         }
         try {
             const result = await api({ action: 'discover' }, { method: 'POST' });
