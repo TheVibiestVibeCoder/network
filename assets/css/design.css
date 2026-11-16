@@ -8444,6 +8444,7 @@ details.import-instructions p {
     background: none;
     color: var(--c-accent-2);
     font: inherit;
+    text-align: left;
     cursor: pointer;
 }
 
@@ -12434,8 +12435,33 @@ details.import-instructions p {
 /* ---- Phones ---- */
 
 @media (max-width: 768px) {
+    /* The actions take their own row above the name, so the name has the
+       sheet's whole width instead of a narrow column beside five buttons. */
     :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header {
         padding: 26px 18px 6px;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header:has(> .ov-head-actions) {
+        flex-wrap: wrap;
+        gap: 4px;
+        padding-top: 20px;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header > .ov-head-actions {
+        order: -1;
+        flex: 1 1 100%;
+        justify-content: flex-end;
+        margin: 0 -8px 0 0;
+    }
+
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-header:has(> .ov-head-actions) > .overview-header-info {
+        flex: 1 1 100%;
+    }
+
+    /* "Last edited by Livio, just now" wraps as whole pieces, never word by word. */
+    :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .edited-by {
+        flex-wrap: wrap;
+        white-space: nowrap;
     }
 
     :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-title-info h2,
