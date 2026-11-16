@@ -11456,18 +11456,52 @@ details.import-instructions p {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 14px;
 }
 
+.fin-tiles + .fin-tiles { margin-top: 8px; }
+
+/* Every tile: label, figure, a line under it - the same height on all
+   three cards, whatever is in them. */
 .fin-tile {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     min-width: 0;
-    padding: 8px 10px;
+    padding: 10px 12px;
+    border: 0;
     border-radius: var(--r-md);
     background: var(--c-tint-3);
+    font: inherit;
+    color: inherit;
+    text-align: left;
 }
+
+/* A tile in a state worth seeing at a glance takes its colour. */
+.fin-tile.is-pos { background: var(--c-success-soft); }
+.fin-tile.is-neg { background: var(--c-danger-soft); }
+.fin-tile.is-warn { background: var(--c-warning-soft); }
+
+/* The VAT tile opens its quarters. */
+.fin-tile.is-button {
+    cursor: pointer;
+    transition: box-shadow var(--dur-1) var(--ease);
+}
+
+.fin-tile.is-button:hover { box-shadow: inset 0 0 0 1px var(--c-accent-soft); }
+.fin-tile.is-button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.fin-tile.is-button .fin-tile-label { width: 100%; }
+
+.fin-tile.is-button .fin-tile-label svg {
+    margin-left: auto;
+    width: 12px;
+    height: 12px;
+    transform: rotate(90deg);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.fin-tile.is-button[aria-expanded="true"] .fin-tile-label svg { transform: rotate(-90deg); }
 
 .fin-tile-label {
     display: inline-flex;
@@ -11481,8 +11515,10 @@ details.import-instructions p {
 .fin-tile-label.is-down svg { color: var(--c-danger-ink); }
 
 .fin-tile-value {
-    font-size: var(--t-md);
+    font-size: 18px;
+    line-height: 1.25;
     font-weight: 700;
+    letter-spacing: -0.01em;
     color: var(--c-ink);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -11490,6 +11526,7 @@ details.import-instructions p {
     text-overflow: ellipsis;
 }
 
+.fin-tile-value.is-pos { color: var(--c-success-ink); }
 .fin-tile-value.is-neg { color: var(--c-danger-ink); }
 .fin-tile-value.is-warn { color: var(--c-warning-ink); }
 /* A link as the figure (the buffer): its hover pill reaches out past the
@@ -11504,6 +11541,9 @@ details.import-instructions p {
 }
 
 .fin-tile-sub {
+    display: block;
+    min-height: 20px;
+    line-height: 20px;
     font-size: var(--t-xs);
     color: var(--c-ink-3);
     white-space: nowrap;
@@ -11511,35 +11551,8 @@ details.import-instructions p {
     text-overflow: ellipsis;
 }
 
-.fin-band {
-    display: flex;
-    flex-direction: column;
-    margin-top: 10px;
-    padding: 12px 14px;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
-}
-
-.fin-band-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.fin-band-label {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-    min-width: 0;
-}
-
-.fin-band-label > span {
-    font-size: var(--t-sm);
-    font-weight: 600;
-    color: var(--c-ink);
-}
+.fin-tile.is-warn .fin-tile-sub { color: var(--c-warning-ink); }
+.fin-tile-sub .fin-band-chip { margin-left: -1px; }
 
 /* The scenario: leads to the forecast's scenario switch. */
 .fin-band-chip {
@@ -11558,83 +11571,7 @@ details.import-instructions p {
 .fin-band-chip:hover { box-shadow: inset 0 0 0 1px var(--c-accent-soft); }
 .fin-band-chip:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
 
-.fin-band-value {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--c-ink);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.fin-band.is-pos { background: var(--c-success-soft); }
-.fin-band.is-pos .fin-band-value { color: var(--c-success-ink); }
-.fin-band.is-neg { background: var(--c-danger-soft); }
-.fin-band.is-neg .fin-band-value { color: var(--c-danger-ink); }
-.fin-band.is-warn { background: var(--c-warning-soft); }
-.fin-band.is-warn .fin-band-value { color: var(--c-warning-ink); }
-
-/* ---- VAT on the liquidity card: what the tax office still gets ---- */
-
-.fin-vat-line {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    margin-top: 10px;
-    padding: 10px 12px 10px 14px;
-    border: 0;
-    border-radius: var(--r-md);
-    background: var(--c-tint-3);
-    font: inherit;
-    color: var(--c-ink);
-    text-align: left;
-    cursor: pointer;
-    transition: background-color var(--dur-1) var(--ease);
-}
-
-.fin-vat-line:hover { background: var(--c-accent-soft); }
-.fin-vat-line:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
-.fin-vat-line.is-warn { background: var(--c-warning-soft); }
-
-.fin-vat-line-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    flex: 1;
-    min-width: 0;
-}
-
-.fin-vat-line-label {
-    font-size: var(--t-sm);
-    font-weight: 600;
-}
-
-.fin-vat-line-text small {
-    font-size: var(--t-xs);
-    color: var(--c-ink-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.fin-vat-line.is-warn .fin-vat-line-text small { color: var(--c-warning-ink); }
-
-.fin-vat-line-value {
-    font-size: var(--t-md);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.fin-vat-line > svg {
-    flex: none;
-    color: var(--c-ink-3);
-    transform: rotate(90deg);
-    transition: transform var(--dur-1) var(--ease);
-}
-
-.fin-vat-line[aria-expanded="true"] > svg { transform: rotate(-90deg); }
+/* ---- VAT on the liquidity card: the quarters, under the VAT tile ---- */
 
 .fin-vat-panel { gap: 0; }
 
@@ -11803,7 +11740,9 @@ details.import-instructions p {
     align-items: center;
     align-self: flex-start;
     gap: 4px;
-    margin-top: 8px;
+    /* At the card's foot: level on the cards side by side. */
+    margin-top: auto;
+    padding-top: 14px !important;
     padding: 2px 0;
     border: 0;
     background: none;

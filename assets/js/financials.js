@@ -415,7 +415,7 @@
                 lasts = 'below zero now';
                 lastsTone = 'is-neg';
             } else if (k.belowZero) {
-                lasts = k.belowZero.offset === 0 ? 'not past this month' : RF.monthName(k.belowZero.offset - 1, now);
+                lasts = k.belowZero.offset === 0 ? 'this month' : RF.monthName(k.belowZero.offset - 1, now);
                 lastsTone = k.belowZero.offset < 6 ? 'is-neg' : 'is-warn';
             } else {
                 lasts = state.horizon === 'year' ? 'past December' : `past ${p.rows[p.rows.length - 1].label}`;
@@ -432,17 +432,12 @@
                 <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
                 <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
                     title="${esc(balanceNote())}">${b ? 'Update' : 'Enter balance'}</button>
-                ${vatLine()}
+                ${tiles([
+                    vatTile(),
+                    { label: 'Lasts until', value: lasts, valueCls: lastsTone, tone: lastsTone, subHtml: scenarioChip(),
+                        title: 'The last month before the balance would fall below zero' }
+                ])}
                 ${state.vatOpen ? vatPanel() : ''}
-                <div class="fin-band ${lastsTone}" title="The last month before the balance would fall below zero">
-                    <div class="fin-band-head">
-                        <div class="fin-band-label">
-                            <span>Lasts until</span>
-                            <button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>
-                        </div>
-                        <strong class="fin-band-value">${esc(lasts)}</strong>
-                    </div>
-                </div>
                 ${state.folds.liquidity ? tiles([
                     { label: 'Low point', value: low && b ? money(low.amount) : '—', sub: low ? low.label : '', valueCls: lowTone },
                     { label: 'Buffer', sub: p.settings.buffer > 0 ? 'always keep' : '',
@@ -462,29 +457,31 @@
     const vatAmount = owed => (owed > 0.005 ? MINUS : owed < -0.005 ? '+' : '') + cents(Math.abs(owed));
 
     /**
-     * Under the balance: the VAT the tax office still gets - every quarter
+     * Beside the balance: the VAT the tax office still gets - every quarter
      * not settled, today's as far as it has run - and when the next one is
-     * due. Opens the quarters.
+     * due. A tile that opens the quarters.
      */
-    function vatLine() {
+    function vatTile() {
         const k = state.plan.kpis;
         const next = k.vatNext;
         const owed = k.vatOwed;
+        // Short enough for half a card: "Q4 so far, due Feb 15"; in full on hover.
+        const q = next ? next.label.split(' ')[0] : '';
+        const day = next ? dayName(next.due).replace(/, \d{4}$/, '') : '';
         let sub;
-        if (!next) sub = 'Nothing open';
-        else if (next.overdue) sub = `${next.label} overdue since ${dayName(next.due)}`;
-        else if (next.running) sub = `${next.label} so far, due ${dayName(next.due)}`;
-        else sub = `${next.label} due ${dayName(next.due)}`;
-        const toneCls = next && next.overdue ? ' is-warn' : '';
-        return `
-            <button type="button" class="fin-vat-line${toneCls}" data-fin-vat data-fin-focus="vat" aria-expanded="${state.vatOpen}">
-                <span class="fin-vat-line-text">
-                    <span class="fin-vat-line-label">${owed < -0.005 ? 'VAT back' : 'VAT owed'}</span>
-                    <small>${esc(sub)}</small>
-                </span>
-                <strong class="fin-vat-line-value">${esc(vatAmount(owed))}</strong>
-                ${ICON.chevron}
-            </button>`;
+        let full;
+        if (!next) sub = full = 'nothing open';
+        else if (next.overdue) { sub = `${q} overdue since ${day}`; full = `${next.label} was due ${dayName(next.due)} and is not linked to a payment yet`; }
+        else if (next.running) { sub = `${q} so far, due ${day}`; full = `${next.label} so far, due ${dayName(next.due)}`; }
+        else { sub = `${q} due ${day}`; full = `${next.label} due ${dayName(next.due)}`; }
+        return {
+            label: owed < -0.005 ? 'VAT back' : 'VAT owed',
+            value: vatAmount(owed),
+            sub,
+            tone: next && next.overdue ? 'is-warn' : '',
+            title: `${full}. Opens each quarter and the bank entries that paid it.`,
+            button: `data-fin-vat data-fin-focus="vat" aria-expanded="${state.vatOpen}"`
+        };
     }
 
     /** One bank row as a choice: "Nov 14, Finanzamt Österreich, −2.600 €". */
@@ -603,25 +600,20 @@
         return `
             <article class="fin-kpi fin-kpi--year${open ? ' is-open' : ''}">
                 <span class="fin-kpi-label">Net result YTD</span>
-                <span class="fin-kpi-value ${tone(y.actual)}" title="Jan 1 – ${esc(dayName(todayIso()))}, without VAT">${esc(signed(y.actual))}</span>
+                <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
+                <span class="fin-kpi-sub">Jan 1 – ${esc(dayName(todayIso()))}, without VAT</span>
+                ${tiles([
+                    { label: `Projected ${y.year}`, value: signed(y.projected), valueCls: tone(y.projected), tone: tone(y.projected),
+                        subHtml: scenarioChip(), title: 'Where the year ends: the result so far plus what the plan nets until December' },
+                    { label: 'Until December', value: signed(y.planned), valueCls: tone(y.planned), sub: 'what the plan still nets',
+                        title: `${euro(y.incomeRest)} still to come in, ${euro(y.costsRest)} still to pay` }
+                ])}
                 ${open ? tiles([
-                    { label: 'Revenue', icon: ICON.up, cls: 'is-up', value: signed(y.income) },
-                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), title: 'Paid so far, from Bookkeeping' }
+                    { label: 'Revenue', icon: ICON.up, cls: 'is-up', value: signed(y.income), sub: `${euro(y.revenue)} for ${y.year}`,
+                        title: `Jan – Dec ${y.year}: ${euro(y.income)} so far + ${euro(y.incomeRest)} open` },
+                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), sub: `${euro(y.costsYear)} for ${y.year}`,
+                        title: `Paid so far, from Bookkeeping. Jan – Dec ${y.year}: ${euro(y.costs)} so far + ${euro(y.costsRest)} open` }
                 ]) : ''}
-                <div class="fin-band ${tone(y.projected)}">
-                    <div class="fin-band-head">
-                        <div class="fin-band-label">
-                            <span>Projected result ${y.year}</span>
-                            <button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>
-                        </div>
-                        <strong class="fin-band-value">${esc(signed(y.projected))}</strong>
-                    </div>
-                    ${open ? `
-                    <dl class="fin-band-lines">
-                        <div title="Jan – Dec ${y.year}: ${esc(euro(y.income))} so far + ${esc(euro(y.incomeRest))} open"><dt>Total revenue</dt><dd>${esc(signed(y.revenue))}</dd></div>
-                        <div title="Jan – Dec ${y.year}: ${esc(euro(y.costs))} so far + ${esc(euro(y.costsRest))} open"><dt>Total costs</dt><dd>${esc(signed(-y.costsYear))}</dd></div>
-                    </dl>` : ''}
-                </div>
                 ${foldToggle('year')}
             </article>`;
     }
@@ -641,15 +633,28 @@
 
     /**
      * Two figures side by side on soft tiles inside a card:
-     * [{ label, value, sub?, icon?, cls?, valueCls?, title?, valueHtml? }].
+     * [{ label, value, sub?, icon?, cls?, valueCls?, title?, valueHtml?,
+     *    subHtml?, tone? (tints the tile: is-pos / is-neg / is-warn),
+     *    button? (attributes: the whole tile is a button) }].
+     * Every tile has its three lines, so tiles side by side - and on the
+     * cards beside each other - are the same height.
      */
     function tiles(list) {
-        return `<div class="fin-tiles">${list.map(t => `
-            <div class="fin-tile"${t.title ? ` title="${esc(t.title)}"` : ''}>
-                <span class="fin-tile-label ${t.cls || ''}">${t.icon || ''}${esc(t.label)}</span>
+        return `<div class="fin-tiles">${list.map(t => {
+            const tag = t.button ? 'button' : 'div';
+            const attrs = (t.button ? ` type="button" ${t.button}` : '') + (t.title ? ` title="${esc(t.title)}"` : '');
+            return `
+            <${tag} class="fin-tile${t.tone ? ' ' + t.tone : ''}${t.button ? ' is-button' : ''}"${attrs}>
+                <span class="fin-tile-label ${t.cls || ''}">${t.icon || ''}${esc(t.label)}${t.button ? ICON.chevron : ''}</span>
                 <strong class="fin-tile-value ${t.valueCls || ''}">${t.valueHtml || esc(t.value)}</strong>
-                ${t.sub ? `<small class="fin-tile-sub">${esc(t.sub)}</small>` : ''}
-            </div>`).join('')}</div>`;
+                <small class="fin-tile-sub">${t.subHtml || esc(t.sub || '')}</small>
+            </${tag}>`;
+        }).join('')}</div>`;
+    }
+
+    /** The scenario a figure rests on, as a chip that leads to the forecast's switch. */
+    function scenarioChip() {
+        return `<button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>`;
     }
 
     function bufferForm() {
