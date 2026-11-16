@@ -709,7 +709,6 @@
             <header class="meeting-head">
                 <div class="meeting-head-main">
                     <div class="meeting-head-meta">
-                        <span class="meeting-stage stage-${stageClass(project.stage)}">${escapeHtml(project.stage)}</span>
                         <span class="meeting-position">Project ${state.index + 1} of ${count}</span>
                     </div>
                     <h2 class="meeting-title">${escapeHtml(project.name)}</h2>
@@ -814,7 +813,7 @@
         return `<span class="assignee-chip${url ? ' has-photo' : ''}" title="Assigned to ${escapeHtml(name)}">${url ? `<img src="${escapeHtml(url)}" alt="">` : escapeHtml(initials(name))}</span>`;
     }
 
-    /** The project as its own detail sheet shows it, read-only. Its stage is in the head above. */
+    /** The project as its own detail sheet shows it, read-only. The stage is here, not in the head above. */
     function detailsHtml(ctx) {
         const p = ctx.project;
         const budget = p.budget_min || p.budget_max
@@ -833,6 +832,7 @@
                     <button type="button" class="ov-add-btn" data-meeting-open-project data-mode="edit" title="Edit the project">Edit</button>
                 </div>
                 <div class="overview-details">
+                    ${fact('Stage', `<span class="meeting-stage stage-${stageClass(p.stage)}">${escapeHtml(p.stage)}</span>`)}
                     ${fact('Responsible', p.assigned_to_name
                         ? `<span class="meeting-person">${personChip(p.assigned_to, p.assigned_to_name)}${escapeHtml(p.assigned_to_name)}</span>`
                         : 'Nobody')}
@@ -1201,14 +1201,12 @@
     function askHtml() {
         const project = ask.project;
         const ctx = ask.context;
-        const stage = ctx && !ctx.error ? ctx.project.stage : project.stage;
         const jobs = ask.jobs.filter(job => job.projectId === project.id);
         const busy = jobs.some(job => job.status === 'working');
         return `
             <header class="meeting-head">
                 <div class="meeting-head-main">
                     <div class="meeting-head-meta">
-                        ${stage ? `<span class="meeting-stage stage-${stageClass(stage)}">${escapeHtml(stage)}</span>` : ''}
                         <span class="meeting-position">${ICON_CLAUDE} Chat with Claude</span>
                     </div>
                     <h2 class="meeting-title">${escapeHtml(project.name)}</h2>
