@@ -521,12 +521,14 @@
         eq([none.budget, none.open.min], [null, 3000], 'no budget');
     });
 
-    test('payment months: the project range, 24 months without an end, outside months kept', () => {
-        const r = PP.monthOptions('2026-10-15', '2027-01-31', ['2027-04'], '2026-10-09');
-        eq(r.map(o => o.value), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-04']);
-        eq(r[4].outside, true, 'outside marked');
+    test('payment months: the project range plus three months, 24 months without an end, outside months kept', () => {
+        const r = PP.monthOptions('2026-10-15', '2027-01-31', ['2027-07'], '2026-10-09');
+        eq(r.map(o => o.value), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-07']);
+        eq(r[7].outside, true, 'outside marked');
         eq(PP.monthOptions('2026-10-15', null, [], '2026-10-09').length, 25, 'no end date');
-        eq(PP.isOutside('2027-02', '2026-10-15', '2027-01-31', '2026-10-09'), true);
+        eq(PP.isOutside('2027-04', '2026-10-15', '2027-01-31', '2026-10-09'), false, 'three months after the end');
+        eq(PP.isOutside('2027-05', '2026-10-15', '2027-01-31', '2026-10-09'), true);
+        eq(PP.monthRange('2026-01-01', '2026-03-31', '2026-10-09').to, PP.monthRange('2026-10-01', null, '2026-10-01').from, 'a long-finished project still reaches this month');
         eq(PP.monthName('2027-02'), 'Feb 2027');
     });
 

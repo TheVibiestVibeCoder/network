@@ -14,9 +14,9 @@
  * cover is "not planned yet", what has been paid is subtracted from what is
  * still open. Payments above the budget make the payments the total.
  *
- * Two ways to plan it: partial payments (any number, each in a month of the
- * project), or one payment in full - the whole project at once, in a month
- * that may lie after the project's end (invoices are paid late). A payment
+ * Two ways to plan it: partial payments (any number), or one payment in
+ * full - the whole project at once. Either can lie up to three months after
+ * the project's end (invoices are paid late). A payment
  * in full is the project's value: no budget is "not planned yet" beside it.
  * It is stored as the one payment, marked { full: true }.
  *
@@ -30,8 +30,8 @@
 
     // Months offered after the start when a project has no end date.
     const MONTHS_AHEAD = 24;
-    // How long after the end a payment in full can be expected.
-    const MONTHS_AFTER_END = 12;
+    // How long after the end a payment can still be expected (invoices are paid late).
+    const MONTHS_AFTER_END = 3;
 
     // ------------------------------------------------------------------
     // Numbers
@@ -127,26 +127,25 @@
     }
 
     /**
-     * The months a payment can be in: start month to end month. Without an
-     * end date, the start and the 24 months after it; without a start date
-     * (older projects), from this month or the end month, whichever is first.
-     * A payment in full (`full`) can also come up to a year after the end.
+     * The months a payment can be in: start month to three months after the
+     * end month, partial payments and payments in full alike. Without an end
+     * date, the start and the 24 months after it; without a start date (older
+     * projects), from this month or the end month, whichever is first.
      */
-    function monthRange(startDate, endDate, today, full) {
+    function monthRange(startDate, endDate, today) {
         const now = monthIndex(today) !== null ? monthIndex(today) : monthIndex(new Date().toISOString());
         const s = monthIndex(startDate);
         const e = monthIndex(endDate);
         const from = s !== null ? s : (e !== null ? Math.min(now, e) : now);
-        let to = e !== null && e >= from ? e : from + MONTHS_AHEAD;
-        if (full && e !== null && e >= from) to = e + MONTHS_AFTER_END;
+        let to = e !== null && e >= from ? e + MONTHS_AFTER_END : from + MONTHS_AHEAD;
         // Never short of this month: a finished project's money can still be due now.
-        if (full) to = Math.max(to, now + MONTHS_AFTER_END);
+        to = Math.max(to, now);
         return { from, to };
     }
 
     /** True when a "YYYY-MM" lies outside the project's months. */
-    function isOutside(month, startDate, endDate, today, full) {
-        const r = monthRange(startDate, endDate, today, full);
+    function isOutside(month, startDate, endDate, today) {
+        const r = monthRange(startDate, endDate, today);
         const i = monthIndex(month);
         return i !== null && (i < r.from || i > r.to);
     }
@@ -165,8 +164,8 @@
      * The dropdown's months: the project's range plus any month already in
      * use outside it, so changing a date never silently moves a payment.
      */
-    function monthOptions(startDate, endDate, used, today, full) {
-        const r = monthRange(startDate, endDate, today, full);
+    function monthOptions(startDate, endDate, used, today) {
+        const r = monthRange(startDate, endDate, today);
         const options = [];
         for (let i = r.from; i <= r.to; i++) options.push({ value: monthKey(i), label: monthLabel(i), outside: false });
         (used || []).forEach(key => {
@@ -391,8 +390,8 @@
         const endDate = project.estimated_completion;
         const now = monthIndex(new Date().toISOString());
         const rows = list.map((p, i) => {
-            const outside = isOutside(p.month, startDate, endDate, null, sum.full);
-            const after = sum.full ? afterEndLabel(p.month, endDate) : '';
+            const outside = isOutside(p.month, startDate, endDate, null);
+            const after = afterEndLabel(p.month, endDate);
             const late = !p.paid && monthIndex(p.month) < now;
             return `
                 <li class="ppay-item${p.paid ? ' is-paid' : ''}${late ? ' is-late' : ''}">
@@ -445,9 +444,8 @@
     }
 
     function monthOptionsHtml(row, ctx, used) {
-        const full = editor.mode === 'full';
-        return monthOptions(ctx.start, ctx.end, used, null, full).map(o => {
-            const after = full ? afterEndLabel(o.value, ctx.end) : '';
+        return monthOptions(ctx.start, ctx.end, used, null).map(o => {
+            const after = afterEndLabel(o.value, ctx.end);
             return `<option value="${esc(o.value)}"${o.value === row.month ? ' selected' : ''}>${esc(o.label)}${after ? ' · ' + esc(after) : ''}${o.outside ? ' (outside dates)' : ''}</option>`;
         }).join('');
     }
@@ -462,7 +460,7 @@
 
     /** Where a payment in full starts: the end month, else this month - inside the months on offer. */
     function defaultFullMonth(ctx) {
-        const r = monthRange(ctx.start, ctx.end, null, true);
+        const r = monthRange(ctx.start, ctx.end, null);
         const e = monthIndex(ctx.end);
         const now = monthIndex(new Date().toISOString());
         const pick = e !== null ? e : now;
@@ -942,12 +940,12 @@
         return new Promise(resolve => { done.resolve = resolve; });
     }
 
-    /** "Nov 2026 · this month" etc: months from half a year back to a year ahead, the end month included. */
+    /** "Nov 2026 · this month" etc: months from half a year back to three months after the end (or after now). */
     function completeMonthOptions(selected) {
         const now = monthIndex(new Date().toISOString());
         const end = monthIndex(done.project.estimated_completion);
         const from = Math.min(now - 6, end === null ? now : end);
-        const to = Math.max(now + MONTHS_AFTER_END, end === null ? now : end);
+        const to = Math.max(now, end === null ? now : end) + MONTHS_AFTER_END;
         const out = [];
         for (let i = from; i <= to; i++) {
             const key = monthKey(i);
