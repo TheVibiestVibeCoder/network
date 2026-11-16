@@ -12254,6 +12254,13 @@ details.import-instructions p {
     padding: 0;
 }
 
+/* Claude's summary is a tinted panel, not a frameless field: it keeps its
+   inner margins (project-summary.css). */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-detail-item.ov-claude-summary {
+    gap: 2px;
+    padding: 12px 14px 13px;
+}
+
 :is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-detail-item.ov-span-2 {
     grid-column: span 2;
 }
