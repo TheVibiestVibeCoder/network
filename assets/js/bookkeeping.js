@@ -3897,7 +3897,7 @@
     }
 
     /**
-     * Every bookkeeping row as { date, amount, excluded, party, vat, open },
+     * Every bookkeeping row as { id, date, amount, excluded, party, text, vat, open },
      * without drawing the table - for Financials, which works out the bank
      * balance, past months and their results from them. The amount is read from the same column the table's
      * month totals use.
@@ -3916,10 +3916,14 @@
             amountColumn,
             rows: rows
                 .map(r => ({
+                    id: r.id,
                     date: r.row_date,
                     amount: parseDecimalValue(r.data[amountColumn]),
                     excluded: !!Number(r.excluded),
                     party: partyColumn ? String(r.data[partyColumn] || '').trim() : '',
+                    // Every cell, for telling a payment to the tax office
+                    // by its reference ("UVA 07-09/2026").
+                    text: Object.values(r.data || {}).join(' '),
                     // Signed as in the table: + on a cost is VAT we get back.
                     vat: rowVat(r, amountColumn),
                     // Still without its invoice (or one not read yet), so

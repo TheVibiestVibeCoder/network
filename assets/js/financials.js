@@ -52,6 +52,14 @@
         balanceError: '',
         bufferOpen: false,
         bufferError: '',
+        // The VAT panel on the liquidity card: each quarter, linked to the
+        // bank row that paid it.
+        vatOpen: false,
+        vatError: '',
+        vatBusy: false,
+        // The bank rows with the VAT quarter each pays marked on them
+        // (cashflow.js markVatPayments): what every sum here reads.
+        txRows: [],
         // The costs card, unfolded to edit the fixed and planned costs.
         costsOpen: false,
         // Recurring payments in Bookkeeping that no fixed cost covers yet.
@@ -86,6 +94,7 @@
     // Whole euros: cents are noise when planning cash.
     const euro = n => PP.euro(Math.round(n));
     const MINUS = '−';
+    const round2 = n => Math.round(n * 100) / 100;
     /** "+1.200 €" / "−300 €" / "0 €". */
     const signed = n => (Math.round(n) > 0 ? '+' : Math.round(n) < 0 ? MINUS : '') + PP.euro(Math.abs(Math.round(n)));
     /** "57,5k €", with a minus when below zero - for the chart's axis. */
@@ -245,11 +254,12 @@
 
     function compute() {
         state.months = monthsFor(state.horizon);
+        state.txRows = CF.markVatPayments(state.tx.rows, (state.overview.settings || {}).vat_links);
         const input = {
             projects: state.projects,
             costs: state.overview.costs,
             balances: state.overview.balances,
-            transactions: state.tx.rows,
+            transactions: state.txRows,
             debts: state.overview.debts || [],
             settings: state.overview.settings,
             scenario: Card.getSettings(),
@@ -270,8 +280,8 @@
         const twelve = state.months === 12 ? state.plan : CF.plan(Object.assign({}, input, { months: 12 }));
         state.next12 = twelve.kpis;
         const toDecember = state.months >= 12 - input.now.month ? state.plan : twelve;
-        state.year = CF.yearResult(state.tx.rows, toDecember, input.now);
-        state.suggestions = CF.recurringSuggestions(state.tx.rows, state.overview.costs,
+        state.year = CF.yearResult(state.txRows, toDecember, input.now);
+        state.suggestions = CF.recurringSuggestions(state.txRows, state.overview.costs,
             (state.overview.settings || {}).dismissed_recurring || [], todayIso());
     }
 
@@ -422,6 +432,8 @@
                 <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
                 <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
                     title="${esc(balanceNote())}">${b ? 'Update' : 'Enter balance'}</button>
+                ${vatLine()}
+                ${state.vatOpen ? vatPanel() : ''}
                 <div class="fin-band ${lastsTone}" title="The last month before the balance would fall below zero">
                     <div class="fin-band-head">
                         <div class="fin-band-label">
@@ -441,6 +453,135 @@
                 ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
                 ${state.bufferOpen ? bufferForm() : ''}
             </article>`;
+    }
+
+
+    // ---- VAT: what the tax office gets, quarter by quarter ----
+
+    /** "−1.900 €" to pay, "+200 €" back - to the cent, as the tax office counts. */
+    const vatAmount = owed => (owed > 0.005 ? MINUS : owed < -0.005 ? '+' : '') + cents(Math.abs(owed));
+
+    /**
+     * Under the balance: the VAT the tax office still gets - every quarter
+     * not settled, today's as far as it has run - and when the next one is
+     * due. Opens the quarters.
+     */
+    function vatLine() {
+        const k = state.plan.kpis;
+        const next = k.vatNext;
+        const owed = k.vatOwed;
+        let sub;
+        if (!next) sub = 'Nothing open';
+        else if (next.overdue) sub = `${next.label} overdue since ${dayName(next.due)}`;
+        else if (next.running) sub = `${next.label} so far, due ${dayName(next.due)}`;
+        else sub = `${next.label} due ${dayName(next.due)}`;
+        const toneCls = next && next.overdue ? ' is-warn' : '';
+        return `
+            <button type="button" class="fin-vat-line${toneCls}" data-fin-vat data-fin-focus="vat" aria-expanded="${state.vatOpen}">
+                <span class="fin-vat-line-text">
+                    <span class="fin-vat-line-label">${owed < -0.005 ? 'VAT back' : 'VAT owed'}</span>
+                    <small>${esc(sub)}</small>
+                </span>
+                <strong class="fin-vat-line-value">${esc(vatAmount(owed))}</strong>
+                ${ICON.chevron}
+            </button>`;
+    }
+
+    /** One bank row as a choice: "Nov 14, Finanzamt Österreich, −2.600 €". */
+    function rowText(t) {
+        return [dayName(t.date), t.party || (t.amount < 0 ? 'Payment' : 'Incoming payment'), (t.amount < 0 ? MINUS : '+') + cents(Math.abs(t.amount))].join(', ');
+    }
+
+    function vatQuarterRow(q) {
+        const off = state.vatBusy ? ' disabled' : '';
+        let status;
+        if (q.payments.length) status = q.payments.map(t => `
+                <span class="fin-vat-paid">${ICON.bank}<span>${esc(rowText(t))}</span>
+                    <button type="button" class="fin-link" data-fin-vat-unlink="${esc(q.key)}" data-row="${esc(t.id)}"${off}>Unlink</button></span>`).join('');
+        else if (q.manual) status = `<span class="fin-vat-paid"><span>Settled without a bank entry</span>
+                    <button type="button" class="fin-link" data-fin-vat-unlink="${esc(q.key)}" data-row=""${off}>Undo</button></span>`;
+        else if (q.running) status = `<span class="fin-muted">Still running, due ${esc(dayName(q.due))}</span>`;
+        else if (q.nil) status = '<span class="fin-muted">Nothing to pay</span>';
+        else status = `<span class="${q.overdue ? 'fin-vat-late' : 'fin-muted'}">${q.overdue ? 'Was due' : 'Due'} ${esc(dayName(q.due))}</span>`;
+
+        // Paid more or less than the quarter comes to: other taxes on the
+        // same transfer, or a correction - said, not judged.
+        const diff = q.payments.length ? round2(Math.abs(q.paid) - Math.abs(q.owed)) : 0;
+        const diffNote = Math.abs(diff) > 1
+            ? `<p class="fin-vat-note">${esc(cents(Math.abs(diff)))} ${diff > 0 ? 'more' : 'less'} than the VAT${diff > 0 ? ', other taxes paid with it?' : ''}</p>` : '';
+
+        let link = '';
+        if (!q.settled && !q.nil && !q.running) {
+            const sug = CF.vatSuggestion(q, state.txRows);
+            const choices = CF.vatCandidates(q, state.txRows, 12);
+            link = `
+                ${sug ? `<button type="button" class="fin-vat-suggest" data-fin-vat-link="${esc(q.key)}" data-row="${esc(sug.row.id)}"${off}>
+                    ${ICON.bank}<span>${esc(rowText(sug.row))}</span><strong>Link</strong></button>` : ''}
+                <div class="fin-vat-actions">
+                    ${choices.length ? `<select class="form-select fin-vat-select" data-fin-vat-pick="${esc(q.key)}" aria-label="Link a bank entry to ${esc(q.label)}"${off}>
+                        <option value="">${sug ? 'Another bank entry…' : 'Link a bank entry…'}</option>
+                        ${choices.map(c => `<option value="${esc(c.row.id)}">${esc(rowText(c.row))}</option>`).join('')}
+                    </select>` : '<span class="fin-muted">No payment in Bookkeeping yet</span>'}
+                    <button type="button" class="fin-link" data-fin-vat-settle="${esc(q.key)}"${off}
+                        title="Paid or offset without a bank entry here, e.g. against a credit on the tax account">Settled otherwise</button>
+                </div>`;
+        }
+
+        return `
+            <li class="fin-vat-q${q.settled ? ' is-settled' : ''}${q.overdue ? ' is-late' : ''}">
+                <div class="fin-vat-q-head">
+                    <strong>${esc(q.label)}</strong>
+                    <span class="fin-vat-q-amount${q.owed < -0.005 ? ' is-pos' : ''}">${esc(vatAmount(q.owed))}</span>
+                </div>
+                <div class="fin-vat-q-meta"
+                    title="VAT on our invoices ${esc(cents(q.collected))}, VAT on what we paid ${esc(cents(q.deductible))}">
+                    ${status}
+                </div>
+                ${q.open ? `<p class="fin-vat-note is-warn">${esc(plural(q.open, 'entry', 'entries'))} without invoice, not final</p>` : ''}
+                ${diffNote}
+                ${link}
+            </li>`;
+    }
+
+    /** The quarters, newest first, and from which one on they are tracked. */
+    function vatPanel() {
+        const quarters = state.plan.vat.slice().reverse();
+        const settings = state.overview.settings || {};
+        const current = CF.quarterOf(todayIso());
+        const from = CF.vatFrom(settings, todayIso());
+        const options = [];
+        for (let i = 0; i <= 8; i++) {
+            const key = CF.shiftQuarter(current, -i);
+            options.push(`<option value="${esc(key)}"${key === from ? ' selected' : ''}>${esc(CF.quarterLabel(key))}</option>`);
+        }
+        return `
+            <div class="fin-balance-form fin-vat-panel">
+                <ul class="fin-vat-list">${quarters.map(vatQuarterRow).join('')}</ul>
+                ${state.vatError ? `<p class="fin-form-error">${esc(state.vatError)}</p>` : ''}
+                <label class="fin-vat-from">
+                    <span>Tracked from</span>
+                    <select class="form-select" data-fin-vat-from aria-label="First quarter tracked"${state.vatBusy ? ' disabled' : ''}>${options.join('')}</select>
+                </label>
+            </div>`;
+    }
+
+    async function saveVat(payload) {
+        state.vatBusy = true;
+        state.vatError = '';
+        renderKpis();
+        try {
+            const result = await post('save-settings', payload);
+            state.overview = result.data;
+            compute();
+            state.vatBusy = false;
+            render();
+        } catch (error) {
+            state.vatBusy = false;
+            state.vatError = error.message;
+            renderKpis();
+        }
+        const again = els.finKpis.querySelector('[data-fin-focus="vat"]');
+        if (again) again.focus();
     }
 
     /** "Realistic", or "custom" for a scenario adjusted by hand. */
@@ -874,7 +1015,8 @@
             const inV = r.in + (now ? sofar.income : 0);
             // Every cost of the month: what Bookkeeping has paid plus what is
             // still open.
-            const outV = r.fixed + r.planned + r.debt + (now ? sofar.costs : 0);
+            // VAT to the tax office is in r.out too; a refund in r.in.
+            const outV = r.out + (now ? sofar.costs : 0);
             const net = inV - outV;
             return `
                 <tr class="fin-month${open ? ' is-open' : ''}${r.offset === 0 ? ' is-now' : ''}"${now ? ' title="Already in Bookkeeping this month plus what is still planned"' : ''}>
@@ -898,7 +1040,7 @@
             <div class="fin-table-scroll">
                 <table class="fin-table">
                     <thead><tr>
-                        <th scope="col">Month</th><th scope="col">In</th><th scope="col">Costs</th>
+                        <th scope="col">Month</th><th scope="col">In</th><th scope="col" title="From this month on: costs, loan repayments and VAT to the tax office">Costs</th>
                         <th scope="col" title="Past months: the actual result, without VAT. From this month on: what the plan nets">Net</th><th scope="col">Balance</th>
                     </tr></thead>
                     <tbody>${body}</tbody>
@@ -940,11 +1082,14 @@
     function bookedRows(offset) {
         const key = monthKey(offset, RF.monthOf(new Date()));
         const net = t => t.amount + (Number(t.vat) || 0);
-        const rows = (state.tx.rows || []).filter(t => !t.excluded && String(t.date).slice(0, 7) === key);
+        const all = (state.txRows || []).filter(t => !t.excluded && String(t.date).slice(0, 7) === key);
+        // VAT to or from the tax office is neither income nor a cost: apart.
+        const rows = all.filter(t => !t.vatQuarter);
         const item = (t, fallback, sign) => ({ name: t.party || fallback, date: t.date, amount: sign * net(t), open: !!t.open });
         return {
             in: rows.filter(t => t.amount > 0).map(t => item(t, 'Incoming payment', 1)).sort((a, b) => b.amount - a.amount),
-            out: rows.filter(t => t.amount < 0).map(t => item(t, 'Payment', -1)).sort((a, b) => b.amount - a.amount)
+            out: rows.filter(t => t.amount < 0).map(t => item(t, 'Payment', -1)).sort((a, b) => b.amount - a.amount),
+            vat: all.filter(t => t.vatQuarter)
         };
     }
 
@@ -958,7 +1103,7 @@
      *   offset: the month; r: its plan row, or null for a month gone by
      */
     function monthDetail(offset, r) {
-        const booked = offset <= 0 ? bookedRows(offset) : { in: [], out: [] };
+        const booked = offset <= 0 ? bookedRows(offset) : { in: [], out: [], vat: [] };
         const sumOf = (list, fn) => list.reduce((t, x) => t + fn(x), 0);
 
         const line = (name, meta, amount, cls) => `
@@ -988,7 +1133,15 @@
             esc([incomeKind(x), x.factor < 1 ? `${Math.round(x.factor * 100)}% of ${euro(x.net)}` : ''].filter(Boolean).join(' · '))
                 + (x.overdue ? '<span class="fin-flow-late">overdue</span>' : ''),
             esc(signed(x.expected)))).join(''), 'is-open');
-        const inTotal = sumOf(booked.in, t => t.amount) + sumOf(expected, x => x.expected);
+        // A quarter's VAT: out to the tax office, or back from it.
+        const vatItems = r ? r.items.vat : [];
+        const vatMeta = q => (q.running ? `${q.label} so far, due ${dayName(q.due)}` : `due ${dayName(q.due)}`)
+            + (q.overdue ? '<span class="fin-flow-late">overdue</span>' : '');
+        const vatIn = vatItems.filter(q => q.owed < 0);
+        const vatOut = vatItems.filter(q => q.owed > 0);
+        const refunds = group('VAT back', -sumOf(vatIn, q => q.owed), 1, vatIn.map(q => line(
+            esc(`VAT ${q.label}`), vatMeta(q), esc(signed(-q.owed)))).join(''), 'is-open');
+        const inTotal = sumOf(booked.in, t => t.amount) + sumOf(expected, x => x.expected) - sumOf(vatIn, q => q.owed);
 
         // Costs: what Bookkeeping has paid this month, then what is still
         // open - a cost whose day has passed but that is not booked yet is
@@ -998,28 +1151,34 @@
         const debts = r ? r.items.debts : [];
         const paidTotal = sumOf(booked.out, t => t.amount);
         const paid = group('Paid', paidTotal, -1, bookedList(booked.out, -1));
-        const openTotal = sumOf(toCome, c => c.amount) + sumOf(debts, d => d.amount);
+        const openTotal = sumOf(toCome, c => c.amount) + sumOf(debts, d => d.amount) + sumOf(vatOut, q => q.owed);
         const openOut = group('Open', openTotal, -1, toCome.map(c => line(esc(c.cost.name),
             esc([c.cost.category, c.cost.kind === 'once' ? 'planned' : rhythm(c.cost)].filter(Boolean).join(' · '))
                 + (c.due ? '<span class="fin-flow-late">due</span>' : ''),
             esc(signed(-c.amount)))).join('')
             + debts.map(d => line(esc(d.debt.name), esc(`repayment ${euro(d.principal)} + ${euro(d.interest)} interest`),
-                esc(signed(-d.amount)))).join(''), 'is-open');
+                esc(signed(-d.amount)))).join('')
+            + vatOut.map(q => line(esc(`VAT ${q.label}`), 'to the tax office, ' + vatMeta(q), esc(signed(-q.owed)))).join(''), 'is-open');
+        // VAT already paid to (or back from) the tax office this month: shown,
+        // but not counted as a cost or income - it only passes through.
+        const vatBooked = group('VAT settled', sumOf(booked.vat, t => t.amount), 1, booked.vat.map(t => line(esc(t.party || 'Tax office'),
+            esc(`${CF.quarterLabel(t.vatQuarter)}, ${dayName(t.date)}`), esc(signed(t.amount)))).join(''), 'is-aside');
         const outTotal = paidTotal + openTotal;
 
         const empty = '<p class="fin-flow-empty">Nothing</p>';
-        if (!received && !openIn && !paid && !openOut) {
+        if (!received && !openIn && !refunds && !paid && !openOut && !vatBooked) {
             return '<p class="fin-muted fin-detail-empty">Nothing booked or planned this month.</p>';
         }
         return `
             <div class="fin-flow">
                 <section class="fin-flow-col is-in" aria-label="Income">
                     <header class="fin-flow-head"><span>Income</span><strong>${esc(signed(inTotal))}</strong></header>
-                    ${received + openIn || empty}
+                    ${received + openIn + refunds || empty}
                 </section>
                 <section class="fin-flow-col is-out" aria-label="Costs">
                     <header class="fin-flow-head"><span>Costs</span><strong>${esc(signed(-outTotal))}</strong></header>
-                    ${paid + openOut || empty}
+                    ${paid + openOut || (vatBooked ? '' : empty)}
+                    ${vatBooked}
                 </section>
             </div>`;
     }
@@ -1601,6 +1760,19 @@
                 renderKpis();
                 const btn = els.finKpis.querySelector('[data-fin-buffer]');
                 if (btn) btn.focus();
+            } else if (t.hasAttribute('data-fin-vat')) {
+                state.vatOpen = !state.vatOpen;
+                state.vatError = '';
+                renderKpis();
+                const again = els.finKpis.querySelector('[data-fin-focus="vat"]');
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-vat-link')) {
+                saveVat({ vat_link: { quarter: t.getAttribute('data-fin-vat-link'), row_id: Number(t.getAttribute('data-row')) } });
+            } else if (t.hasAttribute('data-fin-vat-unlink')) {
+                const row = t.getAttribute('data-row');
+                saveVat({ vat_unlink: { quarter: t.getAttribute('data-fin-vat-unlink'), row_id: row ? Number(row) : null } });
+            } else if (t.hasAttribute('data-fin-vat-settle')) {
+                saveVat({ vat_settle: { quarter: t.getAttribute('data-fin-vat-settle') } });
             } else if (t.hasAttribute('data-fin-balance-delete')) {
                 deleteBalance(Number(t.getAttribute('data-fin-balance-delete')));
             } else if (t.hasAttribute('data-fin-fold')) {
@@ -1712,7 +1884,15 @@
             if (form && state.draft) state.draft = readCostForm(form);
             onDebtInput(e);
         });
-        view.addEventListener('change', onDebtInput);
+        view.addEventListener('change', e => {
+            onDebtInput(e);
+            const pick = e.target.closest('[data-fin-vat-pick]');
+            if (pick && pick.value) {
+                saveVat({ vat_link: { quarter: pick.getAttribute('data-fin-vat-pick'), row_id: Number(pick.value) } });
+            }
+            const from = e.target.closest('[data-fin-vat-from]');
+            if (from) saveVat({ vat_from: from.value });
+        });
 
         view.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;

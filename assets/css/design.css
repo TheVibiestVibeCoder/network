@@ -11565,6 +11565,198 @@ details.import-instructions p {
 .fin-band.is-warn { background: var(--c-warning-soft); }
 .fin-band.is-warn .fin-band-value { color: var(--c-warning-ink); }
 
+/* ---- VAT on the liquidity card: what the tax office still gets ---- */
+
+.fin-vat-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 12px 10px 14px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: var(--c-tint-3);
+    font: inherit;
+    color: var(--c-ink);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
+}
+
+.fin-vat-line:hover { background: var(--c-accent-soft); }
+.fin-vat-line:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.fin-vat-line.is-warn { background: var(--c-warning-soft); }
+
+.fin-vat-line-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+}
+
+.fin-vat-line-label {
+    font-size: var(--t-sm);
+    font-weight: 600;
+}
+
+.fin-vat-line-text small {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fin-vat-line.is-warn .fin-vat-line-text small { color: var(--c-warning-ink); }
+
+.fin-vat-line-value {
+    font-size: var(--t-md);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fin-vat-line > svg {
+    flex: none;
+    color: var(--c-ink-3);
+    transform: rotate(90deg);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+.fin-vat-line[aria-expanded="true"] > svg { transform: rotate(-90deg); }
+
+.fin-vat-panel { gap: 0; }
+
+.fin-vat-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fin-vat-q {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0;
+}
+
+.fin-vat-q + .fin-vat-q { border-top: 1px solid var(--c-line-2); }
+.fin-vat-q:first-child { padding-top: 2px; }
+
+.fin-vat-q-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--t-sm);
+}
+
+.fin-vat-q-amount {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.fin-vat-q-amount.is-pos { color: var(--c-success-ink); }
+.fin-vat-q.is-settled .fin-vat-q-amount { color: var(--c-ink-3); }
+
+.fin-vat-q-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-vat-late {
+    font-weight: 600;
+    color: var(--c-danger-ink);
+}
+
+.fin-vat-paid {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-ink-2);
+}
+
+.fin-vat-paid > svg { flex: none; color: var(--c-success-ink); }
+.fin-vat-paid > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-vat-paid .fin-link { margin-left: auto; font-size: var(--t-xs); }
+
+.fin-vat-note {
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-vat-note.is-warn { color: var(--c-warning-ink); }
+
+/* The tax office's transfer, found after the quarter: linked with a click. */
+.fin-vat-suggest {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 2px;
+    padding: 7px 10px;
+    border: 1px dashed var(--c-accent);
+    border-radius: var(--r-md);
+    background: var(--c-accent-soft);
+    font: inherit;
+    font-size: var(--t-xs);
+    color: var(--c-ink-2);
+    text-align: left;
+    cursor: pointer;
+}
+
+.fin-vat-suggest > svg { flex: none; color: var(--c-accent); }
+.fin-vat-suggest > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-vat-suggest > strong { color: var(--c-accent); font-weight: 600; }
+.fin-vat-suggest:hover { border-style: solid; }
+.fin-vat-suggest:disabled, .fin-vat-select:disabled { opacity: 0.6; cursor: default; }
+
+.fin-vat-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+    font-size: var(--t-xs);
+}
+
+.fin-vat-actions .fin-link { flex: none; font-size: var(--t-xs); }
+
+.fin-vat-select {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    font-size: var(--t-xs);
+}
+
+.fin-vat-from {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--c-line-2);
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-vat-from .form-select {
+    width: auto;
+    height: 30px;
+    margin-left: auto;
+    font-size: var(--t-xs);
+}
+
+/* In a month's detail: VAT that went to or came from the tax office,
+   shown but outside the column's sum - it only passes through. */
+.fin-flow-group.is-aside { opacity: 0.75; }
+.fin-flow-group.is-aside .fin-flow-group-title strong { font-weight: 500; }
+
 /* Unfolded: the year's total revenue and costs behind it, inside its band. */
 .fin-band-lines {
     display: flex;

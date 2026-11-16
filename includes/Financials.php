@@ -11,8 +11,11 @@
  * movements since the balance from Bookkeeping - both are read where they
  * live, not copied here. The arithmetic is in assets/js/cashflow.js.
  *
- * VAT is left out: costs are entered net, like the projects' amounts. The
- * balance is what is in the account.
+ * VAT: costs are entered net, like the projects' amounts. The balance is
+ * what is in the account. What the tax office gets per quarter is worked
+ * out from Bookkeeping (cashflow.js vatQuarters); kept here is only which
+ * bank row paid which quarter (vat_links) and from which quarter on it is
+ * tracked (vat_from).
  */
 
 // ---------------------------------------------------------------------------
@@ -36,6 +39,11 @@ class Financials
         // Recurring costs spotted in Bookkeeping that somebody turned down
         // (cashflow.js recurringSuggestions), as a JSON list of their keys.
         'dismissed_recurring' => '[]',
+        // The first VAT quarter tracked ("2026-Q3"); empty: the one before today's.
+        'vat_from' => '',
+        // Which bank rows paid a quarter's VAT, or that it was settled
+        // without one: {"2026-Q3": {"rows": [12], "settled": false}}.
+        'vat_links' => '{}',
     ];
 
     private PDO $db;
@@ -388,7 +396,59 @@ class Financials
         }
         $dismissed = json_decode($out['dismissed_recurring'], true);
         $out['dismissed_recurring'] = is_array($dismissed) ? array_values(array_filter($dismissed, 'is_string')) : [];
+        $out['vat_links'] = (object) self::cleanVatLinks(json_decode($out['vat_links'], true));
         return $out;
+    }
+
+    private static function isQuarter($value): bool
+    {
+        return is_string($value) && preg_match('/^\d{4}-Q[1-4]$/', $value) === 1;
+    }
+
+    /** {"2026-Q3": {"rows": [ids], "settled": bool}}, junk dropped, empty quarters left out. */
+    private static function cleanVatLinks($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        foreach ($raw as $quarter => $link) {
+            if (!self::isQuarter((string) $quarter) || !is_array($link)) {
+                continue;
+            }
+            $rows = array_values(array_unique(array_filter(array_map('intval', (array) ($link['rows'] ?? [])), fn($id) => $id > 0)));
+            $settled = !empty($link['settled']);
+            if ($rows || $settled) {
+                $out[(string) $quarter] = ['rows' => $rows, 'settled' => $settled];
+            }
+        }
+        ksort($out);
+        return $out;
+    }
+
+    /**
+     * Links a bank row to the VAT quarter it pays (or brings back), and
+     * marks the row as needing no invoice - a payment to the tax office has
+     * none. A row pays one quarter only.
+     */
+    private function linkVatRow(array $links, string $quarter, int $rowId): array|string
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT id FROM bookkeeping_rows WHERE id = :id");
+            $stmt->execute(['id' => $rowId]);
+            if (!$stmt->fetchColumn()) {
+                return 'That bank entry no longer exists';
+            }
+            $this->db->prepare("UPDATE bookkeeping_rows SET no_pdf_needed = 1 WHERE id = :id")->execute(['id' => $rowId]);
+        } catch (PDOException $e) {
+            return 'Bookkeeping is not set up yet';
+        }
+        foreach ($links as $q => $link) {
+            $links[$q]['rows'] = array_values(array_filter($link['rows'], fn($id) => $id !== $rowId));
+        }
+        $links[$quarter] = $links[$quarter] ?? ['rows' => [], 'settled' => false];
+        $links[$quarter]['rows'][] = $rowId;
+        return $links;
     }
 
     /**
@@ -413,6 +473,51 @@ class Financials
                 $list[] = $key;
             }
             $clean['dismissed_recurring'] = json_encode(array_slice($list, -500));
+        }
+        if (array_key_exists('vat_from', $in)) {
+            $from = (string) $in['vat_from'];
+            if ($from !== '' && !self::isQuarter($from)) {
+                return 'Unknown quarter';
+            }
+            $clean['vat_from'] = $from;
+        }
+        // One change to the VAT links per request:
+        //   vat_link: {quarter, row_id}  a bank row pays the quarter
+        //   vat_unlink: {quarter, row_id}  that row does not (row_id null: nor "settled")
+        //   vat_settle: {quarter}  settled without a bank row
+        foreach (['vat_link', 'vat_unlink', 'vat_settle'] as $op) {
+            if (!array_key_exists($op, $in)) {
+                continue;
+            }
+            $arg = is_array($in[$op]) ? $in[$op] : [];
+            $quarter = (string) ($arg['quarter'] ?? '');
+            if (!self::isQuarter($quarter)) {
+                return 'Unknown quarter';
+            }
+            $links = self::cleanVatLinks(json_decode(json_encode($this->settings()['vat_links']), true));
+            $rowId = isset($arg['row_id']) && $arg['row_id'] !== null ? (int) $arg['row_id'] : null;
+            if ($op === 'vat_link') {
+                if (!$rowId || $rowId < 1) {
+                    return 'Pick a bank entry';
+                }
+                $links = $this->linkVatRow($links, $quarter, $rowId);
+                if (is_string($links)) {
+                    return $links;
+                }
+            } elseif ($op === 'vat_unlink') {
+                if (isset($links[$quarter])) {
+                    if ($rowId) {
+                        $links[$quarter]['rows'] = array_values(array_filter($links[$quarter]['rows'], fn($id) => $id !== $rowId));
+                    } else {
+                        $links[$quarter]['settled'] = false;
+                    }
+                }
+            } else {
+                $links[$quarter] = $links[$quarter] ?? ['rows' => [], 'settled' => false];
+                $links[$quarter]['settled'] = true;
+            }
+            $clean['vat_links'] = json_encode((object) self::cleanVatLinks($links));
+            break;
         }
 
         $stmt = $this->db->prepare("

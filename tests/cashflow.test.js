@@ -65,7 +65,7 @@
         nextId = 1;
         const p = run({ projects: [project('In Progress', 10000, 10000, 100, '2026-10-01', '2026-11-30')] });
         near(p.rows[1].income, 10000, 'Nov');
-        eq(p.rows[1].vat, undefined, 'no VAT column');
+        near(p.rows[1].vat, 0, 'no VAT without Bookkeeping');
     });
 
     test('no payments: the whole budget comes in at the end month, not spread', () => {
@@ -466,6 +466,96 @@
         near(y.revenue, 16000);
         near(y.costsYear, 4000);
         near(y.projected, 12000, 'revenue less costs');
+    });
+
+    // ------------------------------------------------------------------
+    // VAT
+    // ------------------------------------------------------------------
+
+    const vb = (id, date, amount, vat, extra) => Object.assign({ id, date, amount, excluded: false, party: '', vat: vat === undefined ? null : vat, open: false }, extra || {});
+
+    test('VAT: due on the 15th of the second month after the quarter', () => {
+        eq(CF.vatDue('2026-Q1'), '2026-05-15');
+        eq(CF.vatDue('2026-Q3'), '2026-11-15');
+        eq(CF.vatDue('2026-Q4'), '2027-02-15', 'into the next year');
+        eq(CF.quarterOf('2026-10-09'), '2026-Q4');
+        eq(CF.shiftQuarter('2026-Q1', -1), '2025-Q4');
+        eq(CF.vatFrom({}, TODAY), '2026-Q3', 'by default the quarter before today');
+        eq(CF.vatFrom({ vat_from: '2027-Q1' }, TODAY), '2026-Q4', 'never after today');
+    });
+
+    test('VAT: what each quarter comes to, from the bank rows', () => {
+        const tx = [
+            vb(1, '2026-08-03', 12000, -2000),          // our invoice: 2.000 owed
+            vb(2, '2026-09-20', -600, 100),             // a cost: 100 back
+            vb(3, '2026-09-25', -50, null, { open: true }),
+            vb(4, '2026-10-02', -1200, 200),            // Q4: 200 back so far
+            vb(5, '2026-07-01', 5000, -1000, { excluded: true })
+        ];
+        const q = CF.vatQuarters(tx, {}, TODAY);
+        eq(q.map(x => x.key), ['2026-Q3', '2026-Q4']);
+        near(q[0].collected, 2000);
+        near(q[0].deductible, 100);
+        near(q[0].owed, 1900, 'owed, the excluded row left out');
+        eq(q[0].open, 1, 'one row still without its invoice');
+        eq([q[0].settled, q[0].overdue, q[0].running], [false, false, false]);
+        near(q[1].owed, -200, 'Q4 so far: a refund');
+        eq(q[1].running, true);
+    });
+
+    test('VAT: planned on its due day, settled once a bank row is linked', () => {
+        const tx = [vb(1, '2026-08-03', 12000, -2000), vb(2, '2026-10-02', -1200, 200)];
+        const p = run({ transactions: tx, balances: [{ id: 1, amount: 20000, as_of: '2026-10-01' }] });
+        near(p.rows[1].vat, 2000, 'Q3 in November');
+        near(p.rows[1].out, 2000, 'out of the account');
+        near(p.rows[4].vat, -200, 'Q4 refund in February');
+        near(p.rows[4].in, 200);
+        near(p.kpis.vatOwed, 1800, 'owed today: Q3 less what Q4 brings back so far');
+        eq(p.kpis.vatNext.label, 'Q3 2026');
+
+        const paid = vb(9, '2026-11-14', -2000, null, { party: 'Finanzamt Österreich' });
+        const all = CF.markVatPayments(tx.concat(paid), { '2026-Q3': { rows: [9] } });
+        const later = run({ transactions: all, today: '2026-11-20', now: { year: 2026, month: 10 } });
+        const q3 = later.vat.find(x => x.key === '2026-Q3');
+        eq(q3.settled, true);
+        near(q3.paid, 2000);
+        near(later.rows[0].vat, 0, 'nothing planned for Q3 any more');
+        near(later.kpis.vatOwed, -200);
+    });
+
+    test('VAT: unpaid after its due day, it is overdue and lands in this month', () => {
+        const tx = [vb(1, '2026-08-03', 12000, -2000)];
+        const p = run({ transactions: tx, today: '2026-12-02', now: { year: 2026, month: 11 } });
+        const q3 = p.vat.find(x => x.key === '2026-Q3');
+        eq(q3.overdue, true);
+        near(p.rows[0].vat, 2000, 'in December');
+    });
+
+    test('VAT: a linked payment is neither cost nor income, nor a recurring cost', () => {
+        const tx = CF.markVatPayments([
+            vb(1, '2026-08-03', 12000, -2000),
+            vb(2, '2026-08-14', -1500, null, { party: 'Finanzamt Österreich' })
+        ], { '2026-Q2': { rows: [2] } });
+        const months = CF.yearMonths(tx, NOW, null);
+        const aug = months.find(m => m.label.indexOf('Aug') === 0);
+        near(aug.costs, 0, 'the VAT payment is no cost');
+        near(aug.income, 10000);
+        eq(tx[1].open, false, 'needs no invoice');
+    });
+
+    test('VAT: the tax office is offered first, after the quarter', () => {
+        const tx = [
+            vb(1, '2026-08-03', 12000, -2000),
+            vb(2, '2026-09-30', -2000, null, { party: 'Finanzamt Österreich' }),   // inside the quarter
+            vb(3, '2026-11-10', -2000, null, { party: 'Office rent' }),
+            vb(4, '2026-11-14', -2600, null, { party: 'Finanzamt Österreich' }),   // with other taxes in it
+            vb(5, '2026-11-12', 300, null, { party: 'Finanzamt Österreich' })      // wrong direction
+        ];
+        const q3 = CF.vatQuarters(tx, {}, '2026-11-20')[0];
+        const c = CF.vatCandidates(q3, tx);
+        eq(c.map(x => x.row.id), [4, 3], 'the tax office first, then by amount');
+        eq(c[1].exact, true);
+        eq(CF.vatSuggestion(q3, tx).row.id, 4);
     });
 
     root.cashflowTestResults = results;

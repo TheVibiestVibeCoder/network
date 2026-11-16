@@ -17,10 +17,13 @@
  * project's end) - the revenue forecast books a complete project's in this
  * month instead, since the work is done.
  *
- * VAT is left out: project amounts are net, and costs are entered net too.
- * Over a VAT period that is what stays in the account - the VAT collected
- * is passed on, the VAT in our costs comes back - only its timing is not
- * shown.
+ * VAT: project amounts are net, and costs are entered net too. What the
+ * bank rows in Bookkeeping carry is settled with the tax office per quarter
+ * (vatQuarters): the VAT on our invoices less the VAT on what we paid, due
+ * on the 15th of the second month after the quarter. Until a bank row is
+ * linked to it, it is a planned payment (or refund) in that month - and
+ * the VAT owed beside the balance. A linked row is the VAT passing through,
+ * neither cost nor income.
  *
  * Money out: our costs, net. A recurring cost every 1, 3, 6 or 12 months
  * from its first month to its last, on its day of the month - 31 meaning
@@ -269,8 +272,10 @@
             const o = m - now.month;
             const prefix = now.year + '-' + String(m + 1).padStart(2, '0');
             const inMonth = rows.filter(t => t.date.slice(0, 7) === prefix);
-            const income = sum(inMonth.filter(t => t.amount > 0), net);
-            const costs = -sum(inMonth.filter(t => t.amount < 0), net);
+            // VAT paid to or back from the tax office is neither.
+            const flows = inMonth.filter(t => !t.vatQuarter);
+            const income = sum(flows.filter(t => t.amount > 0), net);
+            const costs = -sum(flows.filter(t => t.amount < 0), net);
             const end = lastDayOf(o, now);
             out.push({
                 offset: o,
@@ -312,7 +317,8 @@
         const income = round2(sum(months, m => m.income));
         const costs = round2(sum(months, m => m.costs));
         const actual = round2(income - costs);
-        const incomeRest = round2(sum(rest, r => r.in));
+        // The projects' income; a VAT refund is no revenue.
+        const incomeRest = round2(sum(rest, r => r.income));
         // Still to pay until December. A loan's repayment is not a cost;
         // the interest paid with it is.
         const costsRest = round2(sum(rest, r => r.fixed + r.planned + (r.debtInterest || 0)));
@@ -454,7 +460,7 @@
     function recurringSuggestions(transactions, costs, dismissed, today) {
         const groups = new Map();
         (transactions || []).forEach(t => {
-            if (t.excluded || !(t.amount < 0) || !t.party) return;
+            if (t.excluded || t.vatQuarter || !(t.amount < 0) || !t.party) return;
             const words = nameWords(t.party);
             if (!words.length) return;
             const key = words.slice(0, 2).join(' ');
@@ -519,6 +525,177 @@
     }
 
     // ------------------------------------------------------------------
+    // VAT
+    // ------------------------------------------------------------------
+
+    // A bank row to or from the tax office, by its party or its text.
+    const TAX_OFFICE = /finanzamt|abgabenkonto|umsatzsteuer|\buva\b|\bust\b|bundesministerium f(ü|ue)r finanzen|\bbmf\b|\bfa[öo]\b/i;
+    // How long after its due day a quarter's payment is still looked for.
+    const VAT_LOOK_DAYS = 75;
+
+    /** "2026-10-09" -> "2026-Q4"; null when not a date. */
+    function quarterOf(iso) {
+        const m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+        return m ? m[1] + '-Q' + (Math.floor((Number(m[2]) - 1) / 3) + 1) : null;
+    }
+
+    function quarterParts(key) {
+        const m = /^(\d{4})-Q([1-4])$/.exec(String(key || ''));
+        return m ? { year: Number(m[1]), q: Number(m[2]) } : null;
+    }
+
+    /** "2026-Q4" moved by n quarters. */
+    function shiftQuarter(key, n) {
+        const p = quarterParts(key);
+        if (!p) return null;
+        const i = p.year * 4 + (p.q - 1) + n;
+        return Math.floor(i / 4) + '-Q' + ((i % 4) + 1);
+    }
+
+    /** "2026-Q4" -> "Q4 2026". */
+    function quarterLabel(key) {
+        const p = quarterParts(key);
+        return p ? 'Q' + p.q + ' ' + p.year : '';
+    }
+
+    /** The quarter's last day, "YYYY-MM-DD". */
+    function quarterEnd(key) {
+        const p = quarterParts(key);
+        if (!p) return null;
+        const month = p.q * 3;
+        const last = new Date(Date.UTC(p.year, month, 0)).getUTCDate();
+        return p.year + '-' + String(month).padStart(2, '0') + '-' + String(last).padStart(2, '0');
+    }
+
+    /**
+     * When a quarter's VAT is due: the 15th of the second month after it
+     * (Q1 on 15 May, Q4 on 15 February of the next year).
+     */
+    function vatDue(key) {
+        const p = quarterParts(key);
+        if (!p) return null;
+        const i = p.year * 12 + (p.q * 3 - 1) + 2;
+        return Math.floor(i / 12) + '-' + String((i % 12) + 1).padStart(2, '0') + '-15';
+    }
+
+    /** The stored links, cleaned: { "2026-Q3": { rows: [ids], settled } }. */
+    function vatLinks(raw) {
+        const out = {};
+        if (!raw || typeof raw !== 'object') return out;
+        Object.keys(raw).forEach(key => {
+            if (!quarterParts(key)) return;
+            const v = raw[key] || {};
+            const rows = (Array.isArray(v.rows) ? v.rows : []).map(Number).filter(n => Number.isInteger(n) && n > 0);
+            out[key] = { rows, settled: !!v.settled };
+        });
+        return out;
+    }
+
+    /**
+     * The bank rows with the VAT quarter each one pays (or brings back)
+     * marked on it as `vatQuarter`. Such a row is not a cost or an income -
+     * it is the VAT passing through - and needs no invoice.
+     */
+    function markVatPayments(transactions, rawLinks) {
+        const links = vatLinks(rawLinks);
+        const byRow = new Map();
+        Object.keys(links).forEach(key => links[key].rows.forEach(id => byRow.set(id, key)));
+        return (transactions || []).map(t => {
+            const key = t && t.id !== undefined ? byRow.get(Number(t.id)) : undefined;
+            return key ? Object.assign({}, t, { vatQuarter: key, open: false }) : t;
+        });
+    }
+
+    /** The first quarter tracked: the one stored, else the one before today's. */
+    function vatFrom(settings, today) {
+        const stored = settings && settings.vat_from;
+        const current = quarterOf(today);
+        const from = quarterParts(stored) ? stored : shiftQuarter(current, -1);
+        return from > current ? current : from;
+    }
+
+    /**
+     * Each quarter from the first one tracked to today's, as Bookkeeping has
+     * it: the VAT on our own invoices (owed), the VAT on what we paid (comes
+     * back), and what is left - `owed` > 0 is a payment to the tax office,
+     * < 0 a refund. A quarter is in by its bank rows' dates; it accumulates
+     * while it runs. Settled once a bank row is linked to it (or it is
+     * marked as settled without one); until then it is planned on its due
+     * day, and overdue once that has passed.
+     *
+     *   -> [{ key, label, end, due, collected, deductible, owed, open,
+     *         running, settled, manual, paid, payments, overdue, nil }]
+     */
+    function vatQuarters(transactions, settings, today) {
+        const links = vatLinks(settings && settings.vat_links);
+        const current = quarterOf(today);
+        if (!current) return [];
+        const rows = (transactions || []).filter(t => t && !t.excluded && t.date);
+        const out = [];
+        for (let key = vatFrom(settings, today); key <= current; key = shiftQuarter(key, 1)) {
+            const inQ = rows.filter(t => !t.vatQuarter && quarterOf(t.date) === key);
+            const collected = -sum(inQ.filter(t => number(t.vat) < 0), t => number(t.vat));
+            const deductible = sum(inQ.filter(t => number(t.vat) > 0), t => number(t.vat));
+            const owed = round2(collected - deductible);
+            const payments = rows.filter(t => t.vatQuarter === key);
+            const manual = !!(links[key] && links[key].settled);
+            const nil = Math.abs(owed) < 0.005;
+            const settled = payments.length > 0 || manual;
+            const due = vatDue(key);
+            out.push({
+                key,
+                label: quarterLabel(key),
+                end: quarterEnd(key),
+                due,
+                collected: round2(collected),
+                deductible: round2(deductible),
+                owed,
+                open: inQ.filter(t => t.open).length,
+                running: key === current,
+                settled,
+                manual,
+                nil,
+                // What the linked rows moved: + paid to the tax office.
+                paid: round2(-sum(payments, t => t.amount)),
+                payments,
+                overdue: !settled && !nil && due < today
+            });
+        }
+        return out;
+    }
+
+    /**
+     * Bank rows that may pay a quarter's VAT (or bring its refund): the
+     * right direction, after the quarter, not long after its due day, not
+     * linked to anything yet. The tax office first, then by how close the
+     * amount is. `exact`: within a euro of what the quarter comes to.
+     */
+    function vatCandidates(quarter, transactions, limit) {
+        if (!quarter) return [];
+        const refund = quarter.owed < 0;
+        const target = Math.abs(quarter.owed);
+        const lastDay = new Date(Date.parse(quarter.due) + VAT_LOOK_DAYS * 86400000).toISOString().slice(0, 10);
+        return (transactions || [])
+            .filter(t => t && !t.excluded && !t.vatQuarter && t.id !== undefined && t.date > quarter.end && t.date <= lastDay
+                && (refund ? t.amount > 0 : t.amount < 0))
+            .map(t => ({
+                row: t,
+                office: TAX_OFFICE.test(String(t.party || '')) || TAX_OFFICE.test(String(t.text || '')),
+                gap: Math.abs(Math.abs(t.amount) - target)
+            }))
+            .sort((a, b) => (b.office - a.office) || (a.gap - b.gap) || (a.row.date < b.row.date ? -1 : 1))
+            .slice(0, limit || 8)
+            .map(c => Object.assign({}, c, { exact: c.gap <= 1 }));
+    }
+
+    /** The row to offer with one click: the tax office, after the quarter. */
+    function vatSuggestion(quarter, transactions) {
+        if (!quarter || quarter.settled || quarter.nil || quarter.running) return null;
+        const first = vatCandidates(quarter, transactions, 1)[0];
+        return first && first.office ? first : null;
+    }
+
+    // ------------------------------------------------------------------
     // The plan
     // ------------------------------------------------------------------
 
@@ -568,8 +745,8 @@
         for (let i = 0; i < months; i++) {
             rows.push({
                 offset: i, label: RF.monthName(i, now),
-                income: 0, fixed: 0, planned: 0, debt: 0, debtInterest: 0,
-                items: { income: [], costs: [], debts: [] }
+                income: 0, fixed: 0, planned: 0, debt: 0, debtInterest: 0, vat: 0,
+                items: { income: [], costs: [], debts: [], vat: [] }
             });
         }
 
@@ -586,7 +763,7 @@
         // and open until then (due: its day has passed).
         const thisMonth = RF.calendarMonth(0, now);
         const monthPrefix = thisMonth.year + '-' + String(thisMonth.month + 1).padStart(2, '0');
-        const bookedOut = (input.transactions || []).filter(t => !t.excluded && t.amount < 0 && String(t.date).slice(0, 7) === monthPrefix);
+        const bookedOut = (input.transactions || []).filter(t => !t.excluded && !t.vatQuarter && t.amount < 0 && String(t.date).slice(0, 7) === monthPrefix);
 
         const items = [];
         costs.forEach(c => c.occurrences.forEach(o => {
@@ -615,16 +792,31 @@
             r.items.debts.push({ debt: d, principal, interest, amount: round2(principal + interest) });
         });
 
+        // Each quarter's VAT not settled yet: out (or back) on its due day,
+        // this month once that has passed.
+        const vat = vatQuarters(input.transactions, input.settings, today);
+        vat.forEach(q => {
+            if (q.settled || q.nil) return;
+            const o = RF.offsetOf(q.due, now);
+            if (o === null) return;
+            const offset = Math.max(o, 0);
+            if (offset >= months) return;
+            rows[offset].vat += q.owed;
+            rows[offset].items.vat.push(Object.assign({}, q, { offset }));
+        });
+        const vatOpen = vat.filter(q => !q.settled && !q.nil);
+        const vatNext = vatOpen[0] || null;
+
         const balance = balanceToday(input.balances, input.transactions);
         let running = balance ? balance.amount : 0;
         rows.forEach(r => {
             r.opening = round2(running);
-            r.out = r.fixed + r.planned + r.debt;
-            r.in = r.income;
+            r.out = r.fixed + r.planned + r.debt + Math.max(r.vat, 0);
+            r.in = r.income + Math.max(-r.vat, 0);
             r.net = r.in - r.out;
             running += r.net;
             r.closing = round2(running);
-            ['income', 'fixed', 'planned', 'debt', 'debtInterest', 'out', 'in', 'net']
+            ['income', 'fixed', 'planned', 'debt', 'debtInterest', 'vat', 'out', 'in', 'net']
                 .forEach(k => { r[k] = round2(r[k]); });
         });
 
@@ -645,8 +837,14 @@
             income: income.items,
             missing: income.missing,
             costs,
+            vat,
             kpis: {
                 balance: balance ? balance.amount : null,
+                // What the tax office still gets (or, below 0, gives back):
+                // every quarter not settled, today's as far as it has run.
+                vatOwed: round2(sum(vatOpen, q => q.owed)),
+                vatNext: vatNext ? { key: vatNext.key, label: vatNext.label, due: vatNext.due, owed: vatNext.owed, overdue: vatNext.overdue, running: vatNext.running } : null,
+                vatTotal: round2(sum(rows, r => r.vat)),
                 incomeNext3: round2(sum(rows.slice(0, 3), r => r.income)),
                 incomeTotal: round2(sum(rows, r => r.income)),
                 outTotal: round2(sum(rows, r => r.out)),
@@ -671,6 +869,7 @@
         cleanSettings, incomeItems, costOccurrences, monthlyFixed,
         anchorOf, balanceToday, pastMonths, lastDayOf,
         yearMonths, yearResult, recurringSuggestions,
+        quarterOf, quarterLabel, shiftQuarter, vatDue, vatLinks, markVatPayments, vatFrom, vatQuarters, vatCandidates, vatSuggestion,
         daysBetween, debtInterest, debtSummary,
         plan
     };
