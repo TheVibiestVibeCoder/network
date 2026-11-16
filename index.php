@@ -1527,16 +1527,20 @@ function assetUrl(string $path): string
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" id="projectSortOrderIcon"><path d="m6 9.5 6 6 6-6"/></svg>
                                 </button>
                             </div>
-                            <label class="filter-check" id="hideCompletedWrap">
-                                <input type="checkbox" id="hideCompletedProjects" checked>
-                                <span>Hide completed</span>
-                                <span class="filter-check-count" id="hiddenCompletedCount" hidden></span>
-                            </label>
                         </div>
                     </div>
                     <div class="projects-list" id="projectsList">
                         <!-- Projects will be loaded here -->
                     </div>
+
+                    <!-- Completed projects: out of the way, opened like the archived ones below -->
+                    <details class="deleted-projects completed-projects" id="completedProjects" hidden>
+                        <summary class="deleted-projects-head">
+                            <span class="deleted-projects-title">Completed projects</span>
+                            <span class="deleted-projects-count" id="completedProjectsCount">0</span>
+                        </summary>
+                        <div class="projects-list completed-projects-list" id="completedProjectsList"></div>
+                    </details>
 
                     <!-- Archived projects: kept whole, restorable (ProjectArchive) -->
                     <details class="deleted-projects" id="deletedProjects" hidden>

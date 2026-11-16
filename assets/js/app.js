@@ -58,7 +58,6 @@
         projectView: (document.getElementById('projectsView') || { dataset: {} }).dataset.projectView === 'list' ? 'list' : 'cards',
         projectSortOrder: 'ASC',
         projectSearchQuery: '',
-        hideCompletedProjects: true,
         editingProjectId: null,
         viewingProjectId: null,
         viewingProject: null,
@@ -217,8 +216,9 @@
         projectsList: document.getElementById('projectsList'),
         searchProjectsInput: document.getElementById('searchProjectsInput'),
         projectSortField: document.getElementById('projectSortField'),
-        hideCompletedProjects: document.getElementById('hideCompletedProjects'),
-        hiddenCompletedCount: document.getElementById('hiddenCompletedCount'),
+        completedProjects: document.getElementById('completedProjects'),
+        completedProjectsList: document.getElementById('completedProjectsList'),
+        completedProjectsCount: document.getElementById('completedProjectsCount'),
         projectSortOrderBtn: document.getElementById('projectSortOrderBtn'),
         projectSortOrderIcon: document.getElementById('projectSortOrderIcon'),
         addProjectBtn: document.getElementById('addProjectBtn'),
@@ -4247,24 +4247,16 @@
     function renderProjects(projects) {
         const all = projects || [];
 
-        // Completed work is history: it is hidden by default so the list shows
-        // what still needs attention. The count of what is being hidden stays
-        // visible, so the list never looks mysteriously short.
-        const hiddenCount = state.hideCompletedProjects
-            ? all.filter(isCompletedProject).length
-            : 0;
-        const visible = state.hideCompletedProjects
-            ? all.filter(p => !isCompletedProject(p))
-            : all;
-
-        if (elements.hiddenCompletedCount) {
-            elements.hiddenCompletedCount.textContent = hiddenCount > 0 ? `${hiddenCount} hidden` : '';
-            elements.hiddenCompletedCount.hidden = hiddenCount === 0;
-        }
+        // Completed work is history: it sits in its own folded section under
+        // the list, the way archived projects do, so the list shows what
+        // still needs attention.
+        const visible = all.filter(p => !isCompletedProject(p));
+        const completed = all.filter(isCompletedProject);
+        renderCompletedProjects(completed, visible.length === 0);
 
         if (visible.length === 0) {
-            elements.projectsList.innerHTML = hiddenCount > 0
-                ? `<div class="empty-state">Every project here is completed. Untick "Hide completed" to see ${hiddenCount} of them.</div>`
+            elements.projectsList.innerHTML = completed.length
+                ? '<div class="empty-state">No open projects</div>'
                 : '<div class="empty-state">No projects found</div>';
             return;
         }
@@ -4273,8 +4265,28 @@
             ? renderProjectsByStage(visible)
             : projectCollection(visible);
 
+        bindProjectCards(elements.projectsList);
+        triggerProjectDeckAnimation();
+    }
+
+    /**
+     * The completed projects, folded under the list with their count - like
+     * the archived ones below them. A search that finds only completed
+     * projects opens the section, so its results are not hidden.
+     */
+    function renderCompletedProjects(completed, nothingElse) {
+        const section = elements.completedProjects;
+        if (!section) return;
+        section.hidden = completed.length === 0;
+        elements.completedProjectsCount.textContent = String(completed.length);
+        elements.completedProjectsList.innerHTML = completed.length ? projectCollection(completed) : '';
+        bindProjectCards(elements.completedProjectsList);
+        if (completed.length && nothingElse && state.projectSearchQuery) section.open = true;
+    }
+
+    function bindProjectCards(container) {
         // Cards and rows open on click, and on Enter / Space for keyboard users.
-        elements.projectsList.querySelectorAll('.project-card, .project-row').forEach(card => {
+        container.querySelectorAll('.project-card, .project-row').forEach(card => {
             const open = () => openProjectOverview(parseInt(card.dataset.id, 10));
             card.addEventListener('click', open);
             card.addEventListener('keydown', (event) => {
@@ -4284,8 +4296,6 @@
                 }
             });
         });
-
-        triggerProjectDeckAnimation();
     }
 
     /**
@@ -6447,31 +6457,6 @@
             });
         }
 
-        // Hide completed projects. The choice is per browser, so the default
-        // (hidden) applies until this particular device says otherwise.
-        if (elements.hideCompletedProjects) {
-            let stored = null;
-            try {
-                stored = localStorage.getItem('crm.hideCompletedProjects');
-            } catch (e) {
-                // Private mode or blocked storage: fall back to the default.
-            }
-
-            if (stored !== null) {
-                state.hideCompletedProjects = stored === '1';
-            }
-            elements.hideCompletedProjects.checked = state.hideCompletedProjects;
-
-            elements.hideCompletedProjects.addEventListener('change', () => {
-                state.hideCompletedProjects = elements.hideCompletedProjects.checked;
-                try {
-                    localStorage.setItem('crm.hideCompletedProjects', state.hideCompletedProjects ? '1' : '0');
-                } catch (e) {
-                    // Not being able to remember the choice is not worth failing over.
-                }
-                renderProjects(state.projects);
-            });
-        }
 
         // Project sort order toggle
         if (elements.projectSortOrderBtn) {

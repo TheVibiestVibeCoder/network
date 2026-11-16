@@ -8697,6 +8697,15 @@ details.import-instructions p {
     font-weight: 600;
 }
 
+/* Completed projects: the same fold, holding ordinary cards or rows. */
+.completed-projects + .deleted-projects {
+    margin-top: 12px;
+}
+
+.completed-projects-list {
+    margin-top: 12px !important;
+}
+
 .deleted-projects-hint {
     margin: 6px 2px 10px;
     font-size: var(--t-sm);
