@@ -1023,7 +1023,7 @@
         const origins = proposalOrigins();
         const failedJobs = state.jobs.filter(job => job.status === 'failed' || job.status === 'interrupted');
         const unsent = state.projects.filter(p => (state.drafts[p.id] || '').trim());
-        const draw = list => (review && review.renderItems ? review.renderItems(list) : '');
+        const draw = (list, project) => (review && review.renderItems ? review.renderItems(list, { project: project.name }) : '');
 
         // Projects in meeting order, each with what was proposed for it.
         const groups = state.projects.map(project => ({
@@ -1048,11 +1048,11 @@
                         </h2>
                     </div>
                     ${running ? '<p class="mrev-note"><span class="meeting-spinner" aria-hidden="true"></span>Claude is still working on this project…</p>' : ''}
-                    ${waiting.length ? draw(waiting) : ''}
+                    ${waiting.length ? draw(waiting, project) : ''}
                     ${decided.length ? `
                         <div class="review-subgroup mrev-decided">
                             <h3 class="review-subgroup-title">Decided <span class="review-subgroup-count">${decided.length}</span></h3>
-                            ${draw(decided)}
+                            ${draw(decided, project)}
                         </div>` : ''}
                     ${nothing ? '<p class="mrev-note">Claude found nothing to change here.</p>' : ''}
                     ${problems.map(job => `

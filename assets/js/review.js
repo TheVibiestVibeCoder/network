@@ -284,11 +284,16 @@
         }
     }
 
-    /** One line that says what the proposal is, readable without opening it. */
-    function summaryFor(item) {
+    /**
+     * One line that says what the proposal is, readable without opening it.
+     * `scope` is the project the row is drawn under (the meeting's summary):
+     * its name is not repeated.
+     */
+    function summaryFor(item, scope) {
         const s = source(item);
         const p = item.payload || {};
         const r = item.record || {};
+        const project = r.project_name && r.project_name !== scope ? 'Project ' + r.project_name : '';
 
         switch (item.kind) {
             case 'create':
@@ -296,7 +301,7 @@
                     case 'contact': return joinParts([s.company, s.email, s.phone, s.location]);
                     case 'project': return joinParts([s.company, s.stage, budgetText(s)]);
                     case 'todo': return joinParts([
-                        r.contact_name ? 'For ' + r.contact_name : (r.project_name ? 'Project ' + r.project_name : ''),
+                        r.contact_name ? 'For ' + r.contact_name : project,
                         s.due_date ? 'Due ' + formatDay(s.due_date) : '',
                         s.priority ? displayValue('priority', s.priority) + ' priority' : ''
                     ]);
@@ -306,7 +311,7 @@
                     case 'project_document': return joinParts([
                         s.label,
                         formatBytes(r.file_size || p.size),
-                        r.project_name ? 'Project ' + r.project_name : ''
+                        project
                     ]);
                     default: return '';
                 }
@@ -359,7 +364,7 @@
      * Claude proposes; the field is already named in the kind label when
      * there is only one, so it is only repeated when there are several.
      */
-    function summaryHtml(item) {
+    function summaryHtml(item, scope) {
         const p = item.payload || {};
         const previous = item.previous || {};
 
@@ -378,7 +383,7 @@
         if (item.kind === 'assign') {
             return valuePair(previous.assigned_to_name || 'Nobody', p.assigned_to_name || 'Nobody');
         }
-        return escapeHtml(summaryFor(item));
+        return escapeHtml(summaryFor(item, scope));
     }
 
     /**
@@ -510,14 +515,19 @@
     /**
      * One proposal as a row: what it is about, what Claude proposes, and the
      * two buttons most proposals need. Everything else is in the sheet the
-     * row opens.
+     * row opens. Under a project's heading (`scope`, its name) the row does
+     * not name the project again: a proposal about the project itself then
+     * has no title of its own, only what it changes.
      */
-    function renderRow(item) {
+    function renderRow(item, scope) {
+        if (typeof scope !== 'string') scope = '';
         const pending = item.status === 'pending';
         const busy = state.busy.has(item.id);
         const error = state.errors[item.id];
         const stale = pending && isStale(item);
-        const summary = summaryHtml(item);
+        const summary = summaryHtml(item, scope);
+        const title = titleFor(item);
+        const showTitle = !(scope && title === scope);
         const staleTitle = stale
             ? 'Changed since Claude proposed this - ' + staleFields(item).map(f => f.label + ' is now ' + f.now).join(', ')
             : '';
@@ -535,7 +545,7 @@
                     <button type="button" class="review-row-open" data-review-act="sheet" aria-haspopup="dialog">
                         <span class="review-type-icon">${typeIcon(item)}</span>
                         <span class="review-row-text">
-                            <span class="review-row-title">${escapeHtml(titleFor(item))}</span>
+                            ${showTitle ? `<span class="review-row-title">${escapeHtml(title)}</span>` : ''}
                             <span class="review-row-summary">
                                 <span class="review-kind">${escapeHtml(kindLabel(item))}</span>
                                 ${assigneeChip(item)}
@@ -942,8 +952,10 @@
      * - its name, how many proposals, accept all / reject all - with its
      * proposals indented beneath it, each still decided on its own if wanted.
      */
-    function renderCluster(list) {
+    function renderCluster(list, scope) {
+        if (typeof scope !== 'string') scope = '';
         const first = list[0];
+        const title = titleFor(first);
         const key = recordKey(first);
         const n = list.length;
         const off = state.bulk ? ' disabled' : '';
@@ -955,7 +967,7 @@
                     <div class="review-row-open">
                         <span class="review-type-icon review-tone--${SUBGROUP_TONE[subgroupOf(list)]}">${typeIcon(first)}</span>
                         <span class="review-row-text">
-                            <span class="review-row-title">${escapeHtml(titleFor(first))}</span>
+                            ${scope && title === scope ? '' : `<span class="review-row-title">${escapeHtml(title)}</span>`}
                             <span class="review-row-summary">
                                 <span class="review-kind"><span data-review-count>${n}</span> proposals</span>
                                 <span class="review-row-summary-text">${escapeHtml(list.map(kindLabel).join(' · '))}</span>
@@ -968,7 +980,7 @@
                         <button type="button" class="review-act review-act--accept" data-review-cluster-act="accept" title="Accept all" aria-label="Accept all ${n} proposals"${off}>${ICON_CHECK}</button>
                     </div>
                 </div>
-                ${list.map(renderRow).join('')}
+                ${list.map(item => renderRow(item, scope)).join('')}
             </div>`;
     }
 
@@ -1040,7 +1052,8 @@
         const item = findItem(id);
         if (!item) return;
         document.querySelectorAll(`.review-row[data-review-id="${id}"]`).forEach(node => {
-            node.outerHTML = renderRow(item);
+            const scoped = node.closest('[data-review-scope]');
+            node.outerHTML = renderRow(item, scoped ? scoped.getAttribute('data-review-scope') : '');
         });
         if (sheet.id === id) renderSheet();
     }
@@ -2012,8 +2025,11 @@
      * Proposals drawn exactly as this screen draws them - a row each, several
      * about one record as a cluster - for another place (the meeting's
      * summary). Their own buttons decide them, like a record panel's rows.
+     * `opts.project`: the name of the project they are drawn under, which
+     * the rows then leave out.
      */
-    function renderItems(items) {
+    function renderItems(items, opts) {
+        const scope = (opts && opts.project) || '';
         const byRecord = new Map();
         (items || []).forEach(item => {
             panelItems.set(item.id, item);
@@ -2022,8 +2038,8 @@
             byRecord.get(key).push(item);
         });
         const records = [...byRecord.values()].map(list => list.sort((a, b) => kindRank(a) - kindRank(b)));
-        return `<div class="review-list-card">${records.map(list =>
-            list.length > 1 && list.every(i => i.status === 'pending') ? renderCluster(list) : list.map(renderRow).join('')
+        return `<div class="review-list-card"${scope ? ` data-review-scope="${escapeHtml(scope)}"` : ''}>${records.map(list =>
+            list.length > 1 && list.every(i => i.status === 'pending') ? renderCluster(list, scope) : list.map(item => renderRow(item, scope)).join('')
         ).join('')}</div>`;
     }
 

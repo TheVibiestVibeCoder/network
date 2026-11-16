@@ -443,6 +443,12 @@
     line-height: 1.4;
 }
 
+/* Under a project's heading (the meeting's summary), a proposal about the
+   project itself has no title: what it changes is the row's one line. */
+.review-row-text > .review-row-summary:first-child {
+    font-size: var(--t-base);
+}
+
 .review-row-summary-text {
     min-width: 0;
     overflow: hidden;
