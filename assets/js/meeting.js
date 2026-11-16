@@ -814,7 +814,7 @@
         return `<span class="assignee-chip${url ? ' has-photo' : ''}" title="Assigned to ${escapeHtml(name)}">${url ? `<img src="${escapeHtml(url)}" alt="">` : escapeHtml(initials(name))}</span>`;
     }
 
-    /** The project as its own detail sheet shows it, read-only. */
+    /** The project as its own detail sheet shows it, read-only. Its stage is in the head above. */
     function detailsHtml(ctx) {
         const p = ctx.project;
         const budget = p.budget_min || p.budget_max
@@ -833,7 +833,6 @@
                     <button type="button" class="ov-add-btn" data-meeting-open-project data-mode="edit" title="Edit the project">Edit</button>
                 </div>
                 <div class="overview-details">
-                    ${fact('Stage', `<span class="meeting-stage stage-${stageClass(p.stage)}">${escapeHtml(p.stage)}</span>`)}
                     ${fact('Responsible', p.assigned_to_name
                         ? `<span class="meeting-person">${personChip(p.assigned_to, p.assigned_to_name)}${escapeHtml(p.assigned_to_name)}</span>`
                         : 'Nobody')}
