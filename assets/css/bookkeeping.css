@@ -48,7 +48,7 @@
     -webkit-backdrop-filter: blur(3px);
     backdrop-filter: blur(3px);
     border: 2px dashed var(--bk-drop-blue);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     pointer-events: none;
     z-index: 50;
 }
@@ -167,7 +167,7 @@
     bottom: 28%;
     right: 4px;
     width: 2px;
-    border-radius: 1px;
+    border-radius: calc(1px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: transparent;
     transition: background-color var(--transition-fast);
 }
@@ -252,7 +252,7 @@ body.bk-col-resizing * {
     color: var(--color-text);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     white-space: nowrap;
     transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
@@ -344,7 +344,7 @@ body.bk-col-resizing * {
     color: var(--color-text);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     transition: width var(--transition-base), border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
@@ -380,7 +380,7 @@ body.bk-col-resizing * {
     padding: var(--spacing-3);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     transform-origin: top right;
     animation: bk-menu-in var(--transition-fast) ease-out;
@@ -457,7 +457,7 @@ body.bk-col-resizing * {
     gap: var(--spacing-1);
     padding: 3px 10px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface-2);
     font-size: var(--font-size-xs);
     cursor: pointer;
@@ -522,7 +522,7 @@ body.bk-col-resizing * {
     overflow: auto;
     background: var(--color-surface-2);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-sm);
 }
 
@@ -672,7 +672,7 @@ body.bk-col-resizing * {
     z-index: 20;
     transform: translate(-50%, -50%);
     padding: 5px 11px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--bk-drop-blue);
     color: #fff;
     font-size: var(--font-size-xs);
@@ -763,7 +763,7 @@ body.bk-col-resizing * {
     color: var(--color-text);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
@@ -803,7 +803,7 @@ body.bk-col-resizing * {
     align-self: center;
     width: 5px;
     height: 5px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-warning);
 }
 
@@ -819,7 +819,7 @@ body.bk-col-resizing * {
     padding: var(--spacing-3);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     font-size: var(--font-size-sm);
     animation: bk-menu-in var(--transition-fast) ease-out;
@@ -921,7 +921,7 @@ body.bk-col-resizing * {
     flex-shrink: 0;
     padding: 0;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: transparent;
     color: var(--color-text-muted);
     font-size: 14px;
@@ -949,7 +949,7 @@ body.bk-col-resizing * {
     align-items: center;
     height: 22px;
     padding: 0 9px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font: 600 var(--t-xs)/1 var(--font);
     white-space: nowrap;
 }
@@ -978,7 +978,7 @@ body.bk-col-resizing * {
     height: 26px;
     padding: 0;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
@@ -1019,7 +1019,7 @@ body.bk-col-resizing * {
     flex-shrink: 0;
     padding: 0;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
@@ -1049,7 +1049,7 @@ body.bk-col-resizing * {
     width: 22px;
     height: 22px;
     flex-shrink: 0;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
     color: var(--color-text-secondary);
@@ -1078,7 +1078,7 @@ body.bk-col-resizing * {
     padding: var(--spacing-2);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     font-size: var(--font-size-sm);
     animation: bk-menu-in var(--transition-fast) ease-out;
@@ -1101,7 +1101,7 @@ body.bk-col-resizing * {
     width: 100%;
     padding: 7px var(--spacing-2);
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text);
     font-family: inherit;
@@ -1222,7 +1222,7 @@ body.bk-col-resizing * {
     justify-content: center;
     width: 22px;
     height: 22px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
     color: var(--color-text-secondary);
@@ -1297,7 +1297,7 @@ body.bk-col-resizing * {
     align-items: center;
     gap: var(--spacing-2);
     padding: 7px 8px 7px var(--spacing-4);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-lg);
@@ -1346,7 +1346,7 @@ body.bk-col-resizing * {
     color: var(--color-text-secondary);
     background: transparent;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     cursor: pointer;
     white-space: nowrap;
     transition: background-color var(--transition-fast), color var(--transition-fast);
@@ -1415,7 +1415,7 @@ body.bk-col-resizing * {
     padding: var(--spacing-3);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-sm);
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -1439,7 +1439,7 @@ body.bk-col-resizing * {
     color: var(--bk-drop-blue);
     background: color-mix(in srgb, var(--bk-drop-blue) 8%, var(--color-surface-2));
     border: 2px dashed var(--bk-drop-blue);
-    border-radius: inherit;
+    border-radius: inherit; corner-shape: inherit;
     pointer-events: none;
     z-index: 5;
 }
@@ -1499,7 +1499,7 @@ body.bk-col-resizing * {
     width: 36px;
     padding: 8px 0;
     border: 0;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
@@ -1550,7 +1550,7 @@ body.bk-col-resizing * {
     align-items: center;
     gap: var(--spacing-2);
     padding: 7px 8px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background: transparent;
     cursor: grab;
     transition: background-color var(--transition-fast);
@@ -1625,7 +1625,7 @@ body.bk-col-resizing * {
     max-height: 320px;
     overflow-y: auto;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-2);
     margin-bottom: var(--spacing-4);
 }
@@ -1635,7 +1635,7 @@ body.bk-col-resizing * {
     align-items: center;
     gap: var(--spacing-2);
     padding: var(--spacing-1) var(--spacing-2);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     cursor: pointer;
     font-size: var(--font-size-sm);
 }
@@ -1663,7 +1663,7 @@ body.bk-col-resizing * {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
     background: var(--color-accent-subtle);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     padding: var(--spacing-2) var(--spacing-3);
     margin-bottom: var(--spacing-3);
 }
@@ -1677,7 +1677,7 @@ body.bk-col-resizing * {
     background: var(--color-warning-subtle);
     border: 1px solid var(--color-warning);
     color: var(--color-warning);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-3);
     font-size: var(--font-size-sm);
     margin-bottom: var(--spacing-3);
@@ -1703,7 +1703,7 @@ body.bk-col-resizing * {
     max-height: 340px;
     overflow: auto;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .bk-preview-table {
@@ -1743,7 +1743,7 @@ body.bk-col-resizing * {
 .bk-preview-dup-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     font-weight: 600;
     background: color-mix(in srgb, var(--c-warning) 16%, transparent);
@@ -1760,7 +1760,7 @@ body.bk-col-resizing * {
     gap: var(--spacing-2) var(--spacing-3);
     background: var(--color-surface-3);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-3);
     margin: var(--spacing-3) 0;
     text-align: left;
@@ -1795,7 +1795,7 @@ body.bk-col-resizing * {
     background: var(--color-danger-subtle);
     border: 1px solid var(--color-danger);
     color: var(--color-danger);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-3);
     font-size: var(--font-size-sm);
     margin-bottom: var(--spacing-3);
@@ -1847,7 +1847,7 @@ body.bk-col-resizing * {
     background: var(--color-text);
     color: var(--color-bg);
     padding: var(--spacing-2) var(--spacing-4);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     font-size: var(--font-size-sm);
     font-weight: 500;
     box-shadow: var(--shadow-lg);
@@ -1893,7 +1893,7 @@ body.bk-col-resizing * {
     background: var(--color-border);
     border: 3px solid transparent;
     background-clip: content-box;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
 }
 
 .bk-table-wrap::-webkit-scrollbar-thumb:hover,
@@ -1992,7 +1992,7 @@ body.bk-col-resizing * {
     vertical-align: -1px;
     border: 1.5px solid var(--c-claude-soft);
     border-top-color: var(--c-claude);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     animation: bkReadingSpin 0.8s linear infinite;
 }
 
@@ -2043,7 +2043,7 @@ body.bk-col-resizing * {
     max-width: 100%;
     height: 24px;
     padding: 0 3px 0 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-claude-softer);
     box-shadow: inset 0 0 0 1px var(--c-claude-soft);
 }
@@ -2068,7 +2068,7 @@ body.bk-col-resizing * {
     height: 18px;
     padding: 0 8px;
     border: none;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent);
     color: #FFFFFF;
     font: 600 11px/1 var(--font);
@@ -2094,7 +2094,7 @@ body.bk-col-resizing * {
     height: 18px;
     padding: 0;
     border: none;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--color-text-muted);
     font-size: 14px;
@@ -2116,7 +2116,7 @@ body.bk-col-resizing * {
     height: 24px;
     padding: 0 10px;
     border: none;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-claude-soft);
     color: var(--c-claude-2);
     font: 600 var(--t-xs)/1 var(--font);

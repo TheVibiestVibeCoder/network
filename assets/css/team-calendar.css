@@ -115,7 +115,7 @@
 /* Every control in the toolbar is the same height and shape. */
 .tcal-toolbar .btn {
     height: var(--tcal-ctl);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
 }
 
 .tcal-toolbar .btn-icon,
@@ -130,7 +130,7 @@
     align-items: stretch;
     height: var(--tcal-ctl);
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--ctl);
     overflow: hidden;
 }
@@ -178,7 +178,7 @@
     display: inline-flex;
     height: var(--tcal-ctl);
     padding: 3px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-tint-2);
 }
 
@@ -190,7 +190,7 @@
     font-size: var(--t-sm);
     font-weight: 500;
     padding: 0 14px;
-    border-radius: 6px;
+    border-radius: calc(6px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     cursor: pointer;
 }
 
@@ -226,7 +226,7 @@
     place-items: center;
     width: var(--face);
     height: var(--face);
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     overflow: hidden;
     /* Initials on the CRM's neutral grey, as on every other face; a profile
        picture brings its own look - nothing behind it shows through. */
@@ -278,7 +278,7 @@
     height: var(--tcal-ctl);
     padding: 0 8px 0 6px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--ctl, var(--c-surface));
     color: var(--c-ink-3);
     font: inherit;
@@ -314,7 +314,7 @@
     width: auto;
     min-width: 24px;
     padding: 0 5px;
-    border-radius: 12px;
+    border-radius: calc(12px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     font-size: 10px;
 }
 
@@ -333,7 +333,7 @@
     width: 240px;
     max-width: calc(100vw - 32px);
     padding: 6px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     box-shadow: var(--e-3);
 }
@@ -349,7 +349,7 @@
     width: 100%;
     padding: 7px 8px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-3);
     font: inherit;
@@ -412,7 +412,7 @@
     padding: 8px;
     border: 0;
     border-top: 1px solid var(--c-line-2);
-    border-radius: 0 0 var(--r-sm) var(--r-sm);
+    border-radius: 0 0 var(--r-sm) var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-accent);
     font: inherit;
@@ -444,7 +444,7 @@
     height: 30px;
     padding: 0 8px 0 3px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     color: var(--c-ink-4);
     font: inherit;
@@ -503,7 +503,7 @@
     place-items: center;
     width: 16px;
     height: 16px;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--c-danger);
     color: #FFFFFF;
     font-weight: 700;
@@ -516,7 +516,7 @@
     width: 26px;
     height: 26px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -561,7 +561,7 @@
     height: var(--tcal-ctl);
     padding: 0 38px 0 36px;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--ctl);
     color: var(--c-ink);
     font: inherit;
@@ -584,7 +584,7 @@
     width: 28px;
     height: 28px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: none;
     color: var(--c-ink-3);
     font-size: 20px;
@@ -654,7 +654,7 @@
     background: var(--c-surface);
     border: 1px solid transparent;
     box-shadow: var(--e-1);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -724,7 +724,7 @@
     flex: none;
     width: 7px;
     height: 7px;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--tcal-mine);
 }
 
@@ -767,7 +767,7 @@
     width: 28px;
     height: 28px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: none;
     color: var(--c-ink-4);
     cursor: pointer;
@@ -798,7 +798,7 @@
 
 .tcal-free-card {
     padding: 14px 16px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     border: 1px solid transparent;
     box-shadow: var(--e-1);
     background: var(--c-surface);
@@ -828,7 +828,7 @@
     width: auto;
     min-width: 120px;
     height: var(--tcal-ctl);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
 }
 
 .tcal-free .btn-small {
@@ -897,7 +897,7 @@
     align-items: baseline;
     gap: 6px;
     padding: 4px 10px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     border: 1px dashed color-mix(in srgb, var(--c-success) 65%, transparent);
     background: var(--c-success-soft);
     color: var(--c-success-ink);
@@ -944,7 +944,7 @@
     position: absolute;
     inset: 0;
     background: var(--c-surface);
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -1019,7 +1019,7 @@ button.tcal-dayhead:hover {
     place-items: center;
     min-width: 28px;
     height: 28px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font-size: var(--t-md);
     font-weight: 600;
     color: var(--c-ink);
@@ -1148,13 +1148,13 @@ button.tcal-dayhead:hover {
 .tcal-buffer.is-before {
     align-items: flex-start;
     padding-top: 4px;
-    border-radius: 10px 10px 0 0;
+    border-radius: calc(10px * var(--squircle-scale)) calc(10px * var(--squircle-scale)) 0 0; corner-shape: var(--squircle-shape);
 }
 
 .tcal-buffer.is-after {
     align-items: flex-end;
     padding-bottom: 4px;
-    border-radius: 0 0 10px 10px;
+    border-radius: 0 0 calc(10px * var(--squircle-scale)) calc(10px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 .tcal-buffer-tag {
@@ -1214,7 +1214,7 @@ button.tcal-dayhead:hover {
     width: 10px;
     height: 10px;
     margin-top: -4px;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--c-danger);
     box-shadow: 0 0 0 2px var(--c-surface);
     pointer-events: none;
@@ -1318,7 +1318,7 @@ button.tcal-dayhead:hover {
     min-width: 0;
     overflow: hidden;
     border: 0;
-    border-radius: 8px;
+    border-radius: calc(8px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: var(--ev-bg);
     color: var(--ev-ink);
     font: inherit;
@@ -1440,7 +1440,7 @@ button.tcal-dayhead:hover {
     width: auto;
     min-width: 18px;
     padding: 0 4px;
-    border-radius: 9px;
+    border-radius: calc(9px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: var(--ev-plus);
     color: #FFFFFF;
     font-size: 9px;
@@ -1696,7 +1696,7 @@ button.tcal-dayhead:hover {
     flex-wrap: wrap;
     margin: 0 0 18px;
     padding: 10px 12px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-sunken);
 }
 
@@ -1711,7 +1711,7 @@ button.tcal-dayhead:hover {
     min-width: 64px;
     padding: 6px 12px;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--ctl);
     color: var(--c-ink-2);
     font: inherit;
@@ -1796,7 +1796,7 @@ button.tcal-dayhead:hover {
 
 .esheet-desc {
     padding: 10px 12px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-sunken);
     font-size: var(--t-sm);
     color: var(--c-ink-2);
@@ -1909,7 +1909,7 @@ button.tcal-dayhead:hover {
     height: 32px;
     padding: 0 12px 0 10px;
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: 999px; corner-shape: round;
     background: var(--ctl);
     color: var(--c-ink-2);
     font: inherit;
@@ -1946,7 +1946,7 @@ button.tcal-dayhead:hover {
     gap: 7px;
     padding: 3px 12px 3px 3px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--ctl);
     font-size: var(--t-sm);
     color: var(--c-ink-3);
@@ -1990,7 +1990,7 @@ button.tcal-dayhead:hover {
     margin: 0 0 18px;
     padding: 12px 14px;
     border: 1px solid color-mix(in srgb, var(--c-warning) 45%, transparent);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-warning-soft);
     font-size: var(--t-sm);
     color: var(--c-ink-2);
@@ -2026,7 +2026,7 @@ button.tcal-dayhead:hover {
     align-items: center;
     max-width: 100%;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--ctl);
 }
 
@@ -2070,7 +2070,7 @@ button.tcal-dayhead:hover {
     height: 26px;
     margin-right: 2px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-4);
     font-size: 16px;
@@ -2089,7 +2089,7 @@ button.tcal-dayhead:hover {
     gap: 8px;
     margin: 10px 0 0;
     padding: 8px 10px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-accent-softer);
     font-size: var(--t-sm);
     color: var(--c-ink-2);
@@ -2127,7 +2127,7 @@ button.tcal-dayhead:hover {
     gap: 8px;
     padding: 7px 8px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink);
     font: inherit;
@@ -2198,7 +2198,7 @@ button.tcal-dayhead:hover {
     padding: 7px 8px;
     margin: 0 -8px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink);
     font: inherit;
@@ -2233,7 +2233,7 @@ button.tcal-dayhead:hover {
     width: 7px;
     height: 7px;
     margin: 0 7px 1px 0;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--tcal-mine, #30599D);
 }
 
@@ -2462,7 +2462,7 @@ button.tcal-dayhead:hover {
     height: 26px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -2506,7 +2506,7 @@ button.tcal-dayhead:hover {
     width: 34px;
     height: 30px;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     font-size: var(--t-xs);
     font-weight: 600;
     color: var(--c-ink-4);
@@ -2629,7 +2629,7 @@ button.tcal-dayhead:hover {
     height: 22px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--c-accent);
     color: #FFFFFF;
     box-shadow: var(--e-2);
@@ -2653,7 +2653,7 @@ button.tcal-dayhead:hover {
     min-width: 14px;
     height: 14px;
     padding: 0 3px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     color: var(--c-accent);
     font-size: 9px;
@@ -2679,7 +2679,7 @@ button.tcal-dayhead:hover {
     right: 4px;
     z-index: 6;
     padding: 4px 8px;
-    border-radius: 8px;
+    border-radius: calc(8px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: color-mix(in srgb, var(--c-accent) 22%, transparent);
     outline: 1.5px solid var(--c-accent);
     outline-offset: -1.5px;
@@ -2709,7 +2709,7 @@ button.tcal-dayhead:hover {
 .esheet-readonly {
     margin: 0;
     padding: 10px 12px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
     font-size: var(--t-xs);
     line-height: 1.5;
@@ -2814,7 +2814,7 @@ button.tcal-dayhead:hover {
     min-width: 18px;
     height: 18px;
     padding: 0 5px;
-    border-radius: 9px;
+    border-radius: calc(9px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: var(--c-accent);
     color: #FFFFFF;
     font-size: 10px;

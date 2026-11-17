@@ -86,7 +86,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
     background: var(--color-text-muted);
-    border-radius: 3px;
+    border-radius: calc(3px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -136,7 +136,7 @@ body {
 
 .alert {
     padding: var(--spacing-3) var(--spacing-4);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     margin-bottom: var(--spacing-4);
     font-size: var(--font-size-sm);
 }
@@ -172,7 +172,7 @@ body {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background-color: var(--color-surface-2);
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -202,7 +202,7 @@ textarea.form-input {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background-color: var(--color-surface-2);
     cursor: pointer;
     appearance: none;
@@ -238,7 +238,7 @@ textarea.form-input {
     font-size: var(--font-size-sm);
     font-weight: 500;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: all var(--transition-fast);
     text-decoration: none;
@@ -347,7 +347,7 @@ textarea.form-input {
     padding: 3px 10px;
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
 }
 
 .header-center {
@@ -386,7 +386,7 @@ textarea.form-input {
     display: flex;
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: 2px;
 }
 
@@ -401,7 +401,7 @@ textarea.form-input {
     color: var(--color-text-muted);
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -500,7 +500,7 @@ textarea.form-input {
     flex: 1;
     padding: 6px 10px;
     border: none;
-    border-radius: 6px;
+    border-radius: calc(6px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     font-family: var(--font-family);
     font-size: var(--font-size-xs);
     font-weight: 600;
@@ -556,7 +556,7 @@ textarea.form-input {
 
 .marker-cluster {
     background-clip: padding-box;
-    border-radius: 20px;
+    border-radius: calc(20px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 .marker-cluster div {
@@ -565,7 +565,7 @@ textarea.form-input {
     margin-left: 5px;
     margin-top: 5px;
     text-align: center;
-    border-radius: 15px;
+    border-radius: calc(15px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     font: 12px var(--font-family);
     font-weight: 700;
     line-height: 30px;
@@ -679,7 +679,7 @@ textarea.form-input {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     padding: 2px 8px;
 }
 
@@ -690,7 +690,7 @@ textarea.form-input {
     min-width: 24px;
     height: 24px;
     padding: 0 7px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     background-color: var(--color-surface-3);
@@ -719,7 +719,7 @@ textarea.form-input {
 .todo-item {
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-3);
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -789,7 +789,7 @@ textarea.form-input {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     background-color: var(--color-surface-3);
@@ -806,7 +806,7 @@ textarea.form-input {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     border: 1px solid transparent;
 }
@@ -833,7 +833,7 @@ textarea.form-input {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     border: 1px solid transparent;
 }
@@ -938,7 +938,7 @@ textarea.form-input {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background-color: var(--color-surface-2);
     transition: border-color var(--transition-fast);
 }
@@ -1013,7 +1013,7 @@ textarea.form-input {
     font-weight: 500;
     color: var(--color-text-muted);
     background-color: var(--color-surface-3);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
 }
 
 .contact-card {
@@ -1024,7 +1024,7 @@ textarea.form-input {
     height: 60px;
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     margin-bottom: 4px;
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -1038,7 +1038,7 @@ textarea.form-input {
 .contact-card.in-group {
     margin-left: var(--spacing-2);
     border-left: 2px solid var(--color-text-muted);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0; corner-shape: var(--squircle-shape);
 }
 
 .contact-card.in-group:hover {
@@ -1056,7 +1056,7 @@ textarea.form-input {
     color: var(--color-text);
     font-size: var(--font-size-xs);
     font-weight: 600;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -1186,7 +1186,7 @@ textarea.form-input {
     max-height: 90dvh;
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
@@ -1230,7 +1230,7 @@ textarea.form-input {
     color: var(--color-text-muted);
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -1349,7 +1349,7 @@ textarea.form-input {
     color: var(--color-text-secondary);
     font-size: var(--font-size-base);
     font-weight: 600;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -1401,7 +1401,7 @@ textarea.form-input {
     padding: var(--spacing-3);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .detail-item-full {
@@ -1492,7 +1492,7 @@ textarea.form-input {
     padding: var(--spacing-3) var(--spacing-4);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     margin-bottom: var(--spacing-2);
     border-left: 2px solid var(--color-text-muted);
 }
@@ -1529,7 +1529,7 @@ textarea.form-input {
     padding: 4px;
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     color: var(--color-text-muted);
     cursor: pointer;
     opacity: 0;
@@ -1597,7 +1597,7 @@ textarea.form-input {
     align-items: center;
     gap: 4px;
     padding: 3px 10px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     font-weight: 500;
     border: 1px solid;
@@ -1613,7 +1613,7 @@ textarea.form-input {
     background: transparent;
     color: inherit;
     cursor: pointer;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     opacity: 0.5;
     transition: opacity var(--transition-fast);
 }
@@ -1650,7 +1650,7 @@ textarea.form-input {
     right: 0;
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     margin-top: 4px;
     max-height: 200px;
@@ -1692,7 +1692,7 @@ textarea.form-input {
     right: 0;
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     margin-top: 4px;
     max-height: 180px;
@@ -1730,7 +1730,7 @@ textarea.form-input {
 .tag-dot {
     width: 8px;
     height: 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -1765,7 +1765,7 @@ textarea.form-input {
 .tag-count {
     margin-left: auto;
     padding: 1px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     font-weight: 600;
 }
@@ -1795,7 +1795,7 @@ textarea.form-input {
     width: 24px;
     height: 24px;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
@@ -1825,7 +1825,7 @@ textarea.form-input {
     width: 28px;
     height: 28px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: none;
     padding: 1px;
     cursor: pointer;
@@ -1837,7 +1837,7 @@ textarea.form-input {
     min-width: 0;
     padding: 4px 8px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: var(--color-surface-2);
     color: var(--color-text-primary);
     font-size: var(--font-size-xs);
@@ -1859,7 +1859,7 @@ textarea.form-input {
     width: 26px;
     height: 26px;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
@@ -1924,7 +1924,7 @@ textarea.form-input {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     background-color: var(--color-surface-2);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     padding: 1px 6px;
 }
 
@@ -1932,7 +1932,7 @@ textarea.form-input {
     display: flex;
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: 2px;
 }
 
@@ -1943,7 +1943,7 @@ textarea.form-input {
     padding: 6px 12px;
     border: none;
     background: transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     font-family: var(--font-family);
     font-size: var(--font-size-xs);
     font-weight: 500;
@@ -1978,7 +1978,7 @@ textarea.form-input {
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     flex-shrink: 0;
 }
 
@@ -1995,7 +1995,7 @@ textarea.form-input {
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     flex-shrink: 0;
 }
 
@@ -2033,7 +2033,7 @@ textarea.form-input {
 .import-instructions {
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     padding: var(--spacing-4);
     margin-bottom: var(--spacing-4);
 }
@@ -2066,7 +2066,7 @@ textarea.form-input {
     gap: var(--spacing-2);
     padding: var(--spacing-2);
     background-color: var(--color-surface-3);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     border: 1px solid var(--color-border);
 }
 
@@ -2086,7 +2086,7 @@ textarea.form-input {
     color: var(--color-text-secondary);
     background-color: var(--color-surface);
     padding: 1px 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     margin-left: auto;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -2134,7 +2134,7 @@ textarea.form-input {
 /* File Upload */
 .file-upload-area {
     border: 1px dashed var(--color-text-muted);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     padding: var(--spacing-6);
     text-align: center;
     cursor: pointer;
@@ -2196,7 +2196,7 @@ textarea.form-input {
     gap: var(--spacing-3);
     padding: var(--spacing-3);
     background-color: var(--color-surface-3);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .upload-file-info svg {
@@ -2224,7 +2224,7 @@ textarea.form-input {
     color: var(--color-text-muted);
     background: transparent;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -2240,7 +2240,7 @@ textarea.form-input {
     padding: var(--spacing-4);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .import-progress {
@@ -2300,7 +2300,7 @@ textarea.form-input {
     height: 18px;
     border: 2px solid var(--color-border);
     border-top-color: var(--color-text);
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     animation: spin 0.7s linear infinite;
 }
 
@@ -2309,7 +2309,7 @@ textarea.form-input {
     height: 14px;
     border: 2px solid rgba(0, 0, 0, 0.2);
     border-top-color: var(--color-bg);
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     animation: spin 0.7s linear infinite;
 }
 
@@ -2379,7 +2379,7 @@ textarea.form-input {
     font-size: var(--font-size-sm);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background-color: var(--color-surface-2);
     transition: border-color var(--transition-fast);
 }
@@ -2448,7 +2448,7 @@ textarea.form-input {
     padding: var(--spacing-4);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -2524,7 +2524,7 @@ textarea.form-input {
     display: inline-flex;
     align-items: center;
     padding: 1px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     border: 1px solid var(--color-border);
     background-color: var(--color-surface-3);
     font-size: 10px;
@@ -2571,7 +2571,7 @@ textarea.form-input {
 .cal-day-tag {
     display: inline-flex;
     padding: 1px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: 10px;
     font-weight: 500;
     border: 1px solid;
@@ -2875,7 +2875,7 @@ textarea.form-input {
 .project-stage-badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     font-weight: 500;
     text-transform: uppercase;
@@ -2924,7 +2924,7 @@ textarea.form-input {
 .project-card {
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-4);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -3041,7 +3041,7 @@ textarea.form-input {
 
 .project-contact-item:hover {
     background: var(--color-surface-hover);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     padding-left: var(--spacing-2);
     margin-left: calc(-1 * var(--spacing-2));
     padding-right: var(--spacing-2);
@@ -3092,7 +3092,7 @@ textarea.form-input {
     padding: var(--spacing-4);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: all var(--transition-fast);
 }
@@ -3145,7 +3145,7 @@ textarea.form-input {
     margin-top: var(--spacing-1);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
     max-height: 300px;
     overflow-y: auto;
@@ -3258,7 +3258,7 @@ textarea.form-input {
     justify-content: center;
     width: 28px;
     height: 28px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     border: none;
     cursor: pointer;
@@ -3299,7 +3299,7 @@ textarea.form-input {
     padding: var(--spacing-5) var(--spacing-5);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
 }
 
 .dashboard-card-icon {
@@ -3308,7 +3308,7 @@ textarea.form-input {
     justify-content: center;
     width: 44px;
     height: 44px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background: var(--color-primary)1a;
     color: var(--color-primary);
     flex-shrink: 0;
@@ -3440,7 +3440,7 @@ textarea.form-input {
         margin: var(--spacing-3);
         height: calc(100% - var(--spacing-3) * 2);
         max-height: calc(100dvh - var(--spacing-3) * 2);
-        border-radius: var(--radius-lg);
+        border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     }
 
     #projectOverviewModal .modal-body {
@@ -3505,7 +3505,7 @@ textarea.form-input {
     padding: var(--spacing-2);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-sm);
 }
 
@@ -3518,7 +3518,7 @@ textarea.form-input {
     margin-bottom: var(--spacing-2);
     padding: var(--spacing-2) var(--spacing-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background: linear-gradient(180deg, var(--color-surface-2), var(--color-surface));
 }
 
@@ -3550,7 +3550,7 @@ textarea.form-input {
     margin-bottom: var(--spacing-2);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -3565,7 +3565,7 @@ textarea.form-input {
 .contact-card.in-group {
     margin-left: 0;
     border-left: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .contact-card-main {
@@ -3622,7 +3622,7 @@ textarea.form-input {
     align-items: center;
     padding: 2px 8px;
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface);
     color: var(--color-text-muted);
     font-size: 11px;
@@ -3657,7 +3657,7 @@ textarea.form-input {
     height: 28px;
     padding: 0;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--color-text-muted);
     cursor: pointer;
@@ -3710,7 +3710,7 @@ textarea.form-input {
     font-size: 11px;
     font-weight: 700;
     padding: 1px 7px;
-    border-radius: 999px;
+    border-radius: 999px; corner-shape: round;
 }
 
 .contact-card--pinned {
@@ -3732,7 +3732,7 @@ textarea.form-input {
     padding: var(--spacing-4);
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     cursor: pointer;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -3792,7 +3792,7 @@ textarea.form-input {
     align-items: center;
     gap: 6px;
     padding: 5px 9px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     border: 1px solid var(--color-border-subtle);
     background: var(--color-surface);
     color: var(--color-text-secondary);
@@ -3815,7 +3815,7 @@ textarea.form-input {
     position: relative;
     flex: 1;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--color-surface);
     border: 1px solid var(--color-border-subtle);
     overflow: hidden;
@@ -3826,7 +3826,7 @@ textarea.form-input {
     top: 0;
     left: 0;
     bottom: 0;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background: var(--c-success);
 }
 
@@ -3872,7 +3872,7 @@ textarea.form-input {
     .company-group,
     .tag-group {
         padding: var(--spacing-2);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     }
 
     .contact-card {
@@ -3897,7 +3897,7 @@ textarea.form-input {
 
     .project-card {
         padding: var(--spacing-3);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     }
 
     .project-card-head {
@@ -4051,7 +4051,7 @@ textarea.form-input {
     min-height: 42px;
     padding: 7px 10px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     background: var(--color-surface-2);
     justify-content: flex-start;
 }
@@ -4855,7 +4855,7 @@ textarea.form-input {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     padding: var(--spacing-2) var(--spacing-3);
-    border-radius: var(--radius-md, 6px);
+    border-radius: var(--radius-md, 6px); corner-shape: var(--squircle-shape);
     background: var(--color-surface, rgba(0, 0, 0, 0.06));
     color: var(--color-text);
 }
@@ -4869,7 +4869,7 @@ textarea.form-input {
     padding: var(--spacing-1) var(--spacing-3) var(--spacing-1) var(--spacing-1);
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     max-width: 220px;
 }
 
@@ -4886,7 +4886,7 @@ textarea.form-input {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.02em;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -4907,7 +4907,7 @@ textarea.form-input {
     color: var(--color-text-tertiary);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     padding: 1px 6px;
     flex-shrink: 0;
 }
@@ -4938,7 +4938,7 @@ textarea.form-input {
 .users-link-box {
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     padding: var(--spacing-3) var(--spacing-4);
     margin-bottom: var(--spacing-5);
 }
@@ -5002,7 +5002,7 @@ textarea.form-input {
     padding: var(--spacing-3);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     transition: border-color var(--transition-fast);
 }
 
@@ -5025,7 +5025,7 @@ textarea.form-input {
     color: var(--color-text-secondary);
     font-size: var(--font-size-xs);
     font-weight: 700;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -5062,7 +5062,7 @@ textarea.form-input {
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     padding: 2px 7px;
     white-space: nowrap;
 }
@@ -5109,7 +5109,7 @@ textarea.form-input {
     height: 30px;
     background: none;
     border: 1px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
     color: var(--color-text-tertiary);
     cursor: pointer;
     transition: background-color var(--transition-fast), color var(--transition-fast),
@@ -5156,7 +5156,7 @@ textarea.form-input {
 .by-line-dot {
     width: 4px;
     height: 4px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     background-color: var(--color-border);
     flex-shrink: 0;
 }
@@ -5174,7 +5174,7 @@ textarea.form-input {
     justify-content: center;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: 8px;
     font-weight: 700;
     color: var(--color-text-tertiary);
@@ -5227,7 +5227,7 @@ textarea.form-input {
     height: 100%;
     object-fit: cover;
     display: block;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
 }
 
 /* --- The header chip is now a button ------------------------------------ */
@@ -5264,7 +5264,7 @@ button.user-chip:focus-visible {
     padding: var(--spacing-4);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--shadow-lg);
 }
 
@@ -5287,7 +5287,7 @@ button.user-chip:focus-visible {
     color: var(--color-bg);
     font-size: var(--font-size-sm);
     font-weight: 700;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     flex-shrink: 0;
 }
 
@@ -5364,7 +5364,7 @@ button.user-chip:focus-visible {
     flex-shrink: 0;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     color: var(--color-text-tertiary);
     font-size: 9px;
     font-weight: 700;
@@ -5405,7 +5405,7 @@ button.user-chip:focus-visible {
     margin-bottom: var(--spacing-5);
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
 }
 
 .assignee-bar-face {
@@ -5417,7 +5417,7 @@ button.user-chip:focus-visible {
     flex-shrink: 0;
     background-color: var(--color-text);
     color: var(--color-bg);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-xs);
     font-weight: 700;
     overflow: hidden;
@@ -5486,7 +5486,7 @@ button.user-chip:focus-visible {
     font-size: 9px;
     font-weight: 700;
     line-height: 1;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     pointer-events: none;
 }
 
@@ -5530,7 +5530,7 @@ button.user-chip:focus-visible {
     flex-shrink: 0;
     background-color: var(--color-text);
     color: var(--color-bg);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     font-size: var(--font-size-base);
     font-weight: 700;
     overflow: hidden;
@@ -5592,7 +5592,7 @@ button.user-chip:focus-visible {
     font-weight: 700;
     color: var(--color-text-muted);
     background-color: var(--color-surface-3);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     padding: 1px 7px;
 }
 
@@ -5639,7 +5639,7 @@ details.workload-done[open] > summary::after {
     padding: var(--spacing-3);
     background-color: var(--color-surface-2);
     border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md); corner-shape: var(--squircle-shape);
     text-align: left;
     font-family: inherit;
     cursor: pointer;
@@ -5667,7 +5667,7 @@ details.workload-done[open] > summary::after {
     justify-content: center;
     flex-shrink: 0;
     border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     color: var(--color-text-tertiary);
     font-size: 9px;
     font-weight: 700;
@@ -5770,7 +5770,7 @@ div.workload-row {
 .workload-row-main:focus-visible {
     outline: 2px solid var(--color-text-tertiary);
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-sm); corner-shape: var(--squircle-shape);
 }
 
 .workload-row-body {
@@ -5821,7 +5821,7 @@ div.workload-row {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
     padding: 2px 7px;
 }
 
@@ -5856,7 +5856,7 @@ div.workload-row {
     justify-content: center;
     background-color: var(--color-surface-3);
     color: var(--color-text-muted);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-full); corner-shape: round;
 }
 
 .workload-empty-title {

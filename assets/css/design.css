@@ -95,11 +95,17 @@
     --t-2xl: 26px;
     --t-3xl: 32px;
 
-    --r-xs: 6px;
-    --r-sm: 8px;
-    --r-md: 10px;
-    --r-lg: 14px;
-    --r-xl: 20px;
+    /* Squircles: every rounded rectangle has 60% corner smoothing, as in
+       Figma (see the @supports block below the tokens). The scale is 1
+       where a browser cannot draw the shape, so plain corners stay as they
+       were. Circles and pills (50%, --r-full) keep corner-shape: round. */
+    --squircle-scale: 1;
+    --squircle-shape: superellipse(1.78);
+    --r-xs: calc(6px * var(--squircle-scale));
+    --r-sm: calc(8px * var(--squircle-scale));
+    --r-md: calc(10px * var(--squircle-scale));
+    --r-lg: calc(14px * var(--squircle-scale));
+    --r-xl: calc(20px * var(--squircle-scale));
     --r-full: 999px;
 
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -113,6 +119,26 @@
     --page-pad: 32px;
     --page-max: 1280px;
     --control-h: 40px;
+}
+
+/* Squircles, as Figma's 60% corner smoothing. Figma keeps the corner's
+   middle where the plain arc had it but starts the curve earlier, 1.6x the
+   radius along each side. The same here: radii 1.6x as long, and a
+   superellipse of exponent 2^1.78 meets that middle point. Each
+   border-radius in the stylesheets has its corner-shape beside it, so the
+   two always win together: --squircle-shape, or round for circles and
+   pills (50%, --r-full). The rule for all elements catches the rest, such
+   as Leaflet's controls and popups. */
+@supports (corner-shape: superellipse(2)) {
+    :root {
+        --squircle-scale: 1.6;
+    }
+
+    *,
+    *::before,
+    *::after {
+        corner-shape: var(--squircle-shape);
+    }
 }
 
 /* Light: the company colours. */
@@ -383,7 +409,7 @@ h1, h2, h3, h4 {
 *::-webkit-scrollbar-thumb {
     background: var(--c-line-strong);
     border: 3px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background-clip: padding-box;
 }
 
@@ -535,7 +561,7 @@ h1, h2, h3, h4 {
     margin: -6px -6px -6px auto;
     padding: 0;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -578,7 +604,7 @@ h1, h2, h3, h4 {
     padding: 0 10px 0 12px;
     margin: 0;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-2);
     font: 500 var(--t-base)/1 var(--font);
@@ -635,7 +661,7 @@ h1, h2, h3, h4 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -691,7 +717,7 @@ h1, h2, h3, h4 {
     height: 34px;
     padding: 0;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
 }
 
 .sidebar-team .team-item .team-face {
@@ -716,7 +742,7 @@ h1, h2, h3, h4 {
     height: 38px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-2);
     font: 500 var(--t-sm)/1 var(--font);
@@ -741,7 +767,7 @@ h1, h2, h3, h4 {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: 10px;
@@ -797,7 +823,7 @@ h1, h2, h3, h4 {
     height: auto;
     padding: 6px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     text-align: left;
     cursor: pointer;
@@ -1009,7 +1035,7 @@ h1, h2, h3, h4 {
     height: var(--control-h);
     padding: 0 14px 0 38px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     color: var(--c-ink);
     font: 400 var(--t-base)/1 var(--font);
@@ -1076,7 +1102,7 @@ h1, h2, h3, h4 {
     height: var(--control-h);
     padding: 0 16px;
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     font: 500 var(--t-base)/1 var(--font);
     letter-spacing: 0;
     text-transform: none;
@@ -1141,7 +1167,7 @@ h1, h2, h3, h4 {
     height: 32px;
     padding: 0 12px;
     font-size: var(--t-sm);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
 }
 
 .btn-small svg {
@@ -1198,7 +1224,7 @@ textarea.form-input {
     height: var(--control-h);
     padding: 0 12px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     color: var(--c-ink);
     font: 400 var(--t-base)/1.4 var(--font);
@@ -1273,7 +1299,7 @@ input[type="checkbox"] {
     padding: 3px;
     background: var(--c-tint-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 .segmented-btn,
@@ -1284,7 +1310,7 @@ input[type="checkbox"] {
     height: 32px;
     padding: 0 12px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-2);
     font: 500 var(--t-sm)/1 var(--font);
@@ -1321,7 +1347,7 @@ input[type="checkbox"] {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint);
     border: 0;
     color: var(--c-ink);
@@ -1349,7 +1375,7 @@ input[type="checkbox"] {
     height: 22px;
     padding: 0 9px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
     color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
     font: 600 var(--t-xs)/1 var(--font);
@@ -1413,7 +1439,7 @@ input[type="checkbox"] {
 .view-panel .todos-list {
     gap: 0;
     background: var(--c-surface);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -1429,7 +1455,7 @@ input[type="checkbox"] {
     padding: 0;
     background: var(--c-surface);
     border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -1506,7 +1532,7 @@ input[type="checkbox"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -1595,7 +1621,7 @@ input[type="checkbox"] {
     place-items: center;
     flex-shrink: 0;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-4);
     opacity: 0;
@@ -1656,7 +1682,7 @@ input[type="checkbox"] {
     min-height: 360px;
     position: relative;
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
     box-shadow: var(--e-1);
     background: var(--c-sunken);
@@ -1691,7 +1717,7 @@ input[type="checkbox"] {
     margin: 0 0 16px;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     color: var(--c-ink);
 }
@@ -1742,7 +1768,7 @@ input[type="checkbox"] {
 }
 
 .rf-expand:hover { color: var(--c-accent); }
-.rf-expand:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+.rf-expand:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: calc(4px * var(--squircle-scale)); corner-shape: var(--squircle-shape); }
 
 .rf-expand svg {
     width: 14px;
@@ -1784,7 +1810,7 @@ input[type="checkbox"] {
     height: 36px;
     padding: 0 12px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     color: var(--c-ink-2);
     font: 500 var(--t-sm)/1 var(--font);
@@ -1824,7 +1850,7 @@ input[type="checkbox"] {
     gap: 8px 20px;
     margin-top: -4px;
     padding: 8px 12px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
     animation: rf-panel-in var(--dur-2) var(--ease);
 }
@@ -1872,7 +1898,7 @@ input[type="checkbox"] {
     height: 28px;
     padding: 0 9px;
     border: 1px dashed var(--c-line-strong);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-4);
     font: 500 var(--t-sm)/1 var(--font);
@@ -1909,7 +1935,7 @@ input[type="checkbox"] {
 .rf-stage-dot {
     width: 8px;
     height: 8px;
-    border-radius: 2px;
+    border-radius: calc(2px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     flex-shrink: 0;
     box-shadow: inset 0 0 0 1.5px var(--c-line-strong);
 }
@@ -1997,7 +2023,7 @@ input[type="checkbox"] {
     justify-content: space-between;
     gap: 12px;
     padding: 3px 8px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
 }
 
 .rf-compare strong {
@@ -2082,7 +2108,7 @@ input[type="checkbox"] {
     margin: 0;
     padding: 0;
     border: 0;
-    border-radius: var(--r-xs) var(--r-xs) 0 0;
+    border-radius: var(--r-xs) var(--r-xs) 0 0; corner-shape: var(--squircle-shape);
     background: transparent;
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease);
@@ -2110,7 +2136,7 @@ input[type="checkbox"] {
     padding: 10px 12px 8px;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3, var(--e-2));
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
@@ -2146,7 +2172,7 @@ input[type="checkbox"] {
     margin: -3px -5px -3px 0;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -2183,7 +2209,7 @@ input[type="checkbox"] {
 .rf-tip-dot {
     width: 8px;
     height: 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--rf-tone, var(--stage-lead));
 }
 
@@ -2273,7 +2299,7 @@ input[type="checkbox"] {
    so even the corners keep clear of the edge. */
 .rf-ghost {
     border-bottom: 0;
-    border-radius: 4px 4px 0 0;
+    border-radius: calc(4px * var(--squircle-scale)) calc(4px * var(--squircle-scale)) 0 0; corner-shape: var(--squircle-shape);
     background: none;
 }
 
@@ -2281,7 +2307,7 @@ input[type="checkbox"] {
     content: "";
     position: absolute;
     inset: 2px 2px 0;
-    border-radius: 2px 2px 0 0;
+    border-radius: calc(2px * var(--squircle-scale)) calc(2px * var(--squircle-scale)) 0 0; corner-shape: var(--squircle-shape);
     background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1.5px, transparent 1.5px 5px);
 }
 
@@ -2290,7 +2316,7 @@ input[type="checkbox"] {
     height: 8px;
     flex-shrink: 0;
     padding: 1px;
-    border-radius: 2px;
+    border-radius: calc(2px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     background: repeating-linear-gradient(135deg, var(--rf-hatch) 0 1px, transparent 1px 2.5px) content-box;
 }
 
@@ -2307,7 +2333,7 @@ input[type="checkbox"] {
 }
 
 .rf-seg:last-child {
-    border-radius: 4px 4px 0 0;
+    border-radius: calc(4px * var(--squircle-scale)) calc(4px * var(--squircle-scale)) 0 0; corner-shape: var(--squircle-shape);
 }
 
 .rf-axis {
@@ -2430,7 +2456,7 @@ input[type="checkbox"] {
     width: 4px;
     height: 34px;
     margin-right: 12px;
-    border-radius: 2px;
+    border-radius: calc(2px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 .rf-row-text {
@@ -2508,7 +2534,7 @@ input[type="checkbox"] {
     height: 20px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-line-strong);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease);
@@ -2524,7 +2550,7 @@ input[type="checkbox"] {
     left: 2px;
     width: 16px;
     height: 16px;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: #FFFFFF;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     transition: transform var(--dur-1) var(--ease);
@@ -2591,7 +2617,7 @@ input[type="checkbox"] {
 
 .rf-skel {
     display: block;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: linear-gradient(90deg, var(--c-tint-2) 25%, var(--c-tint-3) 50%, var(--c-tint-2) 75%);
     background-size: 200% 100%;
     animation: rf-shimmer 1.4s ease-in-out infinite;
@@ -2677,7 +2703,7 @@ input[type="checkbox"] {
 
 #projectsView .filter-check-count {
     padding: 2px 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -2714,7 +2740,7 @@ input[type="checkbox"] {
     height: 32px;
     padding: 0 5px 0 14px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: color-mix(in srgb, var(--stage-tone) 14%, var(--c-surface));
     color: color-mix(in srgb, var(--stage-tone) 70%, var(--c-ink));
 }
@@ -2739,7 +2765,7 @@ input[type="checkbox"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: color-mix(in srgb, var(--stage-tone) 26%, var(--c-surface));
     color: inherit;
     font-size: var(--t-xs);
@@ -2772,7 +2798,7 @@ input[type="checkbox"] {
     /* No border: white on the grey page is edge enough, and the stage is
        already the group's heading. Transparent, so focus can still colour it. */
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     cursor: pointer;
     text-align: left;
@@ -2967,7 +2993,7 @@ input[type="checkbox"] {
     width: 15px;
     height: 15px;
     flex-shrink: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: conic-gradient(var(--c-accent) calc(var(--chance, 0) * 1%), var(--c-tint-2) 0);
     -webkit-mask: radial-gradient(closest-side, transparent 58%, #000 62%);
     mask: radial-gradient(closest-side, transparent 58%, #000 62%);
@@ -2996,7 +3022,7 @@ input[type="checkbox"] {
 
 .project-rows {
     background: var(--c-surface);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -3230,7 +3256,7 @@ input[type="checkbox"] {
     height: 20px;
     margin-top: 1px;
     border: 1.5px solid var(--c-line-strong);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
 }
 
@@ -3262,7 +3288,7 @@ input[type="checkbox"] {
     height: 22px;
     padding: 0 9px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font: 600 var(--t-xs)/1 var(--font);
     letter-spacing: 0;
     text-transform: none;
@@ -3376,7 +3402,7 @@ input[type="checkbox"] {
     align-items: center;
     justify-content: center;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -3388,7 +3414,7 @@ input[type="checkbox"] {
     display: block;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -3426,7 +3452,7 @@ input[type="checkbox"] {
     position: relative;
     background: var(--c-accent-soft);
     box-shadow: inset 0 0 0 2px var(--c-accent);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 #workloadView .workload-row.is-drop-target::after {
@@ -3436,7 +3462,7 @@ input[type="checkbox"] {
     right: 16px;
     transform: translateY(-50%);
     padding: 5px 11px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent);
     color: #FFFFFF;
     font-size: var(--t-xs);
@@ -3511,7 +3537,7 @@ input[type="checkbox"] {
     content: "";
     width: 7px;
     height: 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-ink-4);
 }
 
@@ -3543,7 +3569,7 @@ input[type="checkbox"] {
     font-size: var(--t-sm);
     background: var(--c-surface);
     border: 1px dashed var(--c-line-strong);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
 }
 
 .empty-state svg {
@@ -3642,7 +3668,7 @@ input[type="checkbox"] {
     align-items: center;
     justify-content: center;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -3683,7 +3709,7 @@ input[type="checkbox"] {
     width: 20px;
     height: 20px;
     border: 1.5px solid var(--c-line-strong);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
@@ -4140,7 +4166,7 @@ input[type="checkbox"] {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: var(--r-full);
+        border-radius: var(--r-full); corner-shape: round;
         background: var(--c-accent);
         color: #fff;
         font-size: 10px;
@@ -4272,7 +4298,7 @@ input[type="checkbox"] {
     /* The map takes the rest of the screen above the tab bar. */
     .contacts-map {
         min-height: 300px;
-        border-radius: var(--r-md);
+        border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     }
 }
 
@@ -4368,7 +4394,7 @@ input[type="checkbox"] {
 .contacts-map .leaflet-control-attribution {
     padding: 2px 8px;
     margin: 0 0 8px 8px !important;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: color-mix(in srgb, var(--c-surface) 82%, transparent);
     color: var(--c-ink-3);
     font-size: 11px;
@@ -4382,7 +4408,7 @@ input[type="checkbox"] {
 /* Zoom buttons in the design's own style. */
 .contacts-map .leaflet-bar {
     border: 1px solid var(--c-line) !important;
-    border-radius: var(--r-md) !important;
+    border-radius: var(--r-md) !important; corner-shape: var(--squircle-shape) !important;
     box-shadow: var(--e-2) !important;
     overflow: hidden;
 }
@@ -4406,7 +4432,7 @@ input[type="checkbox"] {
 .contacts-map .leaflet-popup-content-wrapper {
     background: var(--c-surface);
     color: var(--c-ink);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3);
 }
 
@@ -4465,7 +4491,7 @@ input[type="checkbox"] {
     max-height: calc(100dvh - 48px);
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-4);
     animation: dsDialogIn var(--dur-3) var(--ease) both;
 }
@@ -4523,7 +4549,7 @@ input[type="checkbox"] {
     margin: -6px -8px 0 0;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-3);
     font-size: 22px;
@@ -4573,7 +4599,7 @@ input[type="checkbox"] {
         max-width: 600px;
         height: 100%;
         max-height: none;
-        border-radius: var(--r-xl);
+        border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
         animation: dsSheetIn var(--dur-3) var(--ease) both;
     }
 }
@@ -4628,7 +4654,7 @@ input[type="checkbox"] {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-tint);
     color: var(--c-ink);
 }
@@ -4719,7 +4745,7 @@ input[type="checkbox"] {
 
 /* A contact's details open the edit form when clicked. */
 #overviewDetails .detail-item {
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     cursor: text;
     transition: background-color var(--dur-1) var(--ease);
 }
@@ -4822,7 +4848,7 @@ a.detail-value:hover,
     height: 28px;
     padding: 0 6px 0 10px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink);
     font-size: var(--t-sm);
@@ -4850,7 +4876,7 @@ a.detail-value:hover,
 .contact-suggestions {
     background: var(--c-raised);
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3);
 }
 
@@ -4869,7 +4895,7 @@ a.detail-value:hover,
     padding: 12px 14px;
     background: var(--c-tint-3);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 .note-header {
@@ -4931,7 +4957,7 @@ a.detail-value:hover,
     padding: 12px 14px;
     background: var(--c-tint-3);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     box-shadow: none;
     cursor: pointer;
     transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
@@ -5044,7 +5070,7 @@ a.detail-value:hover,
         max-width: none;
         max-height: calc(100dvh - 24px - env(safe-area-inset-top));
         border: 0;
-        border-radius: 22px 22px 0 0;
+        border-radius: calc(22px * var(--squircle-scale)) calc(22px * var(--squircle-scale)) 0 0; corner-shape: var(--squircle-shape);
         padding-bottom: env(safe-area-inset-bottom);
         animation: dsSheetUp var(--dur-3) var(--ease) both;
     }
@@ -5058,7 +5084,7 @@ a.detail-value:hover,
         width: 36px;
         height: 4px;
         margin-left: -18px;
-        border-radius: var(--r-full);
+        border-radius: var(--r-full); corner-shape: round;
         background: var(--c-line-strong);
         z-index: 2;
     }
@@ -5191,7 +5217,7 @@ textarea.form-input:focus {
 #logView .cal-search-input {
     height: 38px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     font: 400 var(--t-sm)/1 var(--font);
 }
@@ -5251,7 +5277,7 @@ textarea.form-input:focus {
     flex-direction: column;
     background: var(--c-surface);
     border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -5364,13 +5390,13 @@ textarea.form-input:focus {
 #bookkeepingView .bk-table-wrap,
 #bookkeepingView .bk-dropzone {
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     background: var(--c-surface);
 }
 
 #bookkeepingView .bk-btn {
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     font-family: var(--font);
 }
 
@@ -5452,7 +5478,7 @@ textarea.form-input:focus {
     padding: 16px;
     background: var(--c-raised);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3);
     animation: dsDialogIn var(--dur-2) var(--ease) both;
 }
@@ -5494,7 +5520,7 @@ textarea.form-input:focus {
     height: 44px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: none;
     cursor: pointer;
 }
@@ -5515,7 +5541,7 @@ textarea.form-input:focus {
     inset: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: rgba(28, 50, 88, 0.6);
     color: #fff;
     opacity: 0;
@@ -5572,7 +5598,7 @@ textarea.form-input:focus {
     height: 24px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: none;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -5594,7 +5620,7 @@ textarea.form-input:focus {
     padding: 6px;
     background: var(--c-raised);
     border: 1px solid var(--c-line-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3);
     animation: dsDialogIn var(--dur-2) var(--ease) both;
 }
@@ -5607,7 +5633,7 @@ textarea.form-input:focus {
     height: 36px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: none;
     color: var(--c-ink);
     font: inherit;
@@ -5714,7 +5740,7 @@ textarea.form-input:focus {
     background: var(--c-primary);
     color: var(--c-on-primary);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-3);
     font: 500 var(--t-sm)/1.4 var(--font);
 }
@@ -5733,7 +5759,7 @@ textarea.form-input:focus {
 
 .alert {
     padding: 12px 14px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     font-size: var(--t-sm);
     line-height: 1.5;
 }
@@ -5802,7 +5828,7 @@ textarea.form-input:focus {
     padding: 36px 32px 28px;
     background: var(--c-surface);
     border: 1px solid rgba(28, 50, 88, 0.06);
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: 0 30px 70px -28px rgba(28, 50, 88, 0.35), 0 2px 6px rgba(28, 50, 88, 0.05);
     text-align: center;
     animation: loginBoxIn var(--dur-3) var(--ease) both;
@@ -5873,7 +5899,7 @@ textarea.form-input:focus {
 @media (max-width: 480px) {
     .login-box {
         padding: 28px 22px 22px;
-        border-radius: var(--r-lg);
+        border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     }
 }
 
@@ -5909,7 +5935,7 @@ textarea.form-input:focus {
     width: 8px;
     height: 8px;
     flex-shrink: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--tag-color, var(--c-ink-4));
 }
 
@@ -5919,7 +5945,7 @@ textarea.form-input:focus {
     gap: 5px;
     height: 22px;
     padding: 0 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font-size: var(--t-xs);
     font-weight: 500;
 }
@@ -5942,7 +5968,7 @@ textarea.form-input:focus {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -6050,7 +6076,7 @@ details.import-instructions {
     padding: 0;
     background: var(--c-tint-3);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 details.import-instructions > summary {
@@ -6063,7 +6089,7 @@ details.import-instructions > summary {
     color: var(--c-ink-2);
     cursor: pointer;
     list-style: none;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 details.import-instructions > summary::-webkit-details-marker {
@@ -6138,7 +6164,7 @@ details.import-instructions p {
 
 .column-badge {
     padding: 1px 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent-soft);
     color: var(--c-accent-2);
     font-size: var(--t-xs);
@@ -6165,7 +6191,7 @@ details.import-instructions p {
     padding: 28px 20px;
     background: var(--c-tint-3);
     border: 1.5px dashed var(--c-line-strong);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
 
@@ -6290,7 +6316,7 @@ details.import-instructions p {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -6310,7 +6336,7 @@ details.import-instructions p {
 .pdoc-card {
     background: var(--c-tint-3);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -6339,7 +6365,7 @@ details.import-instructions p {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
     color: var(--c-ink-3);
     font: 600 10px/1 var(--font);
@@ -6426,7 +6452,7 @@ details.import-instructions p {
 .pdoc-dot {
     content: "";
     flex-shrink: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--pdoc-hue, var(--c-ink-4));
 }
 
@@ -6445,7 +6471,7 @@ details.import-instructions p {
     max-width: 150px;
     padding: 0 23px 0 22px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background-color: var(--c-surface);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235E7190' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -6490,7 +6516,7 @@ details.import-instructions p {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink-4);
     text-decoration: none;
@@ -6526,7 +6552,7 @@ details.import-instructions p {
     padding: 12px 14px;
     background: var(--c-tint-3);
     border: 1.5px dashed var(--c-line-strong);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     transition: opacity var(--dur-1) var(--ease);
 }
 
@@ -6571,7 +6597,7 @@ details.import-instructions p {
     height: 30px;
     padding: 0 12px 0 10px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink);
     font: 500 var(--t-sm)/1 var(--font);
@@ -6620,7 +6646,7 @@ details.import-instructions p {
     background: color-mix(in srgb, var(--c-surface) 93%, transparent);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
-    border-radius: inherit;
+    border-radius: inherit; corner-shape: inherit;
 }
 
 .pdoc-drop[hidden] {
@@ -6657,7 +6683,7 @@ details.import-instructions p {
     justify-content: center;
     gap: 12px;
     border: 2px dashed var(--c-line-strong);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     color: var(--c-ink);
     font-size: var(--t-xl);
@@ -6732,7 +6758,7 @@ details.import-instructions p {
     margin: 0 -10px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-accent-2);
     font: 500 var(--t-sm)/1 var(--font);
@@ -6836,7 +6862,7 @@ details.import-instructions p {
     height: 28px;
     padding: 0 4px 0 12px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -6849,7 +6875,7 @@ details.import-instructions p {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint);
     color: var(--c-ink-2);
     font-size: 9px;
@@ -6906,7 +6932,7 @@ details.import-instructions p {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: none;
     color: var(--c-ink-4);
     font-size: 14px;
@@ -6924,7 +6950,7 @@ details.import-instructions p {
 .ptodo-card {
     background: var(--c-tint-3);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -7085,7 +7111,7 @@ details.import-instructions p {
 #projectOverviewModal .pdoc-type {
     width: 30px;
     height: 24px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     font-size: 9px;
 }
 
@@ -7222,7 +7248,7 @@ details.import-instructions p {
     height: 36px;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-3);
     cursor: pointer;
@@ -7404,7 +7430,7 @@ details.import-instructions p {
 #todoDetailModal:not(.is-editing):not(.is-new) :is(.detail-value, h2)[data-ov="view"] {
     margin-left: -6px;
     padding: 1px 6px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     cursor: text;
     transition: background-color var(--dur-1) var(--ease);
 }
@@ -7598,7 +7624,7 @@ details.import-instructions p {
     align-items: center;
     gap: 4px;
     padding: 1px 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -7646,7 +7672,7 @@ details.import-instructions p {
     height: 22px;
     display: grid;
     place-items: center;
-    border-radius: 50%;
+    border-radius: 50%; corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-3);
     font-size: 11px;
@@ -7761,7 +7787,7 @@ details.import-instructions p {
     height: 32px;
     padding: 0 12px 0 8px;
     border: 1px solid var(--c-line-strong);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     color: var(--c-ink-2);
     font: 500 var(--t-sm)/1 var(--font);
@@ -7779,7 +7805,7 @@ details.import-instructions p {
     display: grid;
     place-items: center;
     border: 1.5px solid var(--c-line-strong);
-    border-radius: 5px;
+    border-radius: calc(5px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     color: transparent;
     transition: inherit;
 }
@@ -7809,7 +7835,7 @@ details.import-instructions p {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-4);
     cursor: pointer;
@@ -7849,7 +7875,7 @@ details.import-instructions p {
     gap: 8px;
     margin-top: 2px;
     padding: 12px 14px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -7889,7 +7915,7 @@ details.import-instructions p {
 .ppay-bar {
     position: relative;
     height: 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint);
     overflow: hidden;
 }
@@ -7963,7 +7989,7 @@ details.import-instructions p {
     width: 8px;
     height: 8px;
     flex-shrink: 0;
-    border-radius: 2px;
+    border-radius: calc(2px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 .ppay-key.is-paid { background: var(--c-success); }
@@ -8018,7 +8044,7 @@ details.import-instructions p {
     flex: 0 1 auto;
     min-width: 4px;
     height: 5px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint);
 }
 
@@ -8118,7 +8144,7 @@ details.import-instructions p {
     gap: 8px;
     max-width: 100%;
     padding: 5px 10px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-success-soft);
     font-size: var(--t-sm);
 }
@@ -8162,7 +8188,7 @@ details.import-instructions p {
 
 .ppaid-group-title span {
     padding: 0 6px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     font-size: 11px;
     letter-spacing: 0;
@@ -8184,7 +8210,7 @@ details.import-instructions p {
     gap: 12px;
     padding: 10px 12px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
@@ -8331,7 +8357,7 @@ details.import-instructions p {
     height: 26px;
     padding: 0 10px 0 8px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font: 500 var(--t-xs)/1 var(--font);
@@ -8415,7 +8441,7 @@ details.import-instructions p {
         max-width: 560px;
         height: 100%;
         max-height: none;
-        border-radius: var(--r-xl);
+        border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
         animation: dsSheetIn var(--dur-3) var(--ease) both;
     }
 
@@ -8464,7 +8490,7 @@ details.import-instructions p {
     height: 22px;
     padding: 0 9px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font: 600 var(--t-xs)/1 var(--font);
     letter-spacing: 0;
     text-transform: none;
@@ -8520,7 +8546,7 @@ details.import-instructions p {
 .tlink-card {
     background: var(--c-tint-3);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -8547,7 +8573,7 @@ details.import-instructions p {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -8603,7 +8629,7 @@ details.import-instructions p {
     height: 18px;
     margin-left: 8px;
     padding: 0 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent-soft);
     color: var(--c-accent-2);
     font-size: var(--t-xs);
@@ -8690,7 +8716,7 @@ details.import-instructions p {
     align-items: center;
     justify-content: center;
     border: 1px solid transparent;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -8715,7 +8741,7 @@ details.import-instructions p {
 .deleted-projects-list {
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -8981,7 +9007,7 @@ details.import-instructions p {
     margin: 0 0 24px;
     background: var(--c-surface);
     border: 0;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -8999,7 +9025,7 @@ details.import-instructions p {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent-soft);
     color: var(--c-accent);
 }
@@ -9022,7 +9048,7 @@ details.import-instructions p {
     padding: 0 6px;
     display: inline-grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent);
     color: var(--c-bg);
     font: 600 11px/1 var(--font);
@@ -9075,7 +9101,7 @@ details.import-instructions p {
     content: "";
     width: 7px;
     height: 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--wl-type);
 }
 
@@ -9136,7 +9162,7 @@ details.import-instructions p {
     height: 28px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     font: 600 var(--t-sm)/1 var(--font);
     cursor: pointer;
@@ -9185,7 +9211,7 @@ details.import-instructions p {
 #workloadView .home-card {
     background: var(--c-surface);
     border: 0;
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -9374,7 +9400,7 @@ details.import-instructions p {
     width: 8px;
     height: 8px;
     flex-shrink: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-line-strong);
 }
 
@@ -9436,7 +9462,7 @@ details.import-instructions p {
     min-width: 0;
     padding: 7px 0;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink);
     font: inherit;
@@ -9472,7 +9498,7 @@ details.import-instructions p {
     height: 18px;
     display: grid;
     place-items: center;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font-size: 10px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -9482,7 +9508,7 @@ details.import-instructions p {
     content: "";
     width: 4px;
     height: 4px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-line-strong);
 }
 
@@ -9595,7 +9621,7 @@ details.import-instructions p {
     place-items: center;
     padding: 0;
     border: 2px solid var(--c-line-strong);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     color: transparent;
     cursor: pointer;
@@ -9679,7 +9705,7 @@ details.import-instructions p {
     align-self: center;
     flex-shrink: 0;
     padding: 3px 10px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     color: var(--c-ink-2);
     font-size: var(--t-xs);
@@ -9744,13 +9770,13 @@ details.import-instructions p {
     width: 4px;
     height: 34px;
     flex-shrink: 0;
-    border-radius: 2px;
+    border-radius: calc(2px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
 }
 
 .home-pill {
     flex-shrink: 0;
     padding: 3px 8px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -9806,7 +9832,7 @@ details.import-instructions p {
     height: 22px;
     display: grid;
     place-items: center;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: color-mix(in srgb, var(--wl-type) 14%, var(--c-surface));
     color: var(--wl-type);
 }
@@ -9829,13 +9855,13 @@ details.import-instructions p {
     width: 26px;
     height: 26px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: color-mix(in srgb, var(--wl-type) 13%, var(--c-surface));
     color: var(--wl-type);
 }
 
 #workloadView .home-mini .workload-row-mark.is-initials {
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
 }
 
 #workloadView .home-mini .workload-row-body {
@@ -9887,7 +9913,7 @@ details.import-instructions p {
     min-height: 0;
     padding: 12px 14px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     text-align: left;
     transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
@@ -9938,7 +9964,7 @@ details.import-instructions p {
 .home-skel {
     display: block;
     height: 12px;
-    border-radius: var(--r-xs);
+    border-radius: var(--r-xs); corner-shape: var(--squircle-shape);
     background: var(--c-tint-2);
     animation: home-skel-pulse 1.4s var(--ease) infinite alternate;
 }
@@ -9946,14 +9972,14 @@ details.import-instructions p {
 .home-skel.is-title { height: 18px; }
 .home-skel.is-small { height: 10px; }
 .home-skel.is-line { height: 14px; margin: 7px 0; }
-.home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); }
-.home-skel.is-day { height: 52px; border-radius: var(--r-md); }
+.home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); corner-shape: round; }
+.home-skel.is-day { height: 52px; border-radius: var(--r-md); corner-shape: var(--squircle-shape); }
 
 .home-skel.is-meter {
     display: block;
     height: 64px;
     margin: 20px 22px 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 .home-skel-row {
@@ -10113,7 +10139,7 @@ details.import-instructions p {
     min-width: 98px;
     justify-content: center;
     height: 30px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
 }
 
 /* What "Adjust" opens: a row under the header, at its right edge below
@@ -10179,7 +10205,7 @@ details.import-instructions p {
     padding: 16px 18px 18px;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
 }
 
@@ -10258,7 +10284,7 @@ details.import-instructions p {
     margin-top: 6px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-accent-soft);
     color: var(--c-accent-2);
     font: 600 var(--t-xs)/1 var(--font);
@@ -10300,7 +10326,7 @@ details.import-instructions p {
     align-items: center;
     gap: 8px;
     padding-right: 8px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-accent-softer);
 }
 
@@ -10326,7 +10352,7 @@ details.import-instructions p {
     gap: 8px;
     margin-top: 12px;
     padding: 12px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     color: var(--c-ink);
     box-shadow: var(--e-2);
@@ -10368,7 +10394,7 @@ details.import-instructions p {
     gap: 10px;
     margin: 0;
     padding: 10px 14px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     font-size: var(--t-sm);
     line-height: 1.5;
 }
@@ -10388,7 +10414,7 @@ details.import-instructions p {
     align-items: center;
     gap: 12px;
     padding: 16px;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: var(--c-danger-soft);
     color: var(--c-danger-ink);
 }
@@ -10400,7 +10426,7 @@ details.import-instructions p {
     padding: 18px 20px 20px;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-xl);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
 }
 
@@ -10451,7 +10477,7 @@ details.import-instructions p {
     gap: 3px;
     min-width: 150px;
     padding: 9px 12px 10px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-raised);
     box-shadow: var(--e-3);
     font-size: var(--t-xs);
@@ -10696,7 +10722,7 @@ details.import-instructions p {
     padding: 2px 6px 2px 2px;
     margin-left: -4px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     color: var(--c-ink);
     font: 600 var(--t-sm)/1.4 var(--font);
@@ -10729,7 +10755,7 @@ details.import-instructions p {
     gap: 2px;
     margin: 0;
     padding: 8px 12px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
     list-style: none;
 }
@@ -10856,7 +10882,7 @@ details.import-instructions p {
     display: inline-flex;
     align-items: center;
     padding: 0 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     font-size: 11px;
     font-weight: 600;
@@ -10881,7 +10907,7 @@ details.import-instructions p {
     margin-right: -10px;
     width: calc(100% + 20px);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     text-align: left;
     font: inherit;
@@ -10921,7 +10947,7 @@ details.import-instructions p {
 
 .fin-chip {
     padding: 0 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint-2);
     font-size: 11px;
     font-weight: 500;
@@ -10961,7 +10987,7 @@ details.import-instructions p {
     margin: 0 0 14px;
     padding: 14px;
     border: 1px solid color-mix(in srgb, var(--c-accent) 40%, transparent);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     background: color-mix(in srgb, var(--c-accent) 4%, var(--c-surface));
 }
 
@@ -11073,7 +11099,7 @@ details.import-instructions p {
     place-items: center;
     padding: 0;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: transparent;
     color: var(--c-ink-4);
     cursor: pointer;
@@ -11099,13 +11125,13 @@ details.import-instructions p {
     display: block;
     height: 12px;
     width: 60%;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-tint-2);
     animation: rf-shimmer 1.4s ease-in-out infinite;
 }
 
 .fin-skel.is-big { height: 30px; width: 80%; }
-.fin-skel.is-chart { height: 320px; width: 100%; border-radius: var(--r-xl); }
+.fin-skel.is-chart { height: 320px; width: 100%; border-radius: var(--r-xl); corner-shape: var(--squircle-shape); }
 
 @media (prefers-reduced-motion: reduce) {
     .fin-skel { animation: none; }
@@ -11159,7 +11185,7 @@ details.import-instructions p {
     padding: 22px 24px 24px;
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
 }
 
 /* A permission someone has or not: a checkbox with its name, before the role. */
@@ -11171,7 +11197,7 @@ details.import-instructions p {
     margin-right: 6px;
     padding: 0 10px;
     border: 1px solid transparent;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     color: var(--c-ink-2);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -11263,7 +11289,7 @@ details.import-instructions p {
     gap: 10px;
     padding: 12px 14px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     cursor: pointer;
     transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
@@ -11329,7 +11355,7 @@ details.import-instructions p {
     gap: 12px;
     padding: 9px 12px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     cursor: pointer;
 }
 
@@ -11432,7 +11458,7 @@ details.import-instructions p {
     align-self: flex-start;
     margin: 1px 0 1px 0;
     padding: 0 6px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-danger-soft);
     color: var(--c-danger-ink);
     font-size: 11px;
@@ -11470,7 +11496,7 @@ details.import-instructions p {
     min-width: 0;
     padding: 10px 12px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
     font: inherit;
     color: inherit;
@@ -11558,7 +11584,7 @@ details.import-instructions p {
 .fin-band-chip {
     padding: 1px 9px;
     border: 0;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     font: inherit;
     font-size: var(--t-xs);
@@ -11648,7 +11674,7 @@ details.import-instructions p {
     margin-top: 2px;
     padding: 7px 10px;
     border: 1px dashed var(--c-accent);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-accent-soft);
     font: inherit;
     font-size: var(--t-xs);
@@ -11754,7 +11780,7 @@ details.import-instructions p {
 }
 
 .fin-kpi-toggle:hover { color: var(--c-accent); }
-.fin-kpi-toggle:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+.fin-kpi-toggle:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: calc(4px * var(--squircle-scale)); corner-shape: var(--squircle-shape); }
 .fin-kpi-toggle svg { transform: rotate(90deg); transition: transform var(--d-fast, 150ms) ease; }
 .fin-kpi.is-open .fin-kpi-toggle svg { transform: rotate(-90deg); }
 
@@ -11850,7 +11876,7 @@ details.import-instructions p {
 /* Open items stand apart: a soft band behind the group. */
 .fin-flow-group.is-open {
     padding: 4px 8px 6px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -11952,7 +11978,7 @@ details.import-instructions p {
     flex-direction: column;
     gap: 2px;
     padding: 10px 12px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -11997,7 +12023,7 @@ details.import-instructions p {
     margin: 0;
     padding: 10px 12px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: transparent;
     text-align: left;
     font: inherit;
@@ -12083,7 +12109,7 @@ details.import-instructions p {
     gap: 8px;
     margin: 12px 0 0;
     padding: 10px 12px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     border: 1px solid var(--c-line-2);
 }
@@ -12116,7 +12142,7 @@ details.import-instructions p {
     .fin-debt-stats {
         gap: 0;
         padding: 4px 12px;
-        border-radius: var(--r-md);
+        border-radius: var(--r-md); corner-shape: var(--squircle-shape);
         background: var(--c-tint-3);
     }
 
@@ -12195,7 +12221,7 @@ details.import-instructions p {
 #overviewModal:not(.is-editing):not(.is-new) :is(.detail-value, .overview-company, h2)[data-ov="view"] {
     margin-left: -6px;
     padding: 1px 6px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     cursor: text;
     transition: background-color var(--dur-1) var(--ease);
 }
@@ -12236,7 +12262,7 @@ details.import-instructions p {
     margin-left: -10px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     box-shadow: none;
     font-size: var(--t-2xl);
@@ -12251,7 +12277,7 @@ details.import-instructions p {
     margin-left: -10px;
     padding: 0 10px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: transparent;
     box-shadow: none;
     font-size: var(--t-md);
@@ -12289,7 +12315,7 @@ details.import-instructions p {
 #todoDetailModal .ov-edit-context .form-select {
     height: 34px;
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background-color: var(--c-tint-3);
     font-size: var(--t-sm);
 }
@@ -12305,7 +12331,7 @@ details.import-instructions p {
     gap: 4px;
     padding: 3px 8px 3px 3px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     transition: border-color var(--dur-1) var(--ease);
 }
@@ -12431,7 +12457,7 @@ details.import-instructions p {
     height: 46px;
     padding: 0 14px;
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background-color: var(--c-tint-3);
     box-shadow: none;
     font-size: var(--t-md);
@@ -12537,7 +12563,7 @@ details.import-instructions p {
     min-height: 44px;
     padding-left: 20px;
     padding-right: 20px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 /* ---- The appointment's form: the same grey fields ---- */
@@ -12551,7 +12577,7 @@ details.import-instructions p {
 #eventSheet .esheet-form :is(.form-input, .form-select) {
     height: 46px;
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background-color: var(--c-tint-3);
     font-size: var(--t-md);
 }
@@ -12704,7 +12730,7 @@ details.import-instructions p {
 /* Icon buttons in a sheet's header: the page's rounded square, not a circle. */
 .ov-icon-btn,
 .modal-close {
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
 }
 
 /* Bookkeeping's own buttons and search, Calendar's paging and people. */

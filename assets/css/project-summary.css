@@ -14,7 +14,7 @@
 .overview-detail-item.ov-claude-summary {
     margin-top: 4px;
     padding: 12px 14px 13px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -98,7 +98,7 @@
     height: 10px;
     border: 1.5px solid var(--c-claude-soft);
     border-top-color: var(--c-claude);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     animation: ovSummarySpin 0.8s linear infinite;
 }
 

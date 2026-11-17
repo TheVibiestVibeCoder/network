@@ -101,6 +101,24 @@
     const short = n => RF.moneyShort(n);
     const plural = (n, word, many) => n + ' ' + (n === 1 ? word : (many || word + 's'));
 
+    /**
+     * A rectangle with squircle corners, as an SVG path: the chart's version of
+     * the 60% corner smoothing the stylesheets give everything (design.css).
+     * The curve starts 1.6x the radius in from each corner; the handles sit
+     * 0.155 of that from the corner, which puts the corner's middle where a
+     * plain arc of the radius would have it.
+     */
+    function squirclePath(x, y, w, h, r) {
+        const a = Math.max(0, Math.min(r * 1.6, w / 2, h / 2));
+        const k = a * 0.155;
+        const R = x + w, B = y + h;
+        const n = v => Math.round(v * 100) / 100;
+        return `M${n(x + a)} ${n(y)}H${n(R - a)}C${n(R - k)} ${n(y)} ${n(R)} ${n(y + k)} ${n(R)} ${n(y + a)}`
+            + `V${n(B - a)}C${n(R)} ${n(B - k)} ${n(R - k)} ${n(B)} ${n(R - a)} ${n(B)}`
+            + `H${n(x + a)}C${n(x + k)} ${n(B)} ${n(x)} ${n(B - k)} ${n(x)} ${n(B - a)}`
+            + `V${n(y + a)}C${n(x)} ${n(y + k)} ${n(x + k)} ${n(y)} ${n(x + a)} ${n(y)}Z`;
+    }
+
     /** An amount field's value: a number, null when empty, NaN when it cannot be read. */
     const readAmount = value => (window.CRMAmount ? window.CRMAmount.parse(value) : (value === '' ? null : Number(value)));
     const showAmount = n => (window.CRMAmount ? window.CRMAmount.format(n) : String(n ?? ''));
@@ -876,13 +894,14 @@
         cols.forEach((c, i) => {
             const past = c.past ? ' is-past' : '';
             if (c.in > 0.5) {
-                parts.push(`<rect class="fin-flow-bar is-in${past}" x="${cx(i) - barW / 2}" y="${y1(c.in)}" width="${barW}" height="${Math.max(1, y0 - y1(c.in))}" rx="2"/>`);
+                parts.push(`<path class="fin-flow-bar is-in${past}" d="${squirclePath(cx(i) - barW / 2, y1(c.in), barW, Math.max(1, y0 - y1(c.in)), 2)}"/>`);
             }
             if (c.out > 0.5) {
-                parts.push(`<rect class="fin-flow-bar is-out${past}" x="${cx(i) - barW / 2}" y="${y0}" width="${barW}" height="${Math.max(1, y1(-c.out) - y0)}" rx="2"/>`);
+                parts.push(`<path class="fin-flow-bar is-out${past}" d="${squirclePath(cx(i) - barW / 2, y0, barW, Math.max(1, y1(-c.out) - y0), 2)}"/>`);
             }
         });
-        parts.push(`<rect class="fin-hover-band" data-fin-band x="0" y="${top - 6}" width="${cw}" height="${H1 + 12}" rx="8" visibility="hidden"/>`);
+        // Drawn at x 0 and moved under the hovered month with a transform.
+        parts.push(`<path class="fin-hover-band" data-fin-band d="${squirclePath(0, top - 6, cw, H1 + 12, 8)}" visibility="hidden"/>`);
 
         if (p.hasBalance) {
             const pastPts = cols.map((c, i) => (c.past && c.closing !== null ? [cx(i), y1(c.closing)] : null)).filter(Boolean);
@@ -959,7 +978,7 @@
             tip.hidden = true;
             return;
         }
-        band.setAttribute('x', g.padL + g.cw * i);
+        band.setAttribute('transform', `translate(${g.padL + g.cw * i} 0)`);
         band.setAttribute('visibility', 'visible');
         const c = g.cols[i];
         if (c && c.closing !== null) {

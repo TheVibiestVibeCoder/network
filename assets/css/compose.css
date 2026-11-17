@@ -15,7 +15,7 @@
 .compose-card {
     background: var(--c-surface);
     border: 1px solid var(--c-line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-2);
     padding: 20px;
 }
@@ -28,7 +28,7 @@
 .compose-field {
     position: relative;
     border: 1px solid var(--c-line-strong);
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
 }
@@ -84,7 +84,7 @@
 .compose-hl {
     color: var(--c-success-ink);
     background: var(--c-success-soft);
-    border-radius: 4px;
+    border-radius: calc(4px * var(--squircle-scale)); corner-shape: var(--squircle-shape);
     /* An outline drawn with a shadow takes no room, so the mirror stays
        letter for letter under the input. */
     box-shadow: 0 0 0 1.5px var(--c-success);
@@ -124,7 +124,7 @@
     padding: 3px 6px;
     border: 1px solid var(--c-line-strong);
     border-bottom-width: 2px;
-    border-radius: var(--r-xs);
+    border-radius: var(--r-xs); corner-shape: var(--squircle-shape);
     color: var(--c-ink-2);
     background: var(--c-surface);
 }
@@ -145,7 +145,7 @@
     max-width: 100%;
     padding: 5px 11px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-surface);
     font-family: var(--font);
     font-size: var(--t-sm);
@@ -211,7 +211,7 @@
     content: "";
     width: 7px;
     height: 7px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
 }
 
 .compose-chip--pri-high .compose-chip-value::before { background: var(--c-danger); }
@@ -251,7 +251,7 @@
     height: var(--control-h);
     padding: 0 12px;
     border: 1px solid var(--c-line-strong);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
     font-family: var(--font);
     font-size: var(--t-base);
@@ -282,7 +282,7 @@
     align-items: center;
     gap: 10px;
     padding: 9px 10px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     cursor: pointer;
     font-size: var(--t-base);
 }
@@ -337,7 +337,7 @@
     justify-content: center;
     width: 26px;
     height: 26px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-tint);
     color: var(--c-ink-2);
     font-size: 11px;
@@ -362,7 +362,7 @@
     width: 9px;
     height: 9px;
     margin: 0 4px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     border: 1px solid var(--c-line-strong);
     box-sizing: border-box;
 }
@@ -387,7 +387,7 @@
     color: var(--c-ink);
     padding: 5px 8px;
     border: 1px solid var(--c-line);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
     background: var(--c-surface);
 }
 
@@ -401,7 +401,7 @@
 
 .compose-summary {
     padding: 14px 16px;
-    border-radius: var(--r-md);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: var(--c-tint-3);
 }
 
@@ -437,7 +437,7 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    border-radius: var(--r-full);
+    border-radius: var(--r-full); corner-shape: round;
     background: var(--c-success-soft);
     color: var(--c-success-ink);
 }
