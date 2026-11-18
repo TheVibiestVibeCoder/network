@@ -44,7 +44,8 @@
         website: 'Website', address: 'Address', note: 'Note', description: 'Description',
         start_date: 'Start date', estimated_completion: 'Planned finish', stage: 'Stage',
         budget_min: 'Budget from', budget_max: 'Budget to', success_chance: 'Chance (%)',
-        title: 'Title', due_date: 'Due', priority: 'Priority', is_completed: 'Done', content: 'Text'
+        title: 'Title', due_date: 'Due', priority: 'Priority', is_completed: 'Done', content: 'Text',
+        payments: 'Expected payments'
     };
 
     // A field as it reads in "Change to stage".
@@ -53,7 +54,8 @@
         website: 'website', address: 'address', note: 'note', description: 'description',
         start_date: 'start date', estimated_completion: 'planned finish', stage: 'stage',
         budget_min: 'budget', budget_max: 'budget', success_chance: 'chance',
-        title: 'title', due_date: 'due date', priority: 'priority', is_completed: 'status', content: 'text'
+        title: 'title', due_date: 'due date', priority: 'priority', is_completed: 'status', content: 'text',
+        payments: 'payments'
     };
 
     // What can be edited before accepting, per proposed record type.
@@ -186,7 +188,47 @@
         return match ? window.CRMFormat.date(match[1]) : String(value || '');
     }
 
+    // ------------------------------------------------------------------
+    // Expected payments (a project's payments field, proposed by Claude
+    // as a whole list - see includes/McpService.php projectsSetPayments)
+    // ------------------------------------------------------------------
+
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    /** The list as stored or proposed (JSON text or array), cleaned and in month order. */
+    function paymentList(value) {
+        let list = value;
+        if (typeof value === 'string') {
+            try { list = JSON.parse(value); } catch (e) { list = null; }
+        }
+        if (!Array.isArray(list)) return [];
+        return list
+            .map(x => ({ month: String((x && x.month) || ''), amount: Number(x && x.amount), paid: !!(x && x.paid), full: !!(x && x.full) }))
+            .filter(x => /^\d{4}-(0[1-9]|1[0-2])$/.test(x.month) && x.amount > 0)
+            .sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+    }
+
+    /** "Dec 2026 5.000 €; Mar 2027 3.000 € (paid)" - or "Paid in full: ..." for the one full payment. */
+    function paymentsText(value) {
+        const list = paymentList(value);
+        if (list.length === 0) return 'No payments';
+        const one = x => MONTHS_SHORT[Number(x.month.slice(5, 7)) - 1] + ' ' + x.month.slice(0, 4) + ' '
+            + window.CRMFormat.amount(x.amount) + (x.paid ? ' (paid)' : '');
+        if (list.length === 1 && list[0].full) return 'Paid in full: ' + one(list[0]);
+        return list.map(one).join('; ');
+    }
+
+    function samePayments(a, b) {
+        return JSON.stringify(paymentList(a)) === JSON.stringify(paymentList(b));
+    }
+
+    /** sameValue, but a payment list is compared as a list. */
+    function sameField(field, a, b) {
+        return field === 'payments' ? samePayments(a, b) : sameValue(a, b);
+    }
+
     function displayValue(field, value) {
+        if (field === 'payments') return paymentsText(value);
         if (field === 'is_completed') {
             return value === true || value === 1 || value === '1' ? 'Yes' : 'No';
         }
@@ -446,6 +488,8 @@
     }
 
     function canEdit(item) {
+        // A payment plan is accepted or rejected as a whole; it is edited in the project sheet.
+        if (item.kind === 'update' && Object.prototype.hasOwnProperty.call(item.payload || {}, 'payments')) return false;
         return item.status === 'pending' && ((item.kind === 'create' && EDITABLE[item.entity_type]) || item.kind === 'update');
     }
 
@@ -692,7 +736,7 @@
                     label: FIELD_LABEL[field] || field,
                     was: displayValue(field, previous[field]),
                     now: displayValue(field, p[field]),
-                    stale: pending && item.record && !sameValue(previous[field], r[field]) ? displayValue(field, r[field]) : ''
+                    stale: pending && item.record && !sameField(field, previous[field], r[field]) ? displayValue(field, r[field]) : ''
                 }))));
             }
 
@@ -1144,18 +1188,27 @@
         });
     }
 
-    async function putProject(id, values) {
+    /**
+     * `expectPayments`: the payments the proposal was made against. Accepting
+     * replaces the whole list, so when somebody has changed it since, nothing
+     * is overwritten - the proposal is refused and can be rejected instead.
+     */
+    async function putProject(id, values, expectPayments) {
         const current = (await request(`api/projects.php?id=${id}`)).data || {};
+        const withPayments = Object.prototype.hasOwnProperty.call(values, 'payments');
+        if (withPayments && expectPayments !== undefined && !samePayments(current.payments, expectPayments)) {
+            throw new Error('The payments were changed after Claude proposed this. Reject it and ask Claude again.');
+        }
         const merged = Object.assign({}, current, values);
-        await request(`api/projects.php?id=${id}`, {
-            method: 'PUT',
-            json: {
-                name: merged.name, start_date: merged.start_date, description: merged.description,
-                company: merged.company, budget_min: merged.budget_min, budget_max: merged.budget_max,
-                success_chance: merged.success_chance, stage: merged.stage,
-                estimated_completion: merged.estimated_completion
-            }
-        });
+        const json = {
+            name: merged.name, start_date: merged.start_date, description: merged.description,
+            company: merged.company, budget_min: merged.budget_min, budget_max: merged.budget_max,
+            success_chance: merged.success_chance, stage: merged.stage,
+            estimated_completion: merged.estimated_completion
+        };
+        // Payments are only sent when they change: the endpoint keeps them otherwise.
+        if (withPayments) json.payments = paymentList(values.payments);
+        await request(`api/projects.php?id=${id}`, { method: 'PUT', json });
     }
 
     async function putTodo(id, values) {
@@ -1184,7 +1237,7 @@
         if (item.kind === 'update') {
             const changes = values || item.payload || {};
             if (item.entity_type === 'contact') return putContact(id, changes);
-            if (item.entity_type === 'project') return putProject(id, changes);
+            if (item.entity_type === 'project') return putProject(id, changes, (item.previous || {}).payments);
             if (item.entity_type === 'todo') return putTodo(id, changes);
         }
 

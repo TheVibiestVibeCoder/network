@@ -708,8 +708,9 @@ final class ReviewQueue
                         FROM contacts WHERE id = :id";
                 break;
             case 'project':
+                // payments: so a proposal for them can tell when they changed since.
                 $sql = "SELECT id, name, company, stage, description, start_date, estimated_completion,
-                               budget_min, budget_max, success_chance, review_status, assigned_to, assigned_to_name, updated_at
+                               budget_min, budget_max, success_chance, payments, review_status, assigned_to, assigned_to_name, updated_at
                         FROM projects WHERE id = :id";
                 break;
             case 'todo':

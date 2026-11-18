@@ -14,9 +14,17 @@
  * Input is validated with the same rules the CRM's own endpoints apply, so a
  * proposal that reaches a reviewer is one the normal forms would have accepted.
  *
- * Bookkeeping is deliberately narrow: Claude can see which invoice PDFs sit in
- * the pool and put new ones there. It cannot read bank entries or invoices, and
- * filing an invoice on its row stays a person's job.
+ * Bookkeeping: Claude can see which invoice PDFs sit in the pool (with what the
+ * invoice reader found in them) and put new ones there. Filing an invoice on
+ * its bank entry stays a person's job.
+ *
+ * Money (since November 2026, docs/mcp-payments-cashflow.md): Claude reads a
+ * project's expected payments and proposes changes to them - a whole payment
+ * plan, or one payment as received - on the ordinary review path. It also
+ * reads the bank entries, Financials (costs, balances, debts, VAT) and the
+ * cashflow forecast, worked out by includes/Cashflow.php exactly as the
+ * Financials tab does it. Those three show the bank balance and every cost,
+ * so MCP_API_FINANCIALS=false in .env switches them off on their own.
  *
  * Project documents are the opposite on purpose: they are attached to a project
  * so that whoever works on it has the context, and that includes Claude. It can
@@ -33,6 +41,9 @@ if (!defined('APP_ROOT')) {
 }
 
 require_once __DIR__ . '/AssignmentFeed.php';
+require_once __DIR__ . '/TodoLink.php';
+require_once __DIR__ . '/ProjectArchive.php';
+require_once __DIR__ . '/Cashflow.php';
 
 /** A refusal Claude should read and act on - the message is shown to it verbatim. */
 class McpError extends ReviewException
@@ -93,6 +104,11 @@ final class McpService
         'tags.list' => ['tagsList', false],
         'bookkeeping.pool' => ['bookkeepingPool', false],
         'reviews.list' => ['reviewsList', false],
+        'payments.list' => ['paymentsList', false],
+        'projects.archived' => ['projectsArchived', false],
+        'bookkeeping.rows' => ['bookkeepingRows', false],
+        'financials.get' => ['financialsGet', false],
+        'financials.forecast' => ['financialsForecast', false],
 
         'contacts.create' => ['contactsCreate', true],
         'contacts.update' => ['contactsUpdate', true],
@@ -111,6 +127,8 @@ final class McpService
         'records.delete' => ['recordsDelete', true],
         'bookkeeping.upload_pdf' => ['bookkeepingUploadPdf', true],
         'reviews.withdraw' => ['reviewsWithdraw', true],
+        'projects.set_payments' => ['projectsSetPayments', true],
+        'projects.mark_payment_paid' => ['projectsMarkPaymentPaid', true],
     ];
 
     private PDO $db;
@@ -181,6 +199,8 @@ final class McpService
                 'proposals_waiting' => ReviewQueue::pendingCount(),
             ],
             'bookkeeping_available' => ReviewQueue::tableExists('bookkeeping_pdfs'),
+            // Bank entries, Financials and the cashflow forecast (MCP_API_FINANCIALS).
+            'financials_available' => MCP_API_FINANCIALS,
         ];
     }
 
@@ -459,18 +479,25 @@ final class McpService
             LIMIT 50
         ");
         $todos->execute(['id' => $id]);
+        $todoRows = $todos->fetchAll();
+        TodoLink::attach($this->db, $todoRows);
 
-        // Read-only for Claude: proposals cannot set payments (yet).
-        $payments = $this->db->prepare("SELECT payments FROM projects WHERE id = :id");
-        $payments->execute(['id' => $id]);
-        $project['expected_payments'] = Project::decodePayments($payments->fetchColumn());
+        // Expected payments (changed through projects.set_payments / mark_payment_paid)
+        // and the Claude summary the project sheet shows under the description.
+        $extra = $this->db->prepare("SELECT payments, claude_summary, claude_summary_at FROM projects WHERE id = :id");
+        $extra->execute(['id' => $id]);
+        $row = $extra->fetch() ?: [];
+        $project['expected_payments'] = Project::decodePayments($row['payments'] ?? null);
+        $project['payments_summary'] = $this->paymentsSummary($project, $project['expected_payments']);
+        $project['claude_summary'] = $row['claude_summary'] ?? null;
+        $project['claude_summary_at'] = $row['claude_summary_at'] ?? null;
 
         return [
             'project' => $project,
             'contacts' => $contacts->fetchAll(),
             'tags' => $tags->fetchAll(),
             'notes' => $notes->fetchAll(),
-            'todos' => $todos->fetchAll(),
+            'todos' => $todoRows,
             'documents' => array_map([ProjectDocument::class, 'present'], ProjectDocument::forProject($id)),
             'open_proposals' => $this->proposalsFor('project', $id),
         ];
@@ -579,8 +606,10 @@ final class McpService
             LIMIT " . $limit
         );
         $stmt->execute($params);
+        $todos = $stmt->fetchAll();
+        TodoLink::attach($this->db, $todos);
 
-        return ['todos' => $stmt->fetchAll()];
+        return ['todos' => $todos];
     }
 
     private function activityRecent(array $p): array
@@ -623,14 +652,24 @@ final class McpService
     {
         $this->requireBookkeeping();
 
+        // What the invoice reader found in each PDF, where it has read it.
+        $columns = array_column($this->db->query("PRAGMA table_info(bookkeeping_pdfs)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+        $invoiceSql = in_array('invoice_data', $columns, true) ? ', invoice_data, invoice_error' : ', NULL AS invoice_data, NULL AS invoice_error';
         $pdfs = $this->db->query("
-            SELECT id, original_name, file_size, created_at, review_status
+            SELECT id, original_name, file_size, created_at, review_status" . $invoiceSql . "
             FROM bookkeeping_pdfs WHERE row_id IS NULL
             ORDER BY created_at DESC, id DESC LIMIT 200
         ")->fetchAll();
+        foreach ($pdfs as &$pdf) {
+            $pdf['invoice'] = $this->invoiceFacts($pdf['invoice_data']);
+            $pdf['invoice_read'] = $pdf['invoice'] !== null ? 'read' : ($pdf['invoice_error'] ? 'could not be read' : 'not read yet');
+            unset($pdf['invoice_data'], $pdf['invoice_error']);
+        }
+        unset($pdf);
 
         return [
-            'explanation' => 'Invoice PDFs in the bookkeeping drop zone, not yet filed on a bank entry.',
+            'explanation' => 'Invoice PDFs in the bookkeeping drop zone, not yet filed on a bank entry. "invoice" is what the CRM '
+                . 'read from the PDF (issuer, number, dates, net, VAT, gross); amounts as on the invoice.',
             'pdfs' => $pdfs,
         ];
     }
@@ -646,6 +685,304 @@ final class McpService
         }
 
         return ['status' => $status, 'proposals' => $items];
+    }
+
+    // =========================================================================
+    // Reading - money
+    // =========================================================================
+
+    /** Expected payments across all projects, filtered by month and state. */
+    private function paymentsList(array $p): array
+    {
+        $from = $this->month($p, 'from_month');
+        $to = $this->month($p, 'to_month');
+        $status = $this->enum($this->str($p, 'status', 16) ?? 'open', ['open', 'paid', 'all'], 'status');
+        $overdueOnly = $this->bool($p, 'overdue_only');
+        $projectId = $this->id($p, 'project_id', false);
+        $limit = $this->limit($p, 200, 500);
+        $current = Cashflow::today()->format('Y-m');
+
+        $sql = "SELECT id, name, company, stage, success_chance, estimated_completion, payments, review_status
+                FROM projects WHERE payments IS NOT NULL AND payments <> ''";
+        $params = [];
+        if ($projectId !== null) {
+            $sql .= ' AND id = :id';
+            $params['id'] = $projectId;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $rows = [];
+        foreach ($stmt->fetchAll() as $project) {
+            foreach (Cashflow::parsePayments($project['payments']) as $payment) {
+                $overdue = !$payment['paid'] && $payment['month'] < $current;
+                if (($status === 'open' && $payment['paid']) || ($status === 'paid' && !$payment['paid'])
+                    || ($overdueOnly && !$overdue)
+                    || ($from !== null && $payment['month'] < $from) || ($to !== null && $payment['month'] > $to)) {
+                    continue;
+                }
+                $rows[] = [
+                    'project_id' => (int) $project['id'],
+                    'project' => $project['name'],
+                    'company' => $project['company'],
+                    'stage' => $project['stage'],
+                    'success_chance' => $project['success_chance'] === null ? null : (int) $project['success_chance'],
+                    'month' => $payment['month'],
+                    'amount' => $payment['amount'],
+                    'paid' => $payment['paid'],
+                    'payment_in_full' => $payment['full'],
+                    'overdue' => $overdue,
+                    'project_review_status' => $project['review_status'],
+                ];
+            }
+        }
+        usort($rows, fn($a, $b) => strcmp($a['month'], $b['month']) ?: strcasecmp((string) $a['project'], (string) $b['project']) ?: ($a['amount'] <=> $b['amount']));
+
+        $byMonth = [];
+        $sumOpen = 0.0;
+        $sumPaid = 0.0;
+        foreach ($rows as $row) {
+            $byMonth[$row['month']] ??= ['open' => 0.0, 'paid' => 0.0];
+            $byMonth[$row['month']][$row['paid'] ? 'paid' : 'open'] += $row['amount'];
+            $row['paid'] ? $sumPaid += $row['amount'] : $sumOpen += $row['amount'];
+        }
+
+        return [
+            'this_month' => $current,
+            'note' => 'Amounts are net, like the projects\' budgets. A payment is overdue when it is not marked as paid and '
+                . 'its month has passed. Chance is not applied here - see financials.forecast for that.',
+            'count' => count($rows),
+            'totals' => ['open' => Cashflow::round2($sumOpen), 'paid' => Cashflow::round2($sumPaid)],
+            'by_month' => array_map(fn($m) => ['open' => Cashflow::round2($m['open']), 'paid' => Cashflow::round2($m['paid'])], $byMonth),
+            'payments' => array_slice($rows, 0, $limit),
+        ];
+    }
+
+    private function projectsArchived(array $p): array
+    {
+        $limit = $this->limit($p, 50, 200);
+        $query = $this->str($p, 'query', 200);
+        if (!ReviewQueue::tableExists('deleted_projects')) {
+            return ['total' => 0, 'archived' => []];
+        }
+
+        $list = array_values(array_filter(ProjectArchive::list($this->db), fn($a) => $query === null
+            || mb_stripos((string) $a['name'], $query) !== false || mb_stripos((string) $a['company'], $query) !== false));
+
+        return [
+            'explanation' => 'Archived projects: removed from the pipeline with their to-dos, notes and documents, and kept whole so a '
+                . 'person can restore them in the CRM (Projects, Archived). Their ids are not usable with the other tools while archived.',
+            'total' => count($list),
+            'archived' => array_slice($list, 0, $limit),
+        ];
+    }
+
+    /** The bank entries imported into Bookkeeping, newest first. */
+    private function bookkeepingRows(array $p): array
+    {
+        $this->requireFinancials();
+        $this->requireBookkeeping();
+        [$limit, $offset] = $this->paging($p, 100, 500);
+        $from = $this->date($p, 'date_from');
+        $to = $this->date($p, 'date_to');
+        $direction = $this->enum($this->str($p, 'direction', 8) ?? 'all', ['in', 'out', 'all'], 'direction');
+        $query = $this->str($p, 'query', 200);
+        $missingOnly = $this->bool($p, 'missing_invoice_only');
+        $withExcluded = $this->bool($p, 'include_excluded');
+
+        $bank = Cashflow::bankRows($this->db);
+        if ($bank['amount_column'] === null) {
+            return ['count' => 0, 'rows' => [],
+                    'message' => 'No bank entries yet, or Bookkeeping cannot tell which column holds the amounts.'];
+        }
+        $rows = Cashflow::markVatPayments($bank['rows'], (new Financials())->settings()['vat_links']);
+
+        $rows = array_values(array_filter($rows, function ($r) use ($from, $to, $direction, $query, $missingOnly, $withExcluded) {
+            return ($withExcluded || !$r['excluded'])
+                && ($from === null || $r['date'] >= $from) && ($to === null || $r['date'] <= $to)
+                && ($direction === 'all' || ($direction === 'in' ? $r['amount'] > 0 : $r['amount'] < 0))
+                && ($query === null || mb_stripos($r['party'] . ' ' . $r['text'], $query) !== false)
+                && (!$missingOnly || ($r['pdf'] === null && !$r['no_pdf_needed'] && empty($r['vat_quarter'])));
+        }));
+        usort($rows, fn($a, $b) => strcmp($b['date'], $a['date']) ?: ($b['id'] <=> $a['id']));
+
+        $in = 0.0;
+        $out = 0.0;
+        foreach ($rows as $r) {
+            if (!$r['excluded']) {
+                $r['amount'] > 0 ? $in += $r['amount'] : $out -= $r['amount'];
+            }
+        }
+
+        return [
+            'explanation' => 'Bank entries as imported into Bookkeeping: + money in, - money out, as the bank booked it (gross). '
+                . '"vat" is the VAT share the matched invoice gives the entry (+ comes back, - is owed). "needs_invoice" = no '
+                . 'invoice filed yet. "vat_quarter" marks a payment to or from the tax office. Excluded entries (own transfers, '
+                . 'duplicates) do not count in any sum. Filing invoices on entries is a person\'s job.',
+            'amount_column' => $bank['amount_column'],
+            'count' => count($rows),
+            'offset' => $offset,
+            'sums' => ['in' => Cashflow::round2($in), 'out' => Cashflow::round2($out), 'net' => Cashflow::round2($in - $out)],
+            'rows' => array_map(fn($r) => [
+                'id' => $r['id'],
+                'date' => $r['date'],
+                'amount' => $r['amount'],
+                'party' => $r['party'] !== '' ? $r['party'] : null,
+                'details' => $r['data'],
+                'vat' => $r['vat'],
+                'invoice_pdf' => $r['pdf'] ? $r['pdf']['name'] : null,
+                'invoice' => $r['pdf'] ? $this->invoiceFacts($r['pdf']['invoice']) : null,
+                'needs_invoice' => $r['pdf'] === null && !$r['no_pdf_needed'] && empty($r['vat_quarter']),
+                'no_invoice_needed' => $r['no_pdf_needed'],
+                'excluded' => $r['excluded'],
+                'vat_quarter' => $r['vat_quarter'] ?? null,
+            ], array_slice($rows, $offset, $limit)),
+        ];
+    }
+
+    /** What the Financials tab keeps: costs, balances, debts, VAT - without the projection. */
+    private function financialsGet(array $p): array
+    {
+        $this->requireFinancials();
+        $in = Cashflow::inputs($this->db, Cashflow::today());
+        $today = $in['today'];
+        $dates = array_column($in['transactions'], 'date');
+
+        return [
+            'today' => $today,
+            'note' => 'Costs are entered net, like the projects\' amounts; the balance is what is in the account. A recurring cost '
+                . 'falls every interval_months from start_month (until end_month) on its day (31 = the last day of the month). '
+                . 'VAT per quarter comes from the bank entries and their invoices, due on the 15th of the second month after the '
+                . 'quarter; "settled" once a bank entry is linked to it. For what this means month by month, use financials.forecast.',
+            'balance_today' => Cashflow::balanceToday($in['balances'], $in['transactions']),
+            'balances_entered' => $in['balances'],
+            'cash_buffer' => $in['settings']['buffer'],
+            'costs' => $in['costs'],
+            'fixed_costs_per_month' => Cashflow::round2(Cashflow::monthlyFixed($in['costs'], $in['now'])),
+            'debts' => Cashflow::debtSummary($in['debts'], $today),
+            'vat_tracked_from' => Cashflow::vatFrom($in['settings'], $today),
+            'vat_quarters' => Cashflow::vatQuarters($in['transactions'], $in['settings'], $today),
+            'bank_entries' => ['count' => count($in['transactions']), 'latest' => $dates ? max($dates) : null,
+                               'amount_column' => $in['amount_column']],
+        ];
+    }
+
+    /** The cashflow forecast, worked out exactly as on the Financials tab. */
+    private function financialsForecast(array $p): array
+    {
+        $this->requireFinancials();
+        $months = $this->intRange($p, 'months', 1, 36) ?? Cashflow::DEFAULT_HORIZON;
+        $preset = $this->enum($this->str($p, 'scenario', 16) ?? Cashflow::DEFAULT_PRESET, array_keys(Cashflow::PRESETS), 'scenario');
+        $details = !array_key_exists('details', $p) || $p['details'] === null || $this->bool($p, 'details');
+
+        $overrides = [];
+        if (($budget = $this->str($p, 'budget', 8)) !== null) {
+            $overrides['budget'] = $this->enum($budget, ['low', 'mid', 'high'], 'budget');
+        }
+        if (($chance = $this->str($p, 'chance', 8)) !== null) {
+            $overrides['chance'] = $this->enum($chance, ['as_set', 'all'], 'chance') === 'all' ? 'all' : 'as';
+        }
+        if (isset($p['stages'])) {
+            if (!is_array($p['stages'])) {
+                throw new McpError('stages must be a list of: ' . implode(', ', Cashflow::STAGE_KEYS) . '.', 422);
+            }
+            $overrides['stages'] = array_map(fn($s) => $this->enum((string) $s, Cashflow::STAGE_KEYS, 'stages'), $p['stages']);
+        }
+        if (isset($p['exclude_project_ids'])) {
+            if (!is_array($p['exclude_project_ids'])) {
+                throw new McpError('exclude_project_ids must be a list of project ids.', 422);
+            }
+            $overrides['excluded'] = array_map(fn($id) => $this->id(['id' => $id], 'id'), $p['exclude_project_ids']);
+        }
+
+        $in = Cashflow::inputs($this->db, Cashflow::today());
+        $base = ['projects' => $in['projects'], 'costs' => $in['costs'], 'balances' => $in['balances'], 'debts' => $in['debts'],
+                 'settings' => $in['settings'], 'transactions' => $in['transactions'], 'now' => $in['now'], 'today' => $in['today'],
+                 'months' => $months];
+        $scenario = Cashflow::scenario($preset, $overrides);
+        $plan = Cashflow::plan(['scenario' => $scenario] + $base);
+        // The year's end needs a plan reaching December, whatever is asked for.
+        $toDecember = $months >= 12 - $in['now']['month'] ? $plan : Cashflow::plan(['scenario' => $scenario, 'months' => 12] + $base);
+
+        $compare = [];
+        foreach (array_keys(Cashflow::PRESETS) as $key) {
+            $other = $key === $scenario['name'] ? $plan : Cashflow::plan(['scenario' => Cashflow::scenario($key)] + $base);
+            $compare[$key] = [
+                'income_total' => $other['kpis']['income_total'],
+                'end_balance' => $other['kpis']['end'],
+                'lowest' => $other['kpis']['lowest'],
+                'below_zero' => $other['kpis']['below_zero'],
+                'below_buffer' => $other['kpis']['below_buffer'],
+            ];
+        }
+
+        $presentIncome = fn(array $x) => [
+            'project_id' => $x['project_id'],
+            'project' => $x['name'],
+            'stage' => $x['stage'],
+            'kind' => $x['kind'] === 'payment' ? ($x['full'] ? 'payment in full' : 'expected payment') : 'rest of budget (final invoice)',
+            'own_month' => $x['kind'] === 'payment' ? $x['month'] : ($x['due'] === null ? null : Cashflow::monthKey($x['due'], $in['now'])),
+            'net' => Cashflow::round2($x['net']),
+            'factor' => $x['factor'],
+            'expected' => Cashflow::round2($x['expected']),
+            'overdue' => $x['overdue'],
+        ];
+        $counted = array_values(array_filter($plan['income'], fn($x) => $x['counted']));
+
+        return [
+            'today' => $in['today'],
+            'months' => $months,
+            'scenario' => [
+                'name' => $scenario['name'],
+                'stages' => $scenario['stages'],
+                'budget' => $scenario['budget'],
+                'chance' => $scenario['chance'] === 'all' ? 'all 100%' : 'as set on each project',
+                'excluded_projects' => array_keys(array_filter($scenario['excluded'])),
+            ],
+            'notes' => [
+                'Same arithmetic as the Financials tab. All amounts are net, except the bank balance (what is in the account).',
+                'Money in: every expected payment in its month (this month once it is overdue), and what the payments leave of '
+                    . 'the budget in the project\'s end month as the final invoice - times the chance, unless the scenario '
+                    . 'counts everything at 100%. Complete projects bring their unpaid payments in full, in every scenario.',
+                'Money out: fixed and planned costs, loans repaid in their month with their interest, and each VAT quarter '
+                    . 'not settled yet on the 15th of the second month after it (a negative vat is a refund). A cost of this '
+                    . 'month counts as paid - and is left out - once Bookkeeping has its bank entry.',
+                'Each month closes at its opening plus "in" less "out". The tab\'s own scenario is chosen per browser; this '
+                    . 'answer uses the one asked for (default: realistic).',
+            ],
+            'balance_today' => $plan['balance'],
+            'cash_buffer' => $plan['buffer'],
+            'kpis' => $plan['kpis'],
+            'months_ahead' => array_map(fn($r) => [
+                'month' => $r['month'],
+                'label' => $r['label'],
+                'opening' => $r['opening'],
+                'income' => $r['income'],
+                'fixed_costs' => $r['fixed'],
+                'planned_costs' => $r['planned'],
+                'debt_repayments' => $r['debt'],
+                'vat' => $r['vat'],
+                'in' => $r['in'],
+                'out' => $r['out'],
+                'net' => $r['net'],
+                'closing' => $r['closing'],
+            ] + ($details ? ['items' => [
+                'income' => array_map($presentIncome, $r['items']['income']),
+                'costs' => $r['items']['costs'],
+                'debts' => $r['items']['debts'],
+                'vat' => array_map(fn($q) => ['quarter' => $q['label'], 'owed' => $q['owed'], 'due' => $q['due'], 'overdue' => $q['overdue']], $r['items']['vat']),
+            ]] : []), $plan['rows']),
+            'income_outside_the_months' => [
+                'undated' => array_map($presentIncome, array_values(array_filter($counted, fn($x) => $x['offset'] === null))),
+                'after_the_last_month' => array_map($presentIncome, array_values(array_filter($counted, fn($x) => $x['offset'] !== null && $x['offset'] >= $months))),
+            ],
+            'projects_left_out' => array_map(fn($m) => ['project_id' => $m['id'], 'project' => $m['name'], 'stage' => $m['stage'],
+                                                        'missing' => $m['gaps']], $plan['missing']),
+            'past_months' => $plan['past'],
+            'vat_quarters' => array_map(fn($q) => array_diff_key($q, ['payment_rows' => 1]), $plan['vat']),
+            'year' => Cashflow::yearResult($in['transactions'], $toDecember, $in['now']),
+            'scenarios_compared' => $compare,
+        ];
     }
 
     // =========================================================================
@@ -1280,6 +1617,210 @@ final class McpService
     }
 
     // =========================================================================
+    // Writing - expected payments
+    // =========================================================================
+
+    /**
+     * Propose a project's whole list of expected payments. It replaces the
+     * list as one field of the project, so the reviewer sees the old and the
+     * new plan side by side and accepts or rejects it as a whole.
+     */
+    private function projectsSetPayments(array $p): array
+    {
+        $project = $this->fetchProject($this->id($p, 'project_id'));
+        if (!array_key_exists('payments', $p) || !is_array($p['payments'])) {
+            throw new McpError('payments must be a list of {month: "YYYY-MM", amount, paid?, full?} - an empty list removes every payment.', 422);
+        }
+        $payments = Project::normalizePayments($p['payments']);
+        if (is_string($payments)) {
+            throw new McpError($payments . '.', 422);
+        }
+
+        return $this->proposePayments($project, $payments, $p);
+    }
+
+    /** Propose marking one expected payment as received. */
+    private function projectsMarkPaymentPaid(array $p): array
+    {
+        $project = $this->fetchProject($this->id($p, 'project_id'));
+        $month = $this->month($p, 'month', true);
+        $amount = $this->number($p, 'amount');
+
+        $payments = $this->storedPayments((int) $project['id']);
+        $hits = [];
+        foreach ($payments as $i => $payment) {
+            if (empty($payment['paid']) && $payment['month'] === $month
+                && ($amount === null || abs((float) $payment['amount'] - $amount) < 0.005)) {
+                $hits[] = $i;
+            }
+        }
+
+        if (!$hits) {
+            $open = array_values(array_filter($payments, fn($x) => empty($x['paid'])));
+            throw new McpError('This project has no unpaid payment ' . ($amount !== null ? 'of ' . $amount . ' ' : '') . 'in ' . $month . '. '
+                . ($open
+                    ? 'Its unpaid payments: ' . implode(', ', array_map(fn($x) => $x['month'] . ' ' . $x['amount'], $open)) . '.'
+                    : 'It has no unpaid payments.')
+                . ' To change amounts or months, use projects.set_payments.', 404);
+        }
+        $amounts = array_unique(array_map(fn($i) => (float) $payments[$i]['amount'], $hits));
+        if (count($amounts) > 1) {
+            throw new McpError('There are several unpaid payments in ' . $month . ' (' . implode(', ', $amounts) . '). Pass the amount too.', 422);
+        }
+
+        $payments[$hits[0]]['paid'] = true;
+
+        return $this->proposePayments($project, $payments, $p);
+    }
+
+    private function proposePayments(array $project, array $payments, array $p): array
+    {
+        $id = (int) $project['id'];
+        $before = $this->storedPayments($id);
+        if (json_encode($before) === json_encode($payments)) {
+            return ['status' => 'no_change', 'message' => 'The project already has exactly these payments.'];
+        }
+
+        // Two open proposals for the same list would overwrite each other.
+        foreach (ReviewQueue::listItems('pending', 200, 'project', $id) as $item) {
+            if ($item['kind'] === 'update' && array_key_exists('payments', (array) $item['payload'])) {
+                throw new McpError('There is already an open proposal for this project\'s payments (review_id ' . $item['id'] . '). '
+                    . 'Wait until a person has decided on it, or withdraw it (reviews.withdraw) and propose again.', 409);
+            }
+        }
+
+        $warnings = $this->paymentWarnings($project, $payments);
+
+        if ($project['review_status'] === ReviewQueue::PENDING) {
+            (new Project())->update($id, $this->pick($project, self::PROJECT_FIELDS) + ['payments' => $payments]);
+
+            return ['status' => 'updated_pending_record', 'project_id' => $id, 'payments' => $payments, 'warnings' => $warnings,
+                    'message' => 'The project is still a proposal, so its payments were changed directly. It still needs to be accepted.'];
+        }
+
+        $reviewIds = ReviewQueue::addUpdates('project', $id, (string) $project['name'], ['payments' => $payments], ['payments' => $before], $this->comment($p));
+
+        return $this->proposedChanges('project_id', $id, $reviewIds) + [
+            'payments' => $payments,
+            'previous_payments' => $before,
+            'warnings' => $warnings,
+        ];
+    }
+
+    /** The project's stored payments, cleaned the way a save cleans them. */
+    private function storedPayments(int $id): array
+    {
+        $stmt = $this->db->prepare("SELECT payments FROM projects WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+        $decoded = Project::decodePayments($stmt->fetchColumn() ?: null);
+        $clean = Project::normalizePayments($decoded);
+
+        return is_array($clean) ? $clean : $decoded;
+    }
+
+    /**
+     * What the project sheet would object to or point out - said to Claude,
+     * not refused: the CRM itself stores these too.
+     */
+    private function paymentWarnings(array $project, array $payments): array
+    {
+        $warnings = [];
+        $index = fn(string $ym) => (int) substr($ym, 0, 4) * 12 + (int) substr($ym, 5, 2);
+        $end = $project['estimated_completion'] ? $index(substr((string) $project['estimated_completion'], 0, 7)) : null;
+        $current = $index(Cashflow::today()->format('Y-m'));
+
+        foreach ($payments as $payment) {
+            if ($end !== null && $index($payment['month']) > $end + 3) {
+                $warnings[] = 'The payment in ' . $payment['month'] . ' lies more than three months after the project\'s planned end - '
+                    . 'the project sheet only offers months up to three after it.';
+            }
+            if (empty($payment['paid']) && $index($payment['month']) < $current) {
+                $warnings[] = 'The payment in ' . $payment['month'] . ' lies in the past and is not marked as paid, so it counts as overdue.';
+            }
+        }
+
+        $summary = $this->paymentsSummary($project, $payments);
+        if ($summary['above_budget'] > 0.005) {
+            $warnings[] = 'The payments add up to ' . $summary['planned'] . ', ' . Cashflow::round2($summary['above_budget'])
+                . ' more than the budget - the payments then count as the project\'s total.';
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * Where the payments stand against the budget, as the project sheet says
+     * it (project-payments.js summarize).
+     */
+    private function paymentsSummary(array $project, array $payments): array
+    {
+        $list = Cashflow::parsePayments($payments);
+        $planned = array_sum(array_column($list, 'amount'));
+        $paid = array_sum(array_column(array_filter($list, fn($x) => $x['paid']), 'amount'));
+        $full = Cashflow::isFull($list);
+
+        $budget = null;
+        if (!$full) {
+            $min = Cashflow::number($project['budget_min'] ?? null);
+            $max = Cashflow::number($project['budget_max'] ?? null);
+            $min ??= $max;
+            $max ??= $min;
+            if ($min !== null) {
+                $min = max(0.0, $min);
+                $max = max(0.0, $max);
+                if ($min > $max) {
+                    [$min, $max] = [$max, $min];
+                }
+                $budget = $max > 0 ? ['min' => $min, 'max' => $max] : null;
+            }
+        }
+
+        $out = [
+            'count' => count($list),
+            'paid_count' => count(array_filter($list, fn($x) => $x['paid'])),
+            'planned' => Cashflow::round2($planned),
+            'paid' => Cashflow::round2($paid),
+            'payment_in_full' => $full,
+            'budget' => $budget,
+            'above_budget' => 0.0,
+            'below_budget' => 0.0,
+            'not_planned_yet' => null,
+        ];
+        if ($budget) {
+            $out['above_budget'] = Cashflow::round2(max(0, $planned - $budget['max']));
+            $out['below_budget'] = Cashflow::round2(max(0, $budget['min'] - $planned));
+            $out['not_planned_yet'] = ['min' => Cashflow::round2(max(0, $budget['min'] - $planned)), 'max' => Cashflow::round2(max(0, $budget['max'] - $planned))];
+            $out['still_to_pay'] = ['min' => Cashflow::round2(max($budget['min'], $planned) - $paid), 'max' => Cashflow::round2(max($budget['max'], $planned) - $paid)];
+        } else {
+            $out['still_to_pay'] = ['min' => Cashflow::round2($planned - $paid), 'max' => Cashflow::round2($planned - $paid)];
+        }
+
+        return $out;
+    }
+
+    /** What the invoice reader found in a PDF, without its bookkeeping. */
+    private function invoiceFacts($data): ?array
+    {
+        if (is_string($data)) {
+            $data = json_decode($data, true);
+        }
+        if (!is_array($data)) {
+            return null;
+        }
+        $keep = ['kind', 'issuer', 'recipient', 'invoice_number', 'invoice_date', 'due_date', 'subject', 'currency', 'net', 'vat', 'gross'];
+
+        return array_intersect_key($data, array_flip($keep));
+    }
+
+    private function requireFinancials(): void
+    {
+        if (!MCP_API_FINANCIALS) {
+            throw new McpError('Bank entries, Financials and the cashflow forecast are switched off for ' . MCP_ACTOR_NAME
+                . ' in this CRM (MCP_API_FINANCIALS).', 403);
+        }
+    }
+
+    // =========================================================================
     // Record helpers
     // =========================================================================
 
@@ -1765,6 +2306,22 @@ final class McpService
         [$y, $m, $d] = array_map('intval', explode('-', $value));
         if (!checkdate($m, $d, $y)) {
             throw new McpError($key . ' is not a real date.', 422);
+        }
+
+        return $value;
+    }
+
+    private function month(array $p, string $key, bool $required = false): ?string
+    {
+        $value = $p[$key] ?? null;
+        if ($value === null || $value === '') {
+            if ($required) {
+                throw new McpError($key . ' is required (YYYY-MM).', 422);
+            }
+            return null;
+        }
+        if (!is_string($value) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $value)) {
+            throw new McpError($key . ' must be a month written as YYYY-MM.', 422);
         }
 
         return $value;

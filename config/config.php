@@ -284,6 +284,10 @@ define('MCP_API_ALLOWED_IPS', trim((string) ($_ENV['MCP_API_ALLOWED_IPS'] ?? '')
 // With writes off, the API only reads. With them on, every write is still a
 // proposal a person has to accept in the CRM.
 define('MCP_API_ALLOW_WRITES', envBool('MCP_API_ALLOW_WRITES', true));
+// Bank entries, Financials (costs, balances, debts, VAT) and the cashflow
+// forecast. On, because the team decided Claude may work with them; false
+// takes exactly these three away and leaves everything else as it is.
+define('MCP_API_FINANCIALS', envBool('MCP_API_FINANCIALS', true));
 define('MCP_API_RATE_LIMIT', max(10, envInt('MCP_API_RATE_LIMIT', 120)));      // signed requests per minute
 define('MCP_API_MAX_PENDING', max(10, envInt('MCP_API_MAX_PENDING', 200)));    // open proposals before new ones are refused
 define('MCP_ACTOR_NAME', trim((string) ($_ENV['MCP_ACTOR_NAME'] ?? '')) !== '' ? trim((string) $_ENV['MCP_ACTOR_NAME']) : 'Claude');
