@@ -10,6 +10,9 @@
  * switch - Worst / Realistic / Best, with the adjustments behind "Adjust" -
  * sits in this page's header, since the whole page plans with it.
  *
+ * Our own invoices (the invoice card) come from Bookkeeping's files too,
+ * through invoice-list.js; only the reminders sent are kept here.
+ *
  * app.js calls window.Financials.load() when the tab opens.
  */
 (function () {
@@ -19,7 +22,8 @@
     const CF = window.Cashflow;
     const PP = window.ProjectPayments;
     const Card = window.RevenueForecastCard;
-    if (!RF || !CF || !PP || !Card) return;
+    const IL = window.InvoiceList;
+    if (!RF || !CF || !PP || !Card || !IL) return;
 
     const API = 'api/financials.php';
     const HORIZON_KEY = 'crm.financials.months';
@@ -75,6 +79,15 @@
         debtDraft: null,
         debtError: '',
         showPastPlanned: false,
+        // Our own invoices (invoice-list.js) and the year the card shows
+        // (null: the newest there is).
+        invoices: [],
+        invYear: null,
+        invError: '',
+        // Our invoices Claude is reading again for the contact and due date:
+        // once per visit, so a failure does not repeat on every load.
+        invReading: new Set(),
+        invReadTried: false,
         hover: null,
         token: 0
     };
@@ -187,7 +200,7 @@
         if (state.inited) return;
         state.inited = true;
         ['financialsView', 'finHeadTools', 'finPage', 'finKpis', 'finAlerts', 'finChart', 'finMonths',
-            'finDebts', 'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
+            'finInvoices', 'finDebts', 'finForecast', 'finScenario', 'finAdjust'].forEach(id => { els[id] = document.getElementById(id); });
 
         try {
             const stored = localStorage.getItem(HORIZON_KEY);
@@ -244,6 +257,7 @@
             state.loaded = true;
             compute();
             render();
+            readOldInvoices();
         } catch (error) {
             if (token !== state.token) return;
             state.error = error.message || 'Could not load';
@@ -299,6 +313,7 @@
         state.next12 = twelve.kpis;
         const toDecember = state.months >= 12 - input.now.month ? state.plan : twelve;
         state.year = CF.yearResult(state.txRows, toDecember, input.now);
+        state.invoices = IL.build(state.tx.invoices, (state.overview.settings || {}).invoice_reminders || {}, todayIso());
         state.suggestions = CF.recurringSuggestions(state.txRows, state.overview.costs,
             (state.overview.settings || {}).dismissed_recurring || [], todayIso());
     }
@@ -329,6 +344,7 @@
         renderAlerts();
         renderChart();
         renderMonths();
+        renderInvoices();
         renderDebts();
 
         if (focusKey) {
@@ -1228,6 +1244,155 @@
      * interest it has run up until today - and will have by its repayment.
      * A loan opens into its detail view to change it.
      */
+    // ---- Our invoices ----
+
+    const STATUS = {
+        paid: { label: 'Paid', tone: 'paid' },
+        late: { label: 'Paid late', tone: 'late' },
+        partial: { label: 'Part paid', tone: 'partial' },
+        open: { label: 'Sent', tone: 'open' },
+        overdue: { label: 'Overdue', tone: 'overdue' },
+        reminded: { label: 'Reminded', tone: 'reminded' }
+    };
+
+    const ICON_BELL = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8.5a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 14.5 6 8.5"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg>';
+
+    /** The status pill, with the days behind it in its tooltip. */
+    function invoiceStatus(i) {
+        const s = STATUS[i.status];
+        const hint = [];
+        if (i.due) hint.push(`Due ${fullDay(i.due)}`);
+        if (i.daysLate) hint.push(i.paid ? `paid ${plural(i.daysLate, 'day')} late` : `${plural(i.daysLate, 'day')} overdue`);
+        if (i.reminded) hint.push(`reminder sent ${fullDay(i.reminded)}`);
+        if (i.status === 'partial') hint.push(`${cents(i.outstanding)} still open`);
+        return `<span class="fin-inv-status is-${s.tone}"${hint.length ? ` title="${esc(hint.join(', '))}"` : ''}>${esc(s.label)}</span>`;
+    }
+
+    function invoiceRow(i) {
+        const money = n => (n === null ? '<span class="fin-muted">–</span>' : esc((n < 0 ? MINUS : '') + cents(Math.abs(n))));
+        const day = iso => (iso ? esc(window.CRMFormat.date(iso)) : '<span class="fin-muted">–</span>');
+        const unpaid = i.outstanding > 0.005;
+        const reading = state.invReading.has(i.id);
+        return `
+            <tr class="fin-inv${i.credit ? ' is-credit' : ''}">
+                <th scope="row">
+                    <button type="button" class="fin-inv-open" data-fin-inv-open="${i.id}" data-fin-focus="inv-${i.id}" title="Open the invoice">${esc(i.number)}</button>
+                </th>
+                <td>${day(i.date)}</td>
+                <td>${reading ? '<span class="bk-reading-spinner" aria-label="Claude is reading"></span>' : day(i.due)}</td>
+                <td class="fin-inv-state">${invoiceStatus(i)}</td>
+                <td>${i.paid ? day(i.paid.date) : ''}</td>
+                <td class="fin-inv-text" title="${esc(i.customer)}">${esc(i.customer)}</td>
+                <td class="fin-inv-text">${esc(i.contact)}</td>
+                <td class="fin-inv-text is-wide" title="${esc(i.subject)}">${esc(i.subject)}</td>
+                <td>${money(i.net)}</td>
+                <td>${money(i.vat)}</td>
+                <td><strong>${money(i.gross)}</strong></td>
+                <td class="fin-inv-act">${unpaid ? `<button type="button" class="fin-icon-btn${i.reminded ? ' is-on' : ''}" data-fin-inv-remind="${esc(i.number)}" data-fin-focus="remind-${i.id}"
+                    aria-pressed="${!!i.reminded}" title="${i.reminded ? `Reminder sent ${esc(fullDay(i.reminded))}. Click to take it back` : 'Reminder sent today'}"
+                    aria-label="${i.reminded ? 'Take back the reminder' : 'Reminder sent today'}">${ICON_BELL}</button>` : ''}</td>
+            </tr>`;
+    }
+
+    function renderInvoices() {
+        if (!els.finInvoices) return;
+        const all = state.invoices;
+        const years = IL.years(all);
+        if (!years.length) {
+            // Nothing read yet, or Bookkeeping without our invoices: no card.
+            els.finInvoices.hidden = true;
+            els.finInvoices.innerHTML = '';
+            return;
+        }
+        els.finInvoices.hidden = false;
+        const year = years.indexOf(state.invYear) >= 0 ? state.invYear : years[0];
+        const items = all.filter(i => i.year === year);
+        const sum = IL.summary(items);
+        const gaps = IL.gaps(all, year);
+        const bankUntil = state.tx.invoices && state.tx.invoices.bankUntil;
+
+        const head = [];
+        if (sum.open.amount > 0.005) head.push(`<strong>${esc(cents(sum.open.amount))}</strong> open`);
+        if (sum.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(sum.overdue.amount))}</strong> overdue`);
+
+        els.finInvoices.innerHTML = `
+            <div class="fin-card-head">
+                <div>
+                    <h2 class="fin-card-title">Invoices</h2>
+                    ${head.length ? `<p class="fin-card-sub"${bankUntil ? ` title="Payments booked until ${esc(fullDay(bankUntil))}"` : ''}>${head.join(', ')}</p>` : ''}
+                </div>
+                ${years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
+            </div>
+            ${gaps.length ? `<p class="fin-alert is-warn fin-inv-gap">${ICON.warn}<span>Not in Bookkeeping: ${esc(gaps.join(', '))}</span></p>` : ''}
+            ${state.invError ? `<p class="fin-alert is-danger fin-inv-gap">${ICON.warn}<span>${esc(state.invError)}</span></p>` : ''}
+            <div class="fin-table-scroll">
+                <table class="fin-table fin-inv-table">
+                    <thead><tr>
+                        <th scope="col">No.</th><th scope="col">Date</th><th scope="col">Due</th><th scope="col">Status</th>
+                        <th scope="col" title="The day the payment reached the bank">Paid</th>
+                        <th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">What</th>
+                        <th scope="col">Net</th><th scope="col">VAT</th><th scope="col">Gross</th><th scope="col"><span class="sr-only">Reminder</span></th>
+                    </tr></thead>
+                    <tbody>${items.map(invoiceRow).join('')}</tbody>
+                    <tfoot><tr>
+                        <th scope="row" colspan="8">${esc(plural(sum.count, 'invoice'))}</th>
+                        <td>${esc(cents(sum.net))}</td><td>${esc(cents(sum.vat))}</td><td><strong>${esc(cents(sum.gross))}</strong></td><td></td>
+                    </tr></tfoot>
+                </table>
+            </div>`;
+    }
+
+    async function toggleReminder(number) {
+        const item = state.invoices.find(i => i.number === number);
+        if (!item) return;
+        state.invError = '';
+        try {
+            const result = await post('save-settings', { invoice_reminder: { number, day: item.reminded ? null : todayIso() } });
+            state.overview = result.data;
+            compute();
+            render();
+        } catch (error) {
+            state.invError = error.message;
+            renderInvoices();
+        }
+    }
+
+    /**
+     * Our invoices Claude read before it also took the contact and the due
+     * date from the payment terms ("zahlbar binnen 14 Tagen"): read once
+     * more, two at a time, the card filling in as they come back.
+     */
+    async function readOldInvoices() {
+        const info = state.tx.invoices;
+        if (state.invReadTried || !info || !info.reader) return;
+        const ids = IL.needsReading(info);
+        if (!ids.length) return;
+        state.invReadTried = true;
+        ids.forEach(id => state.invReading.add(id));
+        renderInvoices();
+
+        const readOne = async id => {
+            try {
+                const response = await fetch('api/bookkeeping.php?action=read-invoice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+                    body: JSON.stringify({ id, again: true })
+                });
+                const result = await response.json();
+                if (response.ok && result.invoice) {
+                    info.files.forEach(f => { if (f.id === id) f.invoice = result.invoice; });
+                }
+            } catch (e) { /* stays as it was; tried again on the next visit */ }
+            state.invReading.delete(id);
+            if (!state.loaded) return;
+            state.invoices = IL.build(info, (state.overview.settings || {}).invoice_reminders || {}, todayIso());
+            renderInvoices();
+        };
+        const queue = ids.slice();
+        const worker = async () => { while (queue.length) await readOne(queue.shift()); };
+        await Promise.all([worker(), worker()]);
+    }
+
     function renderDebts() {
         if (!els.finDebts) return;
         const debts = state.overview.debts || [];
@@ -1814,6 +1979,16 @@
                     const first = els.finScenario.querySelector('button, select, input');
                     if (first) first.focus({ preventScroll: true });
                 }
+            } else if (t.hasAttribute('data-fin-inv-year')) {
+                state.invYear = Number(t.getAttribute('data-fin-inv-year'));
+                renderInvoices();
+                const again = els.finInvoices.querySelector(`[data-fin-inv-year="${state.invYear}"]`);
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-inv-open')) {
+                const item = state.invoices.find(i => i.id === Number(t.getAttribute('data-fin-inv-open')));
+                if (item && window.Bookkeeping) window.Bookkeeping.preview(`api/bookkeeping.php?action=download-pdf&id=${item.id}`, item.file);
+            } else if (t.hasAttribute('data-fin-inv-remind')) {
+                toggleReminder(t.getAttribute('data-fin-inv-remind'));
             } else if (t.hasAttribute('data-fin-month')) {
                 const o = Number(t.getAttribute('data-fin-month'));
                 if (state.openMonths.has(o)) state.openMonths.delete(o); else state.openMonths.add(o);

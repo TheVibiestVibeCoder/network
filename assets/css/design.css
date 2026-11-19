@@ -10702,6 +10702,117 @@ details.import-instructions p {
 .fin-table td.is-pos { color: var(--c-success-ink); }
 .fin-table td.is-neg { color: var(--c-danger-ink); }
 
+/* ---- Our invoices (financials.js renderInvoices) ---- */
+
+.fin-inv-gap {
+    margin: 0 0 12px;
+}
+
+.fin-inv-table :is(th, td).fin-inv-text,
+.fin-inv-table :is(th, td).fin-inv-state {
+    text-align: left;
+}
+
+.fin-inv-table :is(th, td) {
+    padding-left: 9px;
+    padding-right: 9px;
+}
+
+.fin-inv-table td.fin-inv-text {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--c-ink);
+}
+
+.fin-inv-table td.fin-inv-text.is-wide {
+    max-width: 200px;
+    color: var(--c-ink-2);
+}
+
+/* Headers of the text columns sit over their text. */
+.fin-inv-table thead th:nth-child(4),
+.fin-inv-table thead th:nth-child(6),
+.fin-inv-table thead th:nth-child(7),
+.fin-inv-table thead th:nth-child(8) {
+    text-align: left;
+}
+
+.fin-inv-table tbody th {
+    font-weight: 500;
+}
+
+.fin-inv-open {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--c-ink);
+    cursor: pointer;
+}
+
+.fin-inv-open:hover {
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.fin-inv-open:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.fin-inv.is-credit td { font-style: italic; }
+
+.fin-inv-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 9px;
+    border-radius: var(--r-full); corner-shape: round;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.fin-inv-status.is-paid { background: var(--c-success); color: #fff; }
+.fin-inv-status.is-late { background: var(--c-success-soft); color: var(--c-success-ink); }
+.fin-inv-status.is-partial { background: var(--c-accent-soft); color: var(--c-accent); }
+.fin-inv-status.is-open { background: var(--c-accent); color: #fff; }
+.fin-inv-status.is-overdue { background: var(--c-danger); color: #fff; }
+.fin-inv-status.is-reminded { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+
+.fin-inv-table td.fin-inv-act {
+    width: 26px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.fin-inv-act .fin-icon-btn:hover {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.fin-inv-act .fin-icon-btn.is-on {
+    color: var(--c-danger-ink);
+}
+
+.fin-inv-table tfoot :is(th, td) {
+    border-top: 1px solid var(--c-line);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.fin-inv-table tfoot th {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.fin-inv .bk-reading-spinner {
+    display: inline-block;
+    vertical-align: middle;
+}
+
 .fin-col-balance {
     font-weight: 700;
     color: var(--c-ink) !important;

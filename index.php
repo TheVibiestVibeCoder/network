@@ -1197,6 +1197,8 @@ function assetUrl(string $path): string
                         <div id="finAlerts"></div>
                         <section class="fin-card fin-chart-card" id="finChart" aria-label="Cashflow"></section>
                         <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
+                        <!-- Our own invoices, read from Bookkeeping's files (invoice-list.js). -->
+                        <section class="fin-card" id="finInvoices" aria-label="Invoices" hidden></section>
                         <!-- Loans we owe: lender, dates, rate and the interest so far. -->
                         <section class="fin-card" id="finDebts" aria-label="Debts"></section>
                     </div>
@@ -2514,6 +2516,7 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/revenue-forecast.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/revenue-forecast-card.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/cashflow.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/invoice-list.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/financials.js') ?>"></script>
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
