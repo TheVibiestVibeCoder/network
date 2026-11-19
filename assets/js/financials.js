@@ -1274,7 +1274,7 @@
         const unpaid = i.outstanding > 0.005;
         const reading = state.invReading.has(i.id);
         return `
-            <tr class="fin-inv${i.credit ? ' is-credit' : ''}${i.overdue ? ' is-overdue' : ''}">
+            <tr class="fin-inv${i.credit ? ' is-credit' : ''}${i.overdue || (i.reminded && unpaid) ? ' is-overdue' : ''}">
                 <th scope="row">
                     <button type="button" class="fin-inv-open" data-fin-inv-open="${i.id}" data-fin-focus="inv-${i.id}" title="Open the invoice">${esc(i.number)}</button>
                 </th>
