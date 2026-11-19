@@ -10817,6 +10817,14 @@ details.import-instructions p {
     color: var(--c-ink-3);
 }
 
+.fin-inv-none td {
+    text-align: left !important;
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-toggle.fin-inv-toggle { margin-top: 0; padding-top: 10px !important; }
+.fin-inv-toggle[aria-expanded="true"] svg { transform: rotate(-90deg); }
+
 .fin-inv .bk-reading-spinner {
     display: inline-block;
     vertical-align: middle;

@@ -72,8 +72,9 @@
         year: null,
         // Unfolded to their details: the year card (revenue and costs behind
         // the two results), the liquidity card (low point, buffer), and the
-        // months gone by in the table (one summary row when folded).
-        folds: { year: false, liquidity: false, past: false },
+        // months gone by in the table (one summary row when folded), and the
+        // paid invoices (only the open ones when folded).
+        folds: { year: false, liquidity: false, past: false, invoices: false },
         openMonths: new Set(),
         // A debt being added or edited (its detail view): a draft, id null for new.
         debtDraft: null,
@@ -1308,6 +1309,10 @@
         const year = years.indexOf(state.invYear) >= 0 ? state.invYear : years[0];
         const items = all.filter(i => i.year === year);
         const sum = IL.summary(items);
+        // Folded: only the invoices still to be paid; the sums stay the year's.
+        const open = state.folds.invoices;
+        const shown = open ? items : items.filter(i => i.outstanding > 0.005);
+        const settled = items.length - sum.open.count;
         const gaps = IL.gaps(all, year);
         const bankUntil = state.tx.invoices && state.tx.invoices.bankUntil;
 
@@ -1334,13 +1339,17 @@
                         <th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">What</th>
                         <th scope="col">Net</th><th scope="col">VAT</th><th scope="col">Gross</th><th scope="col"><span class="sr-only">Reminder</span></th>
                     </tr></thead>
-                    <tbody>${items.map(invoiceRow).join('')}</tbody>
+                    <tbody>${shown.map(invoiceRow).join('')}${shown.length ? '' : `
+                        <tr class="fin-inv-none"><td colspan="12">All paid</td></tr>`}</tbody>
                     <tfoot><tr>
                         <th scope="row" colspan="8">${esc(plural(sum.count, 'invoice'))}</th>
                         <td>${esc(cents(sum.net))}</td><td>${esc(cents(sum.vat))}</td><td><strong>${esc(cents(sum.gross))}</strong></td><td></td>
                     </tr></tfoot>
                 </table>
-            </div>`;
+            </div>
+            ${settled > 0 ? `<button type="button" class="fin-kpi-toggle fin-inv-toggle" data-fin-fold="invoices" data-fin-focus="fold-invoices" aria-expanded="${open}">
+                ${open ? 'Only open ones' : `Show paid (${settled})`}${ICON.chevron}
+            </button>` : ''}`;
     }
 
     async function toggleReminder(number) {
@@ -1970,8 +1979,8 @@
                 state.folds[key] = !state.folds[key];
                 if (key === 'liquidity' && !state.folds[key]) state.bufferOpen = false;
                 try { localStorage.setItem(FOLD_KEY + key, state.folds[key] ? '1' : '0'); } catch (e) { /* this visit only */ }
-                const host = key === 'past' ? els.finMonths : els.finKpis;
-                if (key === 'past') renderMonths(); else renderKpis();
+                const host = key === 'past' ? els.finMonths : key === 'invoices' ? els.finInvoices : els.finKpis;
+                if (key === 'past') renderMonths(); else if (key === 'invoices') renderInvoices(); else renderKpis();
                 const again = host.querySelector(`[data-fin-fold="${key}"]`);
                 if (again) again.focus();
             } else if (t.hasAttribute('data-fin-scenario-jump')) {
