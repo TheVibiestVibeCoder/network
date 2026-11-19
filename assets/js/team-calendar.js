@@ -239,6 +239,9 @@
         }
     }
 
+    // An appointment is asked for as action=appointment, never action=event:
+    // ad blockers drop any URL with "?action=event&" (EasyPrivacy), and
+    // Chrome then reports only "Failed to fetch".
     async function api(params, options) {
         const opts = options || {};
         const query = new URLSearchParams(params || {}).toString();
@@ -1037,7 +1040,7 @@
 
     const sheet = {
         mode: null,          // 'view' | 'edit' | 'new' | 'masked'
-        data: null,          // the appointment as api/calendar.php?action=event sends it
+        data: null,          // the appointment as api/calendar.php?action=appointment sends it
         form: null,          // what the fields say while editing
         busy: false,
         confirm: null,       // 'save-scope' | 'cancel' | 'cancel-scope'
@@ -1178,7 +1181,7 @@
         sheetLoading('Loading…');
         try {
             await basics();
-            const data = await api({ action: 'event', uid, occurrence: occurrence || '' });
+            const data = await api({ action: 'appointment', uid, occurrence: occurrence || '' });
             if (seq !== sheet.seq) return;
             sheet.data = data;
             if (opts.edit && data.can.edit) {
@@ -1783,7 +1786,7 @@
                 organizer: f.organizer,
                 links: sheet.pendingLinks.map(l => ({ type: l.type, target_id: l.target_id })),
             });
-            submit(() => api({ action: 'event' }, { method: 'POST', body: JSON.stringify(body) }), result => {
+            submit(() => api({ action: 'appointment' }, { method: 'POST', body: JSON.stringify(body) }), result => {
                 warnings(result.warnings, 'Appointment created.');
                 afterChange();
                 openEvent(result.uid, result.occurrence);
@@ -1812,7 +1815,7 @@
 
     function sendUpdate(body, scope) {
         const d = sheet.data;
-        submit(() => api({ action: 'event', uid: d.uid, occurrence: d.occurrence || '', scope }, { method: 'PATCH', body: JSON.stringify(body) }), result => {
+        submit(() => api({ action: 'appointment', uid: d.uid, occurrence: d.occurrence || '', scope }, { method: 'PATCH', body: JSON.stringify(body) }), result => {
             warnings(result.warnings, 'Saved.');
             afterChange();
             // Moving a whole series moves the occurrence too: show the calendar.
@@ -1826,7 +1829,7 @@
 
     function cancelEvent(scope, base) {
         const d = sheet.data;
-        submit(() => api({ action: 'event', uid: d.uid, occurrence: d.occurrence || '', scope, base: base || d.base }, { method: 'DELETE' }), result => {
+        submit(() => api({ action: 'appointment', uid: d.uid, occurrence: d.occurrence || '', scope, base: base || d.base }, { method: 'DELETE' }), result => {
             warnings(result.warnings, result.cancelled === 'occurrence' ? 'This one is cancelled.' : (d.attendees.length > 1 ? 'Cancelled for everyone.' : 'Deleted.'));
             afterChange();
             closeSheet();

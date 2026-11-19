@@ -23,15 +23,20 @@
  *
  * Appointments (phase 2, includes/CalendarEvents.php):
  *
- *   GET    ?action=event&uid=…[&occurrence=…]      one appointment for the sheet
- *   POST   ?action=event                            new appointment
- *   PATCH  ?action=event&uid=…[&occurrence=…&scope=occurrence|series]
+ *   GET    ?action=appointment&uid=…[&occurrence=…]  one appointment for the sheet
+ *   POST   ?action=appointment                      new appointment
+ *   PATCH  ?action=appointment&uid=…[&occurrence=…&scope=occurrence|series]
  *                                                   change it; 409 when it
  *                                                   changed meanwhile ("base");
  *                                                   "organizer" moves it to
  *                                                   another calendar, "type"
  *                                                   is online|external|office
- *   DELETE ?action=event&uid=…[&occurrence=…&scope=…&base=…]   cancel it
+ *   DELETE ?action=appointment&uid=…[&occurrence=…&scope=…&base=…]   cancel it
+ *
+ *   Not "action=event": ad blockers with the EasyPrivacy list (uBlock Origin,
+ *   Brave, AdGuard) block every URL with "?action=event&" as tracking, and
+ *   the browser then only says "Failed to fetch". "event" is still taken,
+ *   for a page loaded before the rename.
  *   POST   ?action=respond&uid=…                    answer an invitation
  *   POST   ?action=link / DELETE ?action=link&id=N  link a contact or project
  *   GET    ?action=linked&type=contact|project&id=N appointments of a record
@@ -68,6 +73,10 @@ if (!$viewer['can_view']) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = (string) ($_GET['action'] ?? '');
+// The routes below still say "event"; the browser asks for "appointment".
+if ($action === 'appointment') {
+    $action = 'event';
+}
 if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
     Auth::requireCsrfToken();
 }
