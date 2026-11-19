@@ -10765,6 +10765,15 @@ details.import-instructions p {
 
 .fin-inv.is-credit td { font-style: italic; }
 
+/* Overdue: the whole line in red, the status pill keeping its own colours. */
+.fin-inv-table .fin-inv.is-overdue :is(th, td, td.fin-inv-text, .fin-inv-open) {
+    color: var(--c-danger-ink);
+}
+
+.fin-inv-sums strong.is-neg {
+    color: var(--c-danger-ink);
+}
+
 .fin-inv-status {
     display: inline-flex;
     align-items: center;

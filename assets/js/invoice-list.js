@@ -119,9 +119,14 @@
             item.status = statusOf(item, today);
             item.daysLate = item.due && !item.paid && today > item.due ? daysBetween(item.due, today)
                 : item.due && item.paid && item.paid.date > item.due ? daysBetween(item.due, item.paid.date) : 0;
-            // What is still to come in: all of it, or what a part payment left.
+            // What is still to come in: all of it, or what a part payment left -
+            // gross, and net (a part payment's share of the net).
             item.outstanding = !item.paid ? item.gross
                 : item.status === 'partial' ? round2(item.gross - item.paid.amount) : 0;
+            item.outstandingNet = item.net === null || !item.gross ? item.outstanding
+                : round2(item.net * item.outstanding / item.gross);
+            // Past its due date with money still to come in.
+            item.overdue = item.outstanding > 0.005 && !!item.due && today > item.due;
             items.push(item);
         });
 
@@ -155,19 +160,21 @@
         return out;
     }
 
-    /** Sums over a list: invoiced (net, VAT, gross), still open, and overdue. */
+    /**
+     * Sums over a list: invoiced (net, VAT, gross), and what is still open
+     * and overdue - net, as the card shows them.
+     */
     function summary(items) {
         const sum = (list, f) => round2(list.reduce((s, i) => s + (Number(f(i)) || 0), 0));
         const open = items.filter(i => i.outstanding > 0.005);
-        const overdue = open.filter(i => i.status === 'overdue' || i.status === 'reminded'
-            || (i.status === 'partial' && i.due && i.daysLate > 0));
+        const overdue = open.filter(i => i.overdue);
         return {
             count: items.length,
             net: sum(items, i => i.net),
             vat: sum(items, i => i.vat),
             gross: sum(items, i => i.gross),
-            open: { count: open.length, amount: sum(open, i => i.outstanding) },
-            overdue: { count: overdue.length, amount: sum(overdue, i => i.outstanding) }
+            open: { count: open.length, amount: sum(open, i => i.outstandingNet) },
+            overdue: { count: overdue.length, amount: sum(overdue, i => i.outstandingNet) }
         };
     }
 

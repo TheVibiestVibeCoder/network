@@ -1274,7 +1274,7 @@
         const unpaid = i.outstanding > 0.005;
         const reading = state.invReading.has(i.id);
         return `
-            <tr class="fin-inv${i.credit ? ' is-credit' : ''}">
+            <tr class="fin-inv${i.credit ? ' is-credit' : ''}${i.overdue ? ' is-overdue' : ''}">
                 <th scope="row">
                     <button type="button" class="fin-inv-open" data-fin-inv-open="${i.id}" data-fin-focus="inv-${i.id}" title="Open the invoice">${esc(i.number)}</button>
                 </th>
@@ -1312,6 +1312,7 @@
         const bankUntil = state.tx.invoices && state.tx.invoices.bankUntil;
 
         const head = [];
+        // Net, like the projects' amounts.
         if (sum.open.amount > 0.005) head.push(`<strong>${esc(cents(sum.open.amount))}</strong> open`);
         if (sum.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(sum.overdue.amount))}</strong> overdue`);
 
@@ -1319,7 +1320,7 @@
             <div class="fin-card-head">
                 <div>
                     <h2 class="fin-card-title">Invoices</h2>
-                    ${head.length ? `<p class="fin-card-sub"${bankUntil ? ` title="Payments booked until ${esc(fullDay(bankUntil))}"` : ''}>${head.join(', ')}</p>` : ''}
+                    ${head.length ? `<p class="fin-card-sub fin-inv-sums" title="Net${bankUntil ? `, payments booked until ${esc(fullDay(bankUntil))}` : ''}">${head.join(', ')}</p>` : ''}
                 </div>
                 ${years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
             </div>

@@ -90,6 +90,9 @@
         ] }, {}, TODAY);
         eq(items[0].status, 'partial');
         eq(items[0].outstanding, 6000);
+        eq(items[0].outstandingNet, 5000);
+        eq(items[0].overdue, true);
+        eq(IL.summary(items).overdue, { count: 1, amount: 5000 });
     });
 
     test('the same invoice twice: the copy on a bank entry counts', () => {
@@ -116,12 +119,17 @@
         eq(IL.gaps(items, 2025), []);
     });
 
-    test('summary: open and overdue', () => {
+    test('summary: open and overdue, net', () => {
         const s = IL.summary(IL.build(data, {}, TODAY));
         eq(s.count, 5);
-        eq(s.open, { count: 2, amount: 6200 });
-        eq(s.overdue, { count: 1, amount: 3000 });
+        eq(s.open, { count: 2, amount: 5700 });
+        eq(s.overdue, { count: 1, amount: 2500 });
         eq(s.gross, 2500 + 3000 + 2500 + 480 + 3200);
+    });
+
+    test('overdue: unpaid past the due date, reminded or not', () => {
+        const by = Object.fromEntries(IL.build(data, { '0011/2026': '2026-10-02' }, TODAY).map(i => [i.number, i.overdue]));
+        eq(by, { '0010/2026': false, '0011/2026': true, '0012/2026': false, '0014/2026': false, '0016/2026': false });
     });
 
     test('years, newest first', () => {
