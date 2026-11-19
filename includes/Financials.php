@@ -44,6 +44,10 @@ class Financials
         // Which bank rows paid a quarter's VAT, or that it was settled
         // without one: {"2026-Q3": {"rows": [12], "settled": false}}.
         'vat_links' => '{}',
+        // Our own invoices we sent a reminder for, by invoice number, with
+        // the day: {"0011/2026": "2026-10-02"}. Paid or not is read from
+        // Bookkeeping (invoice-list.js); only the reminder lives here.
+        'invoice_reminders' => '{}',
     ];
 
     private PDO $db;
@@ -397,6 +401,7 @@ class Financials
         $dismissed = json_decode($out['dismissed_recurring'], true);
         $out['dismissed_recurring'] = is_array($dismissed) ? array_values(array_filter($dismissed, 'is_string')) : [];
         $out['vat_links'] = (object) self::cleanVatLinks(json_decode($out['vat_links'], true));
+        $out['invoice_reminders'] = (object) self::cleanReminders(json_decode($out['invoice_reminders'], true));
         return $out;
     }
 
@@ -424,6 +429,31 @@ class Financials
         }
         ksort($out);
         return $out;
+    }
+
+    /** {"0011/2026": "2026-10-02"}: an invoice number with the day its reminder went out. */
+    private static function cleanReminders($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        foreach ($raw as $number => $day) {
+            $number = trim((string) $number);
+            if ($number !== '' && mb_strlen($number) <= 80 && self::isDay($day)) {
+                $out[$number] = $day;
+            }
+        }
+        ksort($out);
+        return $out;
+    }
+
+    private static function isDay($value): bool
+    {
+        if (!is_string($value) || !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+            return false;
+        }
+        return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
     }
 
     /**
@@ -518,6 +548,26 @@ class Financials
             }
             $clean['vat_links'] = json_encode((object) self::cleanVatLinks($links));
             break;
+        }
+
+        // invoice_reminder: {number, day}  a reminder went out that day (day null: take it back)
+        if (array_key_exists('invoice_reminder', $in)) {
+            $arg = is_array($in['invoice_reminder']) ? $in['invoice_reminder'] : [];
+            $number = trim((string) ($arg['number'] ?? ''));
+            if ($number === '' || mb_strlen($number) > 80) {
+                return 'Unknown invoice';
+            }
+            $day = $arg['day'] ?? null;
+            if ($day !== null && !self::isDay($day)) {
+                return 'The date must be YYYY-MM-DD';
+            }
+            $reminders = self::cleanReminders(json_decode(json_encode($this->settings()['invoice_reminders']), true));
+            if ($day === null) {
+                unset($reminders[$number]);
+            } else {
+                $reminders[$number] = $day;
+            }
+            $clean['invoice_reminders'] = json_encode((object) $reminders);
         }
 
         $stmt = $this->db->prepare("

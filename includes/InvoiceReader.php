@@ -80,7 +80,7 @@ class InvoiceReader
     /**
      * Read one invoice.
      *
-     * @return array{kind: string, issuer: string, recipient: string, invoice_number: ?string,
+     * @return array{kind: string, issuer: string, recipient: string, contact: string, invoice_number: ?string,
      *               invoice_date: ?string, due_date: ?string, subject: string, currency: string,
      *               net: ?float, vat: ?float, gross: ?float, model: string}
      * @throws RuntimeException with a message fit to show the user; code
@@ -215,6 +215,7 @@ class InvoiceReader
             'kind' => in_array($kind, ['invoice', 'credit_note', 'receipt', 'other'], true) ? $kind : 'other',
             'issuer' => $text($result['issuer'] ?? null, 120),
             'recipient' => $text($result['recipient'] ?? null, 120),
+            'contact' => $text($result['contact'] ?? null, 120),
             'invoice_number' => $number !== '' ? $number : null,
             'invoice_date' => $date($result['invoice_date'] ?? null),
             'due_date' => $date($result['due_date'] ?? null),
@@ -236,9 +237,10 @@ Fill in:
 - kind: "invoice", "credit_note" (a credit or refund note), "receipt" (a till receipt or payment confirmation), or "other" if it is not a bill at all (contract, offer, letter).
 - issuer: the company or person who issued the document, as short as it is still clear ("Adobe", "Deutsche Bahn", "Hotel Alpenblick GmbH").
 - recipient: who it is addressed to, just as short.
-  For either of the two, an empty string if the document does not name one - never a note like "not stated".
+- contact: the person the document is addressed to at the recipient (the name in the address block, "z. Hd.", "Attn.", "Ansprechperson"), name only without title or role ("Lisa Steiner").
+  For these three, an empty string if the document does not name one - never a note like "not stated".
 - invoice_number: as printed, or null.
-- invoice_date and due_date: YYYY-MM-DD, or null if not on the document.
+- invoice_date and due_date: YYYY-MM-DD, or null if not on the document. Only a payment term given ("zahlbar binnen 14 Tagen", "payable within 30 days", "Zahlungsziel 7 Tage"): due_date is invoice_date plus those days. "Sofort", "prompt" or "upon receipt": due_date is invoice_date.
 - subject: a few words on what it is for ("Creative Cloud Team, October", "Train Vienna-Munich"), in the document's language.
 - currency: ISO code of the amounts, e.g. "EUR".
 - gross: the total to be paid, including VAT. net: the total before VAT. vat: the total VAT amount, added up over all VAT rates.
@@ -263,11 +265,12 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['kind', 'issuer', 'recipient', 'invoice_number', 'invoice_date', 'due_date', 'subject', 'currency', 'net', 'vat', 'gross'],
+            'required' => ['kind', 'issuer', 'recipient', 'contact', 'invoice_number', 'invoice_date', 'due_date', 'subject', 'currency', 'net', 'vat', 'gross'],
             'properties' => [
                 'kind' => ['type' => 'string', 'enum' => ['invoice', 'credit_note', 'receipt', 'other']],
                 'issuer' => ['type' => 'string'],
                 'recipient' => ['type' => 'string'],
+                'contact' => ['type' => 'string'],
                 'invoice_number' => $nullable(['type' => 'string']),
                 'invoice_date' => $nullable(['type' => 'string', 'format' => 'date']),
                 'due_date' => $nullable(['type' => 'string', 'format' => 'date']),

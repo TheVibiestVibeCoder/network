@@ -14,6 +14,7 @@
  * POST ?action=set-balance      { amount, as_of, note? }
  * POST ?action=delete-balance   { id }
  * POST ?action=save-settings    { buffer?, dismiss_recurring? (a suggestion's key, turned down) }
+ *                               invoice_reminder? { number, day (YYYY-MM-DD, null: none) }
  */
 
 define('APP_ROOT', dirname(__DIR__));

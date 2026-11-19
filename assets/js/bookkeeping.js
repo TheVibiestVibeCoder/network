@@ -1293,7 +1293,12 @@
      * are too few to tell.
      */
     function ownNameWord() {
-        const invoices = state.pool.concat(state.rows.map(r => r.pdf))
+        return ownWordOf(state.pool.concat(state.rows.map(r => r.pdf)));
+    }
+
+    /** ownNameWord() for any list of files - also the one Financials gets. */
+    function ownWordOf(pdfs) {
+        const invoices = pdfs
             .filter(pdf => pdf && pdf.invoice)
             .map(pdf => pdf.invoice);
         if (invoices.length < 3) return null;
@@ -3901,13 +3906,37 @@
      * without drawing the table - for Financials, which works out the bank
      * balance, past months and their results from them. The amount is read from the same column the table's
      * month totals use.
+     *
+     * Along with them every invoice file, in the drop zone or on a row, as
+     * { id, name, invoice, row: { id, date, amount } | null }, and ownWord,
+     * the word of our own name (ownNameWord): Financials lists our own
+     * invoices from them (invoice-list.js).
      */
     async function transactions() {
         const result = await apiJson('table');
-        const { columns, rows, settings } = result.data;
+        const { columns, rows, settings, pool } = result.data;
         const dateColumn = settings && settings.date_column;
         const amountColumn = detectAmountColumn(columns, rows, name => name === dateColumn || looksLikeDateColumn(name));
-        if (!amountColumn) return { amountColumn: null, rows: [] };
+        const files = (pool || []).map(pdf => ({ id: pdf.id, name: pdf.name, invoice: pdf.invoice || null, row: null }))
+            .concat(rows.filter(r => r.pdf).map(r => ({
+                id: r.pdf.id,
+                name: r.pdf.name,
+                invoice: r.pdf.invoice || null,
+                row: {
+                    id: r.id,
+                    date: r.row_date,
+                    amount: amountColumn ? parseDecimalValue(r.data[amountColumn]) : null,
+                    excluded: !!Number(r.excluded)
+                }
+            })));
+        const invoices = {
+            files,
+            ownWord: ownWordOf(files),
+            reader: !!(settings && settings.invoice_reader),
+            // The newest bank entry: what is paid after it is not known yet.
+            bankUntil: rows.reduce((last, r) => (r.row_date && (!last || r.row_date > last) ? r.row_date : last), null)
+        };
+        if (!amountColumn) return { amountColumn: null, rows: [], invoices };
         // Who the money went to or came from, for spotting recurring costs.
         const partyColumn = findColumnByNames(columns.map(c => c.name),
             ['partnername', 'partner', 'payee', 'empfänger', 'empfaenger', 'auftraggeber', 'beschreibung', 'description']);
@@ -3931,7 +3960,8 @@
                     open: (!r.pdf && !r.no_pdf_needed)
                         || !!(r.pdf && !r.pdf.invoice && !r.pdf.invoice_error && settings && settings.invoice_reader)
                 }))
-                .filter(r => r.date && r.amount !== null)
+                .filter(r => r.date && r.amount !== null),
+            invoices
         };
     }
 
