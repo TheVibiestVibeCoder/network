@@ -26,6 +26,8 @@ if (!defined('APP_ROOT')) {
     exit;
 }
 
+require_once APP_ROOT . '/includes/InvoiceArchive.php';
+
 class Financials
 {
     public const KINDS = ['recurring', 'once'];
@@ -150,6 +152,11 @@ class Financials
             }, $debts),
             'balances' => array_map(fn($b) => ['id' => (int) $b['id'], 'amount' => (float) $b['amount']] + $b, $balances),
             'settings' => $this->settings(),
+            // Our invoices linked by hand to a project or company, and those
+            // from before Bookkeeping (InvoiceArchive): for the invoice list
+            // and the company figures only.
+            'invoice_links' => InvoiceArchive::links($this->db),
+            'invoice_archive' => InvoiceArchive::all($this->db),
         ];
     }
 

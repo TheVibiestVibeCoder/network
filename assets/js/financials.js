@@ -89,6 +89,13 @@
         // once per visit, so a failure does not repeat on every load.
         invReading: new Set(),
         invReadTried: false,
+        // The companies (companies.js), for finding an invoice's company.
+        companies: [],
+        // The invoice whose project and company are being linked (its number).
+        invLink: null,
+        // Adding invoices from the invoice list: { text } while open.
+        invImport: null,
+        invBusy: false,
         hover: null,
         token: 0
     };
@@ -241,15 +248,9 @@
         if (!state.loaded) renderSkeleton();
 
         try {
-            const [projects, overview, tx] = await Promise.all([
-                getJson('api/projects.php?' + new URLSearchParams({ search: '', sort: 'name', order: 'ASC' })).then(r => r.data || []),
-                getJson(`${API}?action=overview`).then(r => r.data),
-                (window.Bookkeeping && window.Bookkeeping.transactions
-                    ? window.Bookkeeping.transactions()
-                    : Promise.resolve({ rows: [], amountColumn: null }))
-                    .catch(error => ({ rows: [], amountColumn: null, error: error.message || 'unavailable' }))
-            ]);
+            const [projects, overview, tx, companies] = await fetchAll(true);
             if (token !== state.token) return;
+            state.companies = companies;
             state.projects = projects;
             state.overview = overview;
             state.tx = tx;
@@ -266,6 +267,36 @@
         } finally {
             if (token === state.token) state.loading = false;
         }
+    }
+
+    /** What the page is drawn from: projects, Financials, Bookkeeping, the companies. */
+    function fetchAll(freshCompanies) {
+        return Promise.all([
+            getJson('api/projects.php?' + new URLSearchParams({ search: '', sort: 'name', order: 'ASC' })).then(r => r.data || []),
+            getJson(`${API}?action=overview`).then(r => r.data),
+            (window.Bookkeeping && window.Bookkeeping.transactions
+                ? window.Bookkeeping.transactions()
+                : Promise.resolve({ rows: [], amountColumn: null }))
+                .catch(error => ({ rows: [], amountColumn: null, error: error.message || 'unavailable' })),
+            (window.CRMCompany ? window.CRMCompany.list(freshCompanies) : Promise.resolve([])).catch(() => [])
+        ]);
+    }
+
+    /**
+     * Our invoices: Bookkeeping's and the archived ones (invoice list), each
+     * with its company and project - linked by hand, or found (invoice-list.js).
+     */
+    function buildInvoices(ctx) {
+        const c = ctx || { overview: state.overview, tx: state.tx, companies: state.companies, projects: state.projects };
+        const reminders = ((c.overview && c.overview.settings) || {}).invoice_reminders || {};
+        const today = todayIso();
+        const fromBookkeeping = c.tx && c.tx.invoices ? IL.build(c.tx.invoices, reminders, today) : [];
+        const archived = IL.fromArchive((c.overview && c.overview.invoice_archive) || [], reminders, today);
+        return IL.attach(IL.merge(fromBookkeeping, archived), {
+            companies: c.companies || [],
+            projects: c.projects || [],
+            links: (c.overview && c.overview.invoice_links) || {}
+        });
     }
 
     /** How many months a horizon shows, this one included. */
@@ -314,7 +345,7 @@
         state.next12 = twelve.kpis;
         const toDecember = state.months >= 12 - input.now.month ? state.plan : twelve;
         state.year = CF.yearResult(state.txRows, toDecember, input.now);
-        state.invoices = IL.build(state.tx.invoices, (state.overview.settings || {}).invoice_reminders || {}, todayIso());
+        state.invoices = buildInvoices();
         state.suggestions = CF.recurringSuggestions(state.txRows, state.overview.costs,
             (state.overview.settings || {}).dismissed_recurring || [], todayIso());
     }
@@ -1269,43 +1300,208 @@
         return `<span class="fin-inv-status is-${s.tone}"${hint.length ? ` title="${esc(hint.join(', '))}"` : ''}>${esc(s.label)}</span>`;
     }
 
+    const ICON_LINK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.7.3l2.8-2.8a4 4 0 0 0-5.7-5.7L11.5 6.6"/><path d="M14 10.5a4 4 0 0 0-5.7-.3L5.5 13a4 4 0 0 0 5.7 5.7l1.3-1.3"/></svg>';
+    const ICON_PASTE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9 4.5V3.8a.8.8 0 0 1 .8-.8h4.4a.8.8 0 0 1 .8.8v.7"/><path d="M9 11h6M9 14.5h6"/></svg>';
+
+    /** The customer: its company, which opens the company's sheet, or the name as written. */
+    function invoiceCustomer(i) {
+        if (i.company) {
+            return `<button type="button" class="fin-inv-link" data-open-company="${i.company.id}" data-company-name="${esc(i.company.name)}"
+                title="${esc(i.customer && i.customer !== i.company.name ? `${i.customer} on the invoice` : i.company.name)}">${esc(i.company.name)}</button>`;
+        }
+        return `<span class="fin-inv-plain" title="${esc(i.customer ? `${i.customer}: no company linked` : '')}">${esc(i.customer)}</span>`;
+    }
+
+    /** The project, which opens its sheet; what the invoice says it is for in the tooltip. */
+    function invoiceProject(i) {
+        const what = i.subject ? `On the invoice: ${i.subject}` : '';
+        const link = `<button type="button" class="fin-icon-btn fin-inv-linkbtn${i.project ? '' : ' is-empty'}" data-fin-inv-link="${esc(i.number)}"
+            data-fin-focus="link-${esc(i.number)}" aria-expanded="${state.invLink === i.number}"
+            title="Link to a project and company" aria-label="Link ${esc(i.number)} to a project">${ICON_LINK}</button>`;
+        const name = i.project
+            ? `<a href="#" class="fin-inv-link" data-crm-action="open-project-overview" data-project-id="${i.project.id}" title="${esc(what)}">${esc(i.project.name)}</a>`
+            : `<span class="fin-inv-plain fin-muted" title="${esc(what)}">${esc(i.subject || '–')}</span>`;
+        return `<span class="fin-inv-project">${name}${link}</span>`;
+    }
+
+    /** Under an invoice: link it to a project and a company by hand. */
+    function invoiceLinkRow(i) {
+        const link = ((state.overview.invoice_links || {})[i.number]) || {};
+        const pick = v => (v === null || v === undefined ? '' : String(v));
+        const auto = (found, what) => `Automatic${found ? `: ${found}` : `, none found`}`;
+        // What the match finds on its own, without the hand-made link.
+        const found = IL.attach([Object.assign({}, i, { company: null, project: null })], {
+            companies: state.companies, projects: state.projects, links: {}
+        })[0];
+        const companyId = link.company_id || (i.company && i.company.id) || null;
+        const own = state.projects.filter(p => (p.companies || []).some(c => Number(c.id) === Number(companyId)));
+        const other = state.projects.filter(p => own.indexOf(p) < 0);
+        const option = (value, label, current) => `<option value="${esc(value)}"${String(value) === current ? ' selected' : ''}>${esc(label)}</option>`;
+        const projectOptions = list => list.map(p => option(p.id, p.name + (p.stage === 'Complete' ? '' : ` (${p.stage})`), pick(link.project_id))).join('');
+        return `
+            <tr class="fin-inv-linkrow"><td colspan="12">
+                <div class="fin-inv-linkform" data-fin-inv-linkform="${esc(i.number)}">
+                    ${i.subject ? `<p class="fin-inv-linkwhat">${esc(i.customer)}: ${esc(i.subject)}</p>` : ''}
+                    <label class="fin-field">
+                        <span>Company</span>
+                        <select class="form-select" name="company_id" data-fin-focus="link-company">
+                            ${option('', auto(found.company && found.company.name), pick(link.company_id))}
+                            ${option('0', 'None', pick(link.company_id))}
+                            ${state.companies.map(c => option(c.id, c.name, pick(link.company_id))).join('')}
+                        </select>
+                    </label>
+                    <label class="fin-field">
+                        <span>Project</span>
+                        <select class="form-select" name="project_id">
+                            ${option('', auto(found.project && found.project.name), pick(link.project_id))}
+                            ${option('0', 'None', pick(link.project_id))}
+                            ${own.length ? `<optgroup label="${esc(i.company ? i.company.name : 'This company')}">${projectOptions(own)}</optgroup>` : ''}
+                            <optgroup label="${own.length ? 'Other projects' : 'Projects'}">${projectOptions(other)}</optgroup>
+                        </select>
+                    </label>
+                    <div class="fin-form-actions">
+                        ${i.archived ? `<button type="button" class="fin-link is-danger" data-fin-archive-delete="${i.archiveId}" title="Take this invoice out of the list">Remove</button>` : ''}
+                        <button type="button" class="btn btn-secondary btn-small" data-fin-inv-link-cancel>Cancel</button>
+                        <button type="button" class="btn btn-primary btn-small" data-fin-inv-link-save="${esc(i.number)}"${state.invBusy ? ' disabled' : ''}>Save</button>
+                    </div>
+                </div>
+            </td></tr>`;
+    }
+
     function invoiceRow(i) {
         const money = n => (n === null ? '<span class="fin-muted">–</span>' : esc((n < 0 ? MINUS : '') + cents(Math.abs(n))));
         const day = iso => (iso ? esc(window.CRMFormat.date(iso)) : '<span class="fin-muted">–</span>');
         const unpaid = i.outstanding > 0.005;
         const reading = state.invReading.has(i.id);
         return `
-            <tr class="fin-inv${i.credit ? ' is-credit' : ''}${i.overdue || (i.reminded && unpaid) ? ' is-overdue' : ''}">
+            <tr class="fin-inv${i.credit ? ' is-credit' : ''}${i.overdue || (i.reminded && unpaid) ? ' is-overdue' : ''}${state.invLink === i.number ? ' is-linking' : ''}">
                 <th scope="row">
-                    <button type="button" class="fin-inv-open" data-fin-inv-open="${i.id}" data-fin-focus="inv-${i.id}" title="Open the invoice">${esc(i.number)}</button>
+                    ${i.archived
+                        ? `<span class="fin-inv-num" title="From the invoice list: no PDF, not in Bookkeeping">${esc(i.number)}</span>`
+                        : `<button type="button" class="fin-inv-open" data-fin-inv-open="${i.id}" data-fin-focus="inv-${i.id}" title="Open the invoice">${esc(i.number)}</button>`}
                 </th>
                 <td>${day(i.date)}</td>
                 <td>${reading ? '<span class="bk-reading-spinner" aria-label="Claude is reading"></span>' : day(i.due)}</td>
                 <td class="fin-inv-state">${invoiceStatus(i)}</td>
                 <td>${i.paid ? day(i.paid.date) : ''}</td>
-                <td class="fin-inv-text" title="${esc(i.customer)}">${esc(i.customer)}</td>
+                <td class="fin-inv-text">${invoiceCustomer(i)}</td>
                 <td class="fin-inv-text">${esc(i.contact)}</td>
-                <td class="fin-inv-text is-wide" title="${esc(i.subject)}">${esc(i.subject)}</td>
+                <td class="fin-inv-text is-wide">${invoiceProject(i)}</td>
                 <td>${money(i.net)}</td>
                 <td>${money(i.vat)}</td>
                 <td><strong>${money(i.gross)}</strong></td>
                 <td class="fin-inv-act">${unpaid ? `<button type="button" class="fin-icon-btn${i.reminded ? ' is-on' : ''}" data-fin-inv-remind="${esc(i.number)}" data-fin-focus="remind-${i.id}"
                     aria-pressed="${!!i.reminded}" title="${i.reminded ? `Reminder sent ${esc(fullDay(i.reminded))}. Click to take it back` : 'Reminder sent today'}"
                     aria-label="${i.reminded ? 'Take back the reminder' : 'Reminder sent today'}">${ICON_BELL}</button>` : ''}</td>
-            </tr>`;
+            </tr>${state.invLink === i.number ? invoiceLinkRow(i) : ''}`;
+    }
+
+    /** Adding our invoices from before Bookkeeping: rows pasted from the invoice list. */
+    function invoiceImportPanel() {
+        const imp = state.invImport;
+        const parsed = IL.parseListRows(imp.text);
+        const known = new Set(state.invoices.filter(i => !i.archived).map(i => i.number));
+        const inBookkeeping = parsed.rows.filter(r => known.has(r.invoice_number)).length;
+        const fresh = parsed.rows.length - inBookkeeping;
+        const note = parsed.rows.length
+            ? `${plural(fresh, 'invoice')} to add${inBookkeeping ? `, ${inBookkeeping} already in Bookkeeping (skipped)` : ''}`
+            : '';
+        return `
+            <div class="fin-balance-form fin-inv-import">
+                <textarea class="form-input" rows="5" data-fin-inv-import-text data-fin-focus="inv-import-text" spellcheck="false"
+                    placeholder="Rows from the invoice list: number, date, due, status, paid on, customer, contact, subject, net, VAT, gross">${esc(imp.text)}</textarea>
+                <p class="fin-hint">For the list and the customer figures only: not in Bookkeeping, VAT or cashflow. A number already here is replaced.</p>
+                <div data-fin-inv-import-live>
+                    <p class="fin-inv-import-note">${esc(note)}</p>
+                    ${parsed.errors.length ? `<p class="fin-form-error">${parsed.errors.map(esc).join('<br>')}</p>` : ''}
+                    ${state.invError ? `<p class="fin-form-error">${esc(state.invError)}</p>` : ''}
+                    <div class="fin-form-actions">
+                        <button type="button" class="btn btn-secondary btn-small" data-fin-inv-import-cancel>Cancel</button>
+                        <button type="button" class="btn btn-primary btn-small" data-fin-inv-import-save${fresh && !state.invBusy ? '' : ' disabled'}>Add</button>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    async function importInvoices() {
+        const parsed = IL.parseListRows(state.invImport ? state.invImport.text : '');
+        const known = new Set(state.invoices.filter(i => !i.archived).map(i => i.number));
+        const rows = parsed.rows.filter(r => !known.has(r.invoice_number));
+        if (!rows.length) return;
+        state.invBusy = true;
+        state.invError = '';
+        renderInvoices();
+        try {
+            const result = await post('archive-invoices', { rows });
+            state.overview = result.data;
+            state.invImport = null;
+            const years = rows.map(r => IL.parseNumber(r.invoice_number)).filter(Boolean).map(x => x.year);
+            if (years.length) state.invYear = Math.max.apply(null, years);
+            compute();
+            render();
+            if (window.CRMCompany) window.CRMCompany.refresh();
+        } catch (error) {
+            state.invError = error.message;
+        } finally {
+            state.invBusy = false;
+            renderInvoices();
+        }
+    }
+
+    async function saveInvoiceLink(number) {
+        const form = els.finInvoices.querySelector(`[data-fin-inv-linkform="${CSS.escape(number)}"]`);
+        if (!form) return;
+        const read = name => {
+            const v = form.querySelector(`[name="${name}"]`).value;
+            return v === '' ? null : Number(v);
+        };
+        state.invBusy = true;
+        state.invError = '';
+        try {
+            const result = await post('link-invoice', { number, company_id: read('company_id'), project_id: read('project_id') });
+            state.overview = result.data;
+            state.invLink = null;
+            state.invoices = buildInvoices();
+        } catch (error) {
+            state.invError = error.message;
+        } finally {
+            state.invBusy = false;
+            renderInvoices();
+            const again = els.finInvoices.querySelector(`[data-fin-focus="link-${CSS.escape(number)}"]`);
+            if (again) again.focus();
+        }
+    }
+
+    async function deleteArchived(id) {
+        if (!(await window.CRMDialog.confirm('Take this invoice out of the list?', { confirm: 'Remove', danger: true }))) return;
+        try {
+            const result = await post('delete-archived', { id });
+            state.overview = result.data;
+            state.invLink = null;
+            state.invoices = buildInvoices();
+        } catch (error) {
+            state.invError = error.message;
+        }
+        renderInvoices();
     }
 
     function renderInvoices() {
         if (!els.finInvoices) return;
         const all = state.invoices;
         const years = IL.years(all);
-        if (!years.length) {
-            // Nothing read yet, or Bookkeeping without our invoices: no card.
-            els.finInvoices.hidden = true;
-            els.finInvoices.innerHTML = '';
+        if (!years.length && !state.invImport) {
+            // No invoices yet: only the way to add some from the invoice list.
+            els.finInvoices.hidden = false;
+            els.finInvoices.innerHTML = `
+                <div class="fin-card-head">
+                    <h2 class="fin-card-title">Invoices</h2>
+                    <button type="button" class="fin-icon-btn" data-fin-inv-import data-fin-focus="inv-import" aria-expanded="false"
+                        title="Add invoices from the invoice list" aria-label="Add invoices from the invoice list">${ICON_PASTE}</button>
+                </div>`;
             return;
         }
         els.finInvoices.hidden = false;
+        if (!years.length) years.push(new Date().getFullYear());
         const year = years.indexOf(state.invYear) >= 0 ? state.invYear : years[0];
         const items = all.filter(i => i.year === year);
         const sum = IL.summary(items);
@@ -1327,20 +1523,25 @@
                     <h2 class="fin-card-title">Invoices</h2>
                     ${head.length ? `<p class="fin-card-sub fin-inv-sums" title="Net${bankUntil ? `, payments booked until ${esc(fullDay(bankUntil))}` : ''}">${head.join(', ')}</p>` : ''}
                 </div>
-                ${years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
+                <div class="fin-inv-tools">
+                    ${years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
+                    <button type="button" class="fin-icon-btn" data-fin-inv-import data-fin-focus="inv-import" aria-expanded="${!!state.invImport}"
+                        title="Add invoices from the invoice list" aria-label="Add invoices from the invoice list">${ICON_PASTE}</button>
+                </div>
             </div>
-            ${gaps.length ? `<p class="fin-alert is-warn fin-inv-gap">${ICON.warn}<span>Not in Bookkeeping: ${esc(gaps.join(', '))}</span></p>` : ''}
+            ${state.invImport ? invoiceImportPanel() : ''}
+            ${gaps.length ? `<p class="fin-alert is-warn fin-inv-gap">${ICON.warn}<span>Numbers missing: ${esc(gaps.join(', '))}</span></p>` : ''}
             ${state.invError ? `<p class="fin-alert is-danger fin-inv-gap">${ICON.warn}<span>${esc(state.invError)}</span></p>` : ''}
             <div class="fin-table-scroll">
                 <table class="fin-table fin-inv-table">
                     <thead><tr>
                         <th scope="col">No.</th><th scope="col">Date</th><th scope="col">Due</th><th scope="col">Status</th>
                         <th scope="col" title="The day the payment reached the bank">Paid</th>
-                        <th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">What</th>
+                        <th scope="col">Customer</th><th scope="col">Contact</th><th scope="col">Project</th>
                         <th scope="col">Net</th><th scope="col">VAT</th><th scope="col">Gross</th><th scope="col"><span class="sr-only">Reminder</span></th>
                     </tr></thead>
                     <tbody>${shown.map(invoiceRow).join('')}${shown.length ? '' : `
-                        <tr class="fin-inv-none"><td colspan="12">All paid</td></tr>`}</tbody>
+                        <tr class="fin-inv-none"><td colspan="12">${items.length ? 'All paid' : 'No invoices yet'}</td></tr>`}</tbody>
                     <tfoot><tr>
                         <th scope="row" colspan="8">${esc(plural(sum.count, 'invoice'))}</th>
                         <td>${esc(cents(sum.net))}</td><td>${esc(cents(sum.vat))}</td><td><strong>${esc(cents(sum.gross))}</strong></td><td></td>
@@ -1395,7 +1596,7 @@
             } catch (e) { /* stays as it was; tried again on the next visit */ }
             state.invReading.delete(id);
             if (!state.loaded) return;
-            state.invoices = IL.build(info, (state.overview.settings || {}).invoice_reminders || {}, todayIso());
+            state.invoices = buildInvoices();
             renderInvoices();
         };
         const queue = ids.slice();
@@ -1997,6 +2198,35 @@
             } else if (t.hasAttribute('data-fin-inv-open')) {
                 const item = state.invoices.find(i => i.id === Number(t.getAttribute('data-fin-inv-open')));
                 if (item && window.Bookkeeping) window.Bookkeeping.preview(`api/bookkeeping.php?action=download-pdf&id=${item.id}`, item.file);
+            } else if (t.hasAttribute('data-fin-inv-link')) {
+                const number = t.getAttribute('data-fin-inv-link');
+                state.invLink = state.invLink === number ? null : number;
+                state.invError = '';
+                renderInvoices();
+                const first = els.finInvoices.querySelector(state.invLink ? '[data-fin-focus="link-company"]' : `[data-fin-focus="link-${CSS.escape(number)}"]`);
+                if (first) first.focus();
+            } else if (t.hasAttribute('data-fin-inv-link-cancel')) {
+                const number = state.invLink;
+                state.invLink = null;
+                renderInvoices();
+                const again = number && els.finInvoices.querySelector(`[data-fin-focus="link-${CSS.escape(number)}"]`);
+                if (again) again.focus();
+            } else if (t.hasAttribute('data-fin-inv-link-save')) {
+                saveInvoiceLink(t.getAttribute('data-fin-inv-link-save'));
+            } else if (t.hasAttribute('data-fin-archive-delete')) {
+                deleteArchived(Number(t.getAttribute('data-fin-archive-delete')));
+            } else if (t.hasAttribute('data-fin-inv-import')) {
+                state.invImport = state.invImport ? null : { text: '' };
+                state.invError = '';
+                renderInvoices();
+                const box = els.finInvoices.querySelector(state.invImport ? '[data-fin-inv-import-text]' : '[data-fin-inv-import]');
+                if (box) box.focus();
+            } else if (t.hasAttribute('data-fin-inv-import-cancel')) {
+                state.invImport = null;
+                state.invError = '';
+                renderInvoices();
+            } else if (t.hasAttribute('data-fin-inv-import-save')) {
+                importInvoices();
             } else if (t.hasAttribute('data-fin-inv-remind')) {
                 toggleReminder(t.getAttribute('data-fin-inv-remind'));
             } else if (t.hasAttribute('data-fin-month')) {
@@ -2089,6 +2319,15 @@
             }
         };
         view.addEventListener('input', e => {
+            if (e.target.matches('[data-fin-inv-import-text]') && state.invImport) {
+                state.invImport.text = e.target.value;
+                // Everything under the text box, so typing is not interrupted.
+                const live = e.target.closest('.fin-inv-import').querySelector('[data-fin-inv-import-live]');
+                const fresh = document.createElement('div');
+                fresh.innerHTML = invoiceImportPanel();
+                live.innerHTML = fresh.querySelector('[data-fin-inv-import-live]').innerHTML;
+                return;
+            }
             const form = e.target.closest('[data-fin-cost-form]:not([data-fin-debt-form])');
             if (form && state.draft) state.draft = readCostForm(form);
             onDebtInput(e);
@@ -2144,5 +2383,40 @@
         }, { passive: true });
     }
 
+    // ---- Our invoices for a company's sheet (companies.js) ----
+
+    let companyCache = null;
+
+    /**
+     * One company's invoices and figures. From the page when it is loaded,
+     * otherwise read once a minute - only where Financials is (admins).
+     */
+    async function invoicesForCompany(company) {
+        if (!document.getElementById('finInvoices') || !company) return null;
+        let items;
+        if (state.loaded) {
+            if (window.CRMCompany) state.companies = window.CRMCompany.cached();
+            items = buildInvoices();
+        } else {
+            if (!companyCache || Date.now() - companyCache.at > 60000) {
+                const [projects, overview, tx, companies] = await fetchAll(false);
+                companyCache = { at: Date.now(), items: buildInvoices({ overview, tx, companies, projects }) };
+            }
+            items = companyCache.items;
+        }
+        const id = Number(company.id);
+        return { items: items.filter(i => i.company && i.company.id === id), stats: IL.companyStats(items, id) };
+    }
+
+    // A company merged, renamed or added: the invoices find theirs again.
+    document.addEventListener('crm:companies-changed', () => {
+        companyCache = null;
+        if (!state.loaded || !window.CRMCompany) return;
+        state.companies = window.CRMCompany.cached();
+        state.invoices = buildInvoices();
+        renderInvoices();
+    });
+
+    window.CompanyInvoices = { forCompany: invoicesForCompany };
     window.Financials = { load };
 })();

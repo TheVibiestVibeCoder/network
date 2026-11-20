@@ -211,7 +211,7 @@
                 cls: inv.overdue > 0.005 ? 'is-neg' : ''
             });
             if (inv.share !== null) {
-                items.push({ label: 'Share of revenue', value: `${Math.round(inv.share * 100)}%`, title: `Of our invoiced net in ${inv.shareYear}` });
+                items.push({ label: 'Share of revenue', value: `${Math.round(inv.share * 100)}%`, title: 'Of everything we invoiced, net' });
             }
         }
         return items;

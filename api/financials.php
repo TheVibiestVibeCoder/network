@@ -15,6 +15,10 @@
  * POST ?action=delete-balance   { id }
  * POST ?action=save-settings    { buffer?, dismiss_recurring? (a suggestion's key, turned down) }
  *                               invoice_reminder? { number, day (YYYY-MM-DD, null: none) }
+ * POST ?action=link-invoice     { number, project_id?, company_id? } (an id, 0: none, null: automatic)
+ * POST ?action=archive-invoices { rows: [{ invoice_number, invoice_date, due_date, paid_date, customer,
+ *                               contact, subject, net, vat, gross }] } - our invoices from before Bookkeeping
+ * POST ?action=delete-archived  { id }
  */
 
 define('APP_ROOT', dirname(__DIR__));
@@ -144,6 +148,29 @@ try {
             if ($error !== null) {
                 finJson(['error' => $error], 400);
             }
+            finJson(['success' => true, 'data' => $model->overview()]);
+            break;
+
+        case 'link-invoice':
+            InvoiceArchive::link(Database::getInstance(), (string) ($input['number'] ?? ''), $input);
+            finJson(['success' => true, 'data' => $model->overview()]);
+            break;
+
+        case 'archive-invoices':
+            $rows = $input['rows'] ?? null;
+            if (!is_array($rows) || !$rows) {
+                finJson(['error' => 'No invoices to add'], 400);
+            }
+            $counts = Database::transactional(fn(PDO $db) => InvoiceArchive::import($db, array_values($rows)));
+            finJson(['success' => true, 'counts' => $counts, 'data' => $model->overview()]);
+            break;
+
+        case 'delete-archived':
+            $id = finId($input['id'] ?? null);
+            if ($id === null) {
+                finJson(['error' => 'An id is required'], 400);
+            }
+            InvoiceArchive::delete(Database::getInstance(), $id);
             finJson(['success' => true, 'data' => $model->overview()]);
             break;
 

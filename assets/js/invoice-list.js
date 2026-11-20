@@ -189,5 +189,264 @@
             .map(file => file.id);
     }
 
-    root.InvoiceList = { isOwn, parseNumber, statusOf, build, years, gaps, summary, needsReading, daysBetween };
+    // ------------------------------------------------------------------
+    // Invoices from before Bookkeeping (the archive, InvoiceArchive.php)
+    // ------------------------------------------------------------------
+
+    /**
+     * Archived invoices as list items, the same shape build() gives. Paid on
+     * the paid date the invoice list carries; amounts are signed already.
+     */
+    function fromArchive(rows, reminders, today) {
+        return (rows || []).map(row => {
+            const number = String(row.invoice_number || '').trim();
+            const parsed = parseNumber(number);
+            const num = v => (v === null || v === undefined || v === '' ? null : Number(v));
+            const item = {
+                id: 'a' + row.id,
+                archiveId: row.id,
+                archived: true,
+                file: null,
+                number,
+                seq: parsed ? parsed.seq : null,
+                year: parsed ? parsed.year : (row.invoice_date ? Number(row.invoice_date.slice(0, 4)) : null),
+                credit: row.kind === 'credit_note',
+                date: row.invoice_date || null,
+                due: row.due_date || null,
+                customer: row.customer || '',
+                contact: row.contact || '',
+                subject: row.subject || '',
+                currency: 'EUR',
+                net: num(row.net),
+                vat: num(row.vat),
+                gross: num(row.gross),
+                paid: null,
+                reminded: (reminders && reminders[number]) || null
+            };
+            if (item.gross === null) item.gross = round2((item.net || 0) + (item.vat || 0));
+            if (row.paid_date) item.paid = { row: null, date: row.paid_date, amount: item.gross };
+            item.status = statusOf(item, today);
+            item.daysLate = item.due && !item.paid && today > item.due ? daysBetween(item.due, today)
+                : item.due && item.paid && item.paid.date > item.due ? daysBetween(item.due, item.paid.date) : 0;
+            item.outstanding = item.paid || item.credit ? 0 : item.gross;
+            item.outstandingNet = item.paid || item.credit ? 0 : (item.net === null ? item.gross : item.net);
+            item.overdue = item.outstanding > 0.005 && !!item.due && today > item.due;
+            return item;
+        });
+    }
+
+    /**
+     * Bookkeeping's invoices and the archived ones in one list, oldest
+     * number first. An invoice in both counts once, from Bookkeeping.
+     */
+    function merge(fromBookkeeping, archived) {
+        const known = new Set(fromBookkeeping.map(i => i.number));
+        return fromBookkeeping.concat(archived.filter(i => !known.has(i.number)))
+            .sort((a, b) => (a.year || 0) - (b.year || 0)
+                || (a.seq === null) - (b.seq === null)
+                || (a.seq || 0) - (b.seq || 0)
+                || String(a.date || '').localeCompare(String(b.date || ''))
+                || a.number.localeCompare(b.number));
+    }
+
+    /** "16.000,00 €" -> 16000; "-1.250,5" -> -1250.5; '' -> null. */
+    function parseAmount(text) {
+        let t = String(text == null ? '' : text).replace(/[€\s ]/g, '').replace(/[−–]/g, '-');
+        if (!t) return null;
+        if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+        const n = Number(t);
+        return Number.isFinite(n) ? n : NaN;
+    }
+
+    /** "08.09.2026" -> "2026-09-08", '' -> null, anything else -> false. */
+    function parseDay(text) {
+        const t = String(text == null ? '' : text).trim();
+        if (!t) return null;
+        let m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(t);
+        if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+        m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+        return m ? t : false;
+    }
+
+    /**
+     * Rows pasted from Livio's invoice list (tab-separated, the columns of
+     * the rechnungszeile skill): number, date, due, status, paid on,
+     * customer, contact, subject, net, VAT, gross. A header line is skipped.
+     * Returns { rows, errors: ["Line 3: ..."] }.
+     */
+    function parseListRows(text) {
+        const rows = [];
+        const errors = [];
+        String(text || '').split(/\r?\n/).forEach((line, i) => {
+            if (!line.trim()) return;
+            const cells = line.split('\t').map(c => c.trim());
+            if (i === 0 && !parseNumber(cells[0]) && /rechnung|number|nr/i.test(cells[0])) return;
+            const at = `Line ${i + 1}`;
+            if (cells.length < 9) {
+                errors.push(`${at}: ${cells.length} columns, expected 11 (tab-separated)`);
+                return;
+            }
+            const [number, date, due, status, paidOn, customer, contact, subject, net, vat, gross] = cells;
+            const days = { date: parseDay(date), due: parseDay(due), paid: parseDay(paidOn) };
+            const amounts = { net: parseAmount(net), vat: parseAmount(vat), gross: parseAmount(gross) };
+            if (!number) { errors.push(`${at}: no invoice number`); return; }
+            if (Object.values(days).some(d => d === false)) { errors.push(`${at}: a date is not DD.MM.YYYY`); return; }
+            if (Object.values(amounts).some(n => Number.isNaN(n))) { errors.push(`${at}: an amount is not a number`); return; }
+            rows.push({
+                invoice_number: number,
+                invoice_date: days.date,
+                due_date: days.due,
+                // "Versendet" with no date is open; a paid status needs its day.
+                paid_date: days.paid,
+                status: status || '',
+                customer: customer || '',
+                contact: contact || '',
+                subject: subject || '',
+                net: amounts.net,
+                vat: amounts.vat,
+                gross: amounts.gross
+            });
+        });
+        return { rows, errors };
+    }
+
+    // ------------------------------------------------------------------
+    // Which company and project an invoice belongs to
+    // ------------------------------------------------------------------
+
+    const COMPANY_NOISE = new Set(['gmbh', 'ltd', 'limited', 'inc', 'llc', 'ag', 'kg', 'og', 'eu', 'co', 'bv', 'sarl', 'se', 'srl',
+        'mbh', 'gesmbh', 'gesellschaft', 'ug', 'ev', 'und', 'and', 'the', 'der', 'die', 'das', 'von', 'for', 'für']);
+
+    /** "Disinfo Combat GmbH" -> "disinfocombat", as Company::nameKey. */
+    function companyKey(name) {
+        const words = String(name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+        const kept = words.filter(w => !COMPANY_NOISE.has(w));
+        return (kept.length ? kept : words).join('');
+    }
+
+    /** The company an invoice's customer name is: the same name, or the one name inside the other. */
+    function matchCompany(customer, companies) {
+        const key = companyKey(customer);
+        if (!key) return null;
+        const exact = companies.filter(c => companyKey(c.name) === key);
+        if (exact.length === 1) return exact[0];
+        if (exact.length > 1) return null;
+        const near = companies.filter(c => {
+            const k = companyKey(c.name);
+            return k.length >= 4 && key.length >= 4 && (k.indexOf(key) >= 0 || key.indexOf(k) >= 0);
+        });
+        return near.length === 1 ? near[0] : null;
+    }
+
+    const WORD_NOISE = new Set(['und', 'and', 'the', 'der', 'die', 'das', 'für', 'for', 'mit', 'von', 'zur', 'zum', 'auftrag',
+        'rechnung', 'teilrechnung', 'akonto', 'online', 'std', 'min']);
+    const wordsOf = text => new Set(String(text || '').toLowerCase().split(/[^\p{L}\p{N}]+/u)
+        .filter(w => w.length >= 3 && !WORD_NOISE.has(w) && !/^\d+$/.test(w)));
+
+    /**
+     * The project an invoice belongs to, among its company's projects: the
+     * only one, or the one that fits clearly best - words of the subject in
+     * the project's name, the net amount among its payments or budget, the
+     * date within its run. Null when nothing or more than one fits.
+     */
+    function matchProject(item, projects, companyId) {
+        if (!companyId) return null;
+        const own = (projects || []).filter(p => p.review_status !== 'pending'
+            && (p.companies || []).some(c => Number(c.id) === Number(companyId)));
+        if (own.length <= 1) return own[0] || null;
+
+        const words = wordsOf(item.subject);
+        const net = Math.abs(Number(item.net) || 0);
+        const scored = own.map(p => {
+            let score = 0;
+            wordsOf(p.name).forEach(w => { if (words.has(w)) score += 2; });
+            const payments = Array.isArray(p.payments) ? p.payments : [];
+            if (net && payments.some(x => Math.abs(Number(x.amount) - net) < 1)) score += 3;
+            if (net && [p.budget_min, p.budget_max].some(b => b !== null && b !== '' && Math.abs(Number(b) - net) < 1)) score += 2;
+            if (item.date && p.start_date) {
+                const end = p.estimated_completion || p.start_date;
+                if (daysBetween(p.start_date, item.date) >= -30 && daysBetween(end, item.date) <= 120) score += 1;
+            }
+            return { p, score };
+        }).sort((a, b) => b.score - a.score);
+        return scored[0].score > 0 && scored[0].score > scored[1].score ? scored[0].p : null;
+    }
+
+    /**
+     * Each invoice with its company and project: { company: { id, name,
+     * auto } | null, project: { id, name, auto } | null }. A link made by
+     * hand wins (links[number]: an id, or 0 for none); without one the
+     * customer's name finds the company, and the company's projects the
+     * project. A project linked by hand brings its company along when the
+     * name found none.
+     */
+    function attach(items, ctx) {
+        const companies = (ctx && ctx.companies) || [];
+        const projects = (ctx && ctx.projects) || [];
+        const links = (ctx && ctx.links) || {};
+        const companyById = new Map(companies.map(c => [Number(c.id), c]));
+        const projectById = new Map(projects.map(p => [Number(p.id), p]));
+        return items.map(item => {
+            const link = links[item.number] || {};
+            let company = null;
+            if (link.company_id) {
+                const c = companyById.get(Number(link.company_id));
+                if (c) company = { id: Number(c.id), name: c.name, auto: false };
+            } else if (link.company_id !== 0) {
+                const c = matchCompany(item.customer, companies);
+                if (c) company = { id: Number(c.id), name: c.name, auto: true };
+            }
+            let project = null;
+            if (link.project_id) {
+                const p = projectById.get(Number(link.project_id));
+                if (p) project = { id: Number(p.id), name: p.name, auto: false };
+            } else if (link.project_id !== 0 && company) {
+                const p = matchProject(item, projects, company.id);
+                if (p) project = { id: Number(p.id), name: p.name, auto: true };
+            }
+            if (!company && link.company_id !== 0 && project) {
+                const p = projectById.get(project.id);
+                const first = p && p.companies && p.companies.length === 1 ? p.companies[0] : null;
+                if (first) company = { id: Number(first.id), name: first.name, auto: true };
+            }
+            return Object.assign({}, item, { company, project });
+        });
+    }
+
+    /**
+     * What we have with one company, from its invoices (attach() first):
+     * how much, since when, how fast it pays, what is open, per year, and
+     * its share of all we invoiced.
+     */
+    function companyStats(items, companyId) {
+        const mine = items.filter(i => i.company && Number(i.company.id) === Number(companyId));
+        const sumNet = list => round2(list.reduce((s, i) => s + (Number(i.net) || 0), 0));
+        const invoices = mine.filter(i => !i.credit);
+        const paid = invoices.filter(i => i.paid && i.paid.date && i.date);
+        const days = paid.map(i => daysBetween(i.date, i.paid.date));
+        const late = paid.filter(i => i.due && i.paid.date > i.due);
+        const byYear = new Map();
+        mine.forEach(i => { if (i.year) byYear.set(i.year, round2((byYear.get(i.year) || 0) + (Number(i.net) || 0))); });
+        const total = sumNet(items);
+        const dates = mine.map(i => i.date).filter(Boolean).sort();
+        return {
+            count: invoices.length,
+            net: sumNet(mine),
+            since: dates[0] || null,
+            paidCount: paid.length,
+            avgDays: days.length ? days.reduce((s, d) => s + d, 0) / days.length : null,
+            lateCount: late.length,
+            avgLate: late.length ? late.reduce((s, i) => s + daysBetween(i.due, i.paid.date), 0) / late.length : 0,
+            open: round2(mine.reduce((s, i) => s + (i.outstanding > 0.005 ? i.outstandingNet : 0), 0)),
+            overdue: round2(mine.reduce((s, i) => s + (i.overdue ? i.outstandingNet : 0), 0)),
+            years: Array.from(byYear.entries()).sort((a, b) => a[0] - b[0]).map(([year, net]) => ({ year, net })),
+            share: total > 0.005 && mine.length ? sumNet(mine) / total : null
+        };
+    }
+
+    root.InvoiceList = {
+        isOwn, parseNumber, statusOf, build, years, gaps, summary, needsReading, daysBetween,
+        fromArchive, merge, parseAmount, parseDay, parseListRows,
+        companyKey, matchCompany, matchProject, attach, companyStats
+    };
 })(typeof window !== 'undefined' ? window : globalThis);

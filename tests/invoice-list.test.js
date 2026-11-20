@@ -151,6 +151,91 @@
         eq(IL.build({ files, ownWord: null }, {}, TODAY), []);
     });
 
+    // ---- The archive, links and company figures ----
+
+    const pasted = [
+        'Rechnungsnummer\tRechnungsdatum\tFälligkeit\tZahlstatus\tZahldatum\tKundenname\tKontakt\tBetreff\tSumme netto\tUSt\tSumme brutto',
+        '0003/2025\t10.03.2025\t24.03.2025\tFristgerecht bezahlt\t20.03.2025\tWiener Zeitung GmbH\tKatharina Hahn\tWorkshop "Desinformation"\t2.500,00 €\t500,00 €\t3.000,00 €',
+        '0004/2025\t01.04.2025\t15.04.2025\tVerspätet bezahlt\t05.05.2025\tAmeropa AG\tLisa Steiner\tRisk Briefing\t11.200,00 €\t0,00 €\t11.200,00 €',
+        '0005/2025\t02.12.2025\t16.12.2025\tVersendet\t\tWiener Zeitung GmbH\t\tVortrag\t1.000,00 €\t200,00 €\t1.200,00 €',
+        '0006/2025\t13.12.2025\t\tVersendet\t\tX\t\tbad\tzwölf\t\t'
+    ].join('\n');
+
+    test('rows pasted from the invoice list are read, a header and a bad line aside', () => {
+        const r = IL.parseListRows(pasted);
+        eq(r.rows.map(x => x.invoice_number), ['0003/2025', '0004/2025', '0005/2025']);
+        eq([r.rows[1].invoice_date, r.rows[1].paid_date, r.rows[1].net, r.rows[0].vat], ['2025-04-01', '2025-05-05', 11200, 500]);
+        eq(r.rows[2].paid_date, null, 'sent, not paid');
+        eq(r.errors, ['Line 5: an amount is not a number']);
+    });
+
+    const archived = () => IL.fromArchive(IL.parseListRows(pasted).rows.map((x, i) => Object.assign({ id: i + 1, kind: 'invoice' }, x)), {}, TODAY);
+
+    test('archived invoices: paid from their paid date, open ones open', () => {
+        const by = Object.fromEntries(archived().map(i => [i.number, [i.status, i.outstandingNet, i.daysLate]]));
+        eq(by['0003/2025'], ['paid', 0, 0]);
+        eq(by['0004/2025'], ['late', 0, 20]);
+        eq(by['0005/2025'][0], 'overdue');
+        eq(by['0005/2025'][1], 1000);
+    });
+
+    test('an invoice in Bookkeeping and the archive counts once, from Bookkeeping', () => {
+        const bk = IL.build(data, {}, TODAY);
+        const dup = IL.fromArchive([{ id: 9, invoice_number: '0012/2026', invoice_date: '2026-10-01', net: 1, vat: 0, gross: 1 }], {}, TODAY);
+        const all = IL.merge(bk, archived().concat(dup));
+        eq(all.filter(i => i.number === '0012/2026').length, 1);
+        eq(all.find(i => i.number === '0012/2026').archived, undefined);
+        eq(all[0].number, '0003/2025', 'oldest first');
+    });
+
+    const companies = [{ id: 1, name: 'Wiener Zeitung' }, { id: 2, name: 'Ameropa AG' }, { id: 3, name: 'Europäisches Parlament' }, { id: 4, name: 'Parlament Wien' }];
+    const projects = [
+        { id: 10, name: 'Workshop Desinformation', companies: [{ id: 1, name: 'Wiener Zeitung' }], budget_min: 2500, budget_max: 2500, start_date: '2025-03-01', estimated_completion: '2025-03-31', payments: [] },
+        { id: 11, name: 'Vortrag Medienkompetenz', companies: [{ id: 1, name: 'Wiener Zeitung' }], budget_min: 1000, budget_max: 1000, start_date: '2025-11-01', estimated_completion: '2025-12-01', payments: [] },
+        { id: 12, name: 'Briefing', companies: [{ id: 2, name: 'Ameropa AG' }], start_date: '2025-03-01', payments: [] }
+    ];
+
+    test('the company from the customer\'s name, legal form aside; unclear names stay open', () => {
+        eq(IL.matchCompany('Wiener Zeitung GmbH', companies).id, 1);
+        eq(IL.matchCompany('AMEROPA', companies).id, 2);
+        eq(IL.matchCompany('Parlament', companies), null, 'inside two names');
+        eq(IL.matchCompany('Somebody else', companies), null);
+    });
+
+    test('the project among the company\'s: the only one, or the clearly best', () => {
+        const items = IL.attach(archived(), { companies, projects, links: {} });
+        const by = Object.fromEntries(items.map(i => [i.number, i.project && i.project.id]));
+        eq(by['0003/2025'], 10, 'subject words, amount and date');
+        eq(by['0004/2025'], 12, 'the only project');
+        eq(by['0005/2025'], 11, 'the amount');
+    });
+
+    test('a link by hand wins, 0 means none, and a project brings its company', () => {
+        const items = IL.attach(archived(), { companies, projects, links: {
+            '0003/2025': { project_id: 11, company_id: null },
+            '0004/2025': { project_id: 0, company_id: null },
+            '0005/2025': { project_id: null, company_id: 0 }
+        } });
+        const by = Object.fromEntries(items.map(i => [i.number, i]));
+        eq([by['0003/2025'].project.id, by['0003/2025'].project.auto], [11, false]);
+        eq(by['0004/2025'].project, null);
+        eq(by['0004/2025'].company.id, 2, 'company still found');
+        eq(by['0005/2025'].company, null);
+        const lone = IL.attach([Object.assign({}, archived()[0], { customer: 'unknown' })], { companies, projects, links: { '0003/2025': { project_id: 12 } } });
+        eq(lone[0].company.id, 2, 'from the project');
+    });
+
+    test('a company\'s figures: volume, since, days to pay, open, per year, share', () => {
+        const items = IL.attach(archived(), { companies, projects, links: {} });
+        const s = IL.companyStats(items, 1);
+        eq([s.count, s.net, s.since, s.paidCount, s.avgDays, s.lateCount], [2, 3500, '2025-03-10', 1, 10, 0]);
+        eq([s.open, s.overdue], [1000, 1000]);
+        eq(s.years, [{ year: 2025, net: 3500 }]);
+        eq(Math.round(s.share * 100), 24);
+        const a = IL.companyStats(items, 2);
+        eq([a.avgDays, a.lateCount, a.avgLate], [34, 1, 20]);
+    });
+
     const failed = results.filter(r => !r.ok);
     const out = results.map(r => (r.ok ? 'ok   ' : 'FAIL ') + r.name + (r.ok ? '' : '\n       ' + r.message)).join('\n')
         + `\n\n${results.length - failed.length}/${results.length} passed`;

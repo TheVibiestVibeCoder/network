@@ -28,6 +28,7 @@ require_once APP_ROOT . '/includes/Contact.php';
 require_once APP_ROOT . '/includes/Project.php';
 require_once APP_ROOT . '/includes/Company.php';
 require_once APP_ROOT . '/includes/ReviewQueue.php';
+require_once APP_ROOT . '/includes/InvoiceArchive.php';
 require_once APP_ROOT . '/includes/McpService.php';
 
 register_shutdown_function(static function () use ($scratch): void {
@@ -235,6 +236,39 @@ test('the connector proposes a project with several companies and a product', fu
     eq(col("SELECT product FROM projects WHERE id = ?", [$id]), 'Risk Briefing', 'product');
     eq($svc->handle('projects.get', ['project_id' => $id])['project']['product'], 'Risk Briefing', 'read back');
     eq(in_array('SHIELD', $svc->handle('meta', [])['project_products'], true), true, 'meta');
+});
+
+test('archived invoices are added or replaced by number, checked line by line', function () {
+    $db = Database::getInstance();
+    $counts = InvoiceArchive::import($db, [
+        ['invoice_number' => '0001/2025', 'invoice_date' => '2025-01-10', 'net' => 1000, 'vat' => 200],
+        ['invoice_number' => '0002/2025', 'invoice_date' => '2025-02-10', 'paid_date' => '2025-02-20', 'net' => -500, 'vat' => 0],
+    ]);
+    eq($counts, ['added' => 2, 'replaced' => 0], 'counts');
+    eq(InvoiceArchive::import($db, [['invoice_number' => '0001/2025', 'net' => 1100, 'vat' => 220]]), ['added' => 0, 'replaced' => 1], 'again');
+    $rows = array_column(InvoiceArchive::all($db), null, 'invoice_number');
+    eq([$rows['0001/2025']['gross'], $rows['0002/2025']['kind']], [1320.0, 'credit_note'], 'gross worked out, credit note');
+    try {
+        InvoiceArchive::import($db, [['invoice_number' => 'x', 'invoice_date' => '10.01.2025']]);
+        throw new RuntimeException('not refused');
+    } catch (InvalidArgumentException $e) {
+        ok(str_contains($e->getMessage(), 'Line 1'), 'says the line');
+    }
+});
+
+test('an invoice link: id, 0 for none, null for automatic; gone when both automatic', function () {
+    $db = Database::getInstance();
+    $acme = (int) col("SELECT id FROM companies WHERE name = 'ACME Group'");
+    InvoiceArchive::link($db, '0001/2025', ['company_id' => $acme, 'project_id' => 0]);
+    eq(InvoiceArchive::links($db)['0001/2025'], ['project_id' => 0, 'company_id' => $acme], 'stored');
+    InvoiceArchive::link($db, '0001/2025', ['project_id' => null]);
+    eq(InvoiceArchive::links($db)['0001/2025'], ['project_id' => null, 'company_id' => $acme], 'one side changed');
+    $other = Company::findOrCreate($db, 'Merged Away');
+    InvoiceArchive::link($db, '0002/2025', ['company_id' => $other]);
+    Company::merge($db, $other, $acme);
+    eq(InvoiceArchive::links($db)['0002/2025']['company_id'], $acme, 'follows a merge');
+    InvoiceArchive::link($db, '0002/2025', ['company_id' => null]);
+    ok(!isset(InvoiceArchive::links($db)['0002/2025']), 'removed');
 });
 
 // =============================================================================

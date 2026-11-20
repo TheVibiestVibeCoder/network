@@ -13391,3 +13391,110 @@ textarea.form-input:focus,
 .rf-split-by {
     margin-right: 4px;
 }
+
+/* ---- Financials: an invoice's company and project ---- */
+
+.fin-inv-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--c-ink);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.fin-inv-link:hover {
+    color: var(--c-accent);
+    text-decoration: underline;
+}
+
+.fin-inv-link:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.fin-inv-project {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.fin-inv-project > :first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The link button shows on the row's hover, always while nothing is linked. */
+.fin-inv-linkbtn {
+    flex: none;
+    opacity: 0;
+    transition: opacity var(--dur-1) var(--ease);
+}
+
+.fin-inv:hover .fin-inv-linkbtn,
+.fin-inv-linkbtn:focus-visible,
+.fin-inv-linkbtn.is-empty,
+.fin-inv-linkbtn[aria-expanded="true"] {
+    opacity: 1;
+}
+
+.fin-inv-linkbtn.is-empty { color: var(--c-accent); }
+
+.fin-inv-num { font-weight: 600; color: var(--c-ink-2); }
+
+.fin-inv.is-linking :is(th, td) { background: var(--c-tint-3); }
+
+.fin-inv-linkrow td {
+    padding: 0 !important;
+    background: var(--c-tint-3);
+}
+
+.fin-inv-linkform {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 14px;
+    padding: 10px 12px 14px;
+    white-space: normal;
+}
+
+.fin-inv-linkform .fin-field { min-width: 220px; flex: 1 1 220px; }
+.fin-inv-linkform .fin-form-actions { margin-left: auto; }
+.fin-inv-linkform .form-select { background: var(--c-surface); }
+
+.fin-inv-linkwhat {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.fin-link.is-danger { color: var(--c-danger); }
+
+.fin-inv-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fin-inv-import textarea {
+    width: 100%;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: var(--t-xs);
+    white-space: pre;
+}
+
+.fin-inv-import-note {
+    margin: 4px 0 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+.fin-inv-import-note:empty { display: none; }
