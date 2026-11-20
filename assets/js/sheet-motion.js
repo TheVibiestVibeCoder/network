@@ -216,10 +216,13 @@
             const shadow = getComputedStyle(box).boxShadow;
             const grow = box.animate(way, { duration: OPEN_MS, easing: 'linear' });
             s.anims.push(grow);
-            // The content once the window is wide enough for it.
+            // The card grows empty; its content comes in at the end, growing a
+            // little with it, rather than being there all along behind the window.
             parts.forEach(part => s.anims.push(part.animate([
-                { opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }
-            ], { duration: OPEN_MS, easing: EASE })));
+                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0' },
+                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0', offset: 0.6 },
+                { opacity: 1, transform: 'none', transformOrigin: '50% 0' }
+            ], { duration: OPEN_MS + 60, easing: EASE })));
             grow.onfinish = () => {
                 settle(s);
                 if (shadow && shadow !== 'none') {
@@ -255,9 +258,11 @@
             const way = frames(back, box.getBoundingClientRect(), radiusOf(box), cornerExponent(box), true);
             lift(s, box, s.origin);
             main = box.animate(way, { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' });
-            // The content leaves first, so only the box goes back into the card.
+            // The content leaves first, shrinking a little; then the empty card goes back.
             Array.from(box.children).forEach(part => s.anims.push(part.animate([
-                { opacity: 1 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }
+                { opacity: 1, transform: 'none', transformOrigin: '50% 0' },
+                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0', offset: 0.3 },
+                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0' }
             ], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })));
         } else {
             lift(s, box, null);
