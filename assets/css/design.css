@@ -13809,3 +13809,19 @@ textarea.form-input:focus,
 }
 
 :root[data-theme="dark"] .co-avatar { background: var(--c-accent); }
+
+/* A sheet's company line stays one line: a long name, or several, is cut
+   with an ellipsis; the full names are in each link's tooltip. */
+:is(#projectOverviewModal, #overviewModal) .overview-company[data-ov="view"] {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.overview-company .ov-company-link {
+    display: inline;
+    text-align: left;
+    white-space: nowrap;
+}

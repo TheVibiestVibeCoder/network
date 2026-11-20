@@ -2964,7 +2964,7 @@
             // Populate header
             elements.overviewName.textContent = contact.name;
             elements.overviewCompany.innerHTML = contact.company
-                ? `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(contact.company_id || '')}" data-company-name="${escapeHtml(contact.company)}">${escapeHtml(contact.company)}</button>`
+                ? `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(contact.company_id || '')}" data-company-name="${escapeHtml(contact.company)}" title="${escapeHtml(contact.company)}">${escapeHtml(contact.company)}</button>`
                 : '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
             setEditedLine(elements.overviewEdited, contact);
@@ -5575,7 +5575,7 @@
             ? project.companies
             : (project.company ? [{ id: '', name: project.company }] : []);
         if (!list.length) return '<span class="detail-empty">No company assigned</span>';
-        return list.map(c => `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(c.id)}" data-company-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</button>`)
+        return list.map(c => `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(c.id)}" data-company-name="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</button>`)
             .join('<span class="ov-company-sep">, </span>');
     }
 
