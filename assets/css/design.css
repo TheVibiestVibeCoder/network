@@ -14296,3 +14296,52 @@ textarea.form-input:focus,
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
+
+/* ---- Bookkeeping: the export popup ---- */
+.bk-export { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+
+.bk-export-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    background: var(--c-tint-3);
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.bk-export-head strong { color: var(--c-ink); }
+
+.bk-export-title {
+    margin: 0 0 4px;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--c-ink);
+}
+
+.bk-export-title span {
+    margin-left: 6px;
+    font-weight: 400;
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+}
+
+.bk-export-item {
+    display: grid;
+    grid-template-columns: 18px auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--c-line-2, var(--c-line));
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+    cursor: pointer;
+}
+
+.bk-export-group .bk-export-item:last-of-type { border-bottom: 0; }
+.bk-export-item input { margin: 0; accent-color: var(--c-accent); }
+.bk-export-no { font-weight: 600; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.bk-export-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-export-amount { font-variant-numeric: tabular-nums; color: var(--c-ink-3); white-space: nowrap; }
+.bk-export-csv { grid-template-columns: 18px 1fr; border-bottom: 0; }
+.bk-export-note { margin: 4px 0 0; font-size: var(--t-xs); color: var(--c-ink-4); }

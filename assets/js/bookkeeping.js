@@ -3162,15 +3162,150 @@
         }
     }
 
+    /**
+     * Export: a popup before the download. It says what goes in - the PDFs
+     * of the selected bank rows - and offers what belongs to the same months
+     * but has no bank row yet: our own invoices still unpaid in the drop
+     * zone (ticked), into a folder of their own. A PDF that went out in an
+     * earlier export (an invoice sent while unpaid, now on its bank row) is
+     * listed and left out unless ticked. The invoice list of the period can
+     * come along as a CSV.
+     */
     function exportSelected() {
         const ids = Array.from(state.selection);
-        const withPdf = state.rows.filter(r => ids.includes(r.id) && r.pdf);
-        if (withPdf.length === 0) {
+        const rows = state.rows.filter(r => ids.includes(r.id));
+        const withPdf = rows.filter(r => r.pdf);
+        const months = rows.map(r => String(r.row_date || '').slice(0, 7)).filter(Boolean).sort();
+        if (!months.length && !withPdf.length) {
             showToast('None of the selected rows has a PDF attached', true);
             return;
         }
-        showToast(`Downloading ${withPdf.length} PDF${withPdf.length === 1 ? '' : 's'} as ZIP...`);
-        window.location.href = `${API}?action=export-pdfs&ids=${ids.join(',')}`;
+        const from = months[0];
+        const to = months[months.length - 1];
+        const label = exportPeriodLabel(from, to);
+        const inPeriod = date => !!date && date.slice(0, 7) >= from && date.slice(0, 7) <= to;
+
+        // Our own invoices: the word of our name the invoices themselves teach.
+        const IL = window.InvoiceList;
+        const allPdfs = state.pool.concat(state.rows.filter(r => r.pdf).map(r => r.pdf));
+        const ownWord = ownWordOf(allPdfs);
+        const ours = pdf => !!(IL && pdf && pdf.invoice && IL.isOwn(pdf.invoice, ownWord)
+            && (pdf.invoice.kind === 'invoice' || pdf.invoice.kind === 'credit_note') && pdf.invoice.invoice_number);
+
+        const open = state.pool.filter(pdf => ours(pdf) && inPeriod(pdf.invoice.invoice_date))
+            .sort((a, b) => String(a.invoice.invoice_number).localeCompare(String(b.invoice.invoice_number)));
+        const fresh = withPdf.filter(r => !r.pdf.exported_at);
+        const again = withPdf.filter(r => r.pdf.exported_at);
+
+        const money = n => (n === null || n === undefined ? '' : window.CRMFormat.amount(n));
+        const invoiceLine = (pdf, checked, attr) => `
+            <label class="bk-export-item">
+                <input type="checkbox" ${attr}="${pdf.id}"${checked ? ' checked' : ''}>
+                <span class="bk-export-no">${escapeHtml(pdf.invoice ? pdf.invoice.invoice_number || '' : '')}</span>
+                <span class="bk-export-who">${escapeHtml(pdf.invoice ? (pdf.invoice.recipient || pdf.name) : pdf.name)}</span>
+                <span class="bk-export-amount">${escapeHtml(pdf.invoice ? money(pdf.invoice.gross) : '')}</span>
+            </label>`;
+
+        const message = `
+            <div class="bk-export">
+                <div class="bk-export-head">
+                    <span>Bank entries</span>
+                    <strong>${fresh.length} PDF${fresh.length === 1 ? '' : 's'}</strong>
+                </div>
+                ${open.length ? `
+                <div class="bk-export-group">
+                    <p class="bk-export-title">Our invoices, not paid yet <span>Ausgangsrechnungen offen</span></p>
+                    ${open.map(pdf => invoiceLine(pdf, !pdf.exported_at, 'data-export-open')).join('')}
+                    ${open.some(pdf => pdf.exported_at) ? `<p class="bk-export-note">Unticked: already exported with ${escapeHtml(open.filter(p => p.exported_at).map(p => p.exported_with).filter(Boolean).join(', '))}</p>` : ''}
+                </div>` : ''}
+                ${again.length ? `
+                <div class="bk-export-group">
+                    <p class="bk-export-title">Exported before</p>
+                    ${again.map(r => `
+                        <label class="bk-export-item">
+                            <input type="checkbox" data-export-again="${r.pdf.id}">
+                            <span class="bk-export-who">${escapeHtml(r.pdf.invoice && r.pdf.invoice.invoice_number ? r.pdf.invoice.invoice_number + ', ' : '')}${escapeHtml(r.pdf.name)}</span>
+                            <span class="bk-export-amount">${escapeHtml(r.pdf.exported_with ? 'with ' + r.pdf.exported_with : '')}</span>
+                        </label>`).join('')}
+                </div>` : ''}
+                <label class="bk-export-item bk-export-csv">
+                    <input type="checkbox" data-export-csv>
+                    <span>Add the invoice list (CSV)</span>
+                </label>
+            </div>`;
+
+        showConfirm({
+            title: `Export ${label}`,
+            message,
+            actions: [{
+                label: 'Download ZIP',
+                handler: () => {
+                    const box = els.confirmMessage;
+                    const openIds = Array.from(box.querySelectorAll('[data-export-open]:checked')).map(i => i.getAttribute('data-export-open'));
+                    const skip = again.map(r => r.pdf.id).filter(id => !box.querySelector(`[data-export-again="${id}"]:checked`));
+                    const csv = box.querySelector('[data-export-csv]:checked')
+                        ? invoiceListCsv(allPdfs.filter(pdf => ours(pdf) && inPeriod(pdf.invoice.invoice_date)), ownWord) : '';
+                    const count = fresh.length + (again.length - skip.length) + openIds.length;
+                    if (!count && !csv) throw new Error('Nothing ticked to export');
+                    submitExport({ rows: ids.join(','), skip: skip.join(','), open: openIds.join(','), csv, period: label });
+                    showToast(`Downloading ${count} PDF${count === 1 ? '' : 's'} as ZIP...`);
+                    // Remembered as exported: read again shortly, after the download began.
+                    setTimeout(() => load(), 2500);
+                }
+            }]
+        });
+    }
+
+    /** "Oct 2026", "Oct – Nov 2026", "Dec 2025 – Jan 2026". */
+    function exportPeriodLabel(from, to) {
+        const name = key => MONTH_NAMES[Number(key.slice(5, 7)) - 1].slice(0, 3);
+        if (!from) return new Date().toISOString().slice(0, 10);
+        if (from === to) return `${name(from)} ${from.slice(0, 4)}`;
+        return from.slice(0, 4) === to.slice(0, 4)
+            ? `${name(from)} – ${name(to)} ${to.slice(0, 4)}`
+            : `${name(from)} ${from.slice(0, 4)} – ${name(to)} ${to.slice(0, 4)}`;
+    }
+
+    /**
+     * Our invoices of the period as a list for the accountant: number,
+     * date, due, customer, contact, subject, net, VAT, gross, paid on (the
+     * bank row's day). Semicolons and decimal commas, as Excel here reads them.
+     */
+    function invoiceListCsv(pdfs, ownWord) {
+        const paidOn = new Map(state.rows.filter(r => r.pdf).map(r => [r.pdf.id, r.row_date]));
+        const cell = v => {
+            const t = String(v === null || v === undefined ? '' : v);
+            return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+        };
+        const num = n => (n === null || n === undefined || n === '' ? '' : Number(n).toFixed(2).replace('.', ','));
+        const day = iso => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '');
+        const lines = [['Rechnungsnummer', 'Rechnungsdatum', 'Fälligkeit', 'Kunde', 'Kontakt', 'Betreff', 'Netto', 'USt', 'Brutto', 'Bezahlt am']];
+        pdfs.slice().sort((a, b) => String(a.invoice.invoice_number).localeCompare(String(b.invoice.invoice_number))).forEach(pdf => {
+            const i = pdf.invoice;
+            const sign = i.kind === 'credit_note' ? -1 : 1;
+            lines.push([i.invoice_number, day(i.invoice_date), day(i.due_date), i.recipient_legal_name || i.recipient, i.contact,
+                i.subject, num(i.net === null ? null : sign * i.net), num(i.vat === null ? null : sign * i.vat),
+                num(i.gross === null ? null : sign * i.gross), day(paidOn.get(pdf.id) || '')]);
+        });
+        return lines.map(line => line.map(cell).join(';')).join('\r\n');
+    }
+
+    /** A form POST into a hidden frame-less target: the browser downloads the ZIP. */
+    function submitExport(fields) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `${API}?action=export`;
+        form.style.display = 'none';
+        Object.entries(Object.assign({}, fields, { csrf_token: getCsrfToken() })).forEach(([name, value]) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
     }
 
     // ------------------------------------------------------------------

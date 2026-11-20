@@ -106,6 +106,10 @@ try {
                 bkSetNoPdf($db);
                 break;
 
+            case 'export':
+                bkExport($db);
+                break;
+
             case 'read-invoice':
                 bkReadInvoice($db);
                 break;
@@ -287,6 +291,13 @@ function bkEnsureSchema(PDO $db): void
         $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_data TEXT");
         $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_error TEXT");
         $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN invoice_read_at DATETIME");
+    }
+
+    // When a PDF last went out in an export, and with which period ("Oct 2026"),
+    // so an invoice exported while unpaid is not sent twice once it is paid.
+    if (!in_array('exported_at', $pdfColumns, true)) {
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN exported_at DATETIME");
+        $db->exec("ALTER TABLE bookkeeping_pdfs ADD COLUMN exported_with VARCHAR(40)");
     }
 
     if (!is_dir(BK_PDF_DIR)) {
@@ -484,7 +495,8 @@ function bkGetTable(PDO $db): void
                r.assigned_to, r.assigned_to_name,
                p.id AS pdf_id, p.original_name AS pdf_name, p.file_size AS pdf_size,
                p.review_status AS pdf_review_status,
-               p.invoice_data AS pdf_invoice_data, p.invoice_error AS pdf_invoice_error
+               p.invoice_data AS pdf_invoice_data, p.invoice_error AS pdf_invoice_error,
+               p.exported_at AS pdf_exported_at, p.exported_with AS pdf_exported_with
         FROM bookkeeping_rows r
         LEFT JOIN bookkeeping_pdfs p ON p.row_id = r.id
         ORDER BY (r.row_date IS NULL), r.row_date, r.id
@@ -507,13 +519,15 @@ function bkGetTable(PDO $db): void
                 'review_status' => $row['pdf_review_status'],
                 'invoice' => bkInvoiceData($row['pdf_invoice_data']),
                 'invoice_error' => $row['pdf_invoice_error'],
+                'exported_at' => $row['pdf_exported_at'],
+                'exported_with' => $row['pdf_exported_with'],
             ] : null,
         ];
     }
 
     $pool = $db->query("
         SELECT id, original_name AS name, file_size AS size, created_at, review_status,
-               invoice_data, invoice_error
+               invoice_data, invoice_error, exported_at, exported_with
         FROM bookkeeping_pdfs
         WHERE row_id IS NULL
         ORDER BY created_at DESC, id DESC
@@ -587,6 +601,86 @@ function bkDownloadPdf(PDO $db, int $id): void
     );
     header('X-Content-Type-Options: nosniff');
     readfile($path);
+    exit;
+}
+
+/**
+ * The export from its popup (bookkeeping.js), as a form POST so it downloads:
+ *
+ *   rows    the bank rows whose PDFs go in (comma-separated ids)
+ *   skip    PDFs of those rows to leave out (already exported)
+ *   open    our unpaid invoices from the drop zone, into "Ausgangsrechnungen offen/"
+ *   csv     the invoice list for the period, as text, added as a .csv
+ *   period  "Oct 2026" or "Oct - Nov 2026": the file's name, and remembered
+ *           on every PDF that went out (exported_at, exported_with)
+ */
+function bkExport(PDO $db): void
+{
+    $rowIds = bkIntList((string) ($_POST['rows'] ?? ''));
+    $skip = bkIntList((string) ($_POST['skip'] ?? ''));
+    $openIds = bkIntList((string) ($_POST['open'] ?? ''));
+    $csv = (string) ($_POST['csv'] ?? '');
+    $period = mb_substr(trim(preg_replace('/[^\p{L}\p{N} \-–]+/u', '', (string) ($_POST['period'] ?? ''))), 0, 40);
+
+    $files = [];
+    if ($rowIds) {
+        $in = implode(',', array_fill(0, count($rowIds), '?'));
+        $stmt = $db->prepare("SELECT p.id, p.original_name, p.stored_name FROM bookkeeping_pdfs p JOIN bookkeeping_rows r ON r.id = p.row_id
+                              WHERE p.row_id IN ($in) ORDER BY r.row_date, r.id");
+        $stmt->execute($rowIds);
+        foreach ($stmt->fetchAll() as $pdf) {
+            if (!in_array((int) $pdf['id'], $skip, true)) {
+                $files[] = $pdf + ['folder' => ''];
+            }
+        }
+    }
+    if ($openIds) {
+        $in = implode(',', array_fill(0, count($openIds), '?'));
+        $stmt = $db->prepare("SELECT id, original_name, stored_name FROM bookkeeping_pdfs WHERE row_id IS NULL AND id IN ($in) ORDER BY id");
+        $stmt->execute($openIds);
+        foreach ($stmt->fetchAll() as $pdf) {
+            $files[] = $pdf + ['folder' => 'Ausgangsrechnungen offen/'];
+        }
+    }
+    if (!$files && $csv === '') {
+        bkJson(['error' => 'Nothing to export'], 400);
+    }
+
+    $label = $period !== '' ? $period : date('Y-m-d');
+    // File names in plain ASCII dashes: not every unzip tool reads an en dash.
+    $fileLabel = str_replace('–', '-', $label);
+    $options = new Archive();
+    $options->setSendHttpHeaders(true);
+    $zip = new ZipStream('Belege ' . $fileLabel . '.zip', $options);
+
+    $used = [];
+    $sent = [];
+    foreach ($files as $pdf) {
+        $path = BK_PDF_DIR . '/' . $pdf['stored_name'];
+        if (!file_exists($path)) {
+            continue;
+        }
+        $file = $pdf['folder'] . $pdf['original_name'];
+        if (isset($used[$file])) {
+            $used[$file]++;
+            $file = $pdf['folder'] . pathinfo($pdf['original_name'], PATHINFO_FILENAME) . ' (' . $used[$file] . ').pdf';
+        } else {
+            $used[$file] = 1;
+        }
+        $zip->addFileFromPath($file, $path);
+        $sent[] = (int) $pdf['id'];
+    }
+    if ($csv !== '' && strlen($csv) < 2000000) {
+        // With a byte order mark, so Excel reads the umlauts.
+        $zip->addFile('Rechnungsliste ' . $fileLabel . '.csv', "\xEF\xBB\xBF" . $csv);
+    }
+    $zip->finish();
+
+    if ($sent) {
+        $in = implode(',', array_fill(0, count($sent), '?'));
+        $db->prepare("UPDATE bookkeeping_pdfs SET exported_at = CURRENT_TIMESTAMP, exported_with = ? WHERE id IN ($in)")
+            ->execute(array_merge([$label], $sent));
+    }
     exit;
 }
 
