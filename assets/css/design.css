@@ -13388,8 +13388,27 @@ textarea.form-input:focus,
 
 .rf-legend { align-items: center; }
 
+.rf-title-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-right: auto;
+}
+
+/* Small and quiet under the title. */
 .rf-split-by {
-    margin-right: 4px;
+    padding: 2px;
+}
+
+.rf-split-by .segmented-btn {
+    height: 22px;
+    padding: 0 8px;
+    font-size: var(--t-xs);
+}
+
+.rf-split-by .segmented-btn.active {
+    font-weight: 600;
 }
 
 /* ---- Financials: an invoice's company and project ---- */

@@ -229,24 +229,25 @@
             }).join('')}</div>`;
         }
 
-        /**
-         * The chart's colour key, and the switch between splitting the bars
-         * by stage or by product. Stages switched off are greyed.
-         */
-        function stageLegend(ctx) {
-            const split = `<div class="segmented rf-seg-sm rf-split-by" role="group" aria-label="Split the bars by">${['stage', 'product'].map(k => {
+        /** Under the title: the bars split by stage or by product. */
+        function splitSwitch() {
+            return `<div class="segmented rf-split-by" role="group" aria-label="Split the bars by">${['stage', 'product'].map(k => {
                 const on = shared.splitBy === k;
                 return `<button type="button" class="segmented-btn${on ? ' active' : ''}" aria-pressed="${on}" data-rf-split="${k}"
                     data-rf-focus="split-${k}" title="Split the bars by ${k}">${k === 'stage' ? 'Stage' : 'Product'}</button>`;
             }).join('')}</div>`;
+        }
+
+        /** The chart's colour key; stages that are switched off are greyed. */
+        function stageLegend(ctx) {
             if (shared.splitBy === 'product') {
                 const present = new Set(ctx.all.map(p => p.product || ''));
-                return `<div class="rf-legend">${split}${RF.PRODUCT_STACK.filter(k => present.has(k)).map(k => `
+                return `<div class="rf-legend">${RF.PRODUCT_STACK.filter(k => present.has(k)).map(k => `
                     <span class="rf-key is-on" data-product="${esc(k)}"><span class="rf-stage-dot" aria-hidden="true"></span>${esc(k || 'No product')}</span>`).join('')}<span class="rf-key is-on rf-key--best"><span class="rf-best-swatch" aria-hidden="true"></span>Best case</span></div>`;
             }
             const s = state.settings;
             const counts = stageCounts(ctx);
-            return `<div class="rf-legend">${split}${RF.STACK.filter(key => counts[key]).map(key => {
+            return `<div class="rf-legend">${RF.STACK.filter(key => counts[key]).map(key => {
                 const st = RF.STAGE_INFO.find(x => x.key === key);
                 // Finished work still owed is always counted.
                 const on = key === RF.COMPLETE || s.stages.indexOf(key) >= 0;
@@ -680,7 +681,10 @@
             el.innerHTML = `
                 <div class="rf-top">
                     <div class="rf-head">
-                        <h2 class="rf-title">Revenue forecast</h2>
+                        <div class="rf-title-wrap">
+                            <h2 class="rf-title">Revenue forecast</h2>
+                            ${splitSwitch()}
+                        </div>
                         ${outside ? '' : controls(ctx)}
                         ${expandBtn}
                     </div>
