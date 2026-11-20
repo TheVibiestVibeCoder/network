@@ -216,11 +216,12 @@
             const shadow = getComputedStyle(box).boxShadow;
             const grow = box.animate(way, { duration: OPEN_MS, easing: 'linear' });
             s.anims.push(grow);
-            // The card grows empty; its content comes in at the end, growing a
-            // little with it, rather than being there all along behind the window.
+            // The card grows empty; its content comes in from about halfway,
+            // growing with it from 80% of its size, rather than being there
+            // all along behind the window.
             parts.forEach(part => s.anims.push(part.animate([
-                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0' },
-                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0', offset: 0.6 },
+                { opacity: 0, transform: 'scale(0.8)', transformOrigin: '50% 0' },
+                { opacity: 0, transform: 'scale(0.8)', transformOrigin: '50% 0', offset: 0.45 },
                 { opacity: 1, transform: 'none', transformOrigin: '50% 0' }
             ], { duration: OPEN_MS + 60, easing: EASE })));
             grow.onfinish = () => {
@@ -261,8 +262,8 @@
             // The content leaves first, shrinking a little; then the empty card goes back.
             Array.from(box.children).forEach(part => s.anims.push(part.animate([
                 { opacity: 1, transform: 'none', transformOrigin: '50% 0' },
-                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0', offset: 0.3 },
-                { opacity: 0, transform: 'scale(0.96)', transformOrigin: '50% 0' }
+                { opacity: 0, transform: 'scale(0.8)', transformOrigin: '50% 0', offset: 0.4 },
+                { opacity: 0, transform: 'scale(0.8)', transformOrigin: '50% 0' }
             ], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })));
         } else {
             lift(s, box, null);
