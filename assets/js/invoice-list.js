@@ -106,6 +106,10 @@
                 due: invoice.due_date || null,
                 customer: invoice.recipient || '',
                 contact: invoice.contact || '',
+                // The customer's address and VAT ID as the invoice gives them.
+                legalName: invoice.recipient_legal_name || '',
+                address: invoice.recipient_address || '',
+                vatId: invoice.recipient_vat_id || '',
                 subject: invoice.subject || '',
                 currency: invoice.currency || 'EUR',
                 net: invoice.net === null || invoice.net === undefined ? null : sign * invoice.net,
@@ -179,13 +183,14 @@
     }
 
     /**
-     * Our invoices read before the reader also took the contact and the due
-     * date from the payment terms: their file ids, to be read once more.
+     * Our invoices read before the reader also took the customer's address
+     * and VAT ID (and before that the contact and the due date from the
+     * payment terms): their file ids, to be read once more.
      */
     function needsReading(data) {
         const ownWord = data && data.ownWord;
         return ((data && data.files) || [])
-            .filter(file => isListed(file.invoice, ownWord) && !Object.prototype.hasOwnProperty.call(file.invoice, 'contact'))
+            .filter(file => isListed(file.invoice, ownWord) && !Object.prototype.hasOwnProperty.call(file.invoice, 'recipient_address'))
             .map(file => file.id);
     }
 
@@ -214,6 +219,8 @@
                 date: row.invoice_date || null,
                 due: row.due_date || null,
                 customer: row.customer || '',
+                // The invoice list has the name as it is on the invoice.
+                legalName: row.customer || '',
                 contact: row.contact || '',
                 subject: row.subject || '',
                 currency: 'EUR',
@@ -414,6 +421,41 @@
     }
 
     /**
+     * What our invoices say about each company: the address and VAT ID of
+     * its newest invoice that has one, only where the company has none yet;
+     * and the name as the newest invoice prints it - unless somebody renamed
+     * the company by hand after it last took one (invoice_name), or another
+     * company has that name. [{ id, name?, address?, vat_id? }]
+     */
+    function companyDetails(items, companies) {
+        const out = [];
+        companies.forEach(c => {
+            const mine = items.filter(i => i.company && Number(i.company.id) === Number(c.id) && !i.credit)
+                .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            const change = { id: Number(c.id) };
+            const named = mine.find(i => String(i.legalName || '').trim());
+            if (named) {
+                const name = named.legalName.trim().replace(/\s+/g, ' ');
+                const byHand = c.invoice_name && c.name !== c.invoice_name;
+                const taken = companies.some(o => Number(o.id) !== Number(c.id) && String(o.name).toLowerCase() === name.toLowerCase());
+                if (name !== c.name && name !== c.invoice_name && !byHand && !taken) change.name = name;
+                else if (!c.invoice_name && name === c.name) change.invoice_name = name;
+            }
+            if (!String(c.address || '').trim()) {
+                const hit = mine.find(i => i.address);
+                if (hit) change.address = hit.address;
+            }
+            if (!String(c.vat_id || '').trim()) {
+                const hit = mine.find(i => i.vatId);
+                if (hit) change.vat_id = hit.vatId;
+            }
+            if (change.name) change.invoice_name = change.name;
+            if (change.name || change.invoice_name || change.address || change.vat_id) out.push(change);
+        });
+        return out;
+    }
+
+    /**
      * What we have with one company, from its invoices (attach() first):
      * how much, since when, how fast it pays, what is open, per year, and
      * its share of all we invoiced.
@@ -447,6 +489,6 @@
     root.InvoiceList = {
         isOwn, parseNumber, statusOf, build, years, gaps, summary, needsReading, daysBetween,
         fromArchive, merge, parseAmount, parseDay, parseListRows,
-        companyKey, matchCompany, matchProject, attach, companyStats
+        companyKey, matchCompany, matchProject, attach, companyStats, companyDetails
     };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -158,9 +158,13 @@
         }
         const website = c.website ? String(c.website) : '';
         const href = website && !/^https?:\/\//i.test(website) ? 'https://' + website : website;
-        els.sub.innerHTML = website
-            ? `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(website.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a>`
-            : '';
+        const lines = [];
+        if (website) {
+            lines.push(`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(website.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a>`);
+        }
+        const details = [c.address ? String(c.address).replace(/\s*\n\s*/g, ', ') : '', c.vat_id ? `UID ${c.vat_id}` : ''].filter(Boolean);
+        if (details.length) lines.push(`<span class="co-head-details">${esc(details.join(', '))}</span>`);
+        els.sub.innerHTML = lines.join('');
     }
 
     /** A project's budget as one figure: the middle of its range. */

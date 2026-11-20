@@ -271,6 +271,17 @@ test('an invoice link: id, 0 for none, null for automatic; gone when both automa
     ok(!isset(InvoiceArchive::links($db)['0002/2025']), 'removed');
 });
 
+test('the name taken from an invoice is kept beside the name', function () {
+    $db = Database::getInstance();
+    $id = Company::findOrCreate($db, 'Invoice Co');
+    Company::update($db, $id, ['name' => 'Invoice Co GmbH', 'invoice_name' => 'Invoice Co GmbH']);
+    eq(col("SELECT invoice_name FROM companies WHERE id = ?", [$id]), 'Invoice Co GmbH', 'stored');
+    Company::update($db, $id, ['name' => 'Invoice Company']);
+    eq([col("SELECT name FROM companies WHERE id = ?", [$id]), col("SELECT invoice_name FROM companies WHERE id = ?", [$id])],
+        ['Invoice Company', 'Invoice Co GmbH'], 'a rename by hand leaves it');
+    eq(array_key_exists('invoice_name', Company::all($db)[0]), true, 'listed');
+});
+
 // =============================================================================
 
 $failed = 0;

@@ -13911,3 +13911,11 @@ textarea.form-input:focus,
 #listView .company-group.is-open > .contact-card {
     padding-left: 54px;
 }
+
+#companyNotesModal .overview-company a { display: block; }
+.co-head-details {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}

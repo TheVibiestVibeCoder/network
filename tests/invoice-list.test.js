@@ -33,7 +33,7 @@
     let nextId = 1;
     function ours(number, date, due, recipient, net, vat, extra) {
         return Object.assign({
-            kind: 'invoice', issuer: 'Disinfo Combat GmbH', recipient, contact: '', invoice_number: number,
+            kind: 'invoice', issuer: 'Disinfo Combat GmbH', recipient, contact: '', recipient_address: '', recipient_vat_id: '', invoice_number: number,
             invoice_date: date, due_date: due, subject: 'Workshop', currency: 'EUR', net, vat, gross: net + vat
         }, extra || {});
     }
@@ -140,9 +140,9 @@
         eq(IL.years(items), [2026, 2025]);
     });
 
-    test('our invoices read before "contact" existed are read again', () => {
+    test('our invoices read before the address existed are read again', () => {
         const old = ours('0003/2026', '2026-05-27', '2026-06-26', 'EP', 3500, 0);
-        delete old.contact;
+        delete old.recipient_address;
         const f = file(old);
         eq(IL.needsReading({ ownWord: 'disinfo', files: [f, files[0], files[5]] }), [f.id]);
     });
@@ -234,6 +234,43 @@
         eq(Math.round(s.share * 100), 24);
         const a = IL.companyStats(items, 2);
         eq([a.avgDays, a.lateCount, a.avgLate], [34, 1, 20]);
+    });
+
+    test('a company gets the address and VAT ID of its newest invoice, only where it has none', () => {
+        const items = [
+            { number: '1', date: '2025-01-01', company: { id: 1 }, address: 'Old Street 1, 1010 Wien', vatId: 'ATU1' },
+            { number: '2', date: '2026-01-01', company: { id: 1 }, address: 'New Street 2, 1070 Wien', vatId: '' },
+            { number: '3', date: '2026-02-01', company: { id: 2 }, address: 'Elsewhere 3', vatId: 'ATU2' },
+            { number: '4', date: '2026-03-01', company: { id: 3 }, address: '', vatId: '' }
+        ];
+        const companies = [{ id: 1, address: '', vat_id: '' }, { id: 2, address: 'Kept 9', vat_id: '' }, { id: 3, address: '', vat_id: '' }];
+        eq(IL.companyDetails(items, companies), [
+            { id: 1, address: 'New Street 2, 1070 Wien', vat_id: 'ATU1' },
+            { id: 2, vat_id: 'ATU2' }
+        ]);
+    });
+
+    test('a company takes the name of its newest invoice, unless renamed by hand since or taken', () => {
+        const items = [
+            { number: '1', date: '2025-01-01', company: { id: 1 }, legalName: 'Wiener Zeitung GmbH' },
+            { number: '2', date: '2026-01-01', company: { id: 2 }, legalName: 'ACME  Consulting GmbH' },
+            { number: '3', date: '2026-02-01', company: { id: 3 }, legalName: 'Beta AG' },
+            { number: '4', date: '2026-03-01', company: { id: 4 }, legalName: 'Taken GmbH' },
+            { number: '5', date: '2026-03-01', company: { id: 6 }, legalName: 'Same Name' }
+        ];
+        const companies = [
+            { id: 1, name: 'Wiener Zeitung', invoice_name: null, address: 'x', vat_id: 'y' },
+            { id: 2, name: 'ACME', invoice_name: 'ACME', address: 'x', vat_id: 'y' },
+            { id: 3, name: 'Beta', invoice_name: 'Beta Aktiengesellschaft', address: 'x', vat_id: 'y' },
+            { id: 4, name: 'Taken', invoice_name: null, address: 'x', vat_id: 'y' },
+            { id: 5, name: 'Taken GmbH', invoice_name: null, address: 'x', vat_id: 'y' },
+            { id: 6, name: 'Same Name', invoice_name: null, address: 'x', vat_id: 'y' }
+        ];
+        eq(IL.companyDetails(items, companies), [
+            { id: 1, name: 'Wiener Zeitung GmbH', invoice_name: 'Wiener Zeitung GmbH' },
+            { id: 2, name: 'ACME Consulting GmbH', invoice_name: 'ACME Consulting GmbH' },
+            { id: 6, invoice_name: 'Same Name' }
+        ]);
     });
 
     const failed = results.filter(r => !r.ok);

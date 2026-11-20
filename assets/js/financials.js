@@ -259,7 +259,8 @@
             state.loaded = true;
             compute();
             render();
-            readOldInvoices();
+            fillCompanyDetails();
+            readOldInvoices().then(fillCompanyDetails);
         } catch (error) {
             if (token !== state.token) return;
             state.error = error.message || 'Could not load';
@@ -1573,6 +1574,31 @@
      * date from the payment terms ("zahlbar binnen 14 Tagen"): read once
      * more, two at a time, the card filling in as they come back.
      */
+    /**
+     * What our invoices say about a company - its name as on the invoice,
+     * its address and VAT ID where it has none - written into the company
+     * (IL.companyDetails says when). Each company tried once per visit.
+     */
+    const detailsTried = new Set();
+    async function fillCompanyDetails() {
+        if (!window.CRMCompany || !state.loaded) return;
+        const changes = IL.companyDetails(state.invoices, state.companies).filter(c => !detailsTried.has(c.id));
+        if (!changes.length) return;
+        for (const change of changes) {
+            detailsTried.add(change.id);
+            const body = {};
+            ['name', 'invoice_name', 'address', 'vat_id'].forEach(k => { if (change[k]) body[k] = change[k]; });
+            try {
+                await fetch(`api/companies.php?id=${change.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+                    body: JSON.stringify(body)
+                });
+            } catch (e) { /* tried again on the next visit */ }
+        }
+        await window.CRMCompany.refresh();
+    }
+
     async function readOldInvoices() {
         const info = state.tx.invoices;
         if (state.invReadTried || !info || !info.reader) return;

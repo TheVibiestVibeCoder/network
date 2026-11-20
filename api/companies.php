@@ -8,7 +8,7 @@
  * POST                      create {name, website?, address?, vat_id?}
  * POST   ?action=merge      {from, into}: move everything over, delete "from"
  * POST   ?action=keep-apart {a, b}: no longer list this pair as similar
- * PUT    ?id=              change name and details
+ * PUT    ?id=              change name and details (invoice_name: the name taken from an invoice)
  * DELETE ?id=              delete; contacts keep their company text
  */
 
@@ -102,7 +102,7 @@ try {
     }
 
     if ($method === 'PUT' && $id !== null) {
-        $fields = array_intersect_key($input, array_flip(['name', 'website', 'address', 'vat_id']));
+        $fields = array_intersect_key($input, array_flip(['name', 'website', 'address', 'vat_id', 'invoice_name']));
         respond(Database::transactional(fn(PDO $d) => Company::update($d, $id, $fields)));
         return;
     }

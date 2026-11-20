@@ -177,7 +177,7 @@ class Company
     public static function all(PDO $db): array
     {
         $rows = $db->query("
-            SELECT c.id, c.name, c.website,
+            SELECT c.id, c.name, c.website, c.address, c.vat_id, c.invoice_name,
                 (SELECT COUNT(*) FROM contacts k WHERE k.company_id = c.id) AS contacts,
                 (SELECT COUNT(*) FROM project_companies pc WHERE pc.company_id = c.id) AS projects
             FROM companies c ORDER BY c.name COLLATE NOCASE
@@ -283,6 +283,10 @@ class Company
             'an' => $actor['name'],
             'id' => $id,
         ]);
+        if (array_key_exists('invoice_name', $data)) {
+            $db->prepare("UPDATE companies SET invoice_name = :n WHERE id = :id")
+                ->execute(['n' => self::cleanName($data['invoice_name']), 'id' => $id]);
+        }
         if ($name !== $company['name']) {
             self::renameEverywhere($db, $id, $company['name'], $name);
         }

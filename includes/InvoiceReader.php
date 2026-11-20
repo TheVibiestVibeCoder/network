@@ -80,7 +80,8 @@ class InvoiceReader
     /**
      * Read one invoice.
      *
-     * @return array{kind: string, issuer: string, recipient: string, contact: string, invoice_number: ?string,
+     * @return array{kind: string, issuer: string, recipient: string, recipient_legal_name: string, contact: string, recipient_address: string,
+     *               recipient_vat_id: string, invoice_number: ?string,
      *               invoice_date: ?string, due_date: ?string, subject: string, currency: string,
      *               net: ?float, vat: ?float, gross: ?float, model: string}
      * @throws RuntimeException with a message fit to show the user; code
@@ -216,6 +217,9 @@ class InvoiceReader
             'issuer' => $text($result['issuer'] ?? null, 120),
             'recipient' => $text($result['recipient'] ?? null, 120),
             'contact' => $text($result['contact'] ?? null, 120),
+            'recipient_legal_name' => $text($result['recipient_legal_name'] ?? null, 255),
+            'recipient_address' => $text($result['recipient_address'] ?? null, 300),
+            'recipient_vat_id' => strtoupper(str_replace(' ', '', $text($result['recipient_vat_id'] ?? null, 32))),
             'invoice_number' => $number !== '' ? $number : null,
             'invoice_date' => $date($result['invoice_date'] ?? null),
             'due_date' => $date($result['due_date'] ?? null),
@@ -238,7 +242,10 @@ Fill in:
 - issuer: the company or person who issued the document, as short as it is still clear ("Adobe", "Deutsche Bahn", "Hotel Alpenblick GmbH").
 - recipient: who it is addressed to, just as short.
 - contact: the person the document is addressed to at the recipient (the name in the address block, "z. Hd.", "Attn.", "Ansprechperson"), name only without title or role ("Lisa Steiner").
-  For these three, an empty string if the document does not name one - never a note like "not stated".
+- recipient_legal_name: the recipient's full name exactly as printed in the address block, legal form included ("Wiener Zeitung GmbH", "Europäisches Parlament").
+- recipient_address: the recipient's postal address from the address block, on one line without the name: street, postcode and city, country if printed ("Neustiftgasse 36, 1070 Wien, Österreich").
+- recipient_vat_id: the recipient's VAT ID (UID, USt-IdNr., VAT No., e.g. "ATU12345678"), never the issuer's own.
+  For these six, an empty string if the document does not name one - never a note like "not stated".
 - invoice_number: as printed, or null.
 - invoice_date and due_date: YYYY-MM-DD, or null if not on the document. Only a payment term given ("zahlbar binnen 14 Tagen", "payable within 30 days", "Zahlungsziel 7 Tage"): due_date is invoice_date plus those days. "Sofort", "prompt" or "upon receipt": due_date is invoice_date.
 - subject: a few words on what it is for ("Creative Cloud Team, October", "Train Vienna-Munich"), in the document's language.
@@ -265,12 +272,15 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['kind', 'issuer', 'recipient', 'contact', 'invoice_number', 'invoice_date', 'due_date', 'subject', 'currency', 'net', 'vat', 'gross'],
+            'required' => ['kind', 'issuer', 'recipient', 'recipient_legal_name', 'contact', 'recipient_address', 'recipient_vat_id', 'invoice_number', 'invoice_date', 'due_date', 'subject', 'currency', 'net', 'vat', 'gross'],
             'properties' => [
                 'kind' => ['type' => 'string', 'enum' => ['invoice', 'credit_note', 'receipt', 'other']],
                 'issuer' => ['type' => 'string'],
                 'recipient' => ['type' => 'string'],
                 'contact' => ['type' => 'string'],
+                'recipient_legal_name' => ['type' => 'string'],
+                'recipient_address' => ['type' => 'string'],
+                'recipient_vat_id' => ['type' => 'string'],
                 'invoice_number' => $nullable(['type' => 'string']),
                 'invoice_date' => $nullable(['type' => 'string', 'format' => 'date']),
                 'due_date' => $nullable(['type' => 'string', 'format' => 'date']),

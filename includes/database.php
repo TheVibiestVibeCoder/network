@@ -706,6 +706,9 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_project_companies_company ON project_companies(company_id)");
 
         self::addColumnIfMissing($db, 'contacts', 'company_id', 'INTEGER');
+        // The name the company last took from one of our invoices: a later
+        // invoice renames it only while nobody has renamed it by hand since.
+        self::addColumnIfMissing($db, 'companies', 'invoice_name', 'VARCHAR(255)');
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company_id ON contacts(company_id)");
 
         // The product a project is about: one of Project::PRODUCTS, or NULL.
