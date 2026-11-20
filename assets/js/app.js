@@ -3145,6 +3145,16 @@
             nameField.focus();
             return;
         }
+        // A company that does not exist yet is created in full first.
+        if (data.company && window.CRMCompany && !window.CRMCompany.byName(data.company)) {
+            const created = await window.CRMCompany.create({ name: data.company });
+            if (!created) {
+                elements.contactEditCompany.focus();
+                return;
+            }
+            data.company = created.name;
+            elements.contactEditCompany.value = created.name;
+        }
 
         elements.saveContactEditBtn.disabled = true;
         try {
@@ -5198,14 +5208,17 @@
             }
         }
 
+        // A company typed but not created yet is created first, in full.
+        const companies = await projectCompaniesToSave();
+        if (companies === null) return;
+
         const data = {
             name: elements.projectEditName.value.trim(),
             start_date: elements.projectEditStartDate.value,
             description: elements.projectEditDescription.value.trim(),
-            // Ids for companies there are, names for new ones (created on save);
-            // the text is the names, for anything still reading it.
-            companies: projectCompaniesToSave().map(c => (c.id ? c.id : { name: c.name })),
-            company: projectCompaniesToSave().map(c => c.name).join(', ') || null,
+            // The companies by id; the text is their names, for anything still reading it.
+            companies: companies.map(c => c.id),
+            company: companies.map(c => c.name).join(', ') || null,
             budget_min: budget[0],
             budget_max: budget[1],
             success_chance: elements.projectEditSuccessChance.value || null,
@@ -5629,32 +5642,44 @@
         if (!box) return;
         const list = state.projectEditCompanies || [];
         box.innerHTML = list.map((c, i) => `
-            <span class="ov-company-chip${c.id ? '' : ' is-new'}" title="${c.id ? '' : 'New company, created on save'}">
+            <span class="ov-company-chip">
                 ${escapeHtml(c.name)}
                 <button type="button" class="ov-company-chip-x" data-remove-company="${i}" aria-label="Remove ${escapeHtml(c.name)}">&times;</button>
             </span>`).join('');
         elements.projectEditCompany.placeholder = list.length ? 'Add another' : 'Company';
     }
 
-    /** Add a company by name: the known one of that name, or a new one. */
-    function addProjectCompany(name, id) {
+    /**
+     * Add a company by name: the known one of that name; a name that is no
+     * company yet opens the company sheet to create it in full first.
+     * Resolves to false when that was cancelled.
+     */
+    async function addProjectCompany(name, id) {
         const clean = String(name || '').trim().replace(/\s+/g, ' ');
-        if (!clean) return;
+        if (!clean) return true;
         const list = state.projectEditCompanies || (state.projectEditCompanies = []);
-        const known = id ? { id: Number(id), name: clean } : (window.CRMCompany && window.CRMCompany.byName(clean));
-        const entry = known ? { id: Number(known.id), name: known.name } : { id: null, name: clean };
-        if (list.some(c => c.name.toLowerCase() === entry.name.toLowerCase())) return;
-        list.push(entry);
+        let known = id ? { id: Number(id), name: clean } : (window.CRMCompany && window.CRMCompany.byName(clean));
+        if (!known && window.CRMCompany) {
+            known = await window.CRMCompany.create({ name: clean });
+            if (!known) {
+                elements.projectEditCompany.value = clean;
+                elements.projectEditCompany.focus();
+                return false;
+            }
+        }
+        if (!known) return false;
+        const entry = { id: Number(known.id), name: known.name };
+        if (!list.some(c => c.name.toLowerCase() === entry.name.toLowerCase())) list.push(entry);
+        elements.projectEditCompany.value = '';
         renderProjectCompanyChips();
+        elements.projectEditCompany.focus();
+        return true;
     }
 
-    /** What the sheet will save: the chips, plus a name still in the field. */
-    function projectCompaniesToSave() {
+    /** What the sheet will save: the chips, plus a name still in the field; null when that was not created. */
+    async function projectCompaniesToSave() {
         const pending = elements.projectEditCompany.value.trim();
-        if (pending) {
-            addProjectCompany(pending);
-            elements.projectEditCompany.value = '';
-        }
+        if (pending && !(await addProjectCompany(pending))) return null;
         return state.projectEditCompanies || [];
     }
 
@@ -5670,10 +5695,58 @@
         const rows = matches.map(c => `
             <div class="autocomplete-suggestion" data-company-id="${c.id}" data-company="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>`);
         if (query && !exact && !taken.has(query)) {
-            rows.push(`<div class="autocomplete-suggestion is-new" data-company="${escapeHtml(elements.projectEditCompany.value.trim())}">New company “${escapeHtml(elements.projectEditCompany.value.trim())}”</div>`);
+            rows.push(`<div class="autocomplete-suggestion is-new" data-company="${escapeHtml(elements.projectEditCompany.value.trim())}">Create company “${escapeHtml(elements.projectEditCompany.value.trim())}”…</div>`);
         }
         box.innerHTML = rows.join('');
         box.classList.toggle('visible', rows.length > 0);
+    }
+
+    /**
+     * A contact's company: suggestions from the companies, and "Create
+     * company" for a name there is none of, which opens the company sheet.
+     */
+    function bindContactCompanyField() {
+        const input = elements.contactEditCompany;
+        const box = document.getElementById('contactEditCompanySuggestions');
+        if (!input || !box) return;
+        const show = () => {
+            const raw = input.value.trim();
+            const query = raw.toLowerCase();
+            const all = window.CRMCompany ? window.CRMCompany.cached() : [];
+            const rows = query
+                ? all.filter(c => c.name.toLowerCase().includes(query)).slice(0, 8)
+                    .map(c => `<div class="autocomplete-suggestion" data-company="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>`)
+                : [];
+            if (query && !all.some(c => c.name.toLowerCase() === query)) {
+                rows.push(`<div class="autocomplete-suggestion is-new" data-company-new="${escapeHtml(raw)}">Create company “${escapeHtml(raw)}”…</div>`);
+            }
+            box.innerHTML = rows.join('');
+            box.classList.toggle('visible', rows.length > 0);
+        };
+        const createFrom = async name => {
+            box.classList.remove('visible');
+            const created = window.CRMCompany ? await window.CRMCompany.create({ name }) : null;
+            if (created) input.value = created.name;
+            input.focus();
+        };
+        input.addEventListener('focus', () => { if (window.CRMCompany) window.CRMCompany.list().catch(() => null); });
+        input.addEventListener('input', show);
+        input.addEventListener('blur', () => setTimeout(() => box.classList.remove('visible'), 150));
+        input.addEventListener('keydown', e => {
+            if (e.key !== 'Enter' || !box.classList.contains('visible')) return;
+            e.preventDefault();
+            const first = box.querySelector('[data-company], [data-company-new]');
+            if (!first) return;
+            if (first.dataset.companyNew) createFrom(first.dataset.companyNew);
+            else { input.value = first.dataset.company; box.classList.remove('visible'); }
+        });
+        box.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const item = e.target.closest('[data-company], [data-company-new]');
+            if (!item) return;
+            if (item.dataset.companyNew) createFrom(item.dataset.companyNew);
+            else { input.value = item.dataset.company; box.classList.remove('visible'); }
+        });
     }
 
     function bindProjectCompanyPicker() {
@@ -5689,9 +5762,8 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const first = box.classList.contains('visible') ? box.querySelector('[data-company]') : null;
-                addProjectCompany(first ? first.dataset.company : input.value, first ? first.dataset.companyId : null);
-                input.value = '';
                 box.classList.remove('visible');
+                addProjectCompany(first ? first.dataset.company : input.value, first ? first.dataset.companyId : null);
             } else if (e.key === 'Backspace' && !input.value && (state.projectEditCompanies || []).length) {
                 state.projectEditCompanies.pop();
                 renderProjectCompanyChips();
@@ -5701,10 +5773,8 @@
             e.preventDefault();
             const item = e.target.closest('[data-company]');
             if (!item) return;
-            addProjectCompany(item.dataset.company, item.dataset.companyId || null);
-            input.value = '';
             box.classList.remove('visible');
-            input.focus();
+            addProjectCompany(item.dataset.company, item.dataset.companyId || null);
         });
         if (chips) {
             chips.addEventListener('click', (e) => {
@@ -6792,6 +6862,7 @@
 
         // Company autocomplete in the sheet's edit mode
         bindProjectCompanyPicker();
+        bindContactCompanyField();
 
         // Project tag input
         if (elements.newProjectTagInput) {
@@ -6954,6 +7025,9 @@
         document.addEventListener('keydown', (e) => {
             // Escape to close modals
             if (e.key === 'Escape') {
+                // The company sheet closes itself (companies.js); a sheet
+                // under it stays open.
+                if (window.CRMCompany && window.CRMCompany.isOpen()) return;
                 if (elements.todoDetailModal && elements.todoDetailModal.classList.contains('active')) {
                     // The to-do sheet opens on top of the project and contact sheets.
                     if (isEditingTodo()) {
@@ -6969,8 +7043,6 @@
                     }
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
-                } else if (window.CRMCompany && window.CRMCompany.isOpen()) {
-                    // companies.js handles its own sheet.
                 } else if (elements.overviewModal.classList.contains('active')) {
                     if (isEditingContact()) {
                         cancelContactEdit();

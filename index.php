@@ -1614,7 +1614,10 @@ function assetUrl(string $path): string
                             <h2 id="overviewName" data-ov="view"></h2>
                             <input type="text" id="contactEditName" class="form-input ov-edit-title" data-ov="edit" aria-label="Name" placeholder="Name" maxlength="255" required>
                             <p class="overview-company" id="overviewCompany" data-ov="view"></p>
-                            <input type="text" id="contactEditCompany" class="form-input ov-edit-sub" data-ov="edit" aria-label="Company" placeholder="Company" maxlength="255">
+                            <div class="autocomplete-wrapper ov-contact-company" data-ov="edit">
+                                <input type="text" id="contactEditCompany" class="form-input ov-edit-sub" autocomplete="off" aria-label="Company" placeholder="Company" maxlength="255">
+                                <div class="autocomplete-suggestions" id="contactEditCompanySuggestions"></div>
+                            </div>
                             <p class="overview-edited" id="overviewEdited"></p>
                         </div>
                     </div>

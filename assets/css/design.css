@@ -13919,3 +13919,6 @@ textarea.form-input:focus,
     font-size: var(--t-sm);
     color: var(--c-ink-3);
 }
+
+/* The company sheet over the project or contact sheet it was asked from. */
+#companyNotesModal.is-stacked { z-index: 1100; }

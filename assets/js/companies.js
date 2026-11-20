@@ -31,6 +31,9 @@
         name: null,         // a name without a company record (legacy)
         invoices: null,     // { items, total } from CompanyInvoices, admins only
         editing: false,
+        // A new company being created (create()): { resolve } until it is
+        // created or cancelled.
+        creating: null,
         busy: false,
         token: 0
     };
@@ -97,7 +100,10 @@
 
     async function open(ref) {
         bind();
+        if (state.creating) finishCreate(null);
         const token = ++state.token;
+        els.modal.classList.remove('is-new', 'is-stacked');
+        els.saveBtn.textContent = 'Save';
         state.editing = false;
         state.company = null;
         state.invoices = null;
@@ -144,8 +150,79 @@
     function close() {
         if (!els) return;
         state.token++;
-        els.modal.classList.remove('active', 'is-editing');
+        els.modal.classList.remove('active', 'is-editing', 'is-new', 'is-stacked');
         state.editing = false;
+        if (state.creating) finishCreate(null);
+    }
+
+    // ---- A new company ----
+
+    /**
+     * The sheet for a new company, with everything about it: name, website,
+     * address, VAT ID. Over the sheet it was asked from (a project, a
+     * contact) when there is one. Resolves to the created company
+     * ({ id, name, ... }) or null when cancelled.
+     */
+    async function create(prefill) {
+        bind();
+        if (state.creating) finishCreate(null);
+        const p = prefill || {};
+        // Known after all (the list was behind): that one, no sheet.
+        if (p.name) {
+            const known = byName(p.name) || (await list(true).catch(() => null), byName(p.name));
+            if (known) return known;
+        }
+        state.token++;
+        state.company = { id: null, name: p.name || '', website: '', address: '', vat_id: '' };
+        state.invoices = null;
+        state.name = null;
+        state.editing = true;
+        els.nameInput.value = p.name || '';
+        els.websiteInput.value = '';
+        els.nameInput.classList.remove('is-invalid');
+        const stacked = !!document.querySelector('.modal.active:not(#companyNotesModal)');
+        els.modal.classList.add('active', 'is-editing', 'is-new');
+        els.modal.classList.toggle('is-stacked', stacked);
+        els.saveBtn.textContent = 'Create company';
+        els.notes.innerHTML = '';
+        render();
+        setTimeout(() => (p.name ? els.websiteInput : els.nameInput).focus(), 30);
+        return new Promise(resolve => { state.creating = { resolve }; });
+    }
+
+    function finishCreate(company) {
+        const pending = state.creating;
+        state.creating = null;
+        if (pending) pending.resolve(company);
+    }
+
+    async function saveNew() {
+        const name = els.nameInput.value.trim();
+        const address = $('companyEditAddress');
+        const vat = $('companyEditVat');
+        state.busy = true;
+        els.saveBtn.disabled = true;
+        try {
+            const company = await request('POST', API, {
+                name,
+                website: els.websiteInput.value.trim(),
+                address: address ? address.value : '',
+                vat_id: vat ? vat.value : ''
+            });
+            await refresh();
+            const pending = state.creating;
+            state.creating = null;
+            state.token++;
+            state.editing = false;
+            els.modal.classList.remove('active', 'is-editing', 'is-new', 'is-stacked');
+            if (pending) pending.resolve(company);
+            else open(company.id);
+        } catch (error) {
+            window.CRMDialog.alert(error.message);
+        } finally {
+            state.busy = false;
+            els.saveBtn.disabled = false;
+        }
     }
 
     function renderHead() {
@@ -463,6 +540,7 @@
     function editForm() {
         const c = state.company;
         const others = (state.list || []).filter(x => x.id !== c.id);
+        const isNew = c.id === null;
         return `
             <div class="overview-section">
                 <div class="overview-details">
@@ -476,7 +554,7 @@
                     </div>
                 </div>
             </div>
-            <div class="overview-section ov-section">
+            ${isNew ? '' : `<div class="overview-section ov-section">
               <div class="co-danger">
                 <div class="co-merge">
                     <label class="detail-label" for="companyMergeTarget">Merge into</label>
@@ -490,7 +568,7 @@
                 </div>
                 <button type="button" class="btn btn-danger btn-small" id="companyDeleteBtn">Delete company</button>
               </div>
-            </div>`;
+            </div>`}`;
     }
 
     async function enterEdit() {
@@ -519,6 +597,10 @@
             return;
         }
         els.nameInput.classList.remove('is-invalid');
+        if (state.company.id === null) {
+            saveNew();
+            return;
+        }
         const address = $('companyEditAddress');
         const vat = $('companyEditVat');
         state.busy = true;
@@ -748,9 +830,11 @@
         if (!els.modal) return;
 
         els.modal.querySelector('.modal-backdrop').addEventListener('click', () => { if (!state.editing) close(); });
+        // Escape on a sheet underneath must not also close it: this one is on top.
+
         $('closeCompanyNotesModal').addEventListener('click', close);
         els.editBtn.addEventListener('click', enterEdit);
-        els.cancelBtn.addEventListener('click', exitEdit);
+        els.cancelBtn.addEventListener('click', () => { if (state.company && state.company.id === null) close(); else exitEdit(); });
         els.saveBtn.addEventListener('click', save);
         [els.nameInput, els.websiteInput].forEach(input => input.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); save(); }
@@ -778,7 +862,7 @@
             if (e.key !== 'Escape' || !els.modal.classList.contains('active')) return;
             const similar = $('companySimilarModal');
             if (similar && similar.classList.contains('active')) return;
-            if (state.editing) exitEdit(); else close();
+            if (state.editing && state.company && state.company.id !== null) exitEdit(); else close();
         });
     }
 
@@ -806,7 +890,7 @@
     });
 
     window.CRMCompany = {
-        open, close, list, byName, refresh,
+        open, close, create, list, byName, refresh,
         cached: () => state.list || [],
         isOpen: () => !!(els && els.modal.classList.contains('active'))
     };
