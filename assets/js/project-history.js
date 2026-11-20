@@ -47,9 +47,9 @@
         const stages = stageTimeline(h.stage || [], start, now);
         if (!chart && !stages) return;
         const rebuilt = (h.stage || []).concat(h.chance || []).some(r => r.source === 'reconstructed');
+        // Side by side where there is room: the chance left, the stages right.
         body.innerHTML = `
-            ${chart}
-            ${stages}
+            <div class="ph-cols">${chart}${stages}</div>
             ${rebuilt ? '<p class="ph-note">Before it was recorded: rebuilt from Claude\'s proposals and the activity log.</p>' : ''}`;
         section.hidden = false;
     }
@@ -59,8 +59,8 @@
         const points = rows.filter(r => r.value !== null && r.value !== undefined)
             .map(r => ({ d: Math.max(0, (time(r.at) - start) / DAY), v: Number(r.value), r }));
         if (!points.length) return '';
-        const W = 600;
-        const H = 150;
+        const W = 460;
+        const H = 160;
         const L = 40;
         const R = 10;
         const T = 10;

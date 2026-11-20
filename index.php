@@ -2017,21 +2017,12 @@ function assetUrl(string $path): string
                     <!-- Proposals from Claude about this project (review.js) -->
                     <div class="review-record-slot" id="projectOverviewReview" hidden></div>
 
-                    <!-- The facts, three to a row: dates and stage, then budget
-                         (min - max in one field) and success chance. Reading
-                         shows each value where its field is when editing. -->
+                    <!-- The facts, three to a row: where it stands (stage,
+                         product, chance), then time and money (start, end,
+                         budget). Reading shows each value where its field is
+                         when editing. -->
                     <div class="overview-section">
                         <div class="overview-details">
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditStartDate">Start date</label>
-                                <span class="detail-value" id="projectOverviewStartDate" data-ov="view"></span>
-                                <input type="date" id="projectEditStartDate" class="form-input ov-field" data-ov="edit" required>
-                            </div>
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditEstCompletion">Est. completion</label>
-                                <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
-                                <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
-                            </div>
                             <div class="overview-detail-item">
                                 <label class="detail-label" for="projectEditStage">Stage</label>
                                 <span class="detail-value" id="projectOverviewStage" data-ov="view"></span>
@@ -2042,6 +2033,32 @@ function assetUrl(string $path): string
                                     <option value="Negotiation">Negotiation</option>
                                     <option value="Lead">Lead</option>
                                 </select>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditProduct">Product</label>
+                                <span class="detail-value" id="projectOverviewProduct" data-ov="view"></span>
+                                <!-- Filled from the products (products.js); "New product…" last -->
+                                <select id="projectEditProduct" class="form-select ov-field" data-ov="edit" data-product-select="none new">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditSuccessChance">Success chance</label>
+                                <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
+                                <div class="ov-field-box" data-ov="edit">
+                                    <input type="number" id="projectEditSuccessChance" class="form-input ov-field" min="0" max="100" placeholder="0–100">
+                                    <span class="ov-field-unit" aria-hidden="true">%</span>
+                                </div>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditStartDate">Start date</label>
+                                <span class="detail-value" id="projectOverviewStartDate" data-ov="view"></span>
+                                <input type="date" id="projectEditStartDate" class="form-input ov-field" data-ov="edit" required>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditEstCompletion">Est. completion</label>
+                                <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
+                                <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
                             </div>
                             <div class="overview-detail-item ov-span-2">
                                 <label class="detail-label" for="projectEditBudgetMin">Budget</label>
@@ -2054,22 +2071,6 @@ function assetUrl(string $path): string
                                     <input type="text" id="projectEditBudgetMax" class="form-input ov-field" data-amount inputmode="decimal" autocomplete="off" placeholder="Max" aria-label="Budget max">
                                     <span class="ov-field-unit" aria-hidden="true">€</span>
                                 </div>
-                            </div>
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditSuccessChance">Success chance</label>
-                                <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
-                                <div class="ov-field-box" data-ov="edit">
-                                    <input type="number" id="projectEditSuccessChance" class="form-input ov-field" min="0" max="100" placeholder="0–100">
-                                    <span class="ov-field-unit" aria-hidden="true">%</span>
-                                </div>
-                            </div>
-                            <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditProduct">Product</label>
-                                <span class="detail-value" id="projectOverviewProduct" data-ov="view"></span>
-                                <!-- Filled from the products (products.js); "New product…" last -->
-                                <select id="projectEditProduct" class="form-select ov-field" data-ov="edit" data-product-select="none new">
-                                    <option value="">None</option>
-                                </select>
                             </div>
                             <!-- Expected payments while reading (opened from the budget) -->
                             <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
@@ -2122,7 +2123,7 @@ function assetUrl(string $path): string
                     <!-- Assigned Contacts Section -->
                     <div class="overview-section ov-section">
                         <div class="ov-section-head">
-                            <h3 class="overview-section-title">Assigned contacts</h3>
+                            <h3 class="overview-section-title">Contacts</h3>
                             <button type="button" class="ov-add-btn" id="addProjectContactBtn" aria-expanded="false" aria-controls="projectContactPicker">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                                 Add

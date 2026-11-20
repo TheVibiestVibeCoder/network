@@ -14558,3 +14558,21 @@ textarea.form-input:focus,
         background: var(--c-scrim);
     }
 }
+
+/* ---- The project sheet with room (desktop) ----
+   Facts in two rows of three: where it stands (stage, product, chance),
+   then time and money (start, end, budget). History: the chance and the
+   stages side by side. */
+@media (min-width: 769px) {
+    #projectOverviewModal .overview-details > .ov-span-2 { grid-column: span 1; }
+
+    .ph-cols {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+    }
+
+    .ph-cols .ph-block + .ph-block { margin-top: 0; }
+    .ph-cols .ph-step { grid-template-columns: 10px 96px minmax(0, 1fr) auto; }
+}
