@@ -13176,7 +13176,7 @@ textarea.form-input:focus,
 
 .co-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 108px 92px 128px;
+    grid-template-columns: minmax(0, 1fr) auto 118px;
     align-items: center;
     gap: 10px;
     width: 100%;
@@ -14222,3 +14222,8 @@ textarea.form-input:focus,
 /* The pin in the contact sheet's head, filled when the contact is pinned. */
 .ov-pin-btn.is-on { color: var(--c-accent); }
 .ov-pin-btn.is-on svg path:nth-child(2) { fill: currentColor; }
+
+/* The company sheet's project rows: title, product short and stage as small tags. */
+.co-row-main .title-tag { flex: none; margin-left: 0; }
+.co-row > .title-tag { justify-self: end; margin-left: 0; }
+.co-row-main { align-items: center; }

@@ -471,11 +471,11 @@
                 <li>
                     <button type="button" class="co-row" data-company-project="${p.id}">
                         <span class="co-row-main">
-                            <span class="co-row-name">${esc(p.name)}</span>
+                            <span class="co-row-name" title="${esc(p.name)}">${esc(p.name)}</span>
+                            ${p.product ? `<span class="title-tag" data-product="${esc(p.product)}" title="${esc(p.product)}">${esc(window.CRMProducts ? window.CRMProducts.short(p.product) : p.product)}</span>` : ''}
                             ${p.companies > 1 ? `<span class="co-row-meta" title="This project is for ${p.companies} companies">shared</span>` : ''}
                         </span>
-                        <span class="co-row-product">${productChip(p.product)}</span>
-                        <span class="project-stage-badge stage-${esc(stageClass)}">${esc(stage)}</span>
+                        <span class="title-tag is-stage stage-${esc(stageClass)}">${esc(stage)}</span>
                         <span class="co-row-amount${budget ? '' : ' is-empty'}">${esc(budget || '–')}</span>
                     </button>
                 </li>`;
