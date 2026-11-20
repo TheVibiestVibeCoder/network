@@ -4895,6 +4895,11 @@
             : '');
         setDetailValue(elements.projectOverviewDescription, project.description);
 
+        // How its chance and stage developed (project-history.js)
+        if (window.ProjectHistory) {
+            window.ProjectHistory.load(project.id, document.getElementById('projectHistorySection'));
+        }
+
         // Claude's summary of the description and notes, written again when
         // either changed since (project-summary.js)
         if (window.CRMProjectSummary) {

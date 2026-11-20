@@ -69,6 +69,18 @@ try {
  */
 function handleGet(Project $model, string $action, ?int $id): void
 {
+    // How the project's stage and chance developed
+    if ($action === 'history' && $id !== null) {
+        $history = ProjectHistory::forProject(Database::getInstance(), $id);
+        if ($history === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Project not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $history]);
+        return;
+    }
+
     // The products, in their order, with their colours
     if ($action === 'products') {
         echo json_encode(['success' => true, 'data' => Project::products()]);

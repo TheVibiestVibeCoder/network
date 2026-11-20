@@ -18,7 +18,7 @@ class ProjectArchive
      * The tables a project's snapshot holds, in the order they are restored:
      * every row after the rows it points to.
      */
-    private const TABLES = ['projects', 'project_notes', 'project_contacts', 'project_tags', 'project_companies', 'project_documents', 'todos', 'todo_links'];
+    private const TABLES = ['projects', 'project_notes', 'project_contacts', 'project_tags', 'project_companies', 'project_history', 'project_documents', 'todos', 'todo_links'];
 
     /**
      * Write a project and everything that hangs off it into the archive.
@@ -206,6 +206,7 @@ class ProjectArchive
             'project_contacts' => $select('SELECT * FROM project_contacts WHERE project_id = :id', $byProject),
             'project_tags' => $select('SELECT * FROM project_tags WHERE project_id = :id', $byProject),
             'project_companies' => $select('SELECT * FROM project_companies WHERE project_id = :id', $byProject),
+            'project_history' => $select('SELECT * FROM project_history WHERE project_id = :id', $byProject),
             'project_documents' => $select('SELECT * FROM project_documents WHERE project_id = :id', $byProject),
             'todos' => $todos,
             'todo_links' => $links,

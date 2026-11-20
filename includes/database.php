@@ -663,6 +663,11 @@ class Database
 
         self::initializeCalendarSchema($db);
         self::initializeCompanySchema($db);
+
+        // How each project's stage and chance developed; rebuilt once from
+        // Claude's proposals and the activity log (includes/ProjectHistory.php).
+        require_once __DIR__ . '/ProjectHistory.php';
+        ProjectHistory::backfill($db);
     }
 
     /**

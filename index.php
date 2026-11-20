@@ -2094,6 +2094,12 @@ function assetUrl(string $path): string
                         <?php endif; ?>
                     </div>
 
+                    <!-- How its chance and stage developed (assets/js/project-history.js) -->
+                    <div class="overview-section ov-section" id="projectHistorySection" data-ov="view" hidden>
+                        <h3 class="overview-section-title">History</h3>
+                        <div data-history-body></div>
+                    </div>
+
                     <!-- Tags: hidden on projects for now (contacts keep theirs).
                          Remove "hidden" to bring them back; app.js still fills it. -->
                     <div class="overview-section ov-section" id="projectTagsSection" hidden>
@@ -2594,6 +2600,7 @@ function assetUrl(string $path): string
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/companies.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/project-history.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/profile.js') ?>"></script>

@@ -14442,3 +14442,55 @@ textarea.form-input:focus,
 .pe-add { margin-top: 10px; }
 .pe-error { margin: 10px 0 0; font-size: var(--t-sm); color: var(--c-danger); }
 .product-editor { z-index: 1150; }
+
+/* ---- A project's history: chance over time, the stages it went through ---- */
+.ph-block + .ph-block { margin-top: 16px; }
+
+.ph-title {
+    margin: 0 0 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.ph-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.ph-grid { stroke: var(--c-line); stroke-width: 1; stroke-dasharray: 3 3; }
+.ph-grid.is-base { stroke-dasharray: none; }
+.ph-label { font-size: 11px; fill: var(--c-ink-4); font-variant-numeric: tabular-nums; }
+.ph-area { fill: color-mix(in srgb, var(--c-accent) 10%, transparent); }
+.ph-line { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-linejoin: round; }
+.ph-dot { fill: var(--c-surface); stroke: var(--c-accent); stroke-width: 2; }
+.ph-dot.is-rebuilt { stroke-dasharray: 2 2; }
+
+.ph-bar {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.ph-seg, .ph-step-dot { background: var(--stage-lead); }
+.ph-seg { min-width: 4px; }
+:is(.ph-seg, .ph-step-dot).stage-in-progress { background: var(--stage-progress); }
+:is(.ph-seg, .ph-step-dot).stage-proposal { background: var(--stage-proposal); }
+:is(.ph-seg, .ph-step-dot).stage-negotiation { background: var(--stage-negotiation); }
+:is(.ph-seg, .ph-step-dot).stage-complete { background: var(--stage-complete); }
+
+.ph-steps { margin: 8px 0 0; padding: 0; list-style: none; }
+
+.ph-step {
+    display: grid;
+    grid-template-columns: 10px 110px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.ph-step-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ph-step-stage { font-weight: 600; color: var(--c-ink-2); }
+.ph-step.is-current .ph-step-stage { color: var(--c-ink); }
+.ph-step-days { font-variant-numeric: tabular-nums; }
+.ph-note { margin: 10px 0 0; font-size: var(--t-xs); color: var(--c-ink-4); }

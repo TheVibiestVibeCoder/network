@@ -21,6 +21,7 @@ if (!defined('APP_ROOT')) {
 require_once APP_ROOT . '/includes/ProjectDocument.php';
 require_once APP_ROOT . '/includes/ProjectArchive.php';
 require_once APP_ROOT . '/includes/Company.php';
+require_once APP_ROOT . '/includes/ProjectHistory.php';
 
 class Project
 {
@@ -194,6 +195,7 @@ class Project
 
         $id = (int) $this->db->lastInsertId();
         Company::syncProject($this->db, $id, $data);
+        ProjectHistory::recordCreated($this->db, $id, $data);
         return $id;
     }
 
@@ -248,8 +250,18 @@ class Project
             $params['product'] = self::cleanProduct($data['product']);
         }
 
+        $before = $this->db->prepare("SELECT stage, success_chance FROM projects WHERE id = :id");
+        $before->execute(['id' => $id]);
+        $previous = $before->fetch() ?: [];
+
         $ok = $stmt->execute($params);
         Company::syncProject($this->db, $id, $data);
+        if ($previous) {
+            ProjectHistory::recordChanges($this->db, $id, $previous, [
+                'stage' => $params['stage'],
+                'success_chance' => $params['success_chance'],
+            ]);
+        }
         return $ok;
     }
 
