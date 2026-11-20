@@ -14328,7 +14328,7 @@ textarea.form-input:focus,
 
 .bk-export-item {
     display: grid;
-    grid-template-columns: 18px auto minmax(0, 1fr) auto;
+    grid-template-columns: 18px auto auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     padding: 6px 2px;
@@ -14345,3 +14345,6 @@ textarea.form-input:focus,
 .bk-export-amount { font-variant-numeric: tabular-nums; color: var(--c-ink-3); white-space: nowrap; }
 .bk-export-csv { grid-template-columns: 18px 1fr; border-bottom: 0; }
 .bk-export-note { margin: 4px 0 0; font-size: var(--t-xs); color: var(--c-ink-4); }
+.bk-export-date { color: var(--c-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bk-export-group:not(:has(.bk-export-date)) .bk-export-item,
+.bk-export-item:not(:has(.bk-export-no)) { grid-template-columns: 18px minmax(0, 1fr) auto; }

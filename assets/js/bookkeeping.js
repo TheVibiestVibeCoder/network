@@ -3202,6 +3202,7 @@
             <label class="bk-export-item">
                 <input type="checkbox" ${attr}="${pdf.id}"${checked ? ' checked' : ''}>
                 <span class="bk-export-no">${escapeHtml(pdf.invoice ? pdf.invoice.invoice_number || '' : '')}</span>
+                <span class="bk-export-date">${escapeHtml(pdf.invoice && pdf.invoice.invoice_date ? window.CRMFormat.date(pdf.invoice.invoice_date) : '')}</span>
                 <span class="bk-export-who">${escapeHtml(pdf.invoice ? (pdf.invoice.recipient || pdf.name) : pdf.name)}</span>
                 <span class="bk-export-amount">${escapeHtml(pdf.invoice ? money(pdf.invoice.gross) : '')}</span>
             </label>`;
