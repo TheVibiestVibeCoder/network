@@ -13922,3 +13922,181 @@ textarea.form-input:focus,
 
 /* The company sheet over the project or contact sheet it was asked from. */
 #companyNotesModal.is-stacked { z-index: 1100; }
+
+/* ---- Contacts: Companies | People | Map ----
+   Companies: a row per company - who it is to us, the products it bought,
+   when we last wrote something down, its pipeline and (admins) revenue -
+   its people folded under it. */
+
+#listView.is-companies .people-only,
+#listView:not(.is-companies) .company-controls {
+    display: none !important;
+}
+
+.company-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+}
+
+.company-controls .segmented-btn { height: 30px; padding: 0 11px; font-size: var(--t-sm); }
+.company-controls .form-select { width: auto; min-width: 140px; }
+
+#listView .company-row,
+#listView .company-columns {
+    display: grid;
+    grid-template-columns: 14px 34px minmax(0, 1fr) 118px 96px 56px;
+    align-items: center;
+    gap: 12px;
+}
+
+#listView .has-money .company-row,
+#listView .has-money .company-columns,
+#listView .contacts-list.has-money .company-row,
+#listView .contacts-list.has-money .company-columns {
+    grid-template-columns: 14px 34px minmax(0, 1fr) 118px 96px 104px 56px;
+}
+
+#listView .company-row {
+    min-height: 58px;
+    padding: 8px 16px;
+}
+
+#listView .company-group.is-open .company-row { padding-bottom: 8px; }
+
+#listView .company-columns {
+    padding: 10px 16px 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-4);
+}
+
+#listView .company-columns > span:first-child { grid-column: 1 / 4; padding-left: 60px; }
+
+.company-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px; corner-shape: var(--squircle-shape);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    background: #1C3258;
+}
+
+.company-mark.is-prospect { background: var(--c-accent); }
+.company-mark.is-other { background: var(--c-tint-2); color: var(--c-ink-3); }
+:root[data-theme="dark"] .company-mark.is-customer { background: #2A4A80; }
+
+.company-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.company-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.company-kind {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+}
+
+.company-kind.is-customer { color: var(--c-ink-2); }
+.company-kind.is-prospect { color: var(--c-accent); }
+
+.company-products { display: inline-flex; gap: 4px; }
+
+.company-product-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--product-tone);
+}
+
+#listView .company-cell {
+    font-size: var(--t-sm);
+    font-weight: 500;
+    color: var(--c-ink-2);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#listView .company-columns .company-cell { color: var(--c-ink-4); font-weight: 600; font-size: var(--t-xs); }
+#listView .company-last { text-align: left; color: var(--c-ink-3); }
+#listView .company-columns .company-last { text-align: left; }
+
+#listView .company-last.is-quiet {
+    color: var(--pri-medium-ink, #9E5A12);
+    font-weight: 600;
+}
+
+#listView .company-last.is-quiet::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--pri-medium, #D08440);
+    vertical-align: middle;
+}
+
+#listView .company-revenue { position: relative; color: var(--c-ink); font-weight: 600; }
+
+.company-overdue {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--c-danger);
+    vertical-align: middle;
+}
+
+#listView .company-row .company-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-left: 0;
+    justify-self: end;
+}
+
+#listView .company-row .company-count svg { width: 12px; height: 12px; color: currentColor; }
+
+#listView .company-group--ungrouped .company-header {
+    display: flex;
+}
+
+#listView .company-group--ungrouped .company-count { margin-left: auto; }
+
+#listView .people-group { border-top: 0; }
+
+/* The people under an unfolded company start under its name. */
+#listView .company-group.is-open > .contact-card.in-group,
+#listView .company-group.is-open > .contact-card {
+    padding-left: 76px;
+}
+
+@media (max-width: 760px) {
+    #listView .company-row,
+    #listView .contacts-list.has-money .company-row {
+        grid-template-columns: 14px 34px minmax(0, 1fr) 56px;
+    }
+    #listView .company-row .company-cell,
+    #listView .company-columns { display: none; }
+    #listView .company-group.is-open > .contact-card { padding-left: 16px; }
+}

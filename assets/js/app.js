@@ -21,6 +21,15 @@
         popupAnchor: [0, -36]
     });
 
+    // A company on the map: the company navy, square-ish, with a building.
+    const companyMarkerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M6 1h20a5 5 0 0 1 5 5v20a5 5 0 0 1-5 5h-6l-4 8-4-8H6a5 5 0 0 1-5-5V6a5 5 0 0 1 5-5z" fill="#1C3258" stroke="#ffffff" stroke-width="2"/><g fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="8" width="8" height="15" rx="1"/><path d="M17 13h4.5a1 1 0 0 1 1 1v9"/><path d="M8 23h16"/><path d="M11.5 11.5h3M11.5 15h3M11.5 18.5h3"/></g></svg>`;
+    const companyIcon = L.icon({
+        iconUrl: 'data:image/svg+xml,' + encodeURIComponent(companyMarkerSvg),
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -36]
+    });
+
     // ============================================
     // State Management
     // ============================================
@@ -40,7 +49,24 @@
         mapBaseLayer: null,
         mapLabelLayer: null,
         theme: 'light',
-        groupBy: 'company', // 'company' or 'tags'
+        // The contacts tab: 'companies' (the companies, their people folded
+        // under them), 'people' (everyone, or by tag) or 'map'. Kept in this browser.
+        contactsView: (() => {
+            try {
+                const v = localStorage.getItem('crm.contacts.view');
+                return v === 'people' || v === 'map' ? v : 'companies';
+            } catch (e) {
+                return 'companies';
+            }
+        })(),
+        groupBy: 'company', // 'company' (Companies), 'people' or 'tags' (People)
+        peopleGroup: 'people',
+        // The companies view: who to show, a product, the order.
+        companyKind: 'all',
+        companyProduct: '',
+        companySort: 'name',
+        // Per company id, what our invoices say (admins): { net, overdue, count }.
+        companyMoney: null,
         allTags: [],
         taggedData: null,
         selectedImportFile: null,
@@ -883,10 +909,15 @@
 
     async function loadMapMarkers() {
         try {
-            const result = await api.getMapContacts();
+            const [result, companies] = await Promise.all([
+                api.getMapContacts(),
+                fetch('api/companies.php?action=map').then(r => r.json()).catch(() => ({ data: [] }))
+            ]);
 
             if (result.success) {
-                state.mapContacts = result.data;
+                // The companies where they are; people only when they have no company.
+                state.mapCompanies = (companies && companies.data) || [];
+                state.mapContacts = result.data.filter(contact => !(contact.company || '').trim());
                 updateMapMarkers();
             }
         } catch (error) {
@@ -914,9 +945,21 @@
             }
         });
 
+        (state.mapCompanies || []).forEach(company => {
+            const marker = L.marker([company.map_lat, company.map_lng], { icon: companyIcon });
+            const where = company.map_from === 'address' ? (company.address || '') : 'Where one of its contacts is';
+            marker.bindPopup(`<div class="map-popup">
+                <h4>${escapeHtml(company.name)}</h4>
+                ${where ? `<p class="popup-location">${escapeHtml(where)}</p>` : ''}
+                <p class="popup-company">${company.contacts === 1 ? '1 contact' : company.contacts + ' contacts'}, ${company.projects === 1 ? '1 project' : company.projects + ' projects'}</p>
+                <div class="popup-buttons"><button type="button" class="popup-btn popup-details-btn" data-open-company="${company.id}" data-company-name="${escapeHtml(company.name)}">Open</button></div>
+            </div>`);
+            state.markers.addLayer(marker);
+        });
+
         // Fit map to markers if there are any. Measure first: fitting into a
         // stale (e.g. zero) size picks a nonsense zoom level.
-        if (state.mapContacts.length > 0) {
+        if (state.mapContacts.length > 0 || (state.mapCompanies || []).length > 0) {
             const bounds = state.markers.getBounds();
             if (bounds.isValid()) {
                 state.map.invalidateSize();
@@ -976,7 +1019,11 @@
 
                 if (result.success) {
                     state.contacts = result.data;
-                    renderContactsListByCompany();
+                    if (state.groupBy === 'people') renderContactsListFlat();
+                    else {
+                        renderContactsListByCompany();
+                        loadCompanyMoney();
+                    }
                 }
             }
         } catch (error) {
@@ -1010,69 +1057,196 @@
         return html;
     }
 
-    function renderContactsListByCompany() {
+    /** People: everyone in one list, the pinned ones first. */
+    function renderContactsListFlat() {
         if (state.contacts.length === 0) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
                     <h3>No contacts found</h3>
                     <p>${state.searchQuery ? 'Try a different search' : 'Add your first contact'}</p>
-                </div>
-            `;
+                </div>`;
+            return;
+        }
+        const pinned = state.contacts.filter(c => c.pinned == 1);
+        const rest = state.contacts.filter(c => !c.pinned || c.pinned == 0);
+        let html = pinned.length ? renderPinnedSection(pinned) : '';
+        html += `<div class="company-group people-group">${rest.map(c => createContactCard(c, false)).join('')}</div>`;
+        elements.contactsList.innerHTML = html;
+        addContactListEventHandlers();
+        triggerContactDeckAnimation();
+    }
+
+    /**
+     * What our invoices say per company, for admins (financials.js): read
+     * once a visit, then the rows show revenue and what is overdue.
+     */
+    let companyMoneyLoading = false;
+    async function loadCompanyMoney() {
+        if (state.companyMoney || companyMoneyLoading || !window.CompanyInvoices || !window.CompanyInvoices.all) return;
+        companyMoneyLoading = true;
+        try {
+            const map = await window.CompanyInvoices.all();
+            if (map) {
+                state.companyMoney = map;
+                if (state.currentView === 'list' && state.contactsView === 'companies') renderContactsListByCompany();
+            }
+        } catch (e) {
+            // The rows stand without it.
+        } finally {
+            companyMoneyLoading = false;
+        }
+    }
+
+    const QUIET_DAYS = 90;
+    const DAY_MS = 86400000;
+
+    /** Who a company is to us: 'customer' (invoiced or won), 'prospect' (open projects) or 'other'. */
+    function companyKind(c, money) {
+        if ((money && money.count) || c.won > 0) return 'customer';
+        return c.open > 0 ? 'prospect' : 'other';
+    }
+
+    /** Days since the last note about a company, or null without one. */
+    function daysSince(iso) {
+        const d = iso ? window.CRMFormat.toDate(iso) : null;
+        return d ? Math.floor((Date.now() - d.getTime()) / DAY_MS) : null;
+    }
+
+    function renderContactsListByCompany() {
+        const pinnedContacts = state.contacts.filter(c => c.pinned == 1);
+        const unpinnedContacts = state.contacts.filter(c => !c.pinned || c.pinned == 0);
+        const companies = window.CRMCompany ? window.CRMCompany.cached() : [];
+        const byKey = new Map(companies.map(c => [c.name.toLowerCase(), c]));
+        const money = state.companyMoney;
+        const query = (state.searchQuery || '').trim().toLowerCase();
+
+        // Every company: its people from the list (the search applied), and
+        // the companies the search finds by name even without people in it.
+        const people = new Map();
+        const noCompany = [];
+        unpinnedContacts.forEach(contact => {
+            const key = (contact.company || '').trim().toLowerCase();
+            if (!key) { noCompany.push(contact); return; }
+            if (!people.has(key)) people.set(key, []);
+            people.get(key).push(contact);
+        });
+        const rows = [];
+        const seen = new Set();
+        companies.forEach(c => {
+            const key = c.name.toLowerCase();
+            const mine = people.get(key) || [];
+            seen.add(key);
+            if (query && !mine.length && !key.includes(query)) return;
+            rows.push({ company: c, name: c.name, contacts: mine });
+        });
+        // Contacts whose company text has no record (should not happen; kept visible).
+        people.forEach((mine, key) => {
+            if (!seen.has(key)) rows.push({ company: { id: '', name: mine[0].company, contacts: mine.length, won: 0, open: 0, pipeline: 0, products: [] }, name: mine[0].company, contacts: mine });
+        });
+
+        // Who to show and in which order.
+        const kind = state.companyKind;
+        const filtered = rows.filter(r => {
+            const m = money && money.get(Number(r.company.id));
+            const k = companyKind(r.company, m);
+            if (state.companyProduct && !(r.company.products || []).includes(state.companyProduct)) return false;
+            if (kind === 'customers') return k === 'customer';
+            if (kind === 'prospects') return k === 'prospect';
+            if (kind === 'others') return k === 'other';
+            if (kind === 'quiet') {
+                const days = daysSince(r.company.last_note);
+                return k === 'customer' && (days === null || days >= QUIET_DAYS);
+            }
+            return true;
+        });
+        const revenue = r => { const m = money && money.get(Number(r.company.id)); return m ? m.net : 0; };
+        const sorters = {
+            name: (a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }),
+            revenue: (a, b) => revenue(b) - revenue(a) || a.name.localeCompare(b.name, 'de'),
+            pipeline: (a, b) => (b.company.pipeline || 0) - (a.company.pipeline || 0) || a.name.localeCompare(b.name, 'de'),
+            // The longest silence first: who to call.
+            last: (a, b) => String(a.company.last_note || '').localeCompare(String(b.company.last_note || '')) || a.name.localeCompare(b.name, 'de')
+        };
+        filtered.sort(sorters[state.companySort] || sorters.name);
+        const showNoCompany = noCompany.length && kind === 'all' && !state.companyProduct;
+
+        if (!filtered.length && !showNoCompany && !pinnedContacts.length) {
+            elements.contactsList.innerHTML = `
+                <div class="empty-state">
+                    <h3>${query ? 'Nothing found' : 'No companies here'}</h3>
+                    <p>${query ? 'Try a different search' : 'Try another filter'}</p>
+                </div>`;
             return;
         }
 
-        const pinnedContacts = state.contacts.filter(c => c.pinned == 1);
-        const unpinnedContacts = state.contacts.filter(c => !c.pinned || c.pinned == 0);
-
-        let html = '';
-
-        if (pinnedContacts.length > 0) {
-            html += renderPinnedSection(pinnedContacts);
-        }
-
-        // The companies first: one row each, its people folded under it.
-        // Companies without anyone in the list show too, so the list is
-        // the companies; a search opens every group it found people in.
-        const grouped = groupContactsByCompany(unpinnedContacts);
-        const shown = new Set(grouped.filter(g => g.company).map(g => g.company.toLowerCase()));
-        const query = (state.searchQuery || '').trim().toLowerCase();
-        const empty = (window.CRMCompany ? window.CRMCompany.cached() : [])
-            .filter(c => !shown.has(c.name.toLowerCase()) && (!query || c.name.toLowerCase().includes(query)))
-            .map(c => ({ company: c.name, companyId: c.id, contacts: [] }));
-        const withCompany = grouped.filter(g => g.company).concat(empty);
-        if (state.sortField === 'company' || empty.length) {
-            const desc = state.sortField === 'company' && state.sortOrder === 'DESC';
-            withCompany.sort((a, b) => (desc ? -1 : 1) * a.company.localeCompare(b.company, 'de', { sensitivity: 'base' }));
-        }
-        const groups = withCompany.concat(grouped.filter(g => !g.company));
         const ICON_CHEVRON = '<svg class="company-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
-        const ICON_BUILDING = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>';
         const ICON_PERSON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
+        const ICON_PEOPLE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5"/><path d="M15.5 6a3 3 0 0 1 0 5.6M17.5 13.8c1.8.7 3 2.6 3 5.2"/></svg>';
+        const euroShort = n => window.CRMFormat.amount(n, { cents: 'never' });
+        const initials = name => String(name || '').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase();
 
-        groups.forEach(group => {
-            const key = group.company ? group.company.toLowerCase() : '__none';
-            const people = group.contacts.length;
-            const open = people > 0 && (query ? true : openCompanyGroups().has(key));
-            const known = group.company && window.CRMCompany ? window.CRMCompany.byName(group.company) : null;
-            const companyId = group.companyId || (known && known.id) || '';
-            html += `<div class="company-group${open ? ' is-open' : ''}${group.company ? '' : ' company-group--ungrouped'}">`;
-            html += `<div class="company-header${people ? ' is-foldable' : ''}${group.company ? '' : ' company-header--muted'}" data-company-fold="${escapeHtml(key)}"
-                ${people ? `role="button" tabindex="0" aria-expanded="${open}"` : ''}>
-                ${people ? ICON_CHEVRON : '<span class="company-chevron-space"></span>'}
-                ${group.company ? ICON_BUILDING : ICON_PERSON}
-                ${group.company
-                    ? `<button type="button" class="company-name" data-open-company="${escapeHtml(companyId)}" data-company-name="${escapeHtml(group.company)}" title="Open ${escapeHtml(group.company)}">${escapeHtml(group.company)}</button>`
-                    : '<span class="company-name">No company</span>'}
-                <span class="company-count" title="${people === 1 ? '1 contact' : people + ' contacts'}">${people}</span>
-            </div>`;
-            if (open) {
-                html += group.contacts.map(contact => createContactCard(contact, !!group.company)).join('');
-            }
+        const lastText = c => {
+            const days = daysSince(c.last_note);
+            if (days === null) return { text: 'No notes yet', quiet: false };
+            const text = days < 1 ? 'Today' : days < 2 ? 'Yesterday' : days < 31 ? `${days} days ago`
+                : days < 365 ? `${Math.round(days / 30)} months ago` : `${Math.round(days / 365)} years ago`;
+            return { text, quiet: days >= QUIET_DAYS };
+        };
+
+        let html = pinnedContacts.length ? renderPinnedSection(pinnedContacts) : '';
+        filtered.forEach(r => {
+            const c = r.company;
+            const key = r.name.toLowerCase();
+            const count = r.contacts.length;
+            const open = count > 0 && (query ? true : openCompanyGroups().has(key));
+            const m = money && money.get(Number(c.id));
+            const k = companyKind(c, m);
+            const last = lastText(c);
+            const quiet = k === 'customer' && (last.quiet || !c.last_note);
+            const dots = (c.products || []).map(p => `<span class="company-product-dot" data-product="${escapeHtml(p)}" title="${escapeHtml(p)}"></span>`).join('');
+            html += `<div class="company-group${open ? ' is-open' : ''}">
+                <div class="company-header company-row${count ? ' is-foldable' : ''}" data-company-fold="${escapeHtml(key)}"
+                    ${count ? `role="button" tabindex="0" aria-expanded="${open}"` : ''}>
+                    ${count ? ICON_CHEVRON : '<span class="company-chevron-space"></span>'}
+                    <span class="company-mark is-${k}" aria-hidden="true">${escapeHtml(initials(r.name))}</span>
+                    <span class="company-main">
+                        <button type="button" class="company-name" data-open-company="${escapeHtml(c.id)}" data-company-name="${escapeHtml(r.name)}" title="Open ${escapeHtml(r.name)}">${escapeHtml(r.name)}</button>
+                        <span class="company-meta">
+                            <span class="company-kind is-${k}">${k === 'customer' ? 'Customer' : k === 'prospect' ? 'Prospect' : 'No project'}</span>
+                            ${dots ? `<span class="company-products">${dots}</span>` : ''}
+                        </span>
+                    </span>
+                    <span class="company-cell company-last${quiet ? ' is-quiet' : ''}" title="${quiet ? 'A customer without a note for ' + QUIET_DAYS + ' days or more' : 'Last note'}">${escapeHtml(last.text)}</span>
+                    <span class="company-cell company-pipeline" title="Open projects, budget × chance">${c.pipeline ? escapeHtml(euroShort(c.pipeline)) : ''}</span>
+                    ${money ? `<span class="company-cell company-revenue" title="Invoiced, net">${m && m.net ? escapeHtml(euroShort(m.net)) : ''}${m && m.overdue > 0.005 ? `<span class="company-overdue" title="${escapeHtml(euroShort(m.overdue))} overdue"></span>` : ''}</span>` : ''}
+                    <span class="company-count" title="${count === 1 ? '1 contact' : count + ' contacts'}">${ICON_PEOPLE}${count}</span>
+                </div>`;
+            if (open) html += r.contacts.map(contact => createContactCard(contact, true)).join('');
             html += `</div>`;
         });
 
-        elements.contactsList.innerHTML = html;
+        if (showNoCompany) {
+            const open = query ? true : openCompanyGroups().has('__none');
+            html += `<div class="company-group company-group--ungrouped${open ? ' is-open' : ''}">
+                <div class="company-header company-header--muted is-foldable" data-company-fold="__none" role="button" tabindex="0" aria-expanded="${open}">
+                    ${ICON_CHEVRON}${ICON_PERSON}
+                    <span class="company-name">No company</span>
+                    <span class="company-count">${ICON_PEOPLE}${noCompany.length}</span>
+                </div>
+                ${open ? noCompany.map(contact => createContactCard(contact, false)).join('') : ''}
+            </div>`;
+        }
+
+        // Column heads above the companies, so the figures read without labels in every row.
+        const head = filtered.length ? `
+            <div class="company-columns" aria-hidden="true">
+                <span>Company</span><span class="company-cell company-last">Last contact</span>
+                <span class="company-cell company-pipeline">Pipeline</span>
+                ${money ? '<span class="company-cell company-revenue">Revenue</span>' : ''}<span class="company-count-head"></span>
+            </div>` : '';
+
+        elements.contactsList.innerHTML = head + html;
+        elements.contactsList.classList.toggle('has-money', !!money);
         addContactListEventHandlers();
         triggerContactDeckAnimation();
     }
@@ -1301,77 +1475,6 @@
         try { localStorage.setItem(OPEN_COMPANIES_KEY, JSON.stringify(Array.from(set))); } catch (e) { /* this visit only */ }
     }
 
-    /**
-     * Group contacts by company
-     * Returns array of { company: string|null, contacts: array }
-     */
-    function groupContactsByCompany(contacts) {
-        const companyMap = new Map();
-        const noCompany = [];
-
-        contacts.forEach(contact => {
-            const company = contact.company ? contact.company.trim() : '';
-
-            if (company) {
-                if (!companyMap.has(company)) {
-                    companyMap.set(company, []);
-                }
-                companyMap.get(company).push(contact);
-            } else {
-                noCompany.push(contact);
-            }
-        });
-
-        const groups = [];
-        const field = state.sortField;
-        const desc = state.sortOrder === 'DESC';
-
-        // Sort company groups based on the active sort field & direction
-        const companyKeys = Array.from(companyMap.keys());
-
-        companyKeys.sort((a, b) => {
-            const contactsA = companyMap.get(a);
-            const contactsB = companyMap.get(b);
-
-            let valA, valB;
-
-            if (field === 'company') {
-                valA = a.toLowerCase();
-                valB = b.toLowerCase();
-            } else {
-                // Sort groups by the first contact's value for the chosen field
-                valA = (contactsA[0][field] || '').toString().toLowerCase();
-                valB = (contactsB[0][field] || '').toString().toLowerCase();
-            }
-
-            let cmp = valA.localeCompare(valB);
-            return desc ? -cmp : cmp;
-        });
-
-        companyKeys.forEach(company => {
-            groups.push({
-                company: company,
-                contacts: companyMap.get(company)
-            });
-        });
-
-        // Add contacts without company
-        if (noCompany.length > 0) {
-            const ungrouped = {
-                company: null,
-                contacts: noCompany
-            };
-            // For DESC, put ungrouped first; for ASC, put at end
-            if (desc) {
-                groups.unshift(ungrouped);
-            } else {
-                groups.push(ungrouped);
-            }
-        }
-
-        return groups;
-    }
-
     function createContactCard(contact, inGroup = false) {
         const company = (contact.company || '').trim();
         const location = (contact.location || '').trim();
@@ -1537,7 +1640,7 @@
                 window.CRMUsers.open();
             }
         } else {
-            // Contacts always opens as the list; the map is one tap away.
+            // Contacts opens as the list last chosen; the map is one tap away.
             setContactsMode('list');
         }
     }
@@ -1550,8 +1653,28 @@
      * a tab of its own that you have to remember is there.
      */
     function setContactsMode(mode) {
+        // 'list' is the list the person last chose, companies or people.
+        if (mode === 'list') mode = state.contactsView === 'people' ? 'people' : 'companies';
+        if (mode !== 'map' && mode !== 'people') mode = 'companies';
         const isMap = mode === 'map';
         state.contactsMode = isMap ? 'map' : 'list';
+        if (!isMap) {
+            state.contactsView = mode;
+            state.groupBy = mode === 'companies' ? 'company' : state.peopleGroup;
+        } else {
+            state.contactsView = 'map';
+        }
+        try { localStorage.setItem('crm.contacts.view', state.contactsView === 'map' ? (state.lastListView || 'companies') : state.contactsView); } catch (e) { /* this visit only */ }
+        if (!isMap) state.lastListView = mode;
+        if (elements.listView) {
+            elements.listView.classList.toggle('is-companies', mode === 'companies');
+            elements.listView.classList.toggle('is-people', mode === 'people');
+        }
+        if (elements.addContactBtn) {
+            const label = mode === 'companies' ? 'New company' : 'New contact';
+            elements.addContactBtn.title = label;
+            elements.addContactBtn.setAttribute('aria-label', label);
+        }
 
         if (elements.listView) {
             elements.listView.classList.toggle('is-map', isMap);
@@ -1564,7 +1687,7 @@
         }
 
         document.querySelectorAll('[data-contacts-mode]').forEach(btn => {
-            const active = btn.getAttribute('data-contacts-mode') === state.contactsMode;
+            const active = btn.getAttribute('data-contacts-mode') === mode;
             btn.classList.toggle('active', active);
             btn.setAttribute('aria-selected', active ? 'true' : 'false');
         });
@@ -6450,10 +6573,37 @@
             loadContacts();
         });
 
-        // Group by toggle (Company/Tags)
+        // The companies view: who, a product, the order.
+        document.querySelectorAll('[data-company-kind]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.companyKind = btn.dataset.companyKind;
+                document.querySelectorAll('[data-company-kind]').forEach(b => b.classList.toggle('active', b === btn));
+                renderContactsListByCompany();
+            });
+        });
+        const productFilter = document.getElementById('companyProductFilter');
+        if (productFilter) {
+            productFilter.addEventListener('change', () => {
+                state.companyProduct = productFilter.value;
+                renderContactsListByCompany();
+            });
+        }
+        const companySort = document.getElementById('companySortField');
+        if (companySort) {
+            if (!document.getElementById('financialsView')) {
+                companySort.querySelectorAll('[data-admin]').forEach(o => o.remove());
+            }
+            companySort.addEventListener('change', () => {
+                state.companySort = companySort.value;
+                renderContactsListByCompany();
+            });
+        }
+
+        // Group by toggle (People: all, or by tag)
         elements.groupBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 state.groupBy = btn.dataset.group;
+                state.peopleGroup = state.groupBy;
                 elements.groupBtns.forEach(b => b.classList.toggle('active', b.dataset.group === state.groupBy));
                 loadContacts();
             });
@@ -6584,7 +6734,14 @@
         }
 
         if (elements.addContactBtn) {
-            elements.addContactBtn.addEventListener('click', () => openContactModal());
+            elements.addContactBtn.addEventListener('click', async () => {
+                if (state.contactsView === 'companies' && window.CRMCompany) {
+                    const company = await window.CRMCompany.create();
+                    if (company) window.CRMCompany.open(company.id);
+                    return;
+                }
+                openContactModal();
+            });
         }
 
         if (elements.themeToggleBtn) {
@@ -7147,8 +7304,12 @@
     // Expose functions globally for map popup buttons and onclick handlers
     // The companies arrived or changed: the contacts list shows them all.
     document.addEventListener('crm:companies-changed', () => {
-        if (state.currentView === 'list' && state.contactsMode !== 'map' && state.groupBy !== 'tags' && state.contacts) {
+        state.companyMoney = null;
+        if (state.currentView === 'list' && state.contactsView === 'companies' && state.contacts) {
             renderContactsListByCompany();
+            loadCompanyMoney();
+        } else if (state.currentView === 'list' && state.contactsView === 'map') {
+            loadMapMarkers();
         }
     });
 

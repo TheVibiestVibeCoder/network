@@ -173,21 +173,75 @@ class Company
     // Reading
     // ------------------------------------------------------------------
 
-    /** Every company with how many contacts and projects it has. */
+    /**
+     * Every company with what its row in the contacts list shows: how many
+     * contacts and projects, when we last wrote a note about it (its people
+     * or its projects), its projects won and open, the open ones weighted by
+     * chance (pipeline), and the products it has bought (won projects).
+     */
     public static function all(PDO $db): array
     {
         $rows = $db->query("
-            SELECT c.id, c.name, c.website, c.address, c.vat_id, c.invoice_name,
+            SELECT c.id, c.name, c.website, c.address, c.vat_id, c.invoice_name, c.latitude, c.longitude,
                 (SELECT COUNT(*) FROM contacts k WHERE k.company_id = c.id) AS contacts,
-                (SELECT COUNT(*) FROM project_companies pc WHERE pc.company_id = c.id) AS projects
+                (SELECT MAX(n.created_at) FROM notes n JOIN contacts k ON k.id = n.contact_id WHERE k.company_id = c.id) AS last_contact_note,
+                (SELECT MAX(pn.created_at) FROM project_notes pn JOIN project_companies pc ON pc.project_id = pn.project_id
+                    WHERE pc.company_id = c.id) AS last_project_note
             FROM companies c ORDER BY c.name COLLATE NOCASE
         ")->fetchAll();
+
+        $projects = [];
+        foreach ($db->query("
+            SELECT pc.company_id, p.stage, p.product, p.budget_min, p.budget_max, p.success_chance
+            FROM project_companies pc JOIN projects p ON p.id = pc.project_id
+            WHERE p.review_status IS NULL OR p.review_status <> 'pending'
+        ")->fetchAll() as $p) {
+            $projects[(int) $p['company_id']][] = $p;
+        }
+
         foreach ($rows as &$row) {
-            $row['id'] = (int) $row['id'];
+            $id = (int) $row['id'];
+            $mine = $projects[$id] ?? [];
+            $won = array_filter($mine, fn($p) => in_array($p['stage'], ['Complete', 'In Progress'], true));
+            $open = array_filter($mine, fn($p) => in_array($p['stage'], ['Lead', 'Proposal', 'Negotiation'], true));
+            $pipeline = 0.0;
+            foreach ($open as $p) {
+                $pipeline += self::budgetMid($p) * ((float) ($p['success_chance'] ?? 0)) / 100;
+            }
+            $products = [];
+            foreach (Project::PRODUCTS as $product) {
+                foreach ($won as $p) {
+                    if ($p['product'] === $product) {
+                        $products[] = $product;
+                        break;
+                    }
+                }
+            }
+            $last = max((string) $row['last_contact_note'], (string) $row['last_project_note']);
+            unset($row['last_contact_note'], $row['last_project_note']);
+            $row['id'] = $id;
             $row['contacts'] = (int) $row['contacts'];
-            $row['projects'] = (int) $row['projects'];
+            $row['projects'] = count($mine);
+            $row['won'] = count($won);
+            $row['open'] = count($open);
+            $row['pipeline'] = round($pipeline, 2);
+            $row['products'] = $products;
+            $row['last_note'] = $last !== '' ? $last : null;
+            $row['latitude'] = $row['latitude'] === null ? null : (float) $row['latitude'];
+            $row['longitude'] = $row['longitude'] === null ? null : (float) $row['longitude'];
         }
         return $rows;
+    }
+
+    /** A project's budget as one figure: the middle of its range. */
+    private static function budgetMid(array $p): float
+    {
+        $min = $p['budget_min'] === null || $p['budget_min'] === '' ? null : (float) $p['budget_min'];
+        $max = $p['budget_max'] === null || $p['budget_max'] === '' ? null : (float) $p['budget_max'];
+        if ($min === null && $max === null) {
+            return 0.0;
+        }
+        return (($min ?? $max) + ($max ?? $min)) / 2;
     }
 
     public static function get(PDO $db, int $id): ?array
@@ -358,6 +412,101 @@ class Company
             self::refreshProjectText($db, (int) $projectId);
         }
         self::forgetDismissed($db, $id);
+    }
+
+    // ------------------------------------------------------------------
+    // The map
+    // ------------------------------------------------------------------
+
+    /**
+     * Where a company is, from its address (OpenStreetMap, as for contacts).
+     * Looked up again only when the address changed; no address, no place.
+     * Never inside a transaction: the lookup can take seconds.
+     */
+    public static function locate(PDO $db, int $id): void
+    {
+        $company = self::get($db, $id);
+        if ($company === null) {
+            return;
+        }
+        $address = trim(preg_replace('/\s+/u', ' ', (string) ($company['address'] ?? '')));
+        if ($address === '') {
+            $db->prepare("UPDATE companies SET latitude = NULL, longitude = NULL, geo_source = NULL WHERE id = :id")->execute(['id' => $id]);
+            return;
+        }
+        if ($address === (string) ($company['geo_source'] ?? '')) {
+            return;
+        }
+        $coords = self::geocode($address);
+        $db->prepare("UPDATE companies SET latitude = :lat, longitude = :lng, geo_source = :src WHERE id = :id")->execute([
+            'lat' => $coords['lat'] ?? null,
+            'lng' => $coords['lng'] ?? null,
+            // Remembered even when nothing was found, so it is not asked again and again.
+            'src' => $address,
+            'id' => $id,
+        ]);
+    }
+
+    /**
+     * The companies for the map: each at its address, or else where one of
+     * its contacts is. A few addresses not looked up yet are looked up on the
+     * way (OpenStreetMap allows one a second).
+     */
+    public static function forMap(PDO $db, int $lookups = 3): array
+    {
+        $pending = $db->query("
+            SELECT id FROM companies
+            WHERE address IS NOT NULL AND TRIM(address) <> '' AND (geo_source IS NULL OR geo_source <> TRIM(address))
+            LIMIT " . max(0, $lookups)
+        )->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($pending as $i => $id) {
+            if ($i > 0) {
+                usleep(1100000);
+            }
+            self::locate($db, (int) $id);
+        }
+
+        $fallback = [];
+        foreach ($db->query("
+            SELECT company_id, latitude, longitude, location FROM contacts
+            WHERE company_id IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL
+            ORDER BY id
+        ")->fetchAll() as $k) {
+            $fallback[(int) $k['company_id']] ??= $k;
+        }
+
+        $out = [];
+        foreach (self::all($db) as $c) {
+            $lat = $c['latitude'];
+            $lng = $c['longitude'];
+            $where = 'address';
+            if ($lat === null || $lng === null) {
+                $k = $fallback[$c['id']] ?? null;
+                if ($k === null) {
+                    continue;
+                }
+                $lat = (float) $k['latitude'];
+                $lng = (float) $k['longitude'];
+                $where = 'contact';
+            }
+            $out[] = $c + ['map_lat' => $lat, 'map_lng' => $lng, 'map_from' => $where];
+        }
+        return $out;
+    }
+
+    private static function geocode(string $query): ?array
+    {
+        $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query(['q' => $query, 'format' => 'json', 'limit' => 1]);
+        $context = stream_context_create(['http' => ['header' => 'User-Agent: SimpleCRM/1.0', 'timeout' => 5]]);
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false) {
+            return null;
+        }
+        $data = json_decode($response, true);
+        if (empty($data[0]['lat']) || empty($data[0]['lon'])) {
+            return null;
+        }
+        return ['lat' => (float) $data[0]['lat'], 'lng' => (float) $data[0]['lon']];
     }
 
     // ------------------------------------------------------------------

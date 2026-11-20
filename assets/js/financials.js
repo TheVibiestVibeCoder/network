@@ -2417,19 +2417,37 @@
      * One company's invoices and figures. From the page when it is loaded,
      * otherwise read once a minute - only where Financials is (admins).
      */
-    async function invoicesForCompany(company) {
-        if (!document.getElementById('finInvoices') || !company) return null;
-        let items;
+    async function allInvoices() {
         if (state.loaded) {
             if (window.CRMCompany) state.companies = window.CRMCompany.cached();
-            items = buildInvoices();
-        } else {
-            if (!companyCache || Date.now() - companyCache.at > 60000) {
-                const [projects, overview, tx, companies] = await fetchAll(false);
-                companyCache = { at: Date.now(), items: buildInvoices({ overview, tx, companies, projects }) };
-            }
-            items = companyCache.items;
+            return buildInvoices();
         }
+        if (!companyCache || Date.now() - companyCache.at > 60000) {
+            const [projects, overview, tx, companies] = await fetchAll(false);
+            companyCache = { at: Date.now(), items: buildInvoices({ overview, tx, companies, projects }) };
+        }
+        return companyCache.items;
+    }
+
+    /** Per company id: { net, overdue, count } - for the rows of the contacts list. */
+    async function invoicesByCompany() {
+        if (!document.getElementById('finInvoices')) return null;
+        const items = await allInvoices();
+        const out = new Map();
+        items.forEach(i => {
+            if (!i.company) return;
+            const m = out.get(i.company.id) || { net: 0, overdue: 0, count: 0 };
+            m.net += Number(i.net) || 0;
+            if (i.overdue) m.overdue += i.outstandingNet || 0;
+            if (!i.credit) m.count++;
+            out.set(i.company.id, m);
+        });
+        return out;
+    }
+
+    async function invoicesForCompany(company) {
+        if (!document.getElementById('finInvoices') || !company) return null;
+        const items = await allInvoices();
         const id = Number(company.id);
         return { items: items.filter(i => i.company && i.company.id === id), stats: IL.companyStats(items, id) };
     }
@@ -2443,6 +2461,6 @@
         renderInvoices();
     });
 
-    window.CompanyInvoices = { forCompany: invoicesForCompany };
+    window.CompanyInvoices = { forCompany: invoicesForCompany, all: invoicesByCompany };
     window.Financials = { load };
 })();

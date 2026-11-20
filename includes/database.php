@@ -709,6 +709,10 @@ class Database
         // The name the company last took from one of our invoices: a later
         // invoice renames it only while nobody has renamed it by hand since.
         self::addColumnIfMissing($db, 'companies', 'invoice_name', 'VARCHAR(255)');
+        // Where the company is, for the map: from its address (Company::locate).
+        self::addColumnIfMissing($db, 'companies', 'latitude', 'REAL');
+        self::addColumnIfMissing($db, 'companies', 'longitude', 'REAL');
+        self::addColumnIfMissing($db, 'companies', 'geo_source', 'TEXT');
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company_id ON contacts(company_id)");
 
         // The product a project is about: one of Project::PRODUCTS, or NULL.

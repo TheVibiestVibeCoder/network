@@ -1360,11 +1360,14 @@ function assetUrl(string $path): string
                             </div>
                             <div class="list-header-actions">
                                 <div class="segmented" role="tablist" aria-label="Show contacts as">
-                                    <button type="button" class="segmented-btn active" data-contacts-mode="list" role="tab" aria-selected="true" title="List">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
-                                            <path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>
-                                        </svg>
-                                        <span class="sr-only">List</span>
+                                    <!-- Companies first; People is everyone in one list (contacts.js view) -->
+                                    <button type="button" class="segmented-btn active" data-contacts-mode="companies" role="tab" aria-selected="true" title="Companies">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
+                                        <span class="sr-only">Companies</span>
+                                    </button>
+                                    <button type="button" class="segmented-btn" data-contacts-mode="people" role="tab" aria-selected="false" title="People">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+                                        <span class="sr-only">People</span>
                                     </button>
                                     <button type="button" class="segmented-btn" data-contacts-mode="map" id="contactsMapBtn" role="tab" aria-selected="false" title="Map">
                                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1387,17 +1390,44 @@ function assetUrl(string $path): string
                         </div>
                         <div class="list-controls" id="listControls">
                             <!-- Group By Toggle -->
-                            <div class="group-toggle">
-                                <button type="button" class="group-btn active" data-group="company" title="Group by Company">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
-                                    <span>Company</span>
+                            <!-- Companies: who they are to us, a product, the order -->
+                            <div class="company-controls" id="companyControls">
+                                <div class="segmented company-kind" role="group" aria-label="Show">
+                                    <button type="button" class="segmented-btn active" data-company-kind="all">All</button>
+                                    <button type="button" class="segmented-btn" data-company-kind="customers" title="Invoiced, or a project won">Customers</button>
+                                    <button type="button" class="segmented-btn" data-company-kind="prospects" title="Open projects, nothing won yet">Prospects</button>
+                                    <button type="button" class="segmented-btn" data-company-kind="quiet" title="Customers without a note for 90 days">Quiet</button>
+                                    <button type="button" class="segmented-btn" data-company-kind="others" title="No project yet">Others</button>
+                                </div>
+                                <select id="companyProductFilter" class="form-select" aria-label="Product">
+                                    <option value="">Any product</option>
+                                    <option value="Workshop">Workshop</option>
+                                    <option value="Risk Briefing">Risk Briefing</option>
+                                    <option value="SHIELD">SHIELD</option>
+                                    <option value="RB &amp; SHIELD">RB &amp; SHIELD</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <div class="sort-controls">
+                                    <label for="companySortField">Sort:</label>
+                                    <select id="companySortField" class="form-select">
+                                        <option value="name">Name</option>
+                                        <option value="revenue" data-admin>Revenue</option>
+                                        <option value="pipeline">Pipeline</option>
+                                        <option value="last">Last contact</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="group-toggle people-only">
+                                <button type="button" class="group-btn active" data-group="people" title="Everyone in one list">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+                                    <span>All</span>
                                 </button>
                                 <button type="button" class="group-btn" data-group="tags" title="Group by Tags">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.6 6.6a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8" cy="8" r="1.3"/></svg>
                                     <span>Tags</span>
                                 </button>
                             </div>
-                            <div class="sort-controls">
+                            <div class="sort-controls people-only">
                                 <label>Sort:</label>
                                 <select id="sortField" class="form-select">
                                     <option value="name">Name</option>
