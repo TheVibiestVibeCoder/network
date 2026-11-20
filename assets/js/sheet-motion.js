@@ -14,10 +14,11 @@
 (function () {
     'use strict';
 
-    const OPEN_MS = 420;
-    const CLOSE_MS = 260;
-    const EASE_OPEN = 'cubic-bezier(0.2, 0.9, 0.25, 1)';
-    const EASE_CLOSE = 'cubic-bezier(0.4, 0, 0.7, 0.2)';
+    // A long, soft landing on the way in; a quick, decided way out.
+    const OPEN_MS = 520;
+    const CLOSE_MS = 340;
+    const EASE_OPEN = 'cubic-bezier(0.16, 1, 0.3, 1)';
+    const EASE_CLOSE = 'cubic-bezier(0.55, 0, 0.75, 0.15)';
 
     const desktop = window.matchMedia('(min-width: 769px)');
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -62,6 +63,30 @@
     function stopAll(s) {
         (s.anims || []).forEach(a => { try { a.cancel(); } catch (e) { /* done */ } });
         s.anims = [];
+        settle(s);
+    }
+
+    /**
+     * While it moves: the box on its own layer, and the element it grows out
+     * of hidden - the card becomes the sheet, rather than a sheet coming out
+     * of a card that stays. Put back when it is done.
+     */
+    function lift(s, box, origin) {
+        settle(s);
+        box.style.willChange = 'transform, opacity';
+        s.box = box;
+        if (origin && origin.style) {
+            s.hidden = origin;
+            s.hiddenWas = origin.style.visibility;
+            origin.style.visibility = 'hidden';
+        }
+    }
+
+    function settle(s) {
+        if (s.box) s.box.style.willChange = '';
+        if (s.hidden) s.hidden.style.visibility = s.hiddenWas || '';
+        s.box = null;
+        s.hidden = null;
     }
 
     function open(modal) {
@@ -77,20 +102,32 @@
 
         const to = box.getBoundingClientRect();
         const parts = Array.from(box.children);
+        const backdrop = modal.querySelector(':scope > .modal-backdrop');
+        if (backdrop) {
+            s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS * 0.6, easing: 'ease-out' }));
+        }
         if (origin) {
-            s.anims.push(box.animate([
-                { transform: onto(origin.rect, to), opacity: 0.85, transformOrigin: 'center' },
-                { transform: 'none', opacity: 1, transformOrigin: 'center' }
-            ], { duration: OPEN_MS, easing: EASE_OPEN }));
-            // The content comes in once the box has room for it.
+            lift(s, box, origin.el);
+            const grow = box.animate([
+                { transform: onto(origin.rect, to), transformOrigin: 'center' },
+                { transform: 'none', transformOrigin: 'center' }
+            ], { duration: OPEN_MS, easing: EASE_OPEN });
+            s.anims.push(grow);
+            // The content comes in once the box has nearly its size, rising a little.
             parts.forEach(part => s.anims.push(part.animate([
-                { opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }
-            ], { duration: OPEN_MS, easing: 'ease-out' })));
+                { opacity: 0, transform: 'translateY(6px)' },
+                { opacity: 0, transform: 'translateY(6px)', offset: 0.3 },
+                { opacity: 1, transform: 'none' }
+            ], { duration: OPEN_MS, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' })));
+            grow.onfinish = () => settle(s);
         } else {
-            s.anims.push(box.animate([
-                { transform: 'translateY(10px) scale(0.97)', opacity: 0 },
+            lift(s, box, null);
+            const appear = box.animate([
+                { transform: 'translateY(12px) scale(0.97)', opacity: 0 },
                 { transform: 'none', opacity: 1 }
-            ], { duration: 260, easing: EASE_OPEN }));
+            ], { duration: 320, easing: EASE_OPEN });
+            s.anims.push(appear);
+            appear.onfinish = () => settle(s);
         }
     }
 
@@ -109,16 +146,18 @@
             ? target : null;
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
 
+        lift(s, box, back ? s.origin : null);
         const main = box.animate(back
-            ? [{ transform: 'none', opacity: 1 }, { transform: onto(back, from), opacity: 0.6 }]
-            : [{ transform: 'none', opacity: 1 }, { transform: 'translateY(6px) scale(0.97)', opacity: 0 }],
-        { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' });
+            ? [{ transform: 'none' }, { transform: onto(back, from) }]
+            : [{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.97)', opacity: 0 }],
+        { duration: back ? CLOSE_MS : 220, easing: back ? EASE_CLOSE : 'ease-in', fill: 'forwards' });
         s.anims.push(main);
+        // The content leaves first, so only the box goes back into the card.
         Array.from(box.children).forEach(part => s.anims.push(part.animate([
-            { opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }
-        ], { duration: CLOSE_MS, fill: 'forwards' })));
+            { opacity: 1 }, { opacity: 0, offset: 0.35 }, { opacity: 0 }
+        ], { duration: CLOSE_MS, easing: 'ease-out', fill: 'forwards' })));
         if (backdrop) {
-            s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, fill: 'forwards' }));
+            s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, easing: 'ease-in', fill: 'forwards' }));
         }
         main.onfinish = () => {
             if (modal.classList.contains('active')) return;
