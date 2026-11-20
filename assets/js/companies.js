@@ -346,7 +346,7 @@
                 value: inv.open > 0.005 ? euro(inv.open) : '',
                 tone: inv.overdue > 0.005 ? 'is-neg' : '',
                 graphic: inv.open > 0.005 ? partsBar([
-                    { n: inv.open - inv.overdue, cls: 'is-open', title: `${euro(inv.open - inv.overdue)} not due yet` },
+                    { n: inv.open - inv.overdue, cls: 'is-expected', title: `${euro(inv.open - inv.overdue)} not due yet` },
                     { n: inv.overdue, cls: 'is-late', title: `${euro(inv.overdue)} overdue` }
                 ]) : '',
                 sub: inv.overdue > 0.005 ? `${euro(inv.overdue)} overdue` : (inv.open > 0.005 ? 'not due yet' : 'nothing open')
@@ -384,62 +384,102 @@
     }
 
     /**
-     * Invoiced per month (per year once it spans more than two years): a
-     * bar per period, paid in blue, open in light blue, overdue in red.
+     * Revenue per month, past and coming: what was paid (green, by invoice
+     * date), what is still to come (blue: invoices not due yet, and the
+     * expected payments of its won projects not invoiced yet, in their
+     * month - one already past comes now) and what is overdue (red). Per
+     * year once the past spans more than two years.
+     *
+     * An expected payment counts as invoiced when an invoice of that project
+     * has its amount (to the euro); then the invoice is what is shown.
      */
     function invoiceChart() {
-        const items = ((state.invoices && state.invoices.items) || []).filter(i => i.date);
-        if (!items.length) return '';
+        const items = ((state.invoices && state.invoices.items) || []).filter(i => i.date && !i.credit);
         const now = new Date();
-        const first = items.map(i => i.date).sort()[0];
-        const startY = Number(first.slice(0, 4));
-        const startM = Number(first.slice(5, 7)) - 1;
-        const span = (now.getFullYear() - startY) * 12 + now.getMonth() - startM + 1;
-        const byYear = span > 24;
+        const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        // Expected payments of its won projects, not paid and not invoiced yet.
+        const expected = [];
+        ((state.company && state.company.projects) || []).forEach(p => {
+            if (!WON.includes(p.stage)) return;
+            const invoiced = items.filter(i => i.project && Number(i.project.id) === Number(p.id)).map(i => Math.abs(Number(i.net) || 0));
+            (p.payments || []).forEach(x => {
+                if (x.paid) return;
+                const amount = Number(x.amount) || 0;
+                const k = invoiced.findIndex(n => Math.abs(n - amount) < 1);
+                if (k >= 0) { invoiced.splice(k, 1); return; }
+                if (amount > 0) expected.push({ month: x.month < thisMonth ? thisMonth : x.month, amount, project: p.name });
+            });
+        });
+        if (!items.length && !expected.length) return '';
+
+        const months = items.map(i => i.date.slice(0, 7)).concat(expected.map(x => x.month)).sort();
+        const first = months[0] < thisMonth ? months[0] : thisMonth;
+        const last = months[months.length - 1] > thisMonth ? months[months.length - 1] : thisMonth;
+        const monthIndex = key => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7)) - 1;
+        const nowIndex = monthIndex(thisMonth);
+        const past = nowIndex - monthIndex(first) + 1;
+        const ahead = Math.min(12, monthIndex(last) - nowIndex);
+        const byYear = past > 24;
 
         const buckets = [];
         if (byYear) {
-            for (let y = startY; y <= now.getFullYear(); y++) buckets.push({ key: String(y), label: String(y), full: String(y) });
+            const endYear = Math.floor((nowIndex + ahead) / 12);
+            for (let y = Number(first.slice(0, 4)); y <= endYear; y++) {
+                buckets.push({ key: String(y), label: String(y), full: String(y), future: y > now.getFullYear(), now: y === now.getFullYear() });
+            }
         } else {
-            const months = Math.max(12, span);
-            for (let k = months - 1; k >= 0; k--) {
-                const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+            const back = Math.max(12 - ahead, past) - 1;
+            for (let k = -back; k <= ahead; k++) {
+                const d = new Date(now.getFullYear(), now.getMonth() + k, 1);
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                buckets.push({ key, label: MONTHS[d.getMonth()].charAt(0), full: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, jan: d.getMonth() === 0 });
+                buckets.push({ key, label: MONTHS[d.getMonth()].charAt(0), full: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
+                    jan: d.getMonth() === 0, future: k > 0, now: k === 0 });
             }
         }
-        buckets.forEach(b => { b.paid = 0; b.open = 0; b.late = 0; b.count = 0; });
+        buckets.forEach(b => { b.paid = 0; b.expected = 0; b.late = 0; b.count = 0; b.planned = 0; });
         const index = new Map(buckets.map(b => [b.key, b]));
+        const bucketOf = month => index.get(byYear ? month.slice(0, 4) : month);
         items.forEach(i => {
-            const b = index.get(byYear ? i.date.slice(0, 4) : i.date.slice(0, 7));
+            const b = bucketOf(i.date.slice(0, 7));
             if (!b) return;
             const net = Number(i.net) || 0;
             b.count++;
             if (i.overdue) b.late += net;
-            else if (i.outstanding > 0.005) b.open += net;
+            else if (i.outstanding > 0.005) b.expected += net;
             else b.paid += net;
         });
-        const max = Math.max.apply(null, buckets.map(b => b.paid + b.open + b.late)) || 1;
+        expected.forEach(x => {
+            const b = bucketOf(x.month);
+            if (!b) return;
+            b.expected += x.amount;
+            b.planned++;
+        });
+
+        const max = Math.max.apply(null, buckets.map(b => b.paid + b.expected + b.late)) || 1;
         const H = 96;
         const seg = (v, cls) => (v > 0 ? `<span class="co-col-seg ${cls}" style="height:${Math.max(3, Math.round(v / max * H))}px"></span>` : '');
         const cols = buckets.map(b => {
-            const total = b.paid + b.open + b.late;
-            const tip = total
-                ? `${b.full}: ${euro(total)}, ${plural(b.count, 'invoice')}` + (b.open ? `, ${euro(b.open)} open` : '') + (b.late ? `, ${euro(b.late)} overdue` : '')
-                : `${b.full}: nothing`;
+            const total = b.paid + b.expected + b.late;
+            const parts = [];
+            if (b.paid) parts.push(`${euro(b.paid)} paid`);
+            if (b.expected) parts.push(`${euro(b.expected)} expected`);
+            if (b.late) parts.push(`${euro(b.late)} overdue`);
+            const counts = [b.count ? plural(b.count, 'invoice') : '', b.planned ? plural(b.planned, 'planned payment') : ''].filter(Boolean).join(', ');
+            const tip = total ? `${b.full}: ${parts.join(', ')}${counts ? ` (${counts})` : ''}` : `${b.full}: nothing`;
             return `
-                <div class="co-col" title="${esc(tip)}" aria-label="${esc(tip)}" role="img">
-                    <span class="co-col-stack">${seg(b.late, 'is-late')}${seg(b.open, 'is-open')}${seg(b.paid, 'is-paid')}</span>
+                <div class="co-col${b.future ? ' is-future' : ''}${b.now ? ' is-now' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}" role="img">
+                    <span class="co-col-stack">${seg(b.late, 'is-late')}${seg(b.expected, 'is-expected')}${seg(b.paid, 'is-paid')}</span>
                     <span class="co-col-label${b.jan ? ' is-jan' : ''}">${esc(b.label)}</span>
                 </div>`;
         }).join('');
         const has = k => buckets.some(b => b[k] > 0);
-        const key = [['paid', 'Paid'], ['open', 'Open'], ['late', 'Overdue']].filter(([k]) => has(k))
-            .map(([k, label]) => `<span class="co-key"><span class="co-key-dot is-${k === 'late' ? 'late' : k}"></span>${label}</span>`).join('');
+        const key = [['paid', 'Paid'], ['expected', 'Expected'], ['late', 'Overdue']].filter(([k]) => has(k))
+            .map(([k, label]) => `<span class="co-key"><span class="co-key-dot is-${k}"></span>${label}</span>`).join('');
         return `
             <div class="overview-section ov-section">
                 <div class="co-chart-head">
-                    <h3 class="overview-section-title">Invoiced per ${byYear ? 'year' : 'month'}</h3>
+                    <h3 class="overview-section-title">Revenue per ${byYear ? 'year' : 'month'}</h3>
                     <span class="co-chart-max">${esc(euro(max))} max</span>
                 </div>
                 <div class="co-chart${byYear ? ' is-years' : ''}" style="--co-h:${H}px">${cols}</div>

@@ -14227,3 +14227,21 @@ textarea.form-input:focus,
 .co-row-main .title-tag { flex: none; margin-left: 0; }
 .co-row > .title-tag { justify-self: end; margin-left: 0; }
 .co-row-main { align-items: center; }
+
+/* Revenue per month: paid in the company green, expected in blue, overdue
+   in red; the months to come behind a quiet line after this one. */
+.co-col-seg.is-paid { background: var(--c-success); }
+.co-col-seg.is-expected { background: var(--c-accent); }
+.co-key-dot.is-paid { background: var(--c-success); }
+.co-key-dot.is-expected { background: var(--c-accent); }
+.co-col.is-now .co-col-label { font-weight: 700; color: var(--c-ink-2); }
+.co-col.is-now + .co-col.is-future::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 18px;
+    border-left: 1px dashed var(--c-line);
+}
+.co-col.is-future .co-col-label { color: var(--c-ink-4); }
+.co-bar-part.is-expected { background: var(--c-accent); }
