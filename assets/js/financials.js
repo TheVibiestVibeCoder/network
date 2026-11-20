@@ -457,8 +457,10 @@
                 ])}
                 ${suggestions && !state.costsOpen ? `<button type="button" class="fin-suggest-pill" data-fin-costs data-fin-focus="costs-suggest"
                     title="Recurring payments in Bookkeeping that are not among the fixed costs yet">${ICON.repeat}${esc(plural(suggestions, 'suggestion'))}</button>` : ''}
-                <button type="button" class="fin-link fin-kpi-action" data-fin-costs data-fin-focus="costs" aria-expanded="${state.costsOpen}">Edit</button>
                 ${state.costsOpen ? costsPanel() : ''}
+                <button type="button" class="fin-kpi-toggle" data-fin-costs data-fin-focus="costs" aria-expanded="${state.costsOpen}">
+                    ${state.costsOpen ? 'Hide details' : 'Show details'}${ICON.chevron}
+                </button>
             </article>
             ${liquidityCard()}`;
     }
@@ -466,7 +468,8 @@
     /**
      * Liquidity: today's bank balance, how long it lasts under the scenario
      * (the last month before it would fall below zero), the low point, and
-     * the buffer. The balance and the buffer are updated from here.
+     * the buffer. Its details hold what is changed from here: the buffer
+     * (its tile) and the balance (the form under them).
      */
     function liquidityCard() {
         const p = state.plan;
@@ -497,8 +500,6 @@
                 <span class="fin-kpi-label">Liquidity</span>
                 <span class="fin-kpi-value${b && b.amount < 0 ? ' is-neg' : ''}">${b ? esc(money(b.amount)) : '—'}</span>
                 <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
-                <button type="button" class="fin-link fin-kpi-action" data-fin-balance data-fin-focus="balance" aria-expanded="${state.balanceOpen}"
-                    title="${esc(balanceNote())}">${b ? 'Update' : 'Enter balance'}</button>
                 ${tiles([
                     vatTile(),
                     { label: 'Lasts until', value: lasts, valueCls: lastsTone, tone: lastsTone, subHtml: scenarioChip(),
@@ -511,9 +512,9 @@
                         valueHtml: `<button type="button" class="fin-link fin-balance-link" data-fin-buffer data-fin-focus="buffer" aria-expanded="${state.bufferOpen}"
                             title="The least that should always be in the account; the chart and the low point warn below it">${p.settings.buffer > 0 ? esc(euro(p.settings.buffer)) : 'Set'}</button>` }
                 ]) : ''}
-                ${foldToggle('liquidity')}
-                ${state.balanceOpen ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
                 ${state.bufferOpen ? bufferForm() : ''}
+                ${state.folds.liquidity ? `<p class="fin-balance-note">${esc(balanceNote())}</p>${balanceForm()}` : ''}
+                ${foldToggle('liquidity')}
             </article>`;
     }
 
@@ -780,7 +781,7 @@
         // Overdue payments show in the month detail and the forecast;
         // no banner for them here.
         if (!p.hasBalance) {
-            alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one on the first card.' });
+            alerts.push({ tone: 'info', html: '<strong>No bank balance yet.</strong> The balance line starts at zero until you enter one under Liquidity, Show details.' });
         }
         els.finAlerts.innerHTML = alerts.length
             ? `<div class="fin-alerts">${alerts.map(a => `<p class="fin-alert is-${a.tone}">${ICON.warn}<span>${a.html}</span></p>`).join('')}</div>`
@@ -2171,9 +2172,12 @@
                 const field = els.financialsView.querySelector('[data-fin-focus="balance-amount"]');
                 if (field) { field.focus(); field.select(); }
             } else if (t.hasAttribute('data-fin-balance-cancel')) {
-                state.balanceOpen = false;
+                // The balance form is the details' last part: Cancel folds them.
+                state.folds.liquidity = false;
+                state.bufferOpen = false;
+                try { localStorage.setItem(FOLD_KEY + 'liquidity', '0'); } catch (err) { /* this visit only */ }
                 renderKpis();
-                const btn = els.financialsView.querySelector('[data-fin-balance]');
+                const btn = els.finKpis.querySelector('[data-fin-fold="liquidity"]');
                 if (btn) btn.focus();
             } else if (t.hasAttribute('data-fin-buffer')) {
                 state.bufferOpen = !state.bufferOpen;
@@ -2389,10 +2393,11 @@
                 renderKpis();
                 const btn = els.finKpis.querySelector('[data-fin-buffer]');
                 if (btn) btn.focus();
-            } else if (state.balanceOpen && e.target.closest('[data-fin-balance-form]')) {
-                state.balanceOpen = false;
+            } else if (state.folds.liquidity && e.target.closest('[data-fin-balance-form]')) {
+                state.folds.liquidity = false;
+                try { localStorage.setItem(FOLD_KEY + 'liquidity', '0'); } catch (err) { /* this visit only */ }
                 renderKpis();
-                const btn = els.financialsView.querySelector('[data-fin-balance]');
+                const btn = els.finKpis.querySelector('[data-fin-fold="liquidity"]');
                 if (btn) btn.focus();
             }
         });
