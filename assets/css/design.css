@@ -13180,19 +13180,31 @@ textarea.form-input:focus,
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 9px 8px;
+    padding: 10px 10px;
     border: 0;
-    border-bottom: 1px solid var(--c-line);
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     background: none;
     font: inherit;
     text-align: left;
     color: var(--c-ink);
     cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease);
 }
 
-.co-list li:last-child .co-row { border-bottom: 0; }
+/* Hairlines between the rows, inset; a hovered row is a rounded tint over them. */
+.co-list li { position: relative; }
+.co-list li + li::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10px;
+    right: 10px;
+    border-top: 1px solid var(--c-line);
+}
+.co-list li:hover::before,
+.co-list li:hover + li::before { border-top-color: transparent; }
 .co-row:hover { background: var(--c-tint-3); }
-.co-row:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
+.co-row:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 0; }
 
 .co-row-main {
     display: flex;
@@ -14245,3 +14257,42 @@ textarea.form-input:focus,
 }
 .co-col.is-future .co-col-label { color: var(--c-ink-4); }
 .co-bar-part.is-expected { background: var(--c-accent); }
+
+/* Revenue per month: a labelled scale behind the bars. */
+.co-chart-wrap {
+    position: relative;
+    margin-top: 10px;
+    padding-left: 46px;
+}
+
+.co-chart-wrap .co-chart {
+    position: relative;
+    margin-top: 0;
+    border-bottom: 0;
+}
+
+.co-ticks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.co-tick {
+    position: absolute;
+    left: 46px;
+    right: 0;
+    border-top: 1px dashed color-mix(in srgb, var(--c-line) 80%, transparent);
+}
+
+.co-tick.is-base { border-top: 1px solid var(--c-line); }
+
+.co-tick span {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: -7px;
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--c-ink-4);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}

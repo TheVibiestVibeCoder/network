@@ -456,8 +456,17 @@
             b.planned++;
         });
 
-        const max = Math.max.apply(null, buckets.map(b => b.paid + b.expected + b.late)) || 1;
+        // The scale: a round step, two or three lines up to just above the highest bar.
+        const top = Math.max.apply(null, buckets.map(b => b.paid + b.expected + b.late)) || 1;
+        const raw = top / 3;
+        const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(v => v >= raw) || mag * 10;
+        const max = Math.ceil(top / step) * step;
         const H = 96;
+        const ticks = [];
+        for (let v = 0; v <= max + step / 2; v += step) {
+            ticks.push(`<span class="co-tick${v === 0 ? ' is-base' : ''}" style="bottom:${Math.round(v / max * H) + 2}px"><span>${esc(window.CRMFormat.amountShort(v))}</span></span>`);
+        }
         const seg = (v, cls) => (v > 0 ? `<span class="co-col-seg ${cls}" style="height:${Math.max(3, Math.round(v / max * H))}px"></span>` : '');
         const cols = buckets.map(b => {
             const total = b.paid + b.expected + b.late;
@@ -480,9 +489,11 @@
             <div class="overview-section ov-section">
                 <div class="co-chart-head">
                     <h3 class="overview-section-title">Revenue per ${byYear ? 'year' : 'month'}</h3>
-                    <span class="co-chart-max">${esc(euro(max))} max</span>
                 </div>
-                <div class="co-chart${byYear ? ' is-years' : ''}" style="--co-h:${H}px">${cols}</div>
+                <div class="co-chart-wrap">
+                    <div class="co-ticks" aria-hidden="true">${ticks.join('')}</div>
+                    <div class="co-chart${byYear ? ' is-years' : ''}" style="--co-h:${H}px">${cols}</div>
+                </div>
                 <div class="co-keys">${key}</div>
             </div>`;
     }
