@@ -811,11 +811,12 @@ function assetUrl(string $path): string
                         <span class="nav-label">Bookkeeping</span>
                     </button>
                     <?php endif; ?>
-                    <button type="button" class="toggle-btn nav-item" data-view="list" title="Contacts">
+                    <!-- Network: the companies, their people, the map -->
+                    <button type="button" class="toggle-btn nav-item" data-view="list" title="Network">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18.5 14c1.9.8 3 2.9 3 6"/>
+                            <circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18.5" r="2.5"/><circle cx="19" cy="18.5" r="2.5"/><path d="M10.8 7.3 6.2 16.2M13.2 7.3l4.6 8.9M7.5 18.5h9"/>
                         </svg>
-                        <span class="nav-label">Contacts</span>
+                        <span class="nav-label">Network</span>
                     </button>
                     <button type="button" class="toggle-btn nav-item" data-view="todos" title="To-dos">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1351,12 +1352,12 @@ function assetUrl(string $path): string
                     <div class="list-header">
                         <div class="list-header-top">
                             <div class="list-head-title">
-                                <h1 class="view-title">Contacts</h1>
+                                <h1 class="view-title">Network</h1>
                                 <span class="view-count" data-contact-count title="People"><?= (int) $contactCount ?></span>
                             </div>
                             <div class="search-box">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
-                                <input type="text" id="searchInput" placeholder="Search contacts..." class="search-input">
+                                <input type="text" id="searchInput" placeholder="Search companies and people…" class="search-input">
                             </div>
                             <div class="list-header-actions">
                                 <div class="segmented" role="tablist" aria-label="Show contacts as">
