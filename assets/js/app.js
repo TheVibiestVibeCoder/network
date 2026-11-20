@@ -1045,21 +1045,47 @@
         }
     }
 
-    function renderPinnedSection(contacts) {
-        let html = `<div class="pinned-section">`;
-        html += `<div class="pinned-header">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
-            <span>Pinned</span>
-            <span class="pinned-count">${contacts.length}</span>
-        </div>`;
-        html += contacts.map(c => createContactCard(c, false)).join('');
-        html += `</div>`;
-        return html;
+    /**
+     * The pinned people as small cards above the list: initials, name,
+     * company. A click opens the contact; the pin on the card unpins it.
+     */
+    function renderPinnedCards(contacts) {
+        const box = document.getElementById('pinnedContacts');
+        if (!box) return;
+        const list = contacts || [];
+        box.hidden = list.length === 0;
+        const initials = name => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase();
+        box.innerHTML = list.map(c => `
+            <div class="pinned-card" data-id="${c.id}" role="button" tabindex="0" title="${escapeHtml(c.name)}">
+                <span class="pinned-card-avatar" aria-hidden="true">${escapeHtml(initials(c.name))}</span>
+                <span class="pinned-card-text">
+                    <span class="pinned-card-name">${escapeHtml(c.name)}</span>
+                    <span class="pinned-card-sub">${escapeHtml((c.company || c.location || '').trim())}</span>
+                </span>
+                <button type="button" class="pin-btn pin-btn--active pinned-card-pin" data-id="${c.id}" title="Unpin" aria-label="Unpin ${escapeHtml(c.name)}">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
+                </button>
+            </div>`).join('');
+        box.querySelectorAll('.pinned-card').forEach(card => {
+            const open = () => openOverviewModal(parseInt(card.dataset.id, 10));
+            card.addEventListener('click', e => { if (!e.target.closest('.pin-btn')) open(); });
+            card.addEventListener('keydown', e => {
+                if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }
+            });
+        });
+        box.querySelectorAll('.pin-btn').forEach(btn => {
+            btn.addEventListener('click', async e => {
+                e.stopPropagation();
+                await api.togglePin(parseInt(btn.dataset.id, 10));
+                loadContacts();
+            });
+        });
     }
 
     /** People: everyone in one list, the pinned ones first. */
     function renderContactsListFlat() {
         if (state.contacts.length === 0) {
+            renderPinnedCards([]);
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
                     <h3>No contacts found</h3>
@@ -1069,7 +1095,8 @@
         }
         const pinned = state.contacts.filter(c => c.pinned == 1);
         const rest = state.contacts.filter(c => !c.pinned || c.pinned == 0);
-        let html = pinned.length ? renderPinnedSection(pinned) : '';
+        renderPinnedCards(pinned);
+        let html = '';
         html += `<div class="company-group people-group">${rest.map(c => createContactCard(c, false)).join('')}</div>`;
         elements.contactsList.innerHTML = html;
         addContactListEventHandlers();
@@ -1115,6 +1142,7 @@
     function renderContactsListByCompany() {
         const pinnedContacts = state.contacts.filter(c => c.pinned == 1);
         const unpinnedContacts = state.contacts.filter(c => !c.pinned || c.pinned == 0);
+        renderPinnedCards(pinnedContacts);
         const companies = window.CRMCompany ? window.CRMCompany.cached() : [];
         const byKey = new Map(companies.map(c => [c.name.toLowerCase(), c]));
         const money = state.companyMoney;
@@ -1170,7 +1198,7 @@
         filtered.sort(sorters[state.companySort] || sorters.name);
         const showNoCompany = noCompany.length && kind === 'all' && !state.companyProduct;
 
-        if (!filtered.length && !showNoCompany && !pinnedContacts.length) {
+        if (!filtered.length && !showNoCompany) {
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
                     <h3>${query ? 'Nothing found' : 'No companies here'}</h3>
@@ -1193,7 +1221,7 @@
             return { text, quiet: days >= QUIET_DAYS };
         };
 
-        let html = pinnedContacts.length ? renderPinnedSection(pinnedContacts) : '';
+        let html = '';
         filtered.forEach(r => {
             const c = r.company;
             const key = r.name.toLowerCase();
@@ -1297,6 +1325,7 @@
         const totalContacts = filteredTags.reduce((sum, t) => sum + t.contacts.length, 0) + filteredUntagged.length;
 
         if (totalContacts === 0) {
+            renderPinnedCards([]);
             elements.contactsList.innerHTML = `
                 <div class="empty-state">
                     <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
@@ -1318,10 +1347,7 @@
         });
 
         let html = '';
-
-        if (pinnedContacts.length > 0) {
-            html += renderPinnedSection(pinnedContacts);
-        }
+        renderPinnedCards(pinnedContacts);
 
         // Render tagged groups, excluding pinned contacts
         filteredTags.forEach(tag => {

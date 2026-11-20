@@ -14141,3 +14141,77 @@ textarea.form-input:focus,
 @media (max-width: 640px) {
     .project-group-switch .segmented-btn { padding: 0 9px; }
 }
+
+/* ---- Contacts: the pinned people as small cards above the list ---- */
+.pinned-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px;
+    margin: 0 0 14px;
+}
+
+.pinned-cards[hidden] { display: none; }
+#listView.is-map .pinned-cards { display: none; }
+
+.pinned-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    background: var(--c-surface);
+    box-shadow: var(--e-1);
+    cursor: pointer;
+    transition: box-shadow var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.pinned-card:hover { box-shadow: var(--e-2, var(--e-1)); }
+.pinned-card:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.pinned-card-avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #1C3258;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+:root[data-theme="dark"] .pinned-card-avatar { background: var(--c-accent); }
+
+.pinned-card-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pinned-card-name,
+.pinned-card-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinned-card-name { font-size: var(--t-sm); font-weight: 600; color: var(--c-ink); }
+.pinned-card-sub { font-size: var(--t-xs); color: var(--c-ink-3); }
+
+/* The pin shows on hover: a click on it unpins. */
+.pinned-card .pinned-card-pin {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    background: var(--c-surface);
+    opacity: 0;
+    transition: opacity var(--dur-1) var(--ease);
+}
+
+.pinned-card:hover .pinned-card-pin,
+.pinned-card .pinned-card-pin:focus-visible { opacity: 1; }

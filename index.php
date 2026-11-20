@@ -1436,6 +1436,8 @@ function assetUrl(string $path): string
                             </div>
                         </div>
                     </div>
+                    <!-- The pinned people: small cards above the list (app.js renderPinnedCards) -->
+                    <div class="pinned-cards" id="pinnedContacts" hidden></div>
                     <div class="contacts-list" id="contactsList">
                         <!-- Contacts will be loaded here -->
                     </div>
