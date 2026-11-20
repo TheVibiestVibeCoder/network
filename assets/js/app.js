@@ -4487,6 +4487,21 @@
         return product ? `<span class="product-chip" data-product="${escapeHtml(product)}">${escapeHtml(product)}</span>` : '';
     }
 
+    /**
+     * The small tag after a project's title: its product, short ("WS"), the
+     * full name in the tooltip - or, while the projects are grouped by
+     * product, its stage, as the group heading names the product already.
+     */
+    function titleTag(project) {
+        if (state.projectSortField === 'product') {
+            const stage = project.stage || 'Lead';
+            return `<span class="title-tag is-stage stage-${escapeHtml(stage.toLowerCase().replace(/ /g, '-'))}" title="${escapeHtml(stage)}">${escapeHtml(stage)}</span>`;
+        }
+        if (!project.product) return '';
+        const short = window.CRMProducts ? window.CRMProducts.short(project.product) : project.product;
+        return `<span class="title-tag" data-product="${escapeHtml(project.product)}" title="${escapeHtml(project.product)}">${escapeHtml(short)}</span>`;
+    }
+
     /** Projects as cards in a grid, or as rows of one list - per state.projectView. */
     function projectCollection(projects) {
         return state.projectView === 'list'
@@ -4653,7 +4668,7 @@
                      aria-label="${escapeHtml(project.name)}">
                 <div class="project-card-head">
                     <div class="project-card-title-wrap">
-                        <h3 class="project-card-title">${escapeHtml(project.name)}</h3>
+                        <h3 class="project-card-title">${escapeHtml(project.name)}${titleTag(project)}</h3>
                         ${project.company ? `<p class="project-card-company">${escapeHtml(project.company)}</p>` : ''}
                         ${isProposed ? `<div class="project-card-review">${reviewBadge(project)}</div>` : ''}
                         ${!isProposed && reviewChangeBadge(project, 'project') ? `<div class="project-card-review">${reviewChangeBadge(project, 'project')}</div>` : ''}
@@ -4662,8 +4677,7 @@
                 </div>
                 <div class="project-card-bottom">
                     <div class="project-card-foot">
-                        <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
-                        ${productChip(project.product)}
+                        ${state.projectSortField === 'stage' || state.projectSortField === 'product' ? '' : `<span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>`}
                         ${budgetStat}
                         ${chanceStat}
                     </div>
@@ -4693,9 +4707,8 @@
             <article class="project-row${isProposed ? ' is-proposed' : ''}" data-id="${project.id}" tabindex="0" role="button"
                      aria-label="${escapeHtml(project.name)}">
                 <div class="project-row-main">
-                    <span class="project-row-title">${escapeHtml(project.name)}</span>
+                    <span class="project-row-title">${escapeHtml(project.name)}</span>${titleTag(project)}
                     ${project.company ? `<span class="project-row-company">${escapeHtml(project.company)}</span>` : ''}
-                    ${productChip(project.product)}
                     ${badge}
                 </div>
                 <div class="project-row-when">${projectTimelineMarkup(project, isComplete)}</div>

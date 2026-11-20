@@ -9,6 +9,7 @@
  *
  * window.CRMProducts:
  *   names()            the names, in their order
+ *   short(name)        its short form for tight places ("WS")
  *   list()             [{ id, name, color, position }]
  *   load()             read them again
  *   add(name)          add one; resolves to it
@@ -21,11 +22,11 @@
 
     // Until the server answers: the products it starts with.
     let products = [
-        { id: 0, name: 'Workshop', color: '#30599D', position: 0 },
-        { id: 0, name: 'Risk Briefing', color: '#1C3258', position: 1 },
-        { id: 0, name: 'SHIELD', color: '#1C7E7E', position: 2 },
-        { id: 0, name: 'RB & SHIELD', color: '#63A375', position: 3 },
-        { id: 0, name: 'Other', color: '#8A94A6', position: 4 }
+        { id: 0, name: 'Workshop', short: 'WS', color: '#30599D', position: 0 },
+        { id: 0, name: 'Risk Briefing', short: 'RB', color: '#1C3258', position: 1 },
+        { id: 0, name: 'SHIELD', short: 'SH', color: '#1C7E7E', position: 2 },
+        { id: 0, name: 'RB & SHIELD', short: 'RB+SH', color: '#63A375', position: 3 },
+        { id: 0, name: 'Other', short: 'Other', color: '#8A94A6', position: 4 }
     ];
 
     const NEW = '__new_product__';
@@ -37,6 +38,12 @@
     }
 
     const names = () => products.map(p => p.name);
+
+    /** A product's short form ("WS"), or its name when it has none. */
+    const short = name => {
+        const p = products.find(x => x.name === name);
+        return (p && p.short) || String(name || '');
+    };
 
     /** The colour rules: one per product, a lighter tone of it in dark mode. */
     function writeStyles() {
@@ -139,7 +146,7 @@
         if (select && select.value !== NEW) select.dataset.previous = select.value;
     });
 
-    window.CRMProducts = { names, list: () => products.slice(), load, add, fillSelect };
+    window.CRMProducts = { names, short, list: () => products.slice(), load, add, fillSelect };
 
     writeStyles();
     if (document.readyState === 'loading') {

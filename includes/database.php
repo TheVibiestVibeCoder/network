@@ -729,11 +729,16 @@ class Database
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ");
+        // A short form for tight places (a project card's title): "WS", "RB".
+        self::addColumnIfMissing($db, 'products', 'short', 'VARCHAR(12)');
+        foreach (['Workshop' => 'WS', 'Risk Briefing' => 'RB', 'SHIELD' => 'SH', 'RB & SHIELD' => 'RB+SH', 'Other' => 'Other'] as $name => $short) {
+            $db->prepare("UPDATE products SET short = :s WHERE name = :n AND (short IS NULL OR short = '')")->execute(['s' => $short, 'n' => $name]);
+        }
         if (!(int) $db->query("SELECT COUNT(*) FROM products")->fetchColumn()) {
-            $seed = $db->prepare("INSERT OR IGNORE INTO products (name, color, position) VALUES (:n, :c, :p)");
-            foreach ([['Workshop', '#30599D'], ['Risk Briefing', '#1C3258'], ['SHIELD', '#1C7E7E'],
-                      ['RB & SHIELD', '#63A375'], ['Other', '#8A94A6']] as $i => [$name, $color]) {
-                $seed->execute(['n' => $name, 'c' => $color, 'p' => $i]);
+            $seed = $db->prepare("INSERT OR IGNORE INTO products (name, short, color, position) VALUES (:n, :s, :c, :p)");
+            foreach ([['Workshop', 'WS', '#30599D'], ['Risk Briefing', 'RB', '#1C3258'], ['SHIELD', 'SH', '#1C7E7E'],
+                      ['RB & SHIELD', 'RB+SH', '#63A375'], ['Other', 'Other', '#8A94A6']] as $i => [$name, $short, $color]) {
+                $seed->execute(['n' => $name, 's' => $short, 'c' => $color, 'p' => $i]);
             }
         }
 

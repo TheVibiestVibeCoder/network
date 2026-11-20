@@ -14102,3 +14102,29 @@ textarea.form-input:focus,
 /* A question or notice is always on top, also over a sheet stacked on another. */
 .modal.crm-dialog { z-index: 1200; }
 .crm-dialog-input { width: 100%; margin-top: 4px; }
+
+/* The small tag after a project's title: its product, short - or its
+   stage while grouped by product. Quiet, in the product's or stage's tone. */
+.title-tag {
+    display: inline;
+    margin-left: 7px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--product-tone, var(--stage-tone, var(--stage-lead))) 13%, var(--c-surface));
+    color: color-mix(in srgb, var(--product-tone, var(--stage-tone, var(--stage-lead))) 78%, var(--c-ink));
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+    vertical-align: 1px;
+    white-space: nowrap;
+    box-decoration-break: clone;
+}
+
+.title-tag.is-stage { --stage-tone: var(--stage-lead); font-weight: 600; letter-spacing: 0; }
+.title-tag.is-stage.stage-in-progress { --stage-tone: var(--stage-progress); }
+.title-tag.is-stage.stage-proposal { --stage-tone: var(--stage-proposal); }
+.title-tag.is-stage.stage-negotiation { --stage-tone: var(--stage-negotiation); }
+.title-tag.is-stage.stage-complete { --stage-tone: var(--stage-complete); }
+
+.project-row-main .title-tag { margin-left: 0; flex: none; vertical-align: 0; }

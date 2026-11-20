@@ -294,6 +294,13 @@ test('a product added in the CRM is a product: kept, with a colour, last in the 
     eq(count($colors), count(array_unique($colors)), 'its own colour');
 });
 
+test('a product has a short form: the five set, new ones made up', function () {
+    $short = array_column(Project::products(), 'short', 'name');
+    eq([$short['Workshop'], $short['Risk Briefing'], $short['SHIELD'], $short['RB & SHIELD']], ['WS', 'RB', 'SH', 'RB+SH'], 'set');
+    eq([Project::shortName('Media Training'), Project::shortName('Coaching'), Project::shortName('OSINT')], ['MT', 'CO', 'OSINT'], 'made up');
+    eq($short['Media Training'], 'MT', 'stored with a new one');
+});
+
 // =============================================================================
 
 $failed = 0;

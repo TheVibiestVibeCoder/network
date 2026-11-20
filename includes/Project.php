@@ -260,8 +260,29 @@ class Project
      */
     public static function products(): array
     {
-        $rows = Database::getInstance()->query("SELECT id, name, color, position FROM products ORDER BY position, id")->fetchAll();
-        return array_map(fn($r) => ['id' => (int) $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'position' => (int) $r['position']], $rows);
+        $rows = Database::getInstance()->query("SELECT id, name, short, color, position FROM products ORDER BY position, id")->fetchAll();
+        return array_map(fn($r) => [
+            'id' => (int) $r['id'], 'name' => $r['name'], 'short' => $r['short'] ?: self::shortName($r['name']),
+            'color' => $r['color'], 'position' => (int) $r['position'],
+        ], $rows);
+    }
+
+    /**
+     * A product's short form: the initials of its words ("Media Training"
+     * -> "MT"), a short word in capitals as it is ("SHIELD" -> "SH" only when
+     * longer than five letters), else its first two letters ("Coaching" -> "CO").
+     */
+    public static function shortName(string $name): string
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', $name, -1, PREG_SPLIT_NO_EMPTY);
+        if (count($words) > 1) {
+            return mb_strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice($words, 0, 4))));
+        }
+        $word = $words[0] ?? $name;
+        if (mb_strlen($word) <= 5 && $word === mb_strtoupper($word)) {
+            return $word;
+        }
+        return mb_strtoupper(mb_substr($word, 0, 2));
     }
 
     /** The products' names, in their order. */
@@ -297,8 +318,10 @@ class Project
         }
         $color ??= self::PRODUCT_COLORS[count($used) % count(self::PRODUCT_COLORS)];
         $position = (int) $db->query("SELECT COALESCE(MAX(position), -1) + 1 FROM products")->fetchColumn();
-        $db->prepare("INSERT INTO products (name, color, position) VALUES (:n, :c, :p)")->execute(['n' => $name, 'c' => $color, 'p' => $position]);
-        return ['id' => (int) $db->lastInsertId(), 'name' => $name, 'color' => $color, 'position' => $position];
+        $short = self::shortName($name);
+        $db->prepare("INSERT INTO products (name, short, color, position) VALUES (:n, :s, :c, :p)")
+            ->execute(['n' => $name, 's' => $short, 'c' => $color, 'p' => $position]);
+        return ['id' => (int) $db->lastInsertId(), 'name' => $name, 'short' => $short, 'color' => $color, 'position' => $position];
     }
 
     /** A product as stored: one of the products (any case), or null. */
