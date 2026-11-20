@@ -792,7 +792,8 @@
         if (what === 'project' && crm.openNewProject) {
             crm.openNewProject();
         } else if (what === 'todo' && crm.openNewTodo) {
-            crm.openNewTodo();
+            // From the home page a new to-do is the creator's own, until changed.
+            crm.openNewTodo({ assignToMe: true });
         }
     }
 

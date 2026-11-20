@@ -1045,6 +1045,30 @@
         }
     }
 
+    /** The pin in the contact sheet's head: on when the contact is pinned. */
+    function setPinButton(pinned) {
+        const btn = document.getElementById('pinContactBtn');
+        if (!btn) return;
+        btn.classList.toggle('is-on', pinned);
+        btn.setAttribute('aria-pressed', String(pinned));
+        btn.title = pinned ? 'Unpin' : 'Pin';
+        btn.setAttribute('aria-label', btn.title);
+    }
+
+    async function togglePinFromSheet() {
+        const id = state.viewingContactId;
+        if (!id) return;
+        try {
+            const result = await api.togglePin(id);
+            const pinned = result && result.data ? result.data.pinned == 1 : !(state.viewingContact && state.viewingContact.pinned == 1);
+            if (state.viewingContact) state.viewingContact.pinned = pinned ? 1 : 0;
+            setPinButton(pinned);
+            if (state.currentView === 'list') loadContacts();
+        } catch (error) {
+            CRMDialog.alert('The contact could not be pinned: ' + error.message);
+        }
+    }
+
     /**
      * The pinned people as small cards above the list: initials, name,
      * company. A click opens the contact; the pin on the card unpins it.
@@ -2640,8 +2664,11 @@
         elements.todoDetailContext.innerHTML = '';
         setEditedLine(elements.todoDetailEdited, null);
         // No record id yet: choosing someone only marks the sheet;
-        // saveTodoEdit() applies it once the to-do exists.
-        elements.todoDetailAssignee.innerHTML = assigneeControl('todo', null);
+        // saveTodoEdit() applies it once the to-do exists. From the home
+        // page (assignToMe) it starts with whoever is creating it.
+        const me = context && context.assignToMe && window.CRMPeople ? window.CRMPeople.me() : null;
+        const preset = me ? { assigned_to: me.is_owner ? 0 : me.id, assigned_to_name: me.name } : null;
+        elements.todoDetailAssignee.innerHTML = assigneeControl('todo', preset);
         elements.todoDetailAssignee.style.display = '';
 
         elements.todoDetailModal.classList.add('active', 'is-new');
@@ -3163,6 +3190,7 @@
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
             setEditedLine(elements.overviewEdited, contact);
             setAssigneeControl(elements.overviewAssignee, 'contact', contact);
+            setPinButton(contact.pinned == 1);
 
             // Populate details
             renderOverviewDetails(contact);
@@ -7079,6 +7107,8 @@
 
         // Company autocomplete in the sheet's edit mode
         bindProjectCompanyPicker();
+        const pinBtn = document.getElementById('pinContactBtn');
+        if (pinBtn) pinBtn.addEventListener('click', togglePinFromSheet);
         bindContactCompanyField();
 
         // Project tag input

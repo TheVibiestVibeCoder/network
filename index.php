@@ -1656,6 +1656,10 @@ function assetUrl(string $path): string
                     <!-- Who is responsible, then the actions, as icons -->
                     <div class="ov-head-actions">
                         <div class="ov-head-assignee" id="overviewAssignee"></div>
+                        <!-- Pin: the contact as a small card above the contacts list -->
+                        <button type="button" class="ov-icon-btn ov-pin-btn" id="pinContactBtn" data-ov="view" title="Pin" aria-label="Pin" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3.5h6"/><path d="M10 3.5v6l-3 3.5h10l-3-3.5v-6"/><path d="M12 13v7.5"/></svg>
+                        </button>
                         <button type="button" class="ov-icon-btn" id="editContactBtn" data-ov="view" title="Edit" aria-label="Edit">
                             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
                         </button>
@@ -1748,7 +1752,7 @@ function assetUrl(string $path): string
                                 New
                             </button>
                         </div>
-                        <div class="todo-list" id="contactTodosList">
+                        <div class="ptodo-list" id="contactTodosList">
                             <!-- To-dos will be populated by JS -->
                         </div>
                     </div>

@@ -6932,6 +6932,7 @@ details.import-instructions p {
 
 /* Completed to-dos, when shown, read as done. */
 #projectOverviewModal .ptodo.todo-completed .ptodo-title,
+#overviewModal .ptodo.todo-completed .ptodo-title,
 #todoView .ptodo.todo-completed .ptodo-title {
     color: var(--c-ink-3);
     text-decoration: line-through;
@@ -6973,6 +6974,7 @@ details.import-instructions p {
 }
 
 #projectOverviewModal .ptodo,
+#overviewModal .ptodo,
 #todoView .ptodo {
     margin: 0;
     padding: 0;
@@ -6983,6 +6985,7 @@ details.import-instructions p {
 }
 
 #projectOverviewModal .ptodo:last-child,
+#overviewModal .ptodo:last-child,
 #todoView .ptodo:last-child {
     border-bottom: 0;
 }
@@ -14215,3 +14218,7 @@ textarea.form-input:focus,
 
 .pinned-card:hover .pinned-card-pin,
 .pinned-card .pinned-card-pin:focus-visible { opacity: 1; }
+
+/* The pin in the contact sheet's head, filled when the contact is pinned. */
+.ov-pin-btn.is-on { color: var(--c-accent); }
+.ov-pin-btn.is-on svg path:nth-child(2) { fill: currentColor; }

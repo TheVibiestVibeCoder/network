@@ -970,13 +970,15 @@
 #listView .contact-card.is-proposed,
 #todoView .todo-item.is-proposed,
 #projectOverviewModal .ptodo.is-proposed,
+#overviewModal .ptodo.is-proposed,
 #workloadView .home-todo.is-proposed,
 #workloadView .home-project.is-proposed,
 #workloadView .workload-row.is-proposed {
     border-radius: 0;
 }
 
-#projectOverviewModal .ptodo-card > .ptodo.is-proposed:first-child {
+#projectOverviewModal .ptodo-card > .ptodo.is-proposed:first-child,
+#overviewModal .ptodo-card > .ptodo.is-proposed:first-child {
     border-top-left-radius: calc(var(--r-lg) - 1px);
     border-top-right-radius: calc(var(--r-lg) - 1px);
 }
@@ -985,7 +987,8 @@
 #listView .pinned-section > .contact-card.is-proposed:last-child,
 #listView .tag-group > .contact-card.is-proposed:last-child,
 #todoView .todo-group-items > .todo-item.is-proposed:last-child,
-#projectOverviewModal .ptodo-card > .ptodo.is-proposed:last-child {
+#projectOverviewModal .ptodo-card > .ptodo.is-proposed:last-child,
+#overviewModal .ptodo-card > .ptodo.is-proposed:last-child {
     border-bottom-left-radius: calc(var(--r-lg) - 1px);
     border-bottom-right-radius: calc(var(--r-lg) - 1px);
 }
