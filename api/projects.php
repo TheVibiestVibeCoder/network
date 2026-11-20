@@ -456,6 +456,7 @@ function handlePost(Project $model, string $action): void
         'estimated_completion' => $estimatedCompletion,
         'payments' => $payments
     ];
+    $sanitized += companiesAndProduct($input);
 
     // Create project
     $id = $model->create($sanitized);
@@ -464,6 +465,39 @@ function handlePost(Project $model, string $action): void
 
     http_response_code(201);
     echo json_encode(['success' => true, 'data' => $project]);
+}
+
+/**
+ * The companies and the product, when the request sends them.
+ *
+ * companies: a list of company ids, or names for companies to find or
+ * create - the sheet's picker sends both. Without it the company text decides
+ * (Company::syncProject). product: one of Project::PRODUCTS, anything else
+ * (or null) is none.
+ */
+function companiesAndProduct(array $input): array
+{
+    $out = [];
+    if (array_key_exists('companies', $input) && is_array($input['companies'])) {
+        $db = Database::getInstance();
+        $ids = [];
+        foreach (array_slice($input['companies'], 0, Company::MAX_PER_PROJECT) as $entry) {
+            if (is_int($entry) || (is_string($entry) && ctype_digit($entry))) {
+                $ids[] = (int) $entry;
+            } elseif (is_array($entry) && isset($entry['id'])) {
+                $ids[] = (int) $entry['id'];
+            } elseif (is_array($entry) && isset($entry['name']) && Company::cleanName($entry['name']) !== null) {
+                $ids[] = Company::findOrCreate($db, $entry['name']);
+            } elseif (is_string($entry) && Company::cleanName($entry) !== null) {
+                $ids[] = Company::findOrCreate($db, $entry);
+            }
+        }
+        $out['company_ids'] = $ids;
+    }
+    if (array_key_exists('product', $input)) {
+        $out['product'] = Project::cleanProduct($input['product']);
+    }
+    return $out;
 }
 
 /**
@@ -569,6 +603,7 @@ function handlePut(Project $model, ?int $id): void
     if ($payments !== null) {
         $sanitized['payments'] = $payments;
     }
+    $sanitized += companiesAndProduct($input);
 
     // Update project
     $model->update($id, $sanitized);

@@ -18,7 +18,7 @@ class ProjectArchive
      * The tables a project's snapshot holds, in the order they are restored:
      * every row after the rows it points to.
      */
-    private const TABLES = ['projects', 'project_notes', 'project_contacts', 'project_tags', 'project_documents', 'todos', 'todo_links'];
+    private const TABLES = ['projects', 'project_notes', 'project_contacts', 'project_tags', 'project_companies', 'project_documents', 'todos', 'todo_links'];
 
     /**
      * Write a project and everything that hangs off it into the archive.
@@ -95,6 +95,7 @@ class ProjectArchive
 
         $contactIds = array_map('intval', $db->query('SELECT id FROM contacts')->fetchAll(PDO::FETCH_COLUMN));
         $tagIds = array_map('intval', $db->query('SELECT id FROM tags')->fetchAll(PDO::FETCH_COLUMN));
+        $companyIds = array_map('intval', $db->query('SELECT id FROM companies')->fetchAll(PDO::FETCH_COLUMN));
         $contactExists = fn($id) => $id === null || $id === '' || in_array((int) $id, $contactIds, true);
 
         $db->beginTransaction();
@@ -107,6 +108,8 @@ class ProjectArchive
                     $list = array_filter($list, fn($r) => $contactExists($r['contact_id'] ?? null));
                 } elseif ($table === 'project_tags') {
                     $list = array_filter($list, fn($r) => in_array((int) $r['tag_id'], $tagIds, true));
+                } elseif ($table === 'project_companies') {
+                    $list = array_filter($list, fn($r) => in_array((int) $r['company_id'], $companyIds, true));
                 } elseif ($table === 'todos') {
                     // Masters before their mirrored copies.
                     usort($list, fn($a, $b) => (int) !empty($a['parent_todo_id']) <=> (int) !empty($b['parent_todo_id']));
@@ -133,6 +136,8 @@ class ProjectArchive
                 self::insertRows($db, $table, $list);
             }
 
+            // The company text follows the companies still there.
+            Company::refreshProjectText($db, $projectId);
             $db->prepare('DELETE FROM deleted_projects WHERE id = :id')->execute(['id' => $archiveId]);
             $db->commit();
         } catch (Throwable $e) {
@@ -200,6 +205,7 @@ class ProjectArchive
             'project_notes' => $select('SELECT * FROM project_notes WHERE project_id = :id', $byProject),
             'project_contacts' => $select('SELECT * FROM project_contacts WHERE project_id = :id', $byProject),
             'project_tags' => $select('SELECT * FROM project_tags WHERE project_id = :id', $byProject),
+            'project_companies' => $select('SELECT * FROM project_companies WHERE project_id = :id', $byProject),
             'project_documents' => $select('SELECT * FROM project_documents WHERE project_id = :id', $byProject),
             'todos' => $todos,
             'todo_links' => $links,

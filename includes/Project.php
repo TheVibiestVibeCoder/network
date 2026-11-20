@@ -20,6 +20,7 @@ if (!defined('APP_ROOT')) {
 // delete is called from.
 require_once APP_ROOT . '/includes/ProjectDocument.php';
 require_once APP_ROOT . '/includes/ProjectArchive.php';
+require_once APP_ROOT . '/includes/Company.php';
 
 class Project
 {
@@ -38,7 +39,7 @@ class Project
      */
     public function getAll(string $search = '', string $sortBy = 'name', string $sortOrder = 'ASC'): array
     {
-        $allowedSortFields = ['name', 'company', 'start_date', 'stage', 'success_chance', 'created_at', 'updated_at'];
+        $allowedSortFields = ['name', 'company', 'start_date', 'stage', 'product', 'success_chance', 'created_at', 'updated_at'];
         $sortBy = in_array($sortBy, $allowedSortFields) ? $sortBy : 'name';
         $sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
 
@@ -49,7 +50,8 @@ class Project
             $sql .= " WHERE name LIKE :search
                       OR company LIKE :search
                       OR description LIKE :search
-                      OR stage LIKE :search";
+                      OR stage LIKE :search
+                      OR product LIKE :search";
             $params['search'] = '%' . $search . '%';
         }
 
@@ -59,6 +61,11 @@ class Project
         // won, then what is only a lead, and finished work last.
         if ($sortBy === 'stage') {
             $sql .= " ORDER BY " . self::stageRankSql() . " $sortOrder, name COLLATE NOCASE ASC";
+        } elseif ($sortBy === 'product') {
+            // In the products' own order, the projects without one last
+            // either way; within a product by stage, as the list reads.
+            $sql .= " ORDER BY (product IS NULL) ASC, " . self::productRankSql() . " $sortOrder, "
+                . self::stageRankSql() . " ASC, name COLLATE NOCASE ASC";
         } else {
             $sql .= " ORDER BY $sortBy $sortOrder";
         }
@@ -66,7 +73,26 @@ class Project
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
-        return $stmt->fetchAll();
+        $projects = $stmt->fetchAll();
+        $companies = Company::companiesByProject($this->db);
+        foreach ($projects as &$project) {
+            $project['companies'] = $companies[(int) $project['id']] ?? [];
+        }
+        unset($project);
+        return $projects;
+    }
+
+    /** The products in their order (PRODUCTS), as a SQL CASE expression. */
+    public static function productRankSql(string $column = 'product'): string
+    {
+        if (!preg_match('/^[a-z_.]+$/', $column)) {
+            $column = 'product';
+        }
+        $sql = 'CASE ' . $column;
+        foreach (self::PRODUCTS as $i => $product) {
+            $sql .= " WHEN '" . str_replace("'", "''", $product) . "' THEN " . $i;
+        }
+        return $sql . ' ELSE ' . count(self::PRODUCTS) . ' END';
     }
 
     /**
@@ -123,7 +149,11 @@ class Project
         $stmt->execute(['id' => $id]);
 
         $project = $stmt->fetch();
-        return $project ?: null;
+        if (!$project) {
+            return null;
+        }
+        $project['companies'] = Company::projectCompanies($this->db, $id);
+        return $project;
     }
 
     /**
@@ -133,10 +163,10 @@ class Project
     {
         $stmt = $this->db->prepare("
             INSERT INTO projects (name, start_date, description, company, budget_min, budget_max,
-                                success_chance, stage, estimated_completion, payments,
+                                success_chance, stage, estimated_completion, payments, product,
                                 created_by, created_by_name, updated_by, updated_by_name)
             VALUES (:name, :start_date, :description, :company, :budget_min, :budget_max,
-                    :success_chance, :stage, :estimated_completion, :payments,
+                    :success_chance, :stage, :estimated_completion, :payments, :product,
                     :actor_id, :actor_name, :actor_id2, :actor_name2)
         ");
 
@@ -158,9 +188,12 @@ class Project
             'stage' => $data['stage'] ?? 'Lead',
             'estimated_completion' => $data['estimated_completion'] ?? null,
             'payments' => self::encodePayments($data['payments'] ?? []),
+            'product' => self::cleanProduct($data['product'] ?? null),
         ]);
 
-        return (int) $this->db->lastInsertId();
+        $id = (int) $this->db->lastInsertId();
+        Company::syncProject($this->db, $id, $data);
+        return $id;
     }
 
     /**
@@ -171,9 +204,11 @@ class Project
     public function update(int $id, array $data): bool
     {
         $withPayments = array_key_exists('payments', $data);
+        // Like the payments: only an update that knows the product changes it.
+        $withProduct = array_key_exists('product', $data);
         $stmt = $this->db->prepare("
             UPDATE projects
-            SET " . ($withPayments ? "payments = :payments," : "") . "
+            SET " . ($withPayments ? "payments = :payments," : "") . ($withProduct ? "product = :product," : "") . "
                 name = :name,
                 start_date = :start_date,
                 description = :description,
@@ -208,8 +243,30 @@ class Project
         if ($withPayments) {
             $params['payments'] = self::encodePayments($data['payments'] ?? []);
         }
+        if ($withProduct) {
+            $params['product'] = self::cleanProduct($data['product']);
+        }
 
-        return $stmt->execute($params);
+        $ok = $stmt->execute($params);
+        Company::syncProject($this->db, $id, $data);
+        return $ok;
+    }
+
+    /** What our projects are about. One per project, or none. */
+    public const PRODUCTS = ['Workshop', 'Risk Briefing', 'SHIELD', 'RB & SHIELD', 'Other'];
+
+    /** A product as stored: one of PRODUCTS (any case), or null. */
+    public static function cleanProduct($value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        foreach (self::PRODUCTS as $product) {
+            if (strcasecmp(trim($value), $product) === 0) {
+                return $product;
+            }
+        }
+        return null;
     }
 
     /**

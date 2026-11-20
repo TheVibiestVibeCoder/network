@@ -662,6 +662,135 @@ class Database
         $db->exec("CREATE INDEX IF NOT EXISTS idx_mcp_api_nonces_seen ON mcp_api_nonces(seen_at)");
 
         self::initializeCalendarSchema($db);
+        self::initializeCompanySchema($db);
+    }
+
+    /**
+     * Companies as records of their own (includes/Company.php), the product
+     * a project is about, and what links our invoices to them.
+     *
+     * contacts.company and projects.company stay as they were: a copy of the
+     * name(s), kept in step by Company.php, so everything that reads them
+     * goes on working. The links are company_id and project_companies.
+     */
+    private static function initializeCompanySchema(PDO $db): void
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(255) NOT NULL COLLATE NOCASE UNIQUE,
+                website VARCHAR(255),
+                address TEXT,
+                vat_id VARCHAR(64),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_by INTEGER,
+                created_by_name VARCHAR(255),
+                updated_by INTEGER,
+                updated_by_name VARCHAR(255)
+            )
+        ");
+
+        // A project can be for several companies; position keeps their order.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS project_companies (
+                project_id INTEGER NOT NULL,
+                company_id INTEGER NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (project_id, company_id),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+            )
+        ");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_project_companies_company ON project_companies(company_id)");
+
+        self::addColumnIfMissing($db, 'contacts', 'company_id', 'INTEGER');
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company_id ON contacts(company_id)");
+
+        // The product a project is about: one of Project::PRODUCTS, or NULL.
+        self::addColumnIfMissing($db, 'projects', 'product', 'VARCHAR(32)');
+
+        // Our invoices linked by hand to a project and a company, by invoice
+        // number. A row overrides the automatic match; 0 means "none" on
+        // purpose, NULL leaves that side to the automatic match.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS invoice_links (
+                invoice_number VARCHAR(64) PRIMARY KEY,
+                project_id INTEGER,
+                company_id INTEGER,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_by INTEGER,
+                updated_by_name VARCHAR(255)
+            )
+        ");
+
+        // Our invoices from before Bookkeeping (2025): for the customer
+        // figures and the invoice list only - never in the bookkeeping, the
+        // VAT, the cashflow or a year's result.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS invoice_archive (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_number VARCHAR(64) NOT NULL UNIQUE,
+                kind VARCHAR(16) NOT NULL DEFAULT 'invoice',
+                invoice_date DATE,
+                due_date DATE,
+                paid_date DATE,
+                customer VARCHAR(255),
+                contact VARCHAR(255),
+                subject TEXT,
+                net DECIMAL(12,2),
+                vat DECIMAL(12,2),
+                gross DECIMAL(12,2),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_by INTEGER,
+                created_by_name VARCHAR(255)
+            )
+        ");
+
+        // Once: a company for every company name the contacts and projects
+        // carry, and the links to it. Names that differ only in case or
+        // spaces become one; anything else is left to the merge list.
+        $done = $db->query("SELECT value FROM app_settings WHERE key = 'companies_migrated'")->fetchColumn();
+        if ($done) {
+            return;
+        }
+        $db->beginTransaction();
+        try {
+            $clean = static fn($name) => trim(preg_replace('/\s+/u', ' ', (string) $name));
+            $ids = [];
+            $idOf = static function (string $name) use ($db, &$ids): int {
+                $key = mb_strtolower($name);
+                if (!isset($ids[$key])) {
+                    $db->prepare("INSERT OR IGNORE INTO companies (name) VALUES (:n)")->execute(['n' => $name]);
+                    $stmt = $db->prepare("SELECT id FROM companies WHERE name = :n");
+                    $stmt->execute(['n' => $name]);
+                    $ids[$key] = (int) $stmt->fetchColumn();
+                }
+                return $ids[$key];
+            };
+            $contacts = $db->query("SELECT id, company FROM contacts WHERE company IS NOT NULL AND TRIM(company) <> ''")->fetchAll();
+            $setContact = $db->prepare("UPDATE contacts SET company_id = :c WHERE id = :id");
+            foreach ($contacts as $row) {
+                $name = $clean($row['company']);
+                if ($name !== '') {
+                    $setContact->execute(['c' => $idOf($name), 'id' => $row['id']]);
+                }
+            }
+            $projects = $db->query("SELECT id, company FROM projects WHERE company IS NOT NULL AND TRIM(company) <> ''")->fetchAll();
+            $link = $db->prepare("INSERT OR IGNORE INTO project_companies (project_id, company_id, position) VALUES (:p, :c, 0)");
+            foreach ($projects as $row) {
+                $name = $clean($row['company']);
+                if ($name !== '') {
+                    $link->execute(['p' => $row['id'], 'c' => $idOf($name)]);
+                }
+            }
+            $db->exec("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('companies_migrated', '1')");
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollBack();
+            error_log('Company migration failed: ' . $e->getMessage());
+        }
     }
 
     /**

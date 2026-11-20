@@ -1760,29 +1760,40 @@ function assetUrl(string $path): string
             </div>
         </div>
 
-        <!-- Company Notes Modal -->
+        <!-- Company sheet (assets/js/companies.js): the company with its
+             figures, projects, contacts, invoices and every note filed under
+             it. Reading and editing share one layout, as on the other sheets;
+             the id stays companyNotesModal for the styles it shares. -->
         <div class="modal" id="companyNotesModal">
             <div class="modal-backdrop"></div>
             <div class="modal-content modal-large">
                 <div class="modal-header">
                     <div class="overview-header-info">
-                        <div class="company-avatar">
-                            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
-                        </div>
                         <div class="overview-title-info">
-                            <h2 id="companyNotesTitle"></h2>
-                            <p class="overview-company">All notes from this company</p>
+                            <h2 id="companyNotesTitle" data-ov="view"></h2>
+                            <input type="text" id="companyEditName" class="form-input ov-edit-title" data-ov="edit" aria-label="Company name" placeholder="Company name" maxlength="255">
+                            <p class="overview-company" id="companySub" data-ov="view"></p>
+                            <input type="text" id="companyEditWebsite" class="form-input ov-edit-sub" data-ov="edit" aria-label="Website" placeholder="Website" maxlength="255">
                         </div>
                     </div>
-                    <button type="button" class="modal-close" id="closeCompanyNotesModal">&times;</button>
+                    <div class="ov-head-actions">
+                        <button type="button" class="ov-icon-btn" id="companyEditBtn" data-ov="view" title="Edit" aria-label="Edit">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5l4 4"/><path d="M4 20l1-4.5L16 4.5a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19z"/></svg>
+                        </button>
+                        <button type="button" class="modal-close" id="closeCompanyNotesModal" aria-label="Close">&times;</button>
+                    </div>
                 </div>
                 <div class="modal-body overview-body">
-                    <div class="notes-timeline" id="companyNotesTimeline">
-                        <!-- Notes will be populated by JS -->
+                    <div id="companyBody"></div>
+                    <div class="overview-section ov-section" data-ov="view">
+                        <h3 class="overview-section-title">Notes</h3>
+                        <div class="notes-timeline" id="companyNotesTimeline"></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="closeCompanyNotesBtn">Close</button>
+                <div class="modal-footer ov-footer">
+                    <button type="button" class="btn btn-secondary" id="closeCompanyNotesBtn" data-ov="view" hidden>Close</button>
+                    <button type="button" class="btn btn-secondary" id="companyCancelBtn" data-ov="edit">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="companySaveBtn" data-ov="edit">Save</button>
                 </div>
             </div>
         </div>
@@ -1941,8 +1952,10 @@ function assetUrl(string $path): string
                             <h2 id="projectOverviewName" data-ov="view">Project Name</h2>
                             <input type="text" id="projectEditName" class="form-input ov-edit-title" data-ov="edit" aria-label="Project name" placeholder="Project name" required>
                             <p class="overview-company" id="projectOverviewCompany" data-ov="view"></p>
-                            <div class="autocomplete-wrapper ov-edit-company" data-ov="edit">
-                                <input type="text" id="projectEditCompany" class="form-input" autocomplete="off" placeholder="Company" aria-label="Company">
+                            <!-- One or more companies: chips, and a field to find or add one -->
+                            <div class="autocomplete-wrapper ov-edit-company ov-company-picker" data-ov="edit">
+                                <div class="ov-company-chips" id="projectEditCompanyChips"></div>
+                                <input type="text" id="projectEditCompany" class="form-input" autocomplete="off" placeholder="Company" aria-label="Add a company">
                                 <div class="autocomplete-suggestions" id="projectEditCompanySuggestions"></div>
                             </div>
                             <p class="overview-edited" id="projectOverviewEdited"></p>
@@ -2531,6 +2544,7 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/meeting.js') ?>"></script>
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/app.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/companies.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/bookkeeping.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/documents.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/profile.js') ?>"></script>

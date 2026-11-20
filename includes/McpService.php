@@ -44,6 +44,8 @@ require_once __DIR__ . '/AssignmentFeed.php';
 require_once __DIR__ . '/TodoLink.php';
 require_once __DIR__ . '/ProjectArchive.php';
 require_once __DIR__ . '/Cashflow.php';
+require_once __DIR__ . '/Project.php';
+require_once __DIR__ . '/Company.php';
 
 /** A refusal Claude should read and act on - the message is shown to it verbatim. */
 class McpError extends ReviewException
@@ -79,7 +81,7 @@ final class McpService
 
     private const PROJECT_FIELDS = [
         'name', 'description', 'company', 'start_date', 'estimated_completion',
-        'stage', 'budget_min', 'budget_max', 'success_chance',
+        'stage', 'budget_min', 'budget_max', 'success_chance', 'product',
     ];
 
     private const TODO_FIELDS = ['title', 'description', 'due_date', 'priority', 'is_completed'];
@@ -189,6 +191,8 @@ final class McpService
             'review_note' => 'Everything written through this API is a proposal. It shows in the CRM marked as coming from '
                 . MCP_ACTOR_NAME . ' and only becomes permanent when a person accepts it.',
             'project_stages' => self::STAGES,
+            // What a project is about: one of these, or none.
+            'project_products' => Project::PRODUCTS,
             'todo_priorities' => self::PRIORITIES,
             'document_labels' => ProjectDocument::LABELS,
             'team' => $users,
@@ -301,32 +305,24 @@ final class McpService
 
         $query = $this->str($p, 'query', 200);
         if ($query !== null) {
-            $filter = " AND company LIKE :q ESCAPE '\\'";
+            $filter = " WHERE c.name LIKE :q ESCAPE '\\'";
             $params['q'] = $this->like($query);
         }
 
         $stmt = $this->db->prepare("
-            SELECT TRIM(company) AS company, COUNT(*) AS contacts
-            FROM contacts
-            WHERE company IS NOT NULL AND TRIM(company) <> ''" . $filter . "
-            GROUP BY LOWER(TRIM(company))
-            ORDER BY company COLLATE NOCASE
+            SELECT c.id, c.name AS company, c.website,
+                (SELECT COUNT(*) FROM contacts k WHERE k.company_id = c.id) AS contacts,
+                (SELECT COUNT(*) FROM project_companies pc WHERE pc.company_id = c.id) AS projects
+            FROM companies c" . $filter . "
+            ORDER BY c.name COLLATE NOCASE
             LIMIT " . $limit
         );
         $stmt->execute($params);
         $companies = $stmt->fetchAll();
-
-        $projectCounts = [];
-        foreach ($this->db->query("
-            SELECT LOWER(TRIM(company)) AS k, COUNT(*) AS n FROM projects
-            WHERE company IS NOT NULL AND TRIM(company) <> '' GROUP BY LOWER(TRIM(company))
-        ")->fetchAll() as $row) {
-            $projectCounts[$row['k']] = (int) $row['n'];
-        }
-
         foreach ($companies as &$company) {
+            $company['id'] = (int) $company['id'];
             $company['contacts'] = (int) $company['contacts'];
-            $company['projects'] = $projectCounts[mb_strtolower((string) $company['company'])] ?? 0;
+            $company['projects'] = (int) $company['projects'];
         }
         unset($company);
 
@@ -336,45 +332,47 @@ final class McpService
     private function companiesGet(array $p): array
     {
         $name = $this->str($p, 'name', 255, true);
-
-        $contacts = $this->db->prepare("
-            SELECT id, name, email, phone, location, review_status
-            FROM contacts WHERE LOWER(TRIM(company)) = LOWER(:name) ORDER BY name COLLATE NOCASE
-        ");
-        $contacts->execute(['name' => $name]);
-        $contactRows = $contacts->fetchAll();
-
-        $projects = $this->db->prepare("
-            SELECT id, name, stage, budget_min, budget_max, estimated_completion, review_status
-            FROM projects WHERE LOWER(TRIM(company)) = LOWER(:name) ORDER BY name COLLATE NOCASE
-        ");
-        $projects->execute(['name' => $name]);
-        $projectRows = $projects->fetchAll();
+        $companyId = Company::idByName($this->db, $name);
 
         // No exact match: offer the near misses rather than an empty answer,
         // so "ACME" still finds "ACME GmbH".
-        if (empty($contactRows) && empty($projectRows)) {
-            $similar = $this->db->prepare("
-                SELECT DISTINCT TRIM(company) AS company FROM (
-                    SELECT company FROM contacts UNION ALL SELECT company FROM projects
-                ) WHERE company LIKE :q ESCAPE '\\' LIMIT 20
-            ");
+        if ($companyId === null) {
+            $similar = $this->db->prepare("SELECT name FROM companies WHERE name LIKE :q ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT 20");
             $similar->execute(['q' => $this->like($name)]);
 
             return [
                 'found' => false,
                 'message' => 'No company with exactly that name. Similar names are listed; call again with one of them.',
-                'similar' => array_column($similar->fetchAll(), 'company'),
+                'similar' => array_column($similar->fetchAll(), 'name'),
             ];
         }
+
+        $company = Company::get($this->db, $companyId);
+
+        $contacts = $this->db->prepare("
+            SELECT id, name, email, phone, location, review_status
+            FROM contacts WHERE company_id = :id ORDER BY name COLLATE NOCASE
+        ");
+        $contacts->execute(['id' => $companyId]);
+        $contactRows = $contacts->fetchAll();
+
+        $projects = $this->db->prepare("
+            SELECT p.id, p.name, p.product, p.stage, p.budget_min, p.budget_max, p.success_chance, p.start_date,
+                   p.estimated_completion, p.review_status,
+                   (SELECT COUNT(*) FROM project_companies o WHERE o.project_id = p.id) AS companies
+            FROM projects p JOIN project_companies pc ON pc.project_id = p.id
+            WHERE pc.company_id = :id ORDER BY p.name COLLATE NOCASE
+        ");
+        $projects->execute(['id' => $companyId]);
+        $projectRows = $projects->fetchAll();
 
         $notes = $this->db->prepare("
             SELECT n.id, n.content, n.created_at, n.review_status, c.name AS contact_name
             FROM notes n JOIN contacts c ON c.id = n.contact_id
-            WHERE LOWER(TRIM(c.company)) = LOWER(:name)
+            WHERE c.company_id = :id OR LOWER(TRIM(n.company)) = LOWER(:name)
             ORDER BY n.created_at DESC LIMIT 30
         ");
-        $notes->execute(['name' => $name]);
+        $notes->execute(['id' => $companyId, 'name' => $company['name']]);
 
         $todos = [];
         $contactIds = array_map('intval', array_column($contactRows, 'id'));
@@ -396,7 +394,11 @@ final class McpService
 
         return [
             'found' => true,
-            'company' => $name,
+            'company' => $company['name'],
+            'company_id' => $companyId,
+            'website' => $company['website'],
+            'address' => $company['address'],
+            'vat_id' => $company['vat_id'],
             'contacts' => $contactRows,
             'projects' => $projectRows,
             'recent_notes' => $notes->fetchAll(),
@@ -422,6 +424,12 @@ final class McpService
             $params['company'] = $this->like($company);
         }
 
+        $product = $this->str($p, 'product', 50);
+        if ($product !== null) {
+            $where[] = 'product = :product';
+            $params['product'] = $this->enum($product, Project::PRODUCTS, 'product');
+        }
+
         $stage = $this->str($p, 'stage', 50);
         if ($stage !== null) {
             $where[] = 'stage = :stage';
@@ -440,7 +448,7 @@ final class McpService
         $count->execute($params);
 
         $stmt = $this->db->prepare("
-            SELECT id, name, company, stage, start_date, estimated_completion, budget_min, budget_max,
+            SELECT id, name, company, product, stage, start_date, estimated_completion, budget_min, budget_max,
                    success_chance, assigned_to_name, review_status, updated_at
             FROM projects" . $whereSql . "
             ORDER BY updated_at DESC
@@ -491,6 +499,7 @@ final class McpService
         $project['payments_summary'] = $this->paymentsSummary($project, $project['expected_payments']);
         $project['claude_summary'] = $row['claude_summary'] ?? null;
         $project['claude_summary_at'] = $row['claude_summary_at'] ?? null;
+        $project['companies'] = Company::projectCompanies($this->db, $id);
 
         return [
             'project' => $project,
@@ -1101,6 +1110,10 @@ final class McpService
         $comment = $this->comment($p);
 
         $result = Database::transactional(function (PDO $db) use ($data, $comment) {
+            if (!empty($data['company_names'])) {
+                $data['company_ids'] = array_map(fn($n) => Company::findOrCreate($db, $n), $data['company_names']);
+            }
+            unset($data['company_names']);
             $id = (new Project())->create($data);
             $db->prepare("UPDATE projects SET review_status = 'pending' WHERE id = :id")->execute(['id' => $id]);
 
@@ -1843,7 +1856,7 @@ final class McpService
     private function fetchProject(int $id): array
     {
         $stmt = $this->db->prepare("
-            SELECT id, name, company, stage, description, start_date, estimated_completion, budget_min, budget_max,
+            SELECT id, name, company, product, stage, description, start_date, estimated_completion, budget_min, budget_max,
                    success_chance, assigned_to, assigned_to_name, review_status, created_by_name, created_at, updated_by_name, updated_at
             FROM projects WHERE id = :id
         ");
@@ -2162,7 +2175,10 @@ final class McpService
 
         $chance = $this->intRange($p, 'success_chance', 0, 100);
 
-        return [
+        $productRaw = $this->str($p, 'product', 50);
+        $product = $productRaw === null ? null : $this->enum($productRaw, Project::PRODUCTS, 'product');
+
+        $input = [
             'name' => $name,
             'description' => $description,
             'start_date' => $startDate,
@@ -2172,7 +2188,26 @@ final class McpService
             'budget_min' => $budgetMin,
             'budget_max' => $budgetMax,
             'success_chance' => $chance,
+            'product' => $product,
         ];
+
+        // Several companies at once (a new project): their names, each found
+        // or created. The text is then their names, as the CRM keeps it.
+        if (isset($p['companies']) && is_array($p['companies']) && $existing === null) {
+            $names = [];
+            foreach (array_slice($p['companies'], 0, Company::MAX_PER_PROJECT) as $entry) {
+                $clean = is_string($entry) ? Company::cleanName($entry) : null;
+                if ($clean !== null) {
+                    $names[] = $clean;
+                }
+            }
+            if ($names) {
+                $input['company_names'] = $names;
+                $input['company'] = implode(', ', $names);
+            }
+        }
+
+        return $input;
     }
 
     private function changes(array $p): array

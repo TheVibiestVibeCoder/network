@@ -185,11 +185,6 @@
         editContactBtn: document.getElementById('editContactBtn'),
 
         // Company notes modal
-        companyNotesModal: document.getElementById('companyNotesModal'),
-        companyNotesTitle: document.getElementById('companyNotesTitle'),
-        companyNotesTimeline: document.getElementById('companyNotesTimeline'),
-        closeCompanyNotesModal: document.getElementById('closeCompanyNotesModal'),
-        closeCompanyNotesBtn: document.getElementById('closeCompanyNotesBtn'),
 
         // Import/Export modal
         importExportBtn: document.getElementById('importExportBtn'),
@@ -1225,7 +1220,7 @@
                 if (!company) {
                     return;
                 }
-                openCompanyNotesModal(company);
+                if (window.CRMCompany) window.CRMCompany.open(company);
             });
         });
 
@@ -2968,7 +2963,9 @@
 
             // Populate header
             elements.overviewName.textContent = contact.name;
-            elements.overviewCompany.textContent = contact.company || '';
+            elements.overviewCompany.innerHTML = contact.company
+                ? `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(contact.company_id || '')}" data-company-name="${escapeHtml(contact.company)}">${escapeHtml(contact.company)}</button>`
+                : '';
             elements.overviewCompany.style.display = contact.company ? 'block' : 'none';
             setEditedLine(elements.overviewEdited, contact);
             setAssigneeControl(elements.overviewAssignee, 'contact', contact);
@@ -3126,6 +3123,7 @@
             }
             refreshData();
             updateContactCount();
+            if (window.CRMCompany) window.CRMCompany.refresh();
             if (savedId) {
                 await openOverviewModal(savedId);
             } else {
@@ -3523,65 +3521,6 @@
         } catch (error) {
             console.error('Error deleting tag:', error);
         }
-    }
-
-    // ============================================
-    // Company Notes Modal Functions
-    // ============================================
-
-    async function openCompanyNotesModal(company) {
-        try {
-            elements.companyNotesTitle.textContent = company;
-
-            // Show loading state
-            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Loading notes...</p>';
-
-            // Show modal
-            elements.companyNotesModal.classList.add('active');
-
-            // Load notes
-            const result = await api.getCompanyNotes(company);
-
-            if (result.success) {
-                renderCompanyNotesTimeline(result.data);
-            } else {
-                elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
-            }
-        } catch (error) {
-            console.error('Error loading company notes:', error);
-            elements.companyNotesTimeline.innerHTML = '<p class=\"empty-hint\">Error loading notes</p>';
-        }
-    }
-
-    function renderCompanyNotesTimeline(notes) {
-        if (!notes || notes.length === 0) {
-            elements.companyNotesTimeline.innerHTML = '<p class="empty-hint">No notes yet for this company</p>';
-            return;
-        }
-
-        let html = '';
-
-        notes.forEach(note => {
-            const formattedDate = formatDate(window.CRMFormat.toDate(note.created_at));
-            const contactName = note.contact_name || 'Unknown';
-
-            html += `
-                <div class="note-item">
-                    <div class="note-header">
-                        <span class="note-date">${formattedDate}</span>
-                        ${byLine(note.author_name, note.author_id)}
-                        <span class="note-source">von ${escapeHtml(contactName)}</span>
-                    </div>
-                    <div class="note-content">${escapeHtml(note.content)}</div>
-                </div>
-            `;
-        });
-
-        elements.companyNotesTimeline.innerHTML = html;
-    }
-
-    function closeCompanyNotesModal() {
-        elements.companyNotesModal.classList.remove('active');
     }
 
     // ============================================
@@ -4632,7 +4571,7 @@
 
     function renderProjectOverview(project, contacts, tags, notes = [], todos = []) {
         elements.projectOverviewName.textContent = project.name;
-        elements.projectOverviewCompany.textContent = project.company || 'No company assigned';
+        elements.projectOverviewCompany.innerHTML = companyLinks(project);
         setEditedLine(elements.projectOverviewEdited, project);
         setAssigneeControl(elements.projectOverviewAssignee, 'project', project);
 
@@ -4980,7 +4919,9 @@
         if (!project) return;
 
         elements.projectEditName.value = project.name || '';
-        elements.projectEditCompany.value = project.company || '';
+        state.projectEditCompanies = (project.companies || []).map(c => ({ id: Number(c.id), name: c.name }));
+        elements.projectEditCompany.value = '';
+        renderProjectCompanyChips();
         elements.projectEditStartDate.value = project.start_date || '';
         elements.projectEditStage.value = project.stage || 'Lead';
         elements.projectEditBudgetMin.value = window.CRMAmount ? window.CRMAmount.format(project.budget_min) : (project.budget_min ?? '');
@@ -5078,6 +5019,8 @@
         const review = document.getElementById('projectOverviewReview');
         if (review) review.hidden = true;
 
+        state.projectEditCompanies = [];
+        renderProjectCompanyChips();
         [elements.projectEditName, elements.projectEditCompany, elements.projectEditBudgetMin,
          elements.projectEditBudgetMax, elements.projectEditSuccessChance,
          elements.projectEditEstCompletion, elements.projectEditDescription].forEach(input => { input.value = ''; });
@@ -5168,7 +5111,10 @@
             name: elements.projectEditName.value.trim(),
             start_date: elements.projectEditStartDate.value,
             description: elements.projectEditDescription.value.trim(),
-            company: elements.projectEditCompany.value.trim() || null,
+            // Ids for companies there are, names for new ones (created on save);
+            // the text is the names, for anything still reading it.
+            companies: projectCompaniesToSave().map(c => (c.id ? c.id : { name: c.name })),
+            company: projectCompaniesToSave().map(c => c.name).join(', ') || null,
             budget_min: budget[0],
             budget_max: budget[1],
             success_chance: elements.projectEditSuccessChance.value || null,
@@ -5194,6 +5140,7 @@
                 }
                 exitProjectEdit();
                 elements.projectOverviewModal.classList.remove('is-new');
+                if (window.CRMCompany) window.CRMCompany.refresh();
                 loadProjects();
                 refreshHome();
                 // Opened only to change something: done once it is saved.
@@ -5569,6 +5516,113 @@
             </div>
         `).join('');
         box.classList.add('visible');
+    }
+
+    // ---- A project's companies ---------------------------------------------
+    // Reading: the names, each opening its company. Editing: a chip per
+    // company and a field to find one, or to add a new one with Enter.
+
+    /** The companies of a project as links, or a quiet line without any. */
+    function companyLinks(project) {
+        const list = project.companies && project.companies.length
+            ? project.companies
+            : (project.company ? [{ id: '', name: project.company }] : []);
+        if (!list.length) return '<span class="detail-empty">No company assigned</span>';
+        return list.map(c => `<button type="button" class="ov-company-link" data-open-company="${escapeHtml(c.id)}" data-company-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</button>`)
+            .join('<span class="ov-company-sep">, </span>');
+    }
+
+    function renderProjectCompanyChips() {
+        const box = document.getElementById('projectEditCompanyChips');
+        if (!box) return;
+        const list = state.projectEditCompanies || [];
+        box.innerHTML = list.map((c, i) => `
+            <span class="ov-company-chip${c.id ? '' : ' is-new'}" title="${c.id ? '' : 'New company, created on save'}">
+                ${escapeHtml(c.name)}
+                <button type="button" class="ov-company-chip-x" data-remove-company="${i}" aria-label="Remove ${escapeHtml(c.name)}">&times;</button>
+            </span>`).join('');
+        elements.projectEditCompany.placeholder = list.length ? 'Add another' : 'Company';
+    }
+
+    /** Add a company by name: the known one of that name, or a new one. */
+    function addProjectCompany(name, id) {
+        const clean = String(name || '').trim().replace(/\s+/g, ' ');
+        if (!clean) return;
+        const list = state.projectEditCompanies || (state.projectEditCompanies = []);
+        const known = id ? { id: Number(id), name: clean } : (window.CRMCompany && window.CRMCompany.byName(clean));
+        const entry = known ? { id: Number(known.id), name: known.name } : { id: null, name: clean };
+        if (list.some(c => c.name.toLowerCase() === entry.name.toLowerCase())) return;
+        list.push(entry);
+        renderProjectCompanyChips();
+    }
+
+    /** What the sheet will save: the chips, plus a name still in the field. */
+    function projectCompaniesToSave() {
+        const pending = elements.projectEditCompany.value.trim();
+        if (pending) {
+            addProjectCompany(pending);
+            elements.projectEditCompany.value = '';
+        }
+        return state.projectEditCompanies || [];
+    }
+
+    function showProjectCompanySuggestions() {
+        const box = elements.projectEditCompanySuggestions;
+        const query = elements.projectEditCompany.value.trim().toLowerCase();
+        const taken = new Set((state.projectEditCompanies || []).map(c => c.name.toLowerCase()));
+        const all = window.CRMCompany && window.CRMCompany.cached ? window.CRMCompany.cached() : [];
+        const matches = query
+            ? all.filter(c => c.name.toLowerCase().includes(query) && !taken.has(c.name.toLowerCase())).slice(0, 8)
+            : [];
+        const exact = all.some(c => c.name.toLowerCase() === query);
+        const rows = matches.map(c => `
+            <div class="autocomplete-suggestion" data-company-id="${c.id}" data-company="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>`);
+        if (query && !exact && !taken.has(query)) {
+            rows.push(`<div class="autocomplete-suggestion is-new" data-company="${escapeHtml(elements.projectEditCompany.value.trim())}">New company “${escapeHtml(elements.projectEditCompany.value.trim())}”</div>`);
+        }
+        box.innerHTML = rows.join('');
+        box.classList.toggle('visible', rows.length > 0);
+    }
+
+    function bindProjectCompanyPicker() {
+        const input = elements.projectEditCompany;
+        const box = elements.projectEditCompanySuggestions;
+        const chips = document.getElementById('projectEditCompanyChips');
+        if (!input || !box) return;
+
+        input.addEventListener('focus', () => { if (window.CRMCompany) window.CRMCompany.list().catch(() => null); });
+        input.addEventListener('input', showProjectCompanySuggestions);
+        input.addEventListener('blur', () => setTimeout(() => box.classList.remove('visible'), 150));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const first = box.classList.contains('visible') ? box.querySelector('[data-company]') : null;
+                addProjectCompany(first ? first.dataset.company : input.value, first ? first.dataset.companyId : null);
+                input.value = '';
+                box.classList.remove('visible');
+            } else if (e.key === 'Backspace' && !input.value && (state.projectEditCompanies || []).length) {
+                state.projectEditCompanies.pop();
+                renderProjectCompanyChips();
+            }
+        });
+        box.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const item = e.target.closest('[data-company]');
+            if (!item) return;
+            addProjectCompany(item.dataset.company, item.dataset.companyId || null);
+            input.value = '';
+            box.classList.remove('visible');
+            input.focus();
+        });
+        if (chips) {
+            chips.addEventListener('click', (e) => {
+                const x = e.target.closest('[data-remove-company]');
+                if (!x) return;
+                state.projectEditCompanies.splice(Number(x.dataset.removeCompany), 1);
+                renderProjectCompanyChips();
+                input.focus();
+            });
+        }
     }
 
     function bindCompanyAutocomplete(input, box) {
@@ -6424,9 +6478,6 @@
         }
 
         // Company notes modal
-        elements.closeCompanyNotesModal.addEventListener('click', closeCompanyNotesModal);
-        elements.closeCompanyNotesBtn.addEventListener('click', closeCompanyNotesModal);
-        elements.companyNotesModal.querySelector('.modal-backdrop').addEventListener('click', closeCompanyNotesModal);
 
         // Allow Enter key in note textarea to add note (with Ctrl/Cmd)
         elements.newNoteContent.addEventListener('keydown', (e) => {
@@ -6648,7 +6699,7 @@
         }
 
         // Company autocomplete in the sheet's edit mode
-        bindCompanyAutocomplete(elements.projectEditCompany, elements.projectEditCompanySuggestions);
+        bindProjectCompanyPicker();
 
         // Project tag input
         if (elements.newProjectTagInput) {
@@ -6826,8 +6877,8 @@
                     }
                 } else if (elements.importExportModal.classList.contains('active')) {
                     closeImportExportModal();
-                } else if (elements.companyNotesModal.classList.contains('active')) {
-                    closeCompanyNotesModal();
+                } else if (window.CRMCompany && window.CRMCompany.isOpen()) {
+                    // companies.js handles its own sheet.
                 } else if (elements.overviewModal.classList.contains('active')) {
                     if (isEditingContact()) {
                         cancelContactEdit();
@@ -6931,6 +6982,9 @@
 
     // Expose functions globally for map popup buttons and onclick handlers
     window.CRM = {
+        closeOverview: closeOverviewModal,
+        closeProjectOverview: closeProjectOverview,
+        refreshContacts: () => loadContacts(),
         editContact: editContact,
         openOverview: openOverviewModal,
         openProjectOverview: openProjectOverview,

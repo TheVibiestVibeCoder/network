@@ -16,6 +16,8 @@ if (!defined('APP_ROOT')) {
     exit;
 }
 
+require_once APP_ROOT . '/includes/Company.php';
+
 class Contact
 {
     private PDO $db;
@@ -114,7 +116,9 @@ class Contact
             'actor_name2' => $actor['name'],
         ]);
 
-        return (int) $this->db->lastInsertId();
+        $id = (int) $this->db->lastInsertId();
+        Company::syncContact($this->db, $id, $data['company'] ?? null);
+        return $id;
     }
 
     /**
@@ -142,7 +146,7 @@ class Contact
 
         $actor = Auth::actor();
 
-        return $stmt->execute([
+        $ok = $stmt->execute([
             'id' => $id,
             'actor_id' => $actor['id'],
             'actor_name' => $actor['name'],
@@ -157,6 +161,8 @@ class Contact
             'website' => $data['website'] ?? null,
             'address' => $data['address'] ?? null,
         ]);
+        Company::syncContact($this->db, $id, $data['company'] ?? null);
+        return $ok;
     }
 
     /**
@@ -245,7 +251,9 @@ class Contact
                         'actor_name2' => $actor['name'],
                     ]);
 
-                    $createdIds[] = (int) $this->db->lastInsertId();
+                    $newId = (int) $this->db->lastInsertId();
+                    Company::syncContact($this->db, $newId, $data['company'] ?? null);
+                    $createdIds[] = $newId;
                     $successCount++;
                 } catch (Exception $e) {
                     // Keep the driver message server-side: it can echo the row

@@ -206,6 +206,15 @@
     --stage-progress: #1C7E7E;
     --stage-complete: #63A375;
 
+    /* Products (Project::PRODUCTS): the company blues for the two
+       briefings, the stage teal for SHIELD, the company green for the
+       whole package, grey for the rest. Always shown with their name. */
+    --product-workshop: #30599D;
+    --product-briefing: #1C3258;
+    --product-shield: #1C7E7E;
+    --product-combo: #63A375;
+    --product-other: #AAB5C5;
+
     /* Medium priority: a light orange of its own, apart from the warning
        colour. -ink is the same hue deep enough for text on -soft (AA). */
     --pri-medium: #D08440;
@@ -272,6 +281,12 @@
     --stage-proposal: #6C92D2;
     --stage-progress: #6BCAC9;
     --stage-complete: #63A375;
+
+    --product-workshop: #6C92D2;
+    --product-briefing: #A9BCE0;
+    --product-shield: #6BCAC9;
+    --product-combo: #7DC08F;
+    --product-other: #7E8A9E;
 
     --pri-medium: #EB9D5A;
     --pri-medium-ink: #EB9D5A;
@@ -12999,4 +13014,353 @@ textarea.form-input:focus,
     textarea:not(.compose-input) {
         font-size: 16px !important;
     }
+}
+
+
+/* ==========================================================================
+   44. Companies and products
+   The company sheet (#companyNotesModal, companies.js), a project's
+   companies in its sheet, and the product chip used wherever a project's
+   product shows.
+   ========================================================================== */
+
+#companyNotesModal:not(.is-editing) [data-ov="edit"],
+#companyNotesModal.is-editing [data-ov="view"] {
+    display: none !important;
+}
+
+[data-product] { --product-tone: var(--product-other); }
+[data-product="Workshop"] { --product-tone: var(--product-workshop); }
+[data-product="Risk Briefing"] { --product-tone: var(--product-briefing); }
+[data-product="SHIELD"] { --product-tone: var(--product-shield); }
+[data-product="RB & SHIELD"] { --product-tone: var(--product-combo); }
+
+.product-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--product-tone) 14%, var(--c-surface));
+    color: color-mix(in srgb, var(--product-tone) 72%, var(--c-ink));
+    font-size: var(--t-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.product-chip::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--product-tone);
+}
+
+/* A company name that opens its sheet. */
+.ov-company-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+    text-underline-offset: 3px;
+}
+
+.ov-company-link:hover {
+    color: var(--c-accent);
+    text-decoration-color: currentColor;
+}
+
+.ov-company-link:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.ov-company-sep { color: var(--c-ink-4); }
+
+/* Editing: the companies as chips in front of the field. */
+#projectOverviewModal .ov-company-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+#projectOverviewModal .ov-company-picker .form-input {
+    flex: 1 1 140px;
+    width: auto;
+    min-width: 120px;
+}
+
+.ov-company-chips {
+    display: contents;
+}
+
+.ov-company-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 4px 0 10px;
+    border-radius: 999px;
+    background: var(--c-tint-3);
+    font-size: var(--t-sm);
+    color: var(--c-ink-2);
+}
+
+.ov-company-chip.is-new {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+
+.ov-company-chip-x {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--c-ink-3);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ov-company-chip-x:hover { background: var(--c-tint-2, rgba(0, 0, 0, 0.06)); color: var(--c-ink); }
+
+.autocomplete-suggestion.is-new { color: var(--c-accent); }
+
+/* ---- The company sheet ---- */
+
+#companyNotesModal .overview-company a {
+    color: inherit;
+    text-decoration: none;
+}
+
+#companyNotesModal .overview-company a:hover { color: var(--c-accent); }
+
+.co-figures .detail-value.is-neg { color: var(--c-danger); }
+.co-figures .detail-value.is-warn { color: var(--pri-medium-ink, #9E5A12); }
+
+.co-fig-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-danger);
+}
+
+.co-products {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.co-list,
+.co-invoices,
+.co-years,
+.co-pairs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.co-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px 100px 140px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 8px;
+    border: 0;
+    border-bottom: 1px solid var(--c-line);
+    background: none;
+    font: inherit;
+    text-align: left;
+    color: var(--c-ink);
+    cursor: pointer;
+}
+
+.co-list li:last-child .co-row { border-bottom: 0; }
+.co-row:hover { background: var(--c-tint-3); }
+.co-row:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
+
+.co-row-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.co-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.co-row-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.co-row .project-stage-badge { justify-self: start; }
+
+.co-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.co-row-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink-2);
+}
+
+.co-row-amount.is-empty { color: var(--c-ink-4); }
+
+.co-years li {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 110px;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+}
+
+.co-year { font-weight: 600; color: var(--c-ink-2); }
+
+.co-year-bar {
+    height: 10px;
+    border-radius: 5px;
+    background: var(--c-tint-3);
+    overflow: hidden;
+}
+
+.co-year-bar span {
+    display: block;
+    height: 100%;
+    border-radius: 5px;
+    background: var(--c-accent);
+}
+
+.co-year-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.co-inv {
+    display: grid;
+    grid-template-columns: 92px 96px minmax(0, 1fr) auto 110px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--c-line);
+    font-size: var(--t-sm);
+}
+
+.co-inv:last-child { border-bottom: 0; }
+.co-inv-no { font-weight: 600; font-variant-numeric: tabular-nums; }
+.co-inv-date { color: var(--c-ink-3); }
+
+.co-inv-what {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--c-ink-2);
+}
+
+.co-inv-state { font-size: var(--t-xs); color: var(--c-ink-3); }
+.co-inv.is-overdue .co-inv-state { color: var(--c-danger); font-weight: 600; }
+.co-inv.is-open .co-inv-state { color: var(--c-accent); }
+
+.co-inv-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.co-pairs-hint {
+    margin: 0 0 6px;
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.co-danger {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.co-merge-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.co-merge-row .form-select { min-width: 220px; }
+
+/* Look-alike companies: the button beside the contacts' view switch, and
+   the list it opens - click the name to keep, or say they differ. */
+.co-similar-btn {
+    position: relative;
+}
+
+.co-similar-count {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--c-accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+.co-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--c-line);
+}
+
+.co-pair:last-child { border-bottom: 0; }
+
+.co-pair-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
+    background: var(--c-tint-3);
+    font: inherit;
+    text-align: left;
+    color: var(--c-ink);
+    cursor: pointer;
+}
+
+.co-pair-side:hover { background: var(--c-accent-soft); }
+.co-pair-side small { color: var(--c-ink-3); font-size: var(--t-xs); }
+
+@media (max-width: 640px) {
+    .co-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .co-row-product, .co-row-amount { display: none; }
+    .co-inv { grid-template-columns: 80px minmax(0, 1fr) 90px; }
+    .co-inv-date, .co-inv-state { display: none; }
+    .co-pair { grid-template-columns: 1fr; }
 }
