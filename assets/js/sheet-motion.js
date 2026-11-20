@@ -3,25 +3,27 @@
  *
  * On a desktop every .modal opens in the middle of the screen; this file
  * moves it there from the element that opened it - a project card, a to-do
- * row, a button - the box growing from that element's place and size while
- * its content fades in, and on closing goes back the same way (or, when that
- * element is gone, fades out in place).
+ * row, a button - and on closing back the same way (or, when that element
+ * is gone, fades it out in place).
+ *
+ * The box is never stretched. It stands at its full size and is revealed
+ * through a rounded window (a clip-path polygon) that starts as the clicked
+ * element's rectangle and opens to the whole box, while the box glides from
+ * the element's place to the middle. The window's corners are the box's own
+ * - radius and curve (the stylesheet's superellipse corners) - so they stay
+ * the same the whole way and nothing jumps at the end; nothing inside is
+ * distorted. Apple's ease-in-out, baked into the frames.
  *
  * Nothing that opens or closes a modal needs to know: it watches every
- * .modal's "active" class. On phones the sheets keep rising from the
- * bottom (design.css), and with reduced motion nothing moves.
+ * .modal's "active" class. On phones the sheets keep rising from the bottom
+ * (design.css), and with reduced motion nothing moves.
  */
 (function () {
     'use strict';
 
-    // Apple's ease-in-out (UIKit / SwiftUI .easeInOut): a soft start and a
-    // soft landing, both ways; a little longer on the way in, as the sheet
-    // covers more ground then.
     const EASE = 'cubic-bezier(0.42, 0, 0.58, 1)';
-    const OPEN_MS = 420;
-    const CLOSE_MS = 350;
-    const EASE_OPEN = EASE;
-    const EASE_CLOSE = EASE;
+    const OPEN_MS = 320;
+    const CLOSE_MS = 260;
 
     const desktop = window.matchMedia('(min-width: 769px)');
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -54,13 +56,23 @@
         return { el: last.el, rect };
     }
 
-    function mapping(from, to) {
-        return {
-            dx: (from.left + from.width / 2) - (to.left + to.width / 2),
-            dy: (from.top + from.height / 2) - (to.top + to.height / 2),
-            sx: Math.max(0.04, from.width / to.width),
-            sy: Math.max(0.04, from.height / to.height)
-        };
+    const onScreen = r => r && r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < window.innerHeight;
+
+    function radiusOf(box) {
+        const r = parseFloat(getComputedStyle(box).borderTopLeftRadius);
+        return Number.isFinite(r) ? r : 16;
+    }
+
+    /**
+     * The corners' exponent: the stylesheet draws them as superellipses
+     * (corner-shape: superellipse(K), exponent 2^K) where the browser can,
+     * else as plain arcs (2).
+     */
+    function cornerExponent(box) {
+        const shape = getComputedStyle(box).getPropertyValue('corner-shape') || '';
+        const m = /superellipse\(\s*([-\d.]+)\s*\)/.exec(shape);
+        if (m) return Math.pow(2, Number(m[1]));
+        return /squircle/.test(shape) ? 4 : 2;
     }
 
     /** cubic-bezier(x1, y1, x2, y2) as a function of time, 0..1 -> 0..1. */
@@ -82,33 +94,76 @@
     }
     const easeInOut = bezier(0.42, 0, 0.58, 1);
 
+    const CORNER_POINTS = 10;
+
     /**
-     * The box's way from rectangle `from` to its place `to` (or back), frame
-     * by frame with Apple's ease-in-out baked in, so the corners can be
-     * counter-scaled at every step: the radius on screen stays the same while
-     * the box stretches unevenly.
+     * A rounded rectangle as a polygon, its corners the same curve the
+     * browser draws (|x|^n + |y|^n = 1 over the radius): rectangle `w` x `h`
+     * at (x, y) inside the box. Always the same number of points, so one
+     * shape can turn into the next.
      */
-    function morph(from, to, radius, back) {
-        const m = mapping(from, to);
-        const frames = [];
-        const N = 30;
-        for (let i = 0; i <= N; i++) {
-            const e = easeInOut(i / N);
-            const k = back ? e : 1 - e; // how far from the box's own place
-            const sx = 1 + (m.sx - 1) * k;
-            const sy = 1 + (m.sy - 1) * k;
-            frames.push({
-                offset: i / N,
-                transform: `translate(${(m.dx * k).toFixed(2)}px, ${(m.dy * k).toFixed(2)}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`,
-                borderRadius: `${(radius / sx).toFixed(2)}px / ${(radius / sy).toFixed(2)}px`
-            });
-        }
-        return frames;
+    function roundedRect(x, y, w, h, radius, n) {
+        const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+        const pts = [];
+        const corner = (cx, cy, sx, sy, from) => {
+            for (let i = 0; i <= CORNER_POINTS; i++) {
+                const t = (from + i / CORNER_POINTS) * Math.PI / 2;
+                const ex = Math.pow(Math.abs(Math.cos(t)), 2 / n);
+                const ey = Math.pow(Math.abs(Math.sin(t)), 2 / n);
+                pts.push(`${(cx + sx * r * ex).toFixed(2)}px ${(cy + sy * r * ey).toFixed(2)}px`);
+            }
+        };
+        corner(x + r, y + r, -1, -1, 0);         // top left: from the left edge up to the top
+        corner(x + w - r, y + r, 1, -1, 0);      // top right
+        corner(x + w - r, y + h - r, 1, 1, 0);   // bottom right
+        corner(x + r, y + h - r, -1, 1, 0);      // bottom left
+        // Each corner from its horizontal to its vertical point, in turn.
+        return `polygon(${orderCorners(pts).join(', ')})`;
     }
 
-    function radiusOf(box) {
-        const r = parseFloat(getComputedStyle(box).borderTopLeftRadius);
-        return Number.isFinite(r) ? r : 16;
+    /** The four corners' points so the outline runs once around, clockwise. */
+    function orderCorners(pts) {
+        const k = CORNER_POINTS + 1;
+        const tl = pts.slice(0, k);              // (left, y) .. (x, top) when walked backwards
+        const tr = pts.slice(k, 2 * k);
+        const br = pts.slice(2 * k, 3 * k);
+        const bl = pts.slice(3 * k, 4 * k);
+        // tl runs from the left edge (t=0) to the top (t=90deg): left edge first is right for clockwise.
+        // tr runs from the right edge to the top: reverse it, top first.
+        // br runs from the right edge to the bottom: right edge first.
+        // bl runs from the left edge to the bottom: reverse it, bottom first.
+        return tl.concat(tr.slice().reverse(), br, bl.slice().reverse());
+    }
+
+    /**
+     * The box's way between rectangle `from` (the clicked element) and its
+     * own place `box`, frame by frame with Apple's ease-in-out baked in: it
+     * glides so its middle moves from the element's to its own, and is cut
+     * to a rounded window that grows from the element's size to its own -
+     * corners the box's own radius and curve all the way, so nothing jumps
+     * when the window is gone.
+     */
+    function frames(from, box, radius, n, closing) {
+        const W = box.width;
+        const H = box.height;
+        const w0 = Math.min(from.width, W);
+        const h0 = Math.min(from.height, H);
+        const tx0 = (from.left + from.width / 2) - (box.left + W / 2);
+        const ty0 = (from.top + from.height / 2) - (box.top + H / 2);
+        const out = [];
+        const N = 24;
+        for (let i = 0; i <= N; i++) {
+            const e = easeInOut(i / N);
+            const k = closing ? e : 1 - e; // how far towards the element
+            const w = W + (w0 - W) * k;
+            const h = H + (h0 - H) * k;
+            out.push({
+                offset: i / N,
+                transform: `translate(${(tx0 * k).toFixed(2)}px, ${(ty0 * k).toFixed(2)}px)`,
+                clipPath: roundedRect((W - w) / 2, (H - h) / 2, w, h, radius, n)
+            });
+        }
+        return out;
     }
 
     function stopAll(s) {
@@ -118,14 +173,13 @@
     }
 
     /**
-     * While it moves: the box on its own layer, and the element it grows out
-     * of hidden - the card becomes the sheet, rather than a sheet coming out
-     * of a card that stays. Put back when it is done.
+     * While it moves: the element it grows out of hidden - the card becomes
+     * the sheet, rather than a sheet coming out of a card that stays.
      */
     function lift(s, box, origin) {
         settle(s);
-        box.style.willChange = 'transform, opacity';
         s.box = box;
+        box.style.willChange = 'transform, clip-path';
         if (origin && origin.style) {
             s.hidden = origin;
             s.hiddenWas = origin.style.visibility;
@@ -151,29 +205,33 @@
         state.set(modal, s);
         if (!enabled()) return;
 
-        const to = box.getBoundingClientRect();
-        const parts = Array.from(box.children);
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
-        if (backdrop) {
-            s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS, easing: EASE }));
-        }
+        if (backdrop) s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS, easing: EASE }));
+        const parts = Array.from(box.children);
+
         if (origin) {
+            const way = frames(origin.rect, box.getBoundingClientRect(), radiusOf(box), cornerExponent(box), false);
             lift(s, box, origin.el);
-            const grow = box.animate(morph(origin.rect, to, radiusOf(box), false), { duration: OPEN_MS, easing: 'linear' });
+            // The window would cut the box's shadow: it comes in at the end.
+            const shadow = getComputedStyle(box).boxShadow;
+            const grow = box.animate(way, { duration: OPEN_MS, easing: 'linear' });
             s.anims.push(grow);
-            // The content comes in once the box has nearly its size, rising a little.
+            // The content once the window is wide enough for it.
             parts.forEach(part => s.anims.push(part.animate([
-                { opacity: 0, transform: 'translateY(6px)' },
-                { opacity: 0, transform: 'translateY(6px)', offset: 0.3 },
-                { opacity: 1, transform: 'none' }
+                { opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }
             ], { duration: OPEN_MS, easing: EASE })));
-            grow.onfinish = () => settle(s);
+            grow.onfinish = () => {
+                settle(s);
+                if (shadow && shadow !== 'none') {
+                    s.anims.push(box.animate([{ boxShadow: 'none' }, { boxShadow: shadow }], { duration: 140, easing: EASE }));
+                }
+            };
         } else {
             lift(s, box, null);
             const appear = box.animate([
-                { transform: 'translateY(12px) scale(0.97)', opacity: 0 },
+                { transform: 'translateY(10px) scale(0.98)', opacity: 0 },
                 { transform: 'none', opacity: 1 }
-            ], { duration: OPEN_MS, easing: EASE_OPEN });
+            ], { duration: OPEN_MS, easing: EASE });
             s.anims.push(appear);
             appear.onfinish = () => settle(s);
         }
@@ -188,22 +246,25 @@
 
         // Shown a moment longer, for the way back.
         modal.classList.add('is-closing');
-        const from = box.getBoundingClientRect();
         const target = s.origin && s.origin.isConnected ? s.origin.getBoundingClientRect() : null;
-        const back = target && target.width > 1 && target.height > 1 && target.bottom > 0 && target.top < window.innerHeight
-            ? target : null;
+        const back = onScreen(target) ? target : null;
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
 
-        lift(s, box, back ? s.origin : null);
-        const main = back
-            ? box.animate(morph(back, from, radiusOf(box), true), { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' })
-            : box.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.97)', opacity: 0 }],
-                { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' });
+        let main;
+        if (back) {
+            const way = frames(back, box.getBoundingClientRect(), radiusOf(box), cornerExponent(box), true);
+            lift(s, box, s.origin);
+            main = box.animate(way, { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' });
+            // The content leaves first, so only the box goes back into the card.
+            Array.from(box.children).forEach(part => s.anims.push(part.animate([
+                { opacity: 1 }, { opacity: 0, offset: 0.4 }, { opacity: 0 }
+            ], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })));
+        } else {
+            lift(s, box, null);
+            main = box.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.98)', opacity: 0 }],
+                { duration: CLOSE_MS, easing: EASE, fill: 'forwards' });
+        }
         s.anims.push(main);
-        // The content leaves first, so only the box goes back into the card.
-        Array.from(box.children).forEach(part => s.anims.push(part.animate([
-            { opacity: 1 }, { opacity: 0, offset: 0.35 }, { opacity: 0 }
-        ], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })));
         if (backdrop) {
             s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' }));
         }
