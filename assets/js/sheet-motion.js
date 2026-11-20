@@ -14,11 +14,14 @@
 (function () {
     'use strict';
 
-    // A long, soft landing on the way in; a quick, decided way out.
-    const OPEN_MS = 520;
-    const CLOSE_MS = 340;
-    const EASE_OPEN = 'cubic-bezier(0.16, 1, 0.3, 1)';
-    const EASE_CLOSE = 'cubic-bezier(0.55, 0, 0.75, 0.15)';
+    // Apple's ease-in-out (UIKit / SwiftUI .easeInOut): a soft start and a
+    // soft landing, both ways; a little longer on the way in, as the sheet
+    // covers more ground then.
+    const EASE = 'cubic-bezier(0.42, 0, 0.58, 1)';
+    const OPEN_MS = 420;
+    const CLOSE_MS = 350;
+    const EASE_OPEN = EASE;
+    const EASE_CLOSE = EASE;
 
     const desktop = window.matchMedia('(min-width: 769px)');
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -104,7 +107,7 @@
         const parts = Array.from(box.children);
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
         if (backdrop) {
-            s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS * 0.6, easing: 'ease-out' }));
+            s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS, easing: EASE }));
         }
         if (origin) {
             lift(s, box, origin.el);
@@ -118,14 +121,14 @@
                 { opacity: 0, transform: 'translateY(6px)' },
                 { opacity: 0, transform: 'translateY(6px)', offset: 0.3 },
                 { opacity: 1, transform: 'none' }
-            ], { duration: OPEN_MS, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' })));
+            ], { duration: OPEN_MS, easing: EASE })));
             grow.onfinish = () => settle(s);
         } else {
             lift(s, box, null);
             const appear = box.animate([
                 { transform: 'translateY(12px) scale(0.97)', opacity: 0 },
                 { transform: 'none', opacity: 1 }
-            ], { duration: 320, easing: EASE_OPEN });
+            ], { duration: OPEN_MS, easing: EASE_OPEN });
             s.anims.push(appear);
             appear.onfinish = () => settle(s);
         }
@@ -150,14 +153,14 @@
         const main = box.animate(back
             ? [{ transform: 'none' }, { transform: onto(back, from) }]
             : [{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.97)', opacity: 0 }],
-        { duration: back ? CLOSE_MS : 220, easing: back ? EASE_CLOSE : 'ease-in', fill: 'forwards' });
+        { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' });
         s.anims.push(main);
         // The content leaves first, so only the box goes back into the card.
         Array.from(box.children).forEach(part => s.anims.push(part.animate([
             { opacity: 1 }, { opacity: 0, offset: 0.35 }, { opacity: 0 }
-        ], { duration: CLOSE_MS, easing: 'ease-out', fill: 'forwards' })));
+        ], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' })));
         if (backdrop) {
-            s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, easing: 'ease-in', fill: 'forwards' }));
+            s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' }));
         }
         main.onfinish = () => {
             if (modal.classList.contains('active')) return;
