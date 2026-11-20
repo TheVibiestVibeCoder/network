@@ -1031,31 +1031,45 @@
             html += renderPinnedSection(pinnedContacts);
         }
 
-        // Group unpinned contacts by company
+        // The companies first: one row each, its people folded under it.
+        // Companies without anyone in the list show too, so the list is
+        // the companies; a search opens every group it found people in.
         const grouped = groupContactsByCompany(unpinnedContacts);
+        const shown = new Set(grouped.filter(g => g.company).map(g => g.company.toLowerCase()));
+        const query = (state.searchQuery || '').trim().toLowerCase();
+        const empty = (window.CRMCompany ? window.CRMCompany.cached() : [])
+            .filter(c => !shown.has(c.name.toLowerCase()) && (!query || c.name.toLowerCase().includes(query)))
+            .map(c => ({ company: c.name, companyId: c.id, contacts: [] }));
+        const withCompany = grouped.filter(g => g.company).concat(empty);
+        if (state.sortField === 'company' || empty.length) {
+            const desc = state.sortField === 'company' && state.sortOrder === 'DESC';
+            withCompany.sort((a, b) => (desc ? -1 : 1) * a.company.localeCompare(b.company, 'de', { sensitivity: 'base' }));
+        }
+        const groups = withCompany.concat(grouped.filter(g => !g.company));
+        const ICON_CHEVRON = '<svg class="company-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+        const ICON_BUILDING = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>';
+        const ICON_PERSON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
 
-        grouped.forEach(group => {
-            if (group.company) {
-                // Company group with header
-                html += `<div class="company-group">`;
-                html += `<div class="company-header" data-company="${escapeHtml(group.company)}" title="Klicken für Firmen-Notizen">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="10" height="17" rx="1.5"/><path d="M14 9.5h4.5A1.5 1.5 0 0 1 20 11v9.5"/><path d="M3 20.5h18"/><path d="M7.5 7.5h3M7.5 11h3M7.5 14.5h3"/></svg>
-                    <span>${escapeHtml(group.company)}</span>
-                    <span class="company-count">${group.contacts.length}</span>
-                </div>`;
-                html += group.contacts.map(contact => createContactCard(contact, true)).join('');
-                html += `</div>`;
-            } else {
-                // Contacts without company get their own section for cleaner visual rhythm
-                html += `<div class="company-group company-group--ungrouped">`;
-                html += `<div class="company-header company-header--muted">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
-                    <span>No Company</span>
-                    <span class="company-count">${group.contacts.length}</span>
-                </div>`;
-                html += group.contacts.map(contact => createContactCard(contact, false)).join('');
-                html += `</div>`;
+        groups.forEach(group => {
+            const key = group.company ? group.company.toLowerCase() : '__none';
+            const people = group.contacts.length;
+            const open = people > 0 && (query ? true : openCompanyGroups().has(key));
+            const known = group.company && window.CRMCompany ? window.CRMCompany.byName(group.company) : null;
+            const companyId = group.companyId || (known && known.id) || '';
+            html += `<div class="company-group${open ? ' is-open' : ''}${group.company ? '' : ' company-group--ungrouped'}">`;
+            html += `<div class="company-header${people ? ' is-foldable' : ''}${group.company ? '' : ' company-header--muted'}" data-company-fold="${escapeHtml(key)}"
+                ${people ? `role="button" tabindex="0" aria-expanded="${open}"` : ''}>
+                ${people ? ICON_CHEVRON : '<span class="company-chevron-space"></span>'}
+                ${group.company ? ICON_BUILDING : ICON_PERSON}
+                ${group.company
+                    ? `<button type="button" class="company-name" data-open-company="${escapeHtml(companyId)}" data-company-name="${escapeHtml(group.company)}" title="Open ${escapeHtml(group.company)}">${escapeHtml(group.company)}</button>`
+                    : '<span class="company-name">No company</span>'}
+                <span class="company-count" title="${people === 1 ? '1 contact' : people + ' contacts'}">${people}</span>
+            </div>`;
+            if (open) {
+                html += group.contacts.map(contact => createContactCard(contact, !!group.company)).join('');
             }
+            html += `</div>`;
         });
 
         elements.contactsList.innerHTML = html;
@@ -1212,15 +1226,27 @@
             });
         });
 
-        // Add click handlers to company headers - open company notes modal
-        elements.contactsList.querySelectorAll('.company-header').forEach(header => {
+        // A company's row folds its people in and out; its name opens the
+        // company (companies.js handles [data-open-company]).
+        elements.contactsList.querySelectorAll('.company-header.is-foldable').forEach(header => {
+            const toggle = () => {
+                const key = header.dataset.companyFold;
+                const set = openCompanyGroups();
+                if (set.has(key)) set.delete(key); else set.add(key);
+                saveOpenCompanyGroups(set);
+                renderContactsListByCompany();
+                const again = elements.contactsList.querySelector(`[data-company-fold="${CSS.escape(key)}"]`);
+                if (again) again.focus();
+            };
             header.addEventListener('click', (e) => {
+                if (e.target.closest('[data-open-company]')) return;
                 e.stopPropagation();
-                const company = header.dataset.company;
-                if (!company) {
-                    return;
-                }
-                if (window.CRMCompany) window.CRMCompany.open(company);
+                toggle();
+            });
+            header.addEventListener('keydown', (e) => {
+                if (e.target !== header || (e.key !== 'Enter' && e.key !== ' ')) return;
+                e.preventDefault();
+                toggle();
             });
         });
 
@@ -1254,6 +1280,25 @@
                 confirmDeleteTag(tagId, tagName);
             });
         });
+    }
+
+    // Which companies' people are unfolded in the contacts list, kept in
+    // this browser: lower-case names, '__none' for the contacts without one.
+    const OPEN_COMPANIES_KEY = 'crm.contacts.openCompanies';
+    let openCompaniesCache = null;
+    function openCompanyGroups() {
+        if (!openCompaniesCache) {
+            try {
+                openCompaniesCache = new Set(JSON.parse(localStorage.getItem(OPEN_COMPANIES_KEY) || '[]'));
+            } catch (e) {
+                openCompaniesCache = new Set();
+            }
+        }
+        return openCompaniesCache;
+    }
+    function saveOpenCompanyGroups(set) {
+        openCompaniesCache = set;
+        try { localStorage.setItem(OPEN_COMPANIES_KEY, JSON.stringify(Array.from(set))); } catch (e) { /* this visit only */ }
     }
 
     /**
@@ -7028,6 +7073,13 @@
     }
 
     // Expose functions globally for map popup buttons and onclick handlers
+    // The companies arrived or changed: the contacts list shows them all.
+    document.addEventListener('crm:companies-changed', () => {
+        if (state.currentView === 'list' && state.contactsMode !== 'map' && state.groupBy !== 'tags' && state.contacts) {
+            renderContactsListByCompany();
+        }
+    });
+
     window.CRM = {
         closeOverview: closeOverviewModal,
         closeProjectOverview: closeProjectOverview,

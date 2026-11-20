@@ -13825,3 +13825,89 @@ textarea.form-input:focus,
     text-align: left;
     white-space: nowrap;
 }
+
+/* ---- Contacts: the companies, each folding its people in and out ---- */
+
+#listView .company-header.is-foldable,
+#listView .company-header {
+    padding: 10px 16px;
+    min-height: 46px;
+}
+
+#listView .company-group.is-open .company-header {
+    padding-bottom: 4px;
+}
+
+#listView .company-header:not(.is-foldable) {
+    cursor: default;
+}
+
+#listView .company-header:not(.is-foldable):hover {
+    background: transparent;
+}
+
+#listView .company-header.is-foldable:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+}
+
+#listView .company-header .company-chevron {
+    width: 14px;
+    height: 14px;
+    color: var(--c-ink-4);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+#listView .company-group.is-open .company-chevron {
+    transform: rotate(90deg);
+}
+
+#listView .company-chevron-space {
+    width: 14px;
+    flex: none;
+}
+
+#listView .company-name {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--t-md);
+    font-weight: 600;
+    color: var(--c-ink);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#listView button.company-name {
+    cursor: pointer;
+}
+
+#listView button.company-name:hover {
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+#listView button.company-name:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+#listView .company-header--muted .company-name {
+    color: var(--c-ink-3);
+}
+
+#listView .company-group:not(.is-open) .company-count {
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+}
+
+/* The people under an unfolded company start under its name. */
+#listView .company-group.is-open > .contact-card {
+    padding-left: 54px;
+}

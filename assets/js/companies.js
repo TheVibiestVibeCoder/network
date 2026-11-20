@@ -780,7 +780,7 @@
 
     function boot() {
         bind();
-        list().catch(() => null);
+        list().then(() => document.dispatchEvent(new CustomEvent('crm:companies-changed'))).catch(() => null);
         loadSimilar();
     }
 
