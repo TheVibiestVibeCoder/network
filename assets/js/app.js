@@ -4482,6 +4482,15 @@
             `).join('');
     }
 
+    /** The Stage / Product switch shows which grouping is on; neither for another order. */
+    function syncProjectGroupSwitch() {
+        document.querySelectorAll('[data-project-group]').forEach(btn => {
+            const on = btn.dataset.projectGroup === state.projectSortField;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', String(on));
+        });
+    }
+
     /** A project's product as a small chip, or nothing. */
     function productChip(product) {
         return product ? `<span class="product-chip" data-product="${escapeHtml(product)}">${escapeHtml(product)}</span>` : '';
@@ -6836,9 +6845,21 @@
             elements.projectSortField.value = state.projectSortField;
             elements.projectSortField.addEventListener('change', () => {
                 state.projectSortField = elements.projectSortField.value;
+                syncProjectGroupSwitch();
                 loadProjects();
             });
         }
+
+        // Stage / Product in the title bar: the two groupings, one click away.
+        document.querySelectorAll('[data-project-group]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                state.projectSortField = btn.dataset.projectGroup;
+                if (elements.projectSortField) elements.projectSortField.value = state.projectSortField;
+                syncProjectGroupSwitch();
+                loadProjects();
+            });
+        });
+        syncProjectGroupSwitch();
 
 
         // Project sort order toggle

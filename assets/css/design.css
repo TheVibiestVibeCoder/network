@@ -14128,3 +14128,16 @@ textarea.form-input:focus,
 .title-tag.is-stage.stage-complete { --stage-tone: var(--stage-complete); }
 
 .project-row-main .title-tag { margin-left: 0; flex: none; vertical-align: 0; }
+
+/* Stage / Product in the projects' title bar. */
+.project-group-switch .segmented-btn {
+    padding: 0 12px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+}
+
+.project-group-switch .segmented-btn.active { font-weight: 600; }
+
+@media (max-width: 640px) {
+    .project-group-switch .segmented-btn { padding: 0 9px; }
+}

@@ -1505,6 +1505,11 @@ function assetUrl(string $path): string
                                 <input type="text" id="searchProjectsInput" placeholder="Search projects..." class="search-input">
                             </div>
                             <div class="list-header-actions">
+                                <!-- Grouped by stage or by product; the other orders are under Filters -->
+                                <div class="segmented project-group-switch" role="group" aria-label="Group projects by">
+                                    <button type="button" class="segmented-btn active" data-project-group="stage" aria-pressed="true" title="Group by stage">Stage</button>
+                                    <button type="button" class="segmented-btn" data-project-group="product" aria-pressed="false" title="Group by product">Product</button>
+                                </div>
                                 <!-- Cards or a list; kept per account (UserPrefs, app.js) -->
                                 <div class="segmented project-view-switch" role="group" aria-label="Show projects as">
                                     <button type="button" class="segmented-btn<?= $projectView === 'cards' ? ' active' : '' ?>" data-project-view-btn="cards" aria-pressed="<?= $projectView === 'cards' ? 'true' : 'false' ?>" title="Cards">
