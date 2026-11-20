@@ -173,57 +173,199 @@
         return (min + max) / 2;
     }
 
+    const STAGE_ORDER = ['Complete', 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
+    const stageClass = stage => String(stage || 'Lead').toLowerCase().replace(/ /g, '-');
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
     /**
-     * The figures on top. From the projects for everyone; from our invoices
-     * for whoever can see Financials, once they are read.
+     * The head of the sheet: the one number that says what the company is
+     * worth to us - what we invoiced (admins), otherwise the budgets won -
+     * with its share of all we invoiced as a ring.
      */
-    function figures() {
+    function heroHtml() {
         const c = state.company;
         const projects = c.projects || [];
-        const won = projects.filter(p => WON.includes(p.stage));
-        const open = projects.filter(p => OPEN.includes(p.stage));
-        const running = projects.filter(p => RUNNING.includes(p.stage)).length;
-        const pipeline = open.reduce((s, p) => s + budgetMid(p) * (Number(p.success_chance) || 0) / 100, 0);
-        const wonBudget = won.reduce((s, p) => s + budgetMid(p), 0);
         const inv = state.invoices && state.invoices.stats;
-
-        const items = [];
-        items.push({ label: 'Projects', value: projects.length ? `${projects.length}${running ? ` (${running} running)` : ''}` : '' });
-        if (inv && inv.count) {
-            items.push({ label: 'Invoiced', value: euro(inv.net), title: `${plural(inv.count, 'invoice')}, net` });
-        } else {
-            items.push({ label: 'Won', value: wonBudget ? euro(wonBudget) : '', title: 'Budgets of the projects complete or in progress' });
+        const won = projects.filter(p => WON.includes(p.stage)).reduce((s, p) => s + budgetMid(p), 0);
+        const invoiced = inv && inv.count;
+        const value = invoiced ? inv.net : won;
+        const sub = invoiced
+            ? `invoiced, net${inv.since ? `, since ${window.CRMFormat.month(inv.since)}` : ''}`
+            : 'won, by the projects\' budgets';
+        let ring = '';
+        if (invoiced && inv.share !== null) {
+            const pct = Math.max(0, Math.min(1, inv.share));
+            const r = 30;
+            const len = 2 * Math.PI * r;
+            ring = `
+                <div class="co-ring" title="${esc(Math.round(pct * 100) + '% of everything we invoiced, net')}">
+                    <svg viewBox="0 0 76 76" width="76" height="76" aria-hidden="true">
+                        <circle cx="38" cy="38" r="${r}" class="co-ring-track"/>
+                        <circle cx="38" cy="38" r="${r}" class="co-ring-value" stroke-dasharray="${(len * pct).toFixed(1)} ${len.toFixed(1)}" transform="rotate(-90 38 38)"/>
+                    </svg>
+                    <span class="co-ring-text"><strong>${esc(pct < 0.01 && pct > 0 ? '<1' : Math.round(pct * 100))}%</strong></span>
+                    <span class="co-ring-label">of our revenue</span>
+                </div>`;
         }
-        items.push({ label: 'Pipeline', value: pipeline ? euro(pipeline) : '', title: 'Open projects: budget × chance' });
-        if (inv && inv.count) {
-            items.push({ label: 'Customer since', value: inv.since ? window.CRMFormat.month(inv.since) : '' });
-            items.push({
-                label: 'Pays in',
-                value: inv.avgDays === null ? '' : plural(Math.round(inv.avgDays), 'day'),
-                title: inv.avgDays === null ? '' : `On average from the invoice date, over ${plural(inv.paidCount, 'paid invoice')}`
-                    + (inv.lateCount ? `; ${inv.lateCount} paid after the due date` : ''),
-                cls: inv.avgLate > 0 ? 'is-warn' : ''
-            });
-            items.push({
-                label: 'Open',
-                value: inv.open > 0.005 ? euro(inv.open) : '',
-                sub: inv.overdue > 0.005 ? `${euro(inv.overdue)} overdue` : '',
-                cls: inv.overdue > 0.005 ? 'is-neg' : ''
-            });
-            if (inv.share !== null) {
-                items.push({ label: 'Share of revenue', value: `${Math.round(inv.share * 100)}%`, title: 'Of everything we invoiced, net' });
-            }
-        }
-        return items;
-    }
-
-    function figureHtml(f) {
         return `
-            <div class="overview-detail-item"${f.title ? ` title="${esc(f.title)}"` : ''}>
-                <span class="detail-label">${esc(f.label)}</span>
-                <span class="detail-value ${f.cls || ''}${f.value ? '' : ' detail-empty'}">${f.value ? esc(f.value) : '–'}${f.sub ? `<small class="co-fig-sub">${esc(f.sub)}</small>` : ''}</span>
+            <div class="co-hero">
+                <div class="co-hero-main">
+                    <span class="co-hero-value">${value ? esc(euro(value)) : '–'}</span>
+                    <span class="co-hero-sub">${esc(sub)}</span>
+                </div>
+                ${ring}
             </div>`;
     }
+
+    /** A soft tile: label, figure, a small picture of it and a line under it. */
+    function tile(t) {
+        return `
+            <div class="co-tile${t.tone ? ' ' + t.tone : ''}"${t.title ? ` title="${esc(t.title)}"` : ''}>
+                <span class="co-tile-label">${esc(t.label)}</span>
+                <strong class="co-tile-value">${t.value ? esc(t.value) : '–'}</strong>
+                ${t.graphic || ''}
+                <small class="co-tile-sub">${t.subHtml || esc(t.sub || '')}</small>
+            </div>`;
+    }
+
+    /** A bar of parts side by side: [{ n, cls?, attr?, title }]. */
+    function partsBar(parts) {
+        const total = parts.reduce((s, p) => s + p.n, 0);
+        if (!total) return '<span class="co-bar is-empty"></span>';
+        return `<span class="co-bar">${parts.filter(p => p.n > 0).map(p => `
+            <span class="co-bar-part ${p.cls || ''}" ${p.attr || ''} style="flex-grow:${p.n}" title="${esc(p.title)}"></span>`).join('')}</span>`;
+    }
+
+    function tiles() {
+        const c = state.company;
+        const projects = c.projects || [];
+        const inv = state.invoices && state.invoices.stats;
+        const items = (state.invoices && state.invoices.items) || [];
+        const out = [];
+
+        // How it pays: on time against late, over its paid invoices.
+        if (inv && inv.count) {
+            const paid = items.filter(i => !i.credit && i.paid && i.paid.date && i.due);
+            const late = paid.filter(i => i.paid.date > i.due).length;
+            const onTime = paid.length - late;
+            out.push({
+                label: 'Pays in',
+                value: inv.avgDays === null ? '' : plural(Math.round(inv.avgDays), 'day'),
+                title: inv.avgDays === null ? 'Nothing paid yet' : `On average from the invoice date, over ${plural(inv.paidCount, 'paid invoice')}`,
+                graphic: paid.length ? partsBar([
+                    { n: onTime, cls: 'is-good', title: `${onTime} on time` },
+                    { n: late, cls: 'is-late', title: `${late} late${inv.avgLate ? `, ${Math.round(inv.avgLate)} days on average` : ''}` }
+                ]) : '',
+                sub: paid.length ? (late ? `${onTime} on time, ${late} late` : 'always on time') : ''
+            });
+            out.push({
+                label: 'Open',
+                value: inv.open > 0.005 ? euro(inv.open) : '',
+                tone: inv.overdue > 0.005 ? 'is-neg' : '',
+                graphic: inv.open > 0.005 ? partsBar([
+                    { n: inv.open - inv.overdue, cls: 'is-open', title: `${euro(inv.open - inv.overdue)} not due yet` },
+                    { n: inv.overdue, cls: 'is-late', title: `${euro(inv.overdue)} overdue` }
+                ]) : '',
+                sub: inv.overdue > 0.005 ? `${euro(inv.overdue)} overdue` : (inv.open > 0.005 ? 'not due yet' : 'nothing open')
+            });
+        } else {
+            const won = projects.filter(p => WON.includes(p.stage));
+            out.push({ label: 'Won', value: won.length ? plural(won.length, 'project') : '', sub: 'complete or in progress' });
+        }
+
+        // Projects, by stage, and what the open ones are worth.
+        const open = projects.filter(p => OPEN.includes(p.stage));
+        const pipeline = open.reduce((s, p) => s + budgetMid(p) * (Number(p.success_chance) || 0) / 100, 0);
+        const byStage = STAGE_ORDER.map(st => ({ st, n: projects.filter(p => (p.stage || 'Lead') === st).length }));
+        out.push({
+            label: 'Projects',
+            value: projects.length ? String(projects.length) : '',
+            graphic: projects.length ? partsBar(byStage.map(x => ({
+                n: x.n, cls: 'is-stage', attr: `data-stage="${esc(stageClass(x.st))}"`, title: `${x.n} ${x.st}`
+            }))) : '',
+            title: byStage.filter(x => x.n).map(x => `${x.n} ${x.st.toLowerCase()}`).join(', '),
+            sub: projects.length ? `${projects.filter(p => WON.includes(p.stage)).length} won, ${open.length} open` : ''
+        });
+        const openBudget = open.reduce((s, p) => s + budgetMid(p), 0);
+        out.push({
+            label: 'Pipeline',
+            value: pipeline ? euro(pipeline) : '',
+            title: `Open projects: budget × chance. ${euro(openBudget)} if all are won`,
+            graphic: openBudget ? partsBar([
+                { n: pipeline, cls: 'is-paid', title: `${euro(pipeline)} weighted by chance` },
+                { n: openBudget - pipeline, cls: 'is-open', title: `${euro(openBudget)} if all are won` }
+            ]) : '',
+            sub: open.length ? `of ${euro(openBudget)} open` : 'nothing open'
+        });
+        return `<div class="co-tiles">${out.map(tile).join('')}</div>`;
+    }
+
+    /**
+     * Invoiced per month (per year once it spans more than two years): a
+     * bar per period, paid in blue, open in light blue, overdue in red.
+     */
+    function invoiceChart() {
+        const items = ((state.invoices && state.invoices.items) || []).filter(i => i.date);
+        if (!items.length) return '';
+        const now = new Date();
+        const first = items.map(i => i.date).sort()[0];
+        const startY = Number(first.slice(0, 4));
+        const startM = Number(first.slice(5, 7)) - 1;
+        const span = (now.getFullYear() - startY) * 12 + now.getMonth() - startM + 1;
+        const byYear = span > 24;
+
+        const buckets = [];
+        if (byYear) {
+            for (let y = startY; y <= now.getFullYear(); y++) buckets.push({ key: String(y), label: String(y), full: String(y) });
+        } else {
+            const months = Math.max(12, span);
+            for (let k = months - 1; k >= 0; k--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                buckets.push({ key, label: MONTHS[d.getMonth()].charAt(0), full: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, jan: d.getMonth() === 0 });
+            }
+        }
+        buckets.forEach(b => { b.paid = 0; b.open = 0; b.late = 0; b.count = 0; });
+        const index = new Map(buckets.map(b => [b.key, b]));
+        items.forEach(i => {
+            const b = index.get(byYear ? i.date.slice(0, 4) : i.date.slice(0, 7));
+            if (!b) return;
+            const net = Number(i.net) || 0;
+            b.count++;
+            if (i.overdue) b.late += net;
+            else if (i.outstanding > 0.005) b.open += net;
+            else b.paid += net;
+        });
+        const max = Math.max.apply(null, buckets.map(b => b.paid + b.open + b.late)) || 1;
+        const H = 96;
+        const seg = (v, cls) => (v > 0 ? `<span class="co-col-seg ${cls}" style="height:${Math.max(3, Math.round(v / max * H))}px"></span>` : '');
+        const cols = buckets.map(b => {
+            const total = b.paid + b.open + b.late;
+            const tip = total
+                ? `${b.full}: ${euro(total)}, ${plural(b.count, 'invoice')}` + (b.open ? `, ${euro(b.open)} open` : '') + (b.late ? `, ${euro(b.late)} overdue` : '')
+                : `${b.full}: nothing`;
+            return `
+                <div class="co-col" title="${esc(tip)}" aria-label="${esc(tip)}" role="img">
+                    <span class="co-col-stack">${seg(b.late, 'is-late')}${seg(b.open, 'is-open')}${seg(b.paid, 'is-paid')}</span>
+                    <span class="co-col-label${b.jan ? ' is-jan' : ''}">${esc(b.label)}</span>
+                </div>`;
+        }).join('');
+        const has = k => buckets.some(b => b[k] > 0);
+        const key = [['paid', 'Paid'], ['open', 'Open'], ['late', 'Overdue']].filter(([k]) => has(k))
+            .map(([k, label]) => `<span class="co-key"><span class="co-key-dot is-${k === 'late' ? 'late' : k}"></span>${label}</span>`).join('');
+        return `
+            <div class="overview-section ov-section">
+                <div class="co-chart-head">
+                    <h3 class="overview-section-title">Invoiced per ${byYear ? 'year' : 'month'}</h3>
+                    <span class="co-chart-max">${esc(euro(max))} max</span>
+                </div>
+                <div class="co-chart${byYear ? ' is-years' : ''}" style="--co-h:${H}px">${cols}</div>
+                <div class="co-keys">${key}</div>
+            </div>`;
+    }
+
+    /** "KM" for Katharina Moser. */
+    const initials = name => String(name || '').split(/\s+/).filter(Boolean).map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase();
 
     function productChip(product) {
         return product ? `<span class="product-chip" data-product="${esc(product)}">${esc(product)}</span>` : '';
@@ -238,9 +380,6 @@
         }
         const projects = c.projects || [];
         const products = PRODUCTS.filter(p => projects.some(x => x.product === p && WON.includes(x.stage)));
-        const inv = state.invoices && state.invoices.stats;
-        const years = inv && inv.years && inv.years.length > 1 ? inv.years : null;
-
         const projectRows = projects.map(p => {
             const stage = p.stage || 'Lead';
             const stageClass = stage.toLowerCase().replace(/ /g, '-');
@@ -260,19 +399,18 @@
         }).join('');
 
         const contacts = (c.contacts || []).map(k => `
-            <span class="pcontact-chip" data-company-contact="${k.id}" title="${esc(k.last_note ? 'Last note ' + day(k.last_note) : 'No notes yet')}">
-                <button type="button" class="pcontact-name" data-company-contact="${k.id}">${esc(k.name)}</button>
-            </span>`).join('');
+            <button type="button" class="co-person" data-company-contact="${k.id}">
+                <span class="co-avatar" aria-hidden="true">${esc(initials(k.name))}</span>
+                <span class="co-person-text">
+                    <span class="co-person-name">${esc(k.name)}</span>
+                    <span class="co-person-meta">${esc(k.last_note ? 'Last note ' + window.CRMFormat.ago(k.last_note) : 'No notes yet')}</span>
+                </span>
+            </button>`).join('');
 
         els.body.innerHTML = `
-            <div class="overview-section">
-                <div class="overview-details co-figures">${figures().map(figureHtml).join('')}</div>
-            </div>
-            ${years ? `
-            <div class="overview-section ov-section">
-                <h3 class="overview-section-title">Per year</h3>
-                ${yearBars(years)}
-            </div>` : ''}
+            ${heroHtml()}
+            ${tiles()}
+            ${invoiceChart()}
             ${products.length ? `
             <div class="overview-section ov-section">
                 <h3 class="overview-section-title">Products</h3>
@@ -284,20 +422,9 @@
             </div>
             <div class="overview-section ov-section">
                 <h3 class="overview-section-title">Contacts</h3>
-                ${contacts ? `<div class="co-contacts">${contacts}</div>` : '<p class="empty-hint">No contacts yet</p>'}
+                ${contacts ? `<div class="co-people">${contacts}</div>` : '<p class="empty-hint">No contacts yet</p>'}
             </div>
             ${invoiceSection()}`;
-    }
-
-    /** Invoiced net per year, as bars: "2025 ████ 18.000 €". */
-    function yearBars(years) {
-        const max = Math.max.apply(null, years.map(y => y.net)) || 1;
-        return `<ul class="co-years">${years.map(y => `
-            <li>
-                <span class="co-year">${esc(y.year)}</span>
-                <span class="co-year-bar"><span style="width:${Math.max(2, Math.round(y.net / max * 100))}%"></span></span>
-                <span class="co-year-amount">${esc(euro(y.net))}</span>
-            </li>`).join('')}</ul>`;
     }
 
     function invoiceSection() {

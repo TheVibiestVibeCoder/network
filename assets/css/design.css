@@ -13175,7 +13175,7 @@ textarea.form-input:focus,
 
 .co-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 120px 100px 140px;
+    grid-template-columns: minmax(0, 1fr) 108px 92px 128px;
     align-items: center;
     gap: 10px;
     width: 100%;
@@ -13221,6 +13221,8 @@ textarea.form-input:focus,
 }
 
 .co-row-amount {
+    white-space: nowrap;
+    font-size: var(--t-sm);
     text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--c-ink-2);
@@ -13517,3 +13519,293 @@ textarea.form-input:focus,
 }
 
 .fin-inv-import-note:empty { display: none; }
+
+/* ---- The company sheet, at a glance ----
+   A hero figure with its share of our revenue as a ring, soft tiles with a
+   small bar each, invoiced per month, and the people with their initials.
+   Company colours only: blue for what is paid, light blue for what is open,
+   red for overdue, green for on time; stages in their own colours. */
+
+.co-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: var(--r-lg, 14px); corner-shape: var(--squircle-shape);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--c-accent) 9%, var(--c-surface)), var(--c-tint-3));
+}
+
+.co-hero-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.co-hero-value {
+    font-size: 2.1rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.co-hero-sub {
+    font-size: var(--t-sm);
+    color: var(--c-ink-3);
+}
+
+.co-ring {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    flex: none;
+}
+
+.co-ring svg circle {
+    fill: none;
+    stroke-width: 8;
+}
+
+.co-ring-track { stroke: color-mix(in srgb, var(--c-accent) 14%, var(--c-surface)); }
+
+.co-ring-value {
+    stroke: var(--c-accent);
+    stroke-linecap: round;
+}
+
+.co-ring-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 76px;
+    display: grid;
+    place-items: center;
+    font-size: var(--t-md);
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.co-ring-label {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+.co-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.co-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 12px 14px;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    background: var(--c-tint-3);
+}
+
+.co-tile.is-neg { background: var(--c-danger-soft); }
+
+.co-tile-label {
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-3);
+}
+
+.co-tile-value {
+    font-size: var(--t-xl);
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-ink);
+}
+
+.co-tile-sub {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.co-tile.is-neg .co-tile-sub { color: var(--c-danger-ink, var(--c-danger)); font-weight: 600; }
+
+/* A thin bar of parts, 2px of tile between them. */
+.co-bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.co-bar.is-empty { background: var(--c-tint-2); }
+.co-bar-part { min-width: 4px; }
+.co-bar-part.is-good { background: var(--c-success); }
+.co-bar-part.is-paid { background: var(--c-accent); }
+.co-bar-part.is-late { background: var(--c-danger); }
+.co-bar-part.is-open { background: color-mix(in srgb, var(--c-accent) 45%, var(--c-surface)); }
+.co-bar-part.is-stage { background: var(--stage-lead); }
+.co-bar-part[data-stage="complete"] { background: var(--stage-complete); }
+.co-bar-part[data-stage="in-progress"] { background: var(--stage-progress); }
+.co-bar-part[data-stage="proposal"] { background: var(--stage-proposal); }
+.co-bar-part[data-stage="negotiation"] { background: var(--stage-negotiation); }
+
+/* Invoiced per month: bars from the baseline, rounded at the top. */
+.co-chart-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.co-chart-max {
+    font-size: var(--t-xs);
+    color: var(--c-ink-4);
+    font-variant-numeric: tabular-nums;
+}
+
+.co-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    margin-top: 10px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--c-line);
+}
+
+.co-col {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: calc(var(--co-h, 96px) + 18px);
+    cursor: default;
+}
+
+.co-col:hover .co-col-stack { filter: brightness(1.08); }
+.co-col:hover { background: var(--c-tint-3); border-radius: 4px; }
+
+.co-col-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    max-width: 22px;
+}
+
+.co-col-seg { display: block; width: 100%; }
+.co-col-stack .co-col-seg:first-child { border-radius: 4px 4px 0 0; }
+.co-col-seg.is-paid { background: var(--c-accent); }
+.co-col-seg.is-open { background: color-mix(in srgb, var(--c-accent) 45%, var(--c-surface)); }
+.co-col-seg.is-late { background: var(--c-danger); }
+
+.co-col-label {
+    position: absolute;
+    bottom: -18px;
+    font-size: 10px;
+    color: var(--c-ink-4);
+}
+
+.co-col-label.is-jan { font-weight: 700; color: var(--c-ink-3); }
+.co-chart.is-years .co-col-label { font-size: var(--t-xs); }
+
+.co-keys {
+    display: flex;
+    gap: 14px;
+    margin-top: 24px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-2);
+}
+
+.co-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.co-key-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.co-key-dot.is-paid { background: var(--c-accent); }
+.co-key-dot.is-open { background: color-mix(in srgb, var(--c-accent) 45%, var(--c-surface)); }
+.co-key-dot.is-late { background: var(--c-danger); }
+
+/* The people: initials, name, when we last wrote something down. */
+.co-people {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.co-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    background: var(--c-tint-3);
+    font: inherit;
+    text-align: left;
+    color: var(--c-ink);
+    cursor: pointer;
+}
+
+.co-person:hover { background: var(--c-accent-soft); }
+.co-person:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.co-avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--c-brand, #1C3258);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.co-person-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.co-person-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.co-person-meta {
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+}
+
+@media (max-width: 640px) {
+    .co-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .co-hero { padding: 14px 16px; }
+    .co-hero-value { font-size: 1.7rem; }
+    .co-col-label { font-size: 9px; }
+}
+
+:root[data-theme="dark"] .co-avatar { background: var(--c-accent); }
