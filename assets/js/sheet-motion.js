@@ -77,39 +77,69 @@
     }
     const easeInOut = bezier(0.42, 0, 0.58, 1);
 
-    const N = 24;
+    /** The sheet's own rectangle on screen, whatever it is moved by (offsets ignore transforms). */
+    function layoutRect(box) {
+        let left = 0;
+        let top = 0;
+        for (let el = box; el; el = el.offsetParent) {
+            left += el.offsetLeft;
+            top += el.offsetTop;
+        }
+        return { left, top, width: box.offsetWidth, height: box.offsetHeight };
+    }
 
     /**
-     * The way between rectangle `from` (the clicked element) and the sheet's
-     * own rectangle `to`, frame by frame: the surface's place and size, and
-     * the content's transform - moved onto the surface and scaled evenly to
-     * fit inside it - with its opacity. `closing` runs it backwards.
+     * One step of the way between rectangle `from` (the clicked element) and
+     * the sheet as it is laid out now - read at every frame, as a sheet that
+     * is still filling in grows and, being centred, moves. `k` is how far
+     * towards the element (1 there, 0 at the sheet). The surface takes the
+     * in-between rectangle; the content is moved onto it, scaled evenly to
+     * fit inside, and cut to it, so it never shows outside.
      */
-    function frames(from, to, closing) {
-        const surface = [];
-        const content = [];
-        for (let i = 0; i <= N; i++) {
-            const t = i / N;
-            const e = easeInOut(t);
-            const k = closing ? e : 1 - e; // how far towards the element
-            const x = to.left + (from.left - to.left) * k;
-            const y = to.top + (from.top - to.top) * k;
-            const w = to.width + (from.width - to.width) * k;
-            const h = to.height + (from.height - to.height) * k;
-            surface.push({ offset: t, left: `${x.toFixed(2)}px`, top: `${y.toFixed(2)}px`, width: `${w.toFixed(2)}px`, height: `${h.toFixed(2)}px` });
+    function place(s, from, k, shown) {
+        const to = layoutRect(s.box);
+        const x = to.left + (from.left - to.left) * k;
+        const y = to.top + (from.top - to.top) * k;
+        const w = to.width + (from.width - to.width) * k;
+        const h = to.height + (from.height - to.height) * k;
+        const st = s.surface.style;
+        st.left = `${x.toFixed(2)}px`;
+        st.top = `${y.toFixed(2)}px`;
+        st.width = `${w.toFixed(2)}px`;
+        st.height = `${h.toFixed(2)}px`;
 
-            const scale = Math.max(0.05, Math.min(w / to.width, h / to.height));
-            const tx = (x + w / 2) - (to.left + to.width / 2);
-            const ty = (y + h / 2) - (to.top + to.height / 2);
+        const scale = Math.max(0.05, Math.min(w / to.width, h / to.height));
+        const cx = to.left + to.width / 2;
+        const cy = to.top + to.height / 2;
+        const tx = (x + w / 2) - cx;
+        const ty = (y + h / 2) - cy;
+        const b = s.box.style;
+        b.transformOrigin = '50% 50%';
+        b.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${scale.toFixed(4)})`;
+        b.opacity = shown.toFixed(3);
+        // The surface in the sheet's own (unscaled) coordinates: the cut.
+        const left = (x - (cx + tx)) / scale + to.width / 2;
+        const top = (y - (cy + ty)) / scale + to.height / 2;
+        const right = to.width - (left + w / scale);
+        const bottom = to.height - (top + h / scale);
+        const radius = s.radius / scale;
+        b.clipPath = `inset(${Math.max(0, top).toFixed(1)}px ${Math.max(0, right).toFixed(1)}px ${Math.max(0, bottom).toFixed(1)}px ${Math.max(0, left).toFixed(1)}px round ${radius.toFixed(1)}px)`;
+    }
+
+    /** Run the way frame by frame; `done` when it has arrived. */
+    function run(s, from, closing, duration, done) {
+        const start = performance.now();
+        const step = now => {
+            const t = Math.min(1, Math.max(0, (now - start) / duration));
+            const e = easeInOut(t);
+            const k = closing ? e : 1 - e;
             // In from about halfway on the way in; out in the first third on the way out.
             const shown = closing ? Math.max(0, 1 - t / 0.35) : Math.max(0, (t - 0.4) / 0.6);
-            content.push({
-                offset: t,
-                transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${scale.toFixed(4)})`,
-                opacity: easeInOut(Math.min(1, shown)).toFixed(3)
-            });
-        }
-        return { surface, content };
+            place(s, from, k, easeInOut(Math.min(1, shown)));
+            if (t < 1) s.raf = requestAnimationFrame(step);
+            else { s.raf = null; done(); }
+        };
+        step(start);
     }
 
     /** The empty surface that grows: the sheet's colour, corners and shadow. */
@@ -128,6 +158,8 @@
     function stopAll(s) {
         (s.anims || []).forEach(a => { try { a.cancel(); } catch (e) { /* done */ } });
         s.anims = [];
+        if (s.raf) cancelAnimationFrame(s.raf);
+        s.raf = null;
         settle(s);
     }
 
@@ -150,7 +182,12 @@
 
     function settle(s) {
         if (s.box) {
-            s.box.style.willChange = '';
+            const b = s.box.style;
+            b.willChange = '';
+            b.transform = '';
+            b.transformOrigin = '';
+            b.opacity = '';
+            b.clipPath = '';
             s.box.classList.remove('is-riding');
         }
         if (s.surface) s.surface.remove();
@@ -174,14 +211,11 @@
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
         if (backdrop) s.anims.push(backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: OPEN_MS, easing: EASE }));
         if (origin) {
-            const way = frames(origin.rect, box.getBoundingClientRect(), false);
             lift(s, box, origin.el);
+            s.radius = parseFloat(getComputedStyle(box).borderTopLeftRadius) || 20;
             s.surface = surfaceFor(modal, box);
             box.classList.add('is-riding');
-            const grow = s.surface.animate(way.surface, { duration: OPEN_MS, easing: 'linear', fill: 'forwards' });
-            s.anims.push(grow);
-            s.anims.push(box.animate(way.content, { duration: OPEN_MS, easing: 'linear' }));
-            grow.onfinish = () => settle(s);
+            run(s, origin.rect, false, OPEN_MS, () => settle(s));
         } else {
             lift(s, box, null);
             const appear = box.animate([
@@ -206,28 +240,30 @@
         const back = onScreen(target) ? target : null;
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
 
-        let main;
+        const finish = () => {
+            if (modal.classList.contains('active')) return;
+            modal.classList.remove('is-closing');
+            stopAll(s);
+        };
+        let main = null;
         if (back) {
-            const way = frames(back, box.getBoundingClientRect(), true);
             lift(s, box, s.origin);
+            s.radius = parseFloat(getComputedStyle(box).borderTopLeftRadius) || 20;
             s.surface = surfaceFor(modal, box);
             box.classList.add('is-riding');
-            main = s.surface.animate(way.surface, { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' });
-            s.anims.push(box.animate(way.content, { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' }));
+            run(s, back, true, CLOSE_MS, finish);
         } else {
             lift(s, box, null);
             main = box.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.98)', opacity: 0 }],
                 { duration: CLOSE_MS, easing: EASE, fill: 'forwards' });
         }
-        s.anims.push(main);
+        if (main) {
+            s.anims.push(main);
+            main.onfinish = finish;
+        }
         if (backdrop) {
             s.anims.push(backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE_MS, easing: EASE, fill: 'forwards' }));
         }
-        main.onfinish = () => {
-            if (modal.classList.contains('active')) return;
-            modal.classList.remove('is-closing');
-            stopAll(s);
-        };
     }
 
     // Every .modal, also the ones made later (dialogs, the product editor).
