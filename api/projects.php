@@ -69,6 +69,12 @@ try {
  */
 function handleGet(Project $model, string $action, ?int $id): void
 {
+    // The products, in their order, with their colours
+    if ($action === 'products') {
+        echo json_encode(['success' => true, 'data' => Project::products()]);
+        return;
+    }
+
     // Deleted projects, newest first
     if ($action === 'deleted') {
         echo json_encode(['success' => true, 'data' => ProjectArchive::list(Database::getInstance())]);
@@ -178,6 +184,21 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // A new product, from the product field: { name }
+    if ($action === 'add-product') {
+        $input = Auth::getJsonInput();
+        try {
+            $product = Project::addProduct(is_array($input) ? (string) ($input['name'] ?? '') : '');
+        } catch (InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+        http_response_code(201);
+        echo json_encode(['success' => true, 'data' => $product, 'products' => Project::products()]);
+        return;
+    }
+
     // Have Claude write the project's summary again, if the description or
     // the notes changed since it last did: POST ?action=summary-refresh&id=..
     if ($action === 'summary-refresh') {
@@ -472,7 +493,7 @@ function handlePost(Project $model, string $action): void
  *
  * companies: a list of company ids, or names for companies to find or
  * create - the sheet's picker sends both. Without it the company text decides
- * (Company::syncProject). product: one of Project::PRODUCTS, anything else
+ * (Company::syncProject). product: one of Project::products(), anything else
  * (or null) is none.
  */
 function companiesAndProduct(array $input): array

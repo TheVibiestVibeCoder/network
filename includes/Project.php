@@ -82,17 +82,18 @@ class Project
         return $projects;
     }
 
-    /** The products in their order (PRODUCTS), as a SQL CASE expression. */
+    /** The products in their order (products()), as a SQL CASE expression. */
     public static function productRankSql(string $column = 'product'): string
     {
         if (!preg_match('/^[a-z_.]+$/', $column)) {
             $column = 'product';
         }
         $sql = 'CASE ' . $column;
-        foreach (self::PRODUCTS as $i => $product) {
+        $names = self::productNames();
+        foreach ($names as $i => $product) {
             $sql .= " WHEN '" . str_replace("'", "''", $product) . "' THEN " . $i;
         }
-        return $sql . ' ELSE ' . count(self::PRODUCTS) . ' END';
+        return $sql . ' ELSE ' . count($names) . ' END';
     }
 
     /**
@@ -252,16 +253,61 @@ class Project
         return $ok;
     }
 
-    /** What our projects are about. One per project, or none. */
-    public const PRODUCTS = ['Workshop', 'Risk Briefing', 'SHIELD', 'RB & SHIELD', 'Other'];
+    /**
+     * What our projects are about: one product per project, or none. The
+     * products are kept in the table products and added from the CRM.
+     * [{ id, name, color, position }] in their order.
+     */
+    public static function products(): array
+    {
+        $rows = Database::getInstance()->query("SELECT id, name, color, position FROM products ORDER BY position, id")->fetchAll();
+        return array_map(fn($r) => ['id' => (int) $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'position' => (int) $r['position']], $rows);
+    }
 
-    /** A product as stored: one of PRODUCTS (any case), or null. */
+    /** The products' names, in their order. */
+    public static function productNames(): array
+    {
+        return array_column(self::products(), 'name');
+    }
+
+    /** Colours for new products, from the company palette and beside it. */
+    private const PRODUCT_COLORS = ['#30599D', '#1C3258', '#1C7E7E', '#63A375', '#8A94A6', '#5B7DB8', '#2E8B9A',
+        '#7A6FB0', '#B07A3A', '#4C6A92', '#3F8F6B', '#9A5B7A'];
+
+    /** Add a product (or find the one of that name), with the next free colour. */
+    public static function addProduct(string $name): array
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', $name));
+        if ($name === '' || mb_strlen($name) > 80) {
+            throw new InvalidArgumentException('A product needs a name of up to 80 characters');
+        }
+        $db = Database::getInstance();
+        foreach (self::products() as $product) {
+            if (mb_strtolower($product['name']) === mb_strtolower($name)) {
+                return $product;
+            }
+        }
+        $used = array_map('strtoupper', array_column(self::products(), 'color'));
+        $color = null;
+        foreach (self::PRODUCT_COLORS as $c) {
+            if (!in_array($c, $used, true)) {
+                $color = $c;
+                break;
+            }
+        }
+        $color ??= self::PRODUCT_COLORS[count($used) % count(self::PRODUCT_COLORS)];
+        $position = (int) $db->query("SELECT COALESCE(MAX(position), -1) + 1 FROM products")->fetchColumn();
+        $db->prepare("INSERT INTO products (name, color, position) VALUES (:n, :c, :p)")->execute(['n' => $name, 'c' => $color, 'p' => $position]);
+        return ['id' => (int) $db->lastInsertId(), 'name' => $name, 'color' => $color, 'position' => $position];
+    }
+
+    /** A product as stored: one of the products (any case), or null. */
     public static function cleanProduct($value): ?string
     {
         if (!is_string($value)) {
             return null;
         }
-        foreach (self::PRODUCTS as $product) {
+        foreach (self::productNames() as $product) {
             if (strcasecmp(trim($value), $product) === 0) {
                 return $product;
             }

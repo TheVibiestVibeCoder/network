@@ -1399,13 +1399,8 @@ function assetUrl(string $path): string
                                     <button type="button" class="segmented-btn" data-company-kind="quiet" title="Customers without a note for 90 days">Quiet</button>
                                     <button type="button" class="segmented-btn" data-company-kind="others" title="No project yet">Others</button>
                                 </div>
-                                <select id="companyProductFilter" class="form-select" aria-label="Product">
+                                <select id="companyProductFilter" class="form-select" aria-label="Product" data-product-select="any">
                                     <option value="">Any product</option>
-                                    <option value="Workshop">Workshop</option>
-                                    <option value="Risk Briefing">Risk Briefing</option>
-                                    <option value="SHIELD">SHIELD</option>
-                                    <option value="RB &amp; SHIELD">RB &amp; SHIELD</option>
-                                    <option value="Other">Other</option>
                                 </select>
                                 <div class="sort-controls">
                                     <label for="companySortField">Sort:</label>
@@ -2060,13 +2055,9 @@ function assetUrl(string $path): string
                             <div class="overview-detail-item">
                                 <label class="detail-label" for="projectEditProduct">Product</label>
                                 <span class="detail-value" id="projectOverviewProduct" data-ov="view"></span>
-                                <select id="projectEditProduct" class="form-select ov-field" data-ov="edit">
+                                <!-- Filled from the products (products.js); "New product…" last -->
+                                <select id="projectEditProduct" class="form-select ov-field" data-ov="edit" data-product-select="none new">
                                     <option value="">None</option>
-                                    <option value="Workshop">Workshop</option>
-                                    <option value="Risk Briefing">Risk Briefing</option>
-                                    <option value="SHIELD">SHIELD</option>
-                                    <option value="RB &amp; SHIELD">RB &amp; SHIELD</option>
-                                    <option value="Other">Other</option>
                                 </select>
                             </div>
                             <!-- Expected payments while reading (opened from the budget) -->
@@ -2569,6 +2560,7 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/amount-input.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/dialog.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/format.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/products.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
         <?php if ($isAdmin): ?>
         <!-- The revenue forecast and cashflow live in Financials only. -->

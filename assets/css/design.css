@@ -13032,11 +13032,9 @@ textarea.form-input:focus,
     display: none !important;
 }
 
+/* Each product's own colour comes from products.js (the products are kept
+   in the CRM); until then, and for one it does not know, grey. */
 [data-product] { --product-tone: var(--product-other); }
-[data-product="Workshop"] { --product-tone: var(--product-workshop); }
-[data-product="Risk Briefing"] { --product-tone: var(--product-briefing); }
-[data-product="SHIELD"] { --product-tone: var(--product-shield); }
-[data-product="RB & SHIELD"] { --product-tone: var(--product-combo); }
 [data-product=""] { --product-tone: var(--product-none); }
 
 .product-chip {
@@ -14100,3 +14098,7 @@ textarea.form-input:focus,
     #listView .company-columns { display: none; }
     #listView .company-group.is-open > .contact-card { padding-left: 16px; }
 }
+
+/* A question or notice is always on top, also over a sheet stacked on another. */
+.modal.crm-dialog { z-index: 1200; }
+.crm-dialog-input { width: 100%; margin-top: 4px; }

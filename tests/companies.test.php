@@ -282,6 +282,18 @@ test('the name taken from an invoice is kept beside the name', function () {
     eq(array_key_exists('invoice_name', Company::all($db)[0]), true, 'listed');
 });
 
+test('a product added in the CRM is a product: kept, with a colour, last in the order', function () {
+    $p = Project::addProduct('  Media   Training ');
+    eq($p['name'], 'Media Training', 'cleaned');
+    ok(preg_match('/^#[0-9A-F]{6}$/i', $p['color']) === 1, 'a colour');
+    eq(Project::addProduct('media training')['id'], $p['id'], 'the same one again');
+    $names = Project::productNames();
+    eq(end($names), 'Media Training', 'last');
+    eq(Project::cleanProduct('MEDIA TRAINING'), 'Media Training', 'accepted on a project');
+    $colors = array_column(Project::products(), 'color');
+    eq(count($colors), count(array_unique($colors)), 'its own colour');
+});
+
 // =============================================================================
 
 $failed = 0;

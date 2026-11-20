@@ -209,7 +209,7 @@ class Company
                 $pipeline += self::budgetMid($p) * ((float) ($p['success_chance'] ?? 0)) / 100;
             }
             $products = [];
-            foreach (Project::PRODUCTS as $product) {
+            foreach (Project::productNames() as $product) {
                 foreach ($won as $p) {
                     if ($p['product'] === $product) {
                         $products[] = $product;

@@ -192,7 +192,7 @@ final class McpService
                 . MCP_ACTOR_NAME . ' and only becomes permanent when a person accepts it.',
             'project_stages' => self::STAGES,
             // What a project is about: one of these, or none.
-            'project_products' => Project::PRODUCTS,
+            'project_products' => Project::productNames(),
             'todo_priorities' => self::PRIORITIES,
             'document_labels' => ProjectDocument::LABELS,
             'team' => $users,
@@ -427,7 +427,7 @@ final class McpService
         $product = $this->str($p, 'product', 50);
         if ($product !== null) {
             $where[] = 'product = :product';
-            $params['product'] = $this->enum($product, Project::PRODUCTS, 'product');
+            $params['product'] = $this->enum($product, Project::productNames(), 'product');
         }
 
         $stage = $this->str($p, 'stage', 50);
@@ -2176,7 +2176,7 @@ final class McpService
         $chance = $this->intRange($p, 'success_chance', 0, 100);
 
         $productRaw = $this->str($p, 'product', 50);
-        $product = $productRaw === null ? null : $this->enum($productRaw, Project::PRODUCTS, 'product');
+        $product = $productRaw === null ? null : $this->enum($productRaw, Project::productNames(), 'product');
 
         $input = [
             'name' => $name,

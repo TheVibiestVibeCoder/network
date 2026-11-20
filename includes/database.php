@@ -715,8 +715,27 @@ class Database
         self::addColumnIfMissing($db, 'companies', 'geo_source', 'TEXT');
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company_id ON contacts(company_id)");
 
-        // The product a project is about: one of Project::PRODUCTS, or NULL.
+        // The product a project is about: one of the products (by name), or NULL.
         self::addColumnIfMissing($db, 'projects', 'product', 'VARCHAR(32)');
+
+        // The products, kept in the CRM so new ones are added from the
+        // product field itself; their order is the order everywhere.
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(80) NOT NULL COLLATE NOCASE UNIQUE,
+                color VARCHAR(7) NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        if (!(int) $db->query("SELECT COUNT(*) FROM products")->fetchColumn()) {
+            $seed = $db->prepare("INSERT OR IGNORE INTO products (name, color, position) VALUES (:n, :c, :p)");
+            foreach ([['Workshop', '#30599D'], ['Risk Briefing', '#1C3258'], ['SHIELD', '#1C7E7E'],
+                      ['RB & SHIELD', '#63A375'], ['Other', '#8A94A6']] as $i => [$name, $color]) {
+                $seed->execute(['n' => $name, 'c' => $color, 'p' => $i]);
+            }
+        }
 
         // Our invoices linked by hand to a project and a company, by invoice
         // number. A row overrides the automatic match; 0 means "none" on

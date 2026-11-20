@@ -18,7 +18,7 @@
     'use strict';
 
     const API = 'api/companies.php';
-    const PRODUCTS = ['Workshop', 'Risk Briefing', 'SHIELD', 'RB & SHIELD', 'Other'];
+    const productNames = () => (window.CRMProducts ? window.CRMProducts.names() : []);
     const RUNNING = ['In Progress'];
     const WON = ['Complete', 'In Progress'];
     const OPEN = ['Lead', 'Proposal', 'Negotiation'];
@@ -462,7 +462,7 @@
             return;
         }
         const projects = c.projects || [];
-        const products = PRODUCTS.filter(p => projects.some(x => x.product === p && WON.includes(x.stage)));
+        const products = productNames().filter(p => projects.some(x => x.product === p && WON.includes(x.stage)));
         const projectRows = projects.map(p => {
             const stage = p.stage || 'Lead';
             const stageClass = stage.toLowerCase().replace(/ /g, '-');

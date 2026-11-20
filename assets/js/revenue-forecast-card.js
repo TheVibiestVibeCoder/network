@@ -111,6 +111,9 @@
         shared.cards.forEach(card => card.render());
     }
 
+    // A product added: its colour and its place in the bars.
+    if (root.document) root.document.addEventListener('crm:products-changed', () => renderAll());
+
     function notify() {
         const settings = getSettings();
         shared.listeners.forEach(fn => { try { fn(settings); } catch (e) { console.error(e); } });

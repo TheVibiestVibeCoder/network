@@ -55,10 +55,19 @@
     // Bottom to top in a monthly bar: the surest money carries the rest.
     const STACK = [COMPLETE, 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
 
-    // The bars can be split by product instead (Project::PRODUCTS), bottom to
-    // top in their own order, the projects without one ('') on top.
+    // The bars can be split by product instead, bottom to top in the
+    // products' order, the projects without one ('') on top. The products
+    // are kept in the CRM (products.js sets them); these until then.
     const PRODUCTS = ['Workshop', 'Risk Briefing', 'SHIELD', 'RB & SHIELD', 'Other'];
     const PRODUCT_STACK = PRODUCTS.concat(['']);
+
+    /** The products, in their order - changed in place, so every reader has them. */
+    function setProducts(list) {
+        PRODUCTS.length = 0;
+        (list || []).forEach(name => { if (name && PRODUCTS.indexOf(name) < 0) PRODUCTS.push(name); });
+        PRODUCT_STACK.length = 0;
+        PRODUCTS.concat(['']).forEach(k => PRODUCT_STACK.push(k));
+    }
 
     // A preset is only a named combination of the controls below it.
     const PRESETS = [
@@ -329,7 +338,7 @@
                 const add = (i, v, part) => {
                     if (i < months) {
                         byStage[p.stage][i] += v;
-                        byProduct[p.product || ''][i] += v;
+                        (byProduct[p.product || ''] || byProduct[''])[i] += v;
                         value += v;
                         parts[i].push(Object.assign({ id: p.id, amount: v }, part));
                     } else {
@@ -341,7 +350,8 @@
                 const rest = restRaw * factor;
                 if (rest > 0 && p.undated) {
                     undatedByStage[p.stage] += rest;
-                    undatedByProduct[p.product || ''] += rest;
+                    if (undatedByProduct[p.product || ''] !== undefined) undatedByProduct[p.product || ''] += rest;
+                    else undatedByProduct[''] += rest;
                     value += rest;
                     undated = rest;
                     undatedParts.push({ id: p.id, kind: 'budget', amount: rest, raw: restRaw, of: restRaw, months: 0 });
@@ -452,7 +462,7 @@
     }
 
     root.RevenueForecast = {
-        STAGES, STAGE_KEYS, STAGE_INFO, COMPLETE, STACK, PRODUCTS, PRODUCT_STACK, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
+        STAGES, STAGE_KEYS, STAGE_INFO, COMPLETE, STACK, PRODUCTS, PRODUCT_STACK, setProducts, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
         monthOf, offsetOf, calendarMonth, monthName,
         prepare, horizon, budgetFor, isCounted, factorFor,
         presetByKey, settingsFor, normalizeSettings, excludedCount, activePreset,
