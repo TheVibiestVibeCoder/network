@@ -54,13 +54,61 @@
         return { el: last.el, rect };
     }
 
-    /** The transform that puts box `to` onto rectangle `from`. */
-    function onto(from, to) {
-        const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
-        const dy = (from.top + from.height / 2) - (to.top + to.height / 2);
-        const sx = Math.max(0.04, from.width / to.width);
-        const sy = Math.max(0.04, from.height / to.height);
-        return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    function mapping(from, to) {
+        return {
+            dx: (from.left + from.width / 2) - (to.left + to.width / 2),
+            dy: (from.top + from.height / 2) - (to.top + to.height / 2),
+            sx: Math.max(0.04, from.width / to.width),
+            sy: Math.max(0.04, from.height / to.height)
+        };
+    }
+
+    /** cubic-bezier(x1, y1, x2, y2) as a function of time, 0..1 -> 0..1. */
+    function bezier(x1, y1, x2, y2) {
+        const a = (p1, p2) => 1 - 3 * p2 + 3 * p1;
+        const b = (p1, p2) => 3 * p2 - 6 * p1;
+        const c = p1 => 3 * p1;
+        const at = (t, p1, p2) => ((a(p1, p2) * t + b(p1, p2)) * t + c(p1)) * t;
+        const slope = (t, p1, p2) => 3 * a(p1, p2) * t * t + 2 * b(p1, p2) * t + c(p1);
+        return x => {
+            let t = x;
+            for (let i = 0; i < 8; i++) {
+                const d = slope(t, x1, x2);
+                if (Math.abs(d) < 1e-6) break;
+                t -= (at(t, x1, x2) - x) / d;
+            }
+            return at(Math.min(1, Math.max(0, t)), y1, y2);
+        };
+    }
+    const easeInOut = bezier(0.42, 0, 0.58, 1);
+
+    /**
+     * The box's way from rectangle `from` to its place `to` (or back), frame
+     * by frame with Apple's ease-in-out baked in, so the corners can be
+     * counter-scaled at every step: the radius on screen stays the same while
+     * the box stretches unevenly.
+     */
+    function morph(from, to, radius, back) {
+        const m = mapping(from, to);
+        const frames = [];
+        const N = 30;
+        for (let i = 0; i <= N; i++) {
+            const e = easeInOut(i / N);
+            const k = back ? e : 1 - e; // how far from the box's own place
+            const sx = 1 + (m.sx - 1) * k;
+            const sy = 1 + (m.sy - 1) * k;
+            frames.push({
+                offset: i / N,
+                transform: `translate(${(m.dx * k).toFixed(2)}px, ${(m.dy * k).toFixed(2)}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`,
+                borderRadius: `${(radius / sx).toFixed(2)}px / ${(radius / sy).toFixed(2)}px`
+            });
+        }
+        return frames;
+    }
+
+    function radiusOf(box) {
+        const r = parseFloat(getComputedStyle(box).borderTopLeftRadius);
+        return Number.isFinite(r) ? r : 16;
     }
 
     function stopAll(s) {
@@ -111,10 +159,7 @@
         }
         if (origin) {
             lift(s, box, origin.el);
-            const grow = box.animate([
-                { transform: onto(origin.rect, to), transformOrigin: 'center' },
-                { transform: 'none', transformOrigin: 'center' }
-            ], { duration: OPEN_MS, easing: EASE_OPEN });
+            const grow = box.animate(morph(origin.rect, to, radiusOf(box), false), { duration: OPEN_MS, easing: 'linear' });
             s.anims.push(grow);
             // The content comes in once the box has nearly its size, rising a little.
             parts.forEach(part => s.anims.push(part.animate([
@@ -150,10 +195,10 @@
         const backdrop = modal.querySelector(':scope > .modal-backdrop');
 
         lift(s, box, back ? s.origin : null);
-        const main = box.animate(back
-            ? [{ transform: 'none' }, { transform: onto(back, from) }]
-            : [{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.97)', opacity: 0 }],
-        { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' });
+        const main = back
+            ? box.animate(morph(back, from, radiusOf(box), true), { duration: CLOSE_MS, easing: 'linear', fill: 'forwards' })
+            : box.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(8px) scale(0.97)', opacity: 0 }],
+                { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' });
         s.anims.push(main);
         // The content leaves first, so only the box goes back into the card.
         Array.from(box.children).forEach(part => s.anims.push(part.animate([
