@@ -670,6 +670,20 @@
         eq(f.current.parts[1].some(x => x.id === 1 && x.kind === 'budget'), false, 'nothing of it before');
     });
 
+    test('split by product, the bars add up to the same totals', () => {
+        const rows = busy();
+        rows[0].product = 'SHIELD';
+        rows.push(project('Lead', 5000, 5000, 20, '2026-11-01', null, { product: 'Workshop' }));
+        rows.push(project('Proposal', 8000, 8000, 50, '2026-11-01', '2027-01-31', { product: 'Webinar' }));
+        const f = RF.forecast(RF.prepare(rows, NOW).items, RF.settingsFor('realistic'), 12);
+        f.current.totals.forEach((total, i) => {
+            near(RF.PRODUCT_STACK.reduce((sum, k) => sum + f.current.byProduct[k][i], 0), total, 'month ' + i);
+        });
+        near(RF.PRODUCT_STACK.reduce((sum, k) => sum + f.current.undatedByProduct[k], 0), f.current.undated, 'no date');
+        near(f.current.undatedByProduct.Workshop, 1000, 'the undated lead is a workshop');
+        eq(f.current.byProduct[''].some(v => v > 0), true, 'an unknown product counts as none');
+    });
+
     root.revenueForecastTestResults = results;
 
     if (typeof document === 'undefined') {

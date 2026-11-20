@@ -213,7 +213,8 @@
     --product-briefing: #1C3258;
     --product-shield: #1C7E7E;
     --product-combo: #63A375;
-    --product-other: #AAB5C5;
+    --product-other: #8A94A6;
+    --product-none: #D3D9E3;
 
     /* Medium priority: a light orange of its own, apart from the warning
        colour. -ink is the same hue deep enough for text on -soft (AA). */
@@ -287,6 +288,7 @@
     --product-shield: #6BCAC9;
     --product-combo: #7DC08F;
     --product-other: #7E8A9E;
+    --product-none: #3B475B;
 
     --pri-medium: #EB9D5A;
     --pri-medium-ink: #EB9D5A;
@@ -3605,8 +3607,9 @@ input[type="checkbox"] {
 
 /* ---- Project cards ------------------------------------------------------ */
 
-/* Inside a stage group the heading already names the stage. */
-.project-group .project-card .project-stage-badge {
+/* Inside a group the heading already names the stage, or the product. */
+.project-group.is-by-stage .project-card .project-stage-badge,
+.project-group.is-by-product :is(.project-card, .project-row) .product-chip {
     display: none;
 }
 
@@ -13034,6 +13037,7 @@ textarea.form-input:focus,
 [data-product="Risk Briefing"] { --product-tone: var(--product-briefing); }
 [data-product="SHIELD"] { --product-tone: var(--product-shield); }
 [data-product="RB & SHIELD"] { --product-tone: var(--product-combo); }
+[data-product=""] { --product-tone: var(--product-none); }
 
 .product-chip {
     display: inline-flex;
@@ -13363,4 +13367,27 @@ textarea.form-input:focus,
     .co-inv { grid-template-columns: 80px minmax(0, 1fr) 90px; }
     .co-inv-date, .co-inv-state { display: none; }
     .co-pair { grid-template-columns: 1fr; }
+}
+
+/* Projects grouped by product: the stage pill's look in the product's tone. */
+.project-group-pill.is-product {
+    --stage-tone: var(--product-tone, var(--product-other));
+}
+
+.project-group-pill.is-product:not([data-product]) {
+    --stage-tone: var(--product-none);
+}
+
+.project-row-main .product-chip {
+    flex: none;
+}
+
+/* Revenue forecast split by product: the bars and the key in the
+   products' colours, and the Stage / Product switch at the key's start. */
+:is(.rf-card, .rf-adjust-panel) [data-product] { --rf-tone: var(--product-tone); }
+
+.rf-legend { align-items: center; }
+
+.rf-split-by {
+    margin-right: 4px;
 }

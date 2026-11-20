@@ -4202,7 +4202,9 @@
 
         elements.projectsList.innerHTML = state.projectSortField === 'stage'
             ? renderProjectsByStage(visible)
-            : projectCollection(visible);
+            : state.projectSortField === 'product'
+                ? renderProjectsByProduct(visible)
+                : projectCollection(visible);
 
         bindProjectCards(elements.projectsList);
         triggerProjectDeckAnimation();
@@ -4259,7 +4261,7 @@
         return groups.map(group => {
             const stageClass = group.stage.toLowerCase().replace(/ /g, '-');
             return `
-                <section class="project-group">
+                <section class="project-group is-by-stage">
                     <header class="project-group-head">
                         <div class="project-group-pill stage-${escapeHtml(stageClass)}">
                             <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
@@ -4270,6 +4272,41 @@
                 </section>
             `;
         }).join('');
+    }
+
+    /**
+     * Projects under a heading per product, in the products' order and
+     * those without one last - the server sorts them so (Project::getAll),
+     * so consecutive runs are the groups, as by stage.
+     */
+    function renderProjectsByProduct(projects) {
+        const groups = [];
+        projects.forEach(project => {
+            const product = project.product || '';
+            const last = groups[groups.length - 1];
+            if (last && last.product === product) {
+                last.items.push(project);
+            } else {
+                groups.push({ product, items: [project] });
+            }
+        });
+
+        return groups.map(group => `
+                <section class="project-group is-by-product">
+                    <header class="project-group-head">
+                        <div class="project-group-pill is-product"${group.product ? ` data-product="${escapeHtml(group.product)}"` : ''}>
+                            <h2 class="project-group-title">${escapeHtml(group.product || 'No product')}</h2>
+                            <span class="project-group-count" title="${group.items.length === 1 ? '1 project' : group.items.length + ' projects'}">${group.items.length}</span>
+                        </div>
+                    </header>
+                    ${projectCollection(group.items)}
+                </section>
+            `).join('');
+    }
+
+    /** A project's product as a small chip, or nothing. */
+    function productChip(product) {
+        return product ? `<span class="product-chip" data-product="${escapeHtml(product)}">${escapeHtml(product)}</span>` : '';
     }
 
     /** Projects as cards in a grid, or as rows of one list - per state.projectView. */
@@ -4448,6 +4485,7 @@
                 <div class="project-card-bottom">
                     <div class="project-card-foot">
                         <span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>
+                        ${productChip(project.product)}
                         ${budgetStat}
                         ${chanceStat}
                     </div>
@@ -4479,6 +4517,7 @@
                 <div class="project-row-main">
                     <span class="project-row-title">${escapeHtml(project.name)}</span>
                     ${project.company ? `<span class="project-row-company">${escapeHtml(project.company)}</span>` : ''}
+                    ${productChip(project.product)}
                     ${badge}
                 </div>
                 <div class="project-row-when">${projectTimelineMarkup(project, isComplete)}</div>
@@ -4580,6 +4619,11 @@
             ? window.CRMFormat.date(project.start_date)
             : '');
         setDetailValue(elements.projectOverviewStage, project.stage);
+        const productView = document.getElementById('projectOverviewProduct');
+        if (productView) {
+            productView.innerHTML = project.product ? productChip(project.product) : '';
+            productView.classList.toggle('detail-empty', !project.product);
+        }
 
         // Same exact figures as the card. Both zero means "not decided yet".
         const ovBMin = (project.budget_min !== null && project.budget_min !== '' && project.budget_min !== undefined) ? parseFloat(project.budget_min) : null;
@@ -4924,6 +4968,7 @@
         renderProjectCompanyChips();
         elements.projectEditStartDate.value = project.start_date || '';
         elements.projectEditStage.value = project.stage || 'Lead';
+        document.getElementById('projectEditProduct').value = project.product || '';
         elements.projectEditBudgetMin.value = window.CRMAmount ? window.CRMAmount.format(project.budget_min) : (project.budget_min ?? '');
         elements.projectEditBudgetMax.value = window.CRMAmount ? window.CRMAmount.format(project.budget_max) : (project.budget_max ?? '');
         elements.projectEditSuccessChance.value = project.success_chance ?? '';
@@ -5026,6 +5071,7 @@
          elements.projectEditEstCompletion, elements.projectEditDescription].forEach(input => { input.value = ''; });
         elements.projectEditStartDate.value = new Date().toISOString().split('T')[0];
         elements.projectEditStage.value = 'Lead';
+        document.getElementById('projectEditProduct').value = '';
         if (window.ProjectPayments) {
             window.ProjectPayments.edit(null);
         }
@@ -5119,6 +5165,7 @@
             budget_max: budget[1],
             success_chance: elements.projectEditSuccessChance.value || null,
             stage: elements.projectEditStage.value,
+            product: document.getElementById('projectEditProduct').value || null,
             estimated_completion: elements.projectEditEstCompletion.value || null,
             payments: payments.payments
         };

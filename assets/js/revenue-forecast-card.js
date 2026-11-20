@@ -87,6 +87,8 @@
     }
 
     shared.settings = RF.normalizeSettings(readStored().settings);
+    // What the bars are split by: 'stage' or 'product'. Kept like the scenario.
+    shared.splitBy = readStored().splitBy === 'product' ? 'product' : 'stage';
 
     /** Expanded or not, per copy; the Projects card keeps its old key. */
     function storedExpanded(name) {
@@ -98,6 +100,7 @@
         try {
             const raw = readStored();
             raw.settings = shared.settings;
+            raw.splitBy = shared.splitBy;
             if (name === 'projects') raw.expanded = expanded;
             else raw.expandedBy = Object.assign({}, raw.expandedBy, { [name]: expanded });
             root.localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
@@ -226,11 +229,24 @@
             }).join('')}</div>`;
         }
 
-        /** The chart's colour key; stages that are switched off are greyed. */
+        /**
+         * The chart's colour key, and the switch between splitting the bars
+         * by stage or by product. Stages switched off are greyed.
+         */
         function stageLegend(ctx) {
+            const split = `<div class="segmented rf-seg-sm rf-split-by" role="group" aria-label="Split the bars by">${['stage', 'product'].map(k => {
+                const on = shared.splitBy === k;
+                return `<button type="button" class="segmented-btn${on ? ' active' : ''}" aria-pressed="${on}" data-rf-split="${k}"
+                    data-rf-focus="split-${k}" title="Split the bars by ${k}">${k === 'stage' ? 'Stage' : 'Product'}</button>`;
+            }).join('')}</div>`;
+            if (shared.splitBy === 'product') {
+                const present = new Set(ctx.all.map(p => p.product || ''));
+                return `<div class="rf-legend">${split}${RF.PRODUCT_STACK.filter(k => present.has(k)).map(k => `
+                    <span class="rf-key is-on" data-product="${esc(k)}"><span class="rf-stage-dot" aria-hidden="true"></span>${esc(k || 'No product')}</span>`).join('')}<span class="rf-key is-on rf-key--best"><span class="rf-best-swatch" aria-hidden="true"></span>Best case</span></div>`;
+            }
             const s = state.settings;
             const counts = stageCounts(ctx);
-            return `<div class="rf-legend">${RF.STACK.filter(key => counts[key]).map(key => {
+            return `<div class="rf-legend">${split}${RF.STACK.filter(key => counts[key]).map(key => {
                 const st = RF.STAGE_INFO.find(x => x.key === key);
                 // Finished work still owed is always counted.
                 const on = key === RF.COMPLETE || s.stages.indexOf(key) >= 0;
@@ -267,11 +283,24 @@
         /** Columns on the chart: the months, then the undated bar if there is one. */
         const columnCount = f => f.months + (f.hasUndated ? 1 : 0);
 
-        /** One column's numbers from a compute() result: a month, or the undated bar. */
+        /**
+         * One column's numbers from a compute() result: a month, or the
+         * undated bar. part(k) is a stage's share, or a product's while the
+         * bars are split by product.
+         */
         function columnOf(f, result, i) {
-            if (i >= f.months) return { total: result.undated, stage: k => result.undatedByStage[k] };
-            return { total: result.totals[i], stage: k => result.byStage[k][i] };
+            const byProduct = shared.splitBy === 'product';
+            const months = byProduct ? result.byProduct : result.byStage;
+            const undated = byProduct ? result.undatedByProduct : result.undatedByStage;
+            if (i >= f.months) return { total: result.undated, part: k => undated[k] };
+            return { total: result.totals[i], part: k => months[k][i] };
         }
+
+        /** The keys a bar is stacked by, bottom to top. */
+        const stackKeys = () => (shared.splitBy === 'product' ? RF.PRODUCT_STACK : RF.STACK);
+        /** The colour of a stack key: a stage's tone, or a product's. */
+        const keyAttr = k => (shared.splitBy === 'product' ? `data-product="${esc(k)}"` : `data-tone="${toneOf(k)}"`);
+        const keyLabel = k => (shared.splitBy === 'product' ? (k || 'No product') : labelOf(k));
 
         const columnName = (ctx, i) => (i >= ctx.f.months ? UNDATED_LABEL : RF.monthName(i, ctx.now));
 
@@ -323,7 +352,7 @@
             const rest = groups.slice(TIP_LIMIT);
 
             const rows = shown.map(g => `
-                <li class="rf-tip-project" data-tone="${toneOf(g.p.stage)}">
+                <li class="rf-tip-project" ${shared.splitBy === 'product' ? `data-product="${esc(g.p.product)}"` : `data-tone="${toneOf(g.p.stage)}"`}>
                     <span class="rf-tip-dot" aria-hidden="true"></span>
                     <span class="rf-tip-main">
                         <a href="#" class="rf-tip-name" data-crm-action="open-project-overview" data-project-id="${esc(g.p.id)}">${esc(g.p.name)}</a>${g.p.complete ? (g.parts.some(x => x.o < 0) ? '<span class="rf-overdue">Overdue</span>' : '<span class="rf-overdue is-open">Not paid yet</span>') : ''}
@@ -368,11 +397,11 @@
             for (let i = 0; i < columnCount(f); i++) {
                 const undated = i >= f.months;
                 const col = columnOf(f, f.current, i);
-                const stack = RF.STACK
-                    .map(k => ({ k, h: px(col.stage(k)) }))
+                const stack = stackKeys()
+                    .map(k => ({ k, h: px(col.part(k)) }))
                     .filter(x => x.h > 0);
                 const segs = stack
-                    .map(x => `<span class="rf-seg" data-tone="${toneOf(x.k)}" style="height:${x.h}px"></span>`)
+                    .map(x => `<span class="rf-seg" ${keyAttr(x.k)} style="height:${x.h}px"></span>`)
                     .join('');
                 // The best case is drawn above the bar, not behind it, so the
                 // gaps between the stages show the background, not the hatching.
@@ -381,8 +410,8 @@
                 const ghostFrom = stackH ? stackH + GAP : 0;
                 const ghostTotal = px(columnOf(f, f.ceiling, i).total);
                 const ghost = Math.max(0, ghostTotal - ghostFrom);
-                const parts = RF.STACK.filter(k => col.stage(k) > 0)
-                    .map(k => `, ${labelOf(k)} ${RF.moneyFull(col.stage(k))}`).join('')
+                const parts = stackKeys().filter(k => col.part(k) > 0)
+                    .map(k => `, ${keyLabel(k)} ${RF.moneyFull(col.part(k))}`).join('')
                     + columnProjects(ctx, i).map(g => `; ${g.p.name} ${RF.moneyFull(g.amount)}`).join('');
 
                 const selected = state.selected === i;
@@ -763,6 +792,10 @@
                     render();
                 } else if (t.hasAttribute('data-rf-expand')) {
                     update(() => { state.expanded = !state.expanded; });
+                } else if (t.hasAttribute('data-rf-split')) {
+                    shared.splitBy = t.getAttribute('data-rf-split') === 'product' ? 'product' : 'stage';
+                    store(name, state.expanded);
+                    renderAll();
                 } else if (t.hasAttribute('data-rf-preset')) {
                     update(() => { state.settings = RF.settingsFor(t.getAttribute('data-rf-preset')); });
                 } else if (t.hasAttribute('data-rf-chance')) {

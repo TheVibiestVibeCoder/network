@@ -55,6 +55,11 @@
     // Bottom to top in a monthly bar: the surest money carries the rest.
     const STACK = [COMPLETE, 'In Progress', 'Proposal', 'Negotiation', 'Lead'];
 
+    // The bars can be split by product instead (Project::PRODUCTS), bottom to
+    // top in their own order, the projects without one ('') on top.
+    const PRODUCTS = ['Workshop', 'Risk Briefing', 'SHIELD', 'RB & SHIELD', 'Other'];
+    const PRODUCT_STACK = PRODUCTS.concat(['']);
+
     // A preset is only a named combination of the controls below it.
     const PRESETS = [
         { key: 'worst', label: 'Worst', chance: 'as', budget: 'low', stages: ['In Progress'] },
@@ -149,7 +154,10 @@
                 return { o, at: Math.max(o, 0), amount: x.amount, full: !!x.full };
             });
 
-            const base = { id: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: p.stage };
+            const base = {
+                id: p.id, name: p.name || 'Untitled project', company: p.company || '', stage: p.stage,
+                product: PRODUCTS.indexOf(p.product) >= 0 ? p.product : ''
+            };
 
             if (complete) {
                 // Paid in full, or never planned: nothing left to forecast.
@@ -301,6 +309,10 @@
         const byStage = {};
         const undatedByStage = {};
         STACK.forEach(k => { byStage[k] = new Array(months).fill(0); undatedByStage[k] = 0; });
+        // The same sums split by product, for the bars when they show products.
+        const byProduct = {};
+        const undatedByProduct = {};
+        PRODUCT_STACK.forEach(k => { byProduct[k] = new Array(months).fill(0); undatedByProduct[k] = 0; });
         const perProject = {};
         const parts = Array.from({ length: months }, () => []);
         const undatedParts = [];
@@ -317,6 +329,7 @@
                 const add = (i, v, part) => {
                     if (i < months) {
                         byStage[p.stage][i] += v;
+                        byProduct[p.product || ''][i] += v;
                         value += v;
                         parts[i].push(Object.assign({ id: p.id, amount: v }, part));
                     } else {
@@ -328,6 +341,7 @@
                 const rest = restRaw * factor;
                 if (rest > 0 && p.undated) {
                     undatedByStage[p.stage] += rest;
+                    undatedByProduct[p.product || ''] += rest;
                     value += rest;
                     undated = rest;
                     undatedParts.push({ id: p.id, kind: 'budget', amount: rest, raw: restRaw, of: restRaw, months: 0 });
@@ -349,7 +363,7 @@
         const undated = STACK.reduce((sum, k) => sum + undatedByStage[k], 0);
         const dated = totals.reduce((a, b) => a + b, 0);
         return {
-            byStage, totals, undatedByStage, undated, perProject, parts, undatedParts,
+            byStage, totals, undatedByStage, undated, perProject, parts, undatedParts, byProduct, undatedByProduct,
             // The total is always what the months hold plus the "No date" bar.
             dated,
             total: dated + undated
@@ -438,7 +452,7 @@
     }
 
     root.RevenueForecast = {
-        STAGES, STAGE_KEYS, STAGE_INFO, COMPLETE, STACK, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
+        STAGES, STAGE_KEYS, STAGE_INFO, COMPLETE, STACK, PRODUCTS, PRODUCT_STACK, PRESETS, DEFAULT_PRESET, MONTHS_SHORT,
         monthOf, offsetOf, calendarMonth, monthName,
         prepare, horizon, budgetFor, isCounted, factorFor,
         presetByKey, settingsFor, normalizeSettings, excludedCount, activePreset,

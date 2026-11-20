@@ -1523,6 +1523,7 @@ function assetUrl(string $path): string
                                     <option value="company">Company</option>
                                     <option value="start_date">Start Date</option>
                                     <option value="stage" selected>Stage</option>
+                                    <option value="product">Product</option>
                                     <option value="success_chance">Success Chance</option>
                                 </select>
                                 <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
@@ -2022,6 +2023,18 @@ function assetUrl(string $path): string
                                     <input type="number" id="projectEditSuccessChance" class="form-input ov-field" min="0" max="100" placeholder="0–100">
                                     <span class="ov-field-unit" aria-hidden="true">%</span>
                                 </div>
+                            </div>
+                            <div class="overview-detail-item">
+                                <label class="detail-label" for="projectEditProduct">Product</label>
+                                <span class="detail-value" id="projectOverviewProduct" data-ov="view"></span>
+                                <select id="projectEditProduct" class="form-select ov-field" data-ov="edit">
+                                    <option value="">None</option>
+                                    <option value="Workshop">Workshop</option>
+                                    <option value="Risk Briefing">Risk Briefing</option>
+                                    <option value="SHIELD">SHIELD</option>
+                                    <option value="RB &amp; SHIELD">RB &amp; SHIELD</option>
+                                    <option value="Other">Other</option>
+                                </select>
                             </div>
                             <!-- Expected payments while reading (opened from the budget) -->
                             <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
