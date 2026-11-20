@@ -14494,3 +14494,60 @@ textarea.form-input:focus,
 .ph-step.is-current .ph-step-stage { color: var(--c-ink); }
 .ph-step-days { font-variant-numeric: tabular-nums; }
 .ph-note { margin: 10px 0 0; font-size: var(--t-xs); color: var(--c-ink-4); }
+
+/* --------------------------------------------------------------------------
+   45. Sheets in the middle, growing out of what was clicked
+   On a desktop the detail sheets (contact, project, company, to-do,
+   proposal, costs) open in the middle of the screen, wider than the side
+   panel they were. assets/js/sheet-motion.js grows them out of the element
+   that opened them and back into it on closing (.is-closing keeps a modal
+   shown for that). Phones keep their bottom sheets.
+   -------------------------------------------------------------------------- */
+
+.modal.is-closing {
+    display: flex !important;
+    pointer-events: none;
+}
+
+@media (min-width: 769px) {
+    #overviewModal,
+    #projectOverviewModal,
+    #companyNotesModal,
+    #finCostsModal,
+    #todoDetailModal,
+    #reviewDetailModal {
+        justify-content: center;
+        align-items: center;
+        padding: 32px;
+    }
+
+    #overviewModal .modal-content,
+    #projectOverviewModal .modal-content,
+    #companyNotesModal .modal-content {
+        width: min(880px, 100%);
+        max-width: 880px;
+        height: auto;
+        max-height: calc(100dvh - 64px);
+    }
+
+    #todoDetailModal .modal-content,
+    #reviewDetailModal .modal-content,
+    #finCostsModal .modal-content {
+        width: min(720px, 100%);
+        max-width: 720px;
+        height: auto;
+        max-height: calc(100dvh - 64px);
+    }
+
+    #todoDetailModal .modal-backdrop,
+    #reviewDetailModal .modal-backdrop {
+        background: var(--c-scrim);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+    }
+
+    /* The script moves the box; the keyframes would fight it. */
+    html.sheet-motion .modal-content {
+        animation: none !important;
+    }
+}

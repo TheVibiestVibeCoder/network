@@ -2576,6 +2576,7 @@ function assetUrl(string $path): string
         <!-- Application JS -->
         <script src="<?= assetUrl('assets/js/amount-input.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/dialog.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/sheet-motion.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/format.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/products.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
