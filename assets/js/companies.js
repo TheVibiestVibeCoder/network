@@ -249,14 +249,16 @@
             const late = paid.filter(i => i.paid.date > i.due).length;
             const onTime = paid.length - late;
             out.push({
-                label: 'Pays in',
+                label: 'Avg. time to pay',
                 value: inv.avgDays === null ? '' : plural(Math.round(inv.avgDays), 'day'),
-                title: inv.avgDays === null ? 'Nothing paid yet' : `On average from the invoice date, over ${plural(inv.paidCount, 'paid invoice')}`,
+                title: inv.avgDays === null
+                    ? 'No invoice paid yet: it counts from the invoice date to the day the money came in'
+                    : `From the invoice date to the day the money came in, on average over ${plural(inv.paidCount, 'paid invoice')}`,
                 graphic: paid.length ? partsBar([
                     { n: onTime, cls: 'is-good', title: `${onTime} on time` },
                     { n: late, cls: 'is-late', title: `${late} late${inv.avgLate ? `, ${Math.round(inv.avgLate)} days on average` : ''}` }
                 ]) : '',
-                sub: paid.length ? (late ? `${onTime} on time, ${late} late` : 'always on time') : ''
+                sub: paid.length ? (late ? `${onTime} on time, ${late} late` : 'always on time') : 'nothing paid yet'
             });
             out.push({
                 label: 'Open',
