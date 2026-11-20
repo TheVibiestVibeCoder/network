@@ -14348,3 +14348,97 @@ textarea.form-input:focus,
 .bk-export-date { color: var(--c-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bk-export-group:not(:has(.bk-export-date)) .bk-export-item,
 .bk-export-item:not(:has(.bk-export-no)) { grid-template-columns: 18px minmax(0, 1fr) auto; }
+
+/* ---- The product editor (products.js) ---- */
+.product-editor .modal-content { width: min(560px, calc(100vw - 32px)); }
+
+.pe-head,
+.pe-line {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 92px auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.pe-head {
+    padding: 0 0 6px;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--c-ink-4);
+}
+
+.pe-list { margin: 0; padding: 0; list-style: none; }
+.pe-row { padding: 5px 0; }
+.pe-row + .pe-row { border-top: 1px solid var(--c-line-2, var(--c-line)); }
+.pe-line .form-input { height: 36px; }
+
+.pe-color,
+.pe-swatch {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--pe-color);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+}
+
+.pe-color[aria-expanded="true"],
+.pe-swatch.is-on { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--pe-color); }
+.pe-color:focus-visible,
+.pe-swatch:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+
+.pe-actions { display: inline-flex; gap: 2px; }
+
+.pe-icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--c-ink-3);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pe-icon:hover:not(:disabled) { background: var(--c-tint-3); color: var(--c-ink); }
+.pe-icon.is-danger:hover { color: var(--c-danger); }
+.pe-icon:disabled { opacity: 0.3; cursor: default; }
+
+.pe-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 6px 38px;
+}
+
+.pe-swatch { width: 22px; height: 22px; }
+
+.pe-custom {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--t-xs);
+    color: var(--c-ink-3);
+    cursor: pointer;
+}
+
+.pe-custom input[type="color"] {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+}
+
+.pe-add { margin-top: 10px; }
+.pe-error { margin: 10px 0 0; font-size: var(--t-sm); color: var(--c-danger); }
+.product-editor { z-index: 1150; }

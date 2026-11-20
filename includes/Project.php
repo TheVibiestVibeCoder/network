@@ -324,6 +324,78 @@ class Project
         return ['id' => (int) $db->lastInsertId(), 'name' => $name, 'short' => $short, 'color' => $color, 'position' => $position];
     }
 
+    /**
+     * Save the products as edited in the CRM, in this order:
+     * [{ id?, name, short?, color }]. A renamed product renames it on its
+     * projects; one left out is gone, and its projects have no product then.
+     * Returns the products as they now are.
+     */
+    public static function saveProducts(array $list): array
+    {
+        $db = Database::getInstance();
+        $clean = [];
+        $names = [];
+        foreach (array_values($list) as $i => $p) {
+            if (!is_array($p)) {
+                throw new InvalidArgumentException('Each product needs a name and a colour');
+            }
+            $name = trim(preg_replace('/\s+/u', ' ', (string) ($p['name'] ?? '')));
+            if ($name === '' || mb_strlen($name) > 80) {
+                throw new InvalidArgumentException('Product ' . ($i + 1) . ' needs a name of up to 80 characters');
+            }
+            $key = mb_strtolower($name);
+            if (isset($names[$key])) {
+                throw new InvalidArgumentException('Two products are called ' . $name);
+            }
+            $names[$key] = true;
+            $color = strtoupper(trim((string) ($p['color'] ?? '')));
+            if (!preg_match('/^#[0-9A-F]{6}$/', $color)) {
+                throw new InvalidArgumentException('The colour of ' . $name . ' must be like #30599D');
+            }
+            $short = trim((string) ($p['short'] ?? ''));
+            $short = $short === '' ? self::shortName($name) : mb_substr($short, 0, 12);
+            $clean[] = ['id' => isset($p['id']) && (int) $p['id'] > 0 ? (int) $p['id'] : null, 'name' => $name, 'short' => $short, 'color' => $color];
+        }
+
+        return Database::transactional(function (PDO $db) use ($clean) {
+            $old = [];
+            foreach ($db->query("SELECT id, name FROM products")->fetchAll() as $row) {
+                $old[(int) $row['id']] = $row['name'];
+            }
+            $kept = array_filter(array_column($clean, 'id'));
+            // Gone: their projects have no product any more.
+            foreach ($old as $id => $name) {
+                if (!in_array($id, $kept, true)) {
+                    $db->prepare("UPDATE projects SET product = NULL WHERE product = :n")->execute(['n' => $name]);
+                    $db->prepare("DELETE FROM products WHERE id = :id")->execute(['id' => $id]);
+                }
+            }
+            // Renames first under a temporary name, so swapping two names works.
+            foreach ($clean as $p) {
+                if ($p['id'] !== null && isset($old[$p['id']])) {
+                    $temp = "\x01" . $p['id'];
+                    $db->prepare("UPDATE products SET name = :n WHERE id = :id")->execute(['n' => $temp, 'id' => $p['id']]);
+                    if ($old[$p['id']] !== $p['name']) {
+                        $db->prepare("UPDATE projects SET product = :t WHERE product = :old")->execute(['t' => $temp, 'old' => $old[$p['id']]]);
+                    }
+                }
+            }
+            foreach ($clean as $position => $p) {
+                if ($p['id'] !== null && isset($old[$p['id']])) {
+                    $db->prepare("UPDATE products SET name = :n, short = :s, color = :c, position = :pos WHERE id = :id")
+                        ->execute(['n' => $p['name'], 's' => $p['short'], 'c' => $p['color'], 'pos' => $position, 'id' => $p['id']]);
+                    if ($old[$p['id']] !== $p['name']) {
+                        $db->prepare("UPDATE projects SET product = :new WHERE product = :t")->execute(['new' => $p['name'], 't' => "\x01" . $p['id']]);
+                    }
+                } else {
+                    $db->prepare("INSERT INTO products (name, short, color, position) VALUES (:n, :s, :c, :pos)")
+                        ->execute(['n' => $p['name'], 's' => $p['short'], 'c' => $p['color'], 'pos' => $position]);
+                }
+            }
+            return self::products();
+        });
+    }
+
     /** A product as stored: one of the products (any case), or null. */
     public static function cleanProduct($value): ?string
     {

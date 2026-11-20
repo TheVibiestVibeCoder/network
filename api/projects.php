@@ -184,6 +184,20 @@ function handleGet(Project $model, string $action, ?int $id): void
  */
 function handlePost(Project $model, string $action): void
 {
+    // The products as edited in the CRM, in their order: { products: [{ id?, name, short?, color }] }
+    if ($action === 'save-products') {
+        $input = Auth::getJsonInput();
+        try {
+            $products = Project::saveProducts(is_array($input) && is_array($input['products'] ?? null) ? $input['products'] : []);
+        } catch (InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $products]);
+        return;
+    }
+
     // A new product, from the product field: { name }
     if ($action === 'add-product') {
         $input = Auth::getJsonInput();

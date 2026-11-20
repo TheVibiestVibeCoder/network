@@ -301,6 +301,36 @@ test('a product has a short form: the five set, new ones made up', function () {
     eq($short['Media Training'], 'MT', 'stored with a new one');
 });
 
+test('products edited in the CRM: renamed on their projects, recoloured, reordered, removed', function () {
+    $db = Database::getInstance();
+    $before = array_column(Project::products(), null, 'name');
+    $id = project(['name' => 'Ws', 'product' => 'Workshop']);
+    $gone = project(['name' => 'Ot', 'product' => 'Other']);
+    $list = [
+        ['id' => $before['SHIELD']['id'], 'name' => 'SHIELD', 'color' => '#112233'],
+        ['id' => $before['Workshop']['id'], 'name' => 'Training', 'short' => 'TR', 'color' => '#30599d'],
+        ['id' => $before['Risk Briefing']['id'], 'name' => 'Risk Briefing', 'color' => '#1C3258'],
+        ['name' => 'Keynote', 'color' => '#7A6FB0'],
+    ];
+    $after = Project::saveProducts($list);
+    eq(array_column($after, 'name'), ['SHIELD', 'Training', 'Risk Briefing', 'Keynote'], 'order');
+    eq([$after[0]['color'], $after[1]['short'], $after[3]['short']], ['#112233', 'TR', 'KE'], 'colour and short');
+    eq(col("SELECT product FROM projects WHERE id = ?", [$id]), 'Training', 'renamed on its project');
+    eq(col("SELECT product FROM projects WHERE id = ?", [$gone]), null, 'removed from its project');
+    $swap = Project::saveProducts([
+        ['id' => $after[0]['id'], 'name' => 'Training', 'color' => '#112233'],
+        ['id' => $after[1]['id'], 'name' => 'SHIELD', 'color' => '#30599D'],
+    ]);
+    eq(array_column($swap, 'name'), ['Training', 'SHIELD'], 'two names swapped');
+    eq(col("SELECT product FROM projects WHERE id = ?", [$id]), 'SHIELD', 'its project follows the swap');
+    try {
+        Project::saveProducts([['name' => 'A', 'color' => '#111111'], ['name' => 'a', 'color' => '#222222']]);
+        throw new RuntimeException('not refused');
+    } catch (InvalidArgumentException $e) {
+        ok(true, 'same name twice refused');
+    }
+});
+
 // =============================================================================
 
 $failed = 0;
