@@ -14576,3 +14576,20 @@ textarea.form-input:focus,
     .ph-cols .ph-block + .ph-block { margin-top: 0; }
     .ph-cols .ph-step { grid-template-columns: 10px 96px minmax(0, 1fr) auto; }
 }
+
+/* The surface a sheet grows on (sheet-motion.js): empty, under the sheet,
+   which shows only its content while it rides on it. */
+.sheet-surface {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.modal-content.is-riding {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
