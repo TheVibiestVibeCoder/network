@@ -721,14 +721,14 @@
      * invoices, our result - once every entry has its invoice or needs none,
      * and Gross until then, when the VAT is not complete yet.
      */
-    function monthRowContent(dateStr, label, totals) {
+    function monthRowContent(dateStr, label, totals, check) {
         const key = monthKey(dateStr);
         const sums = key ? totals.get(key) : null;
 
         if (!sums) {
             // No amount column, or nothing in this month parsed as one: show
             // the month exactly as it used to look, with nothing to add up.
-            return `<div class="bk-month-line"><span class="bk-month-name">${escapeHtml(label)}</span></div>`;
+            return `<div class="bk-month-line">${check || ''}<span class="bk-month-name">${escapeHtml(label)}</span></div>`;
         }
 
         const complete = sums.open === 0;
@@ -739,7 +739,7 @@
 
         return `
             <div class="bk-month-line">
-                <span class="bk-month-name">${escapeHtml(label)}</span>
+                ${check || ''}<span class="bk-month-name">${escapeHtml(label)}</span>
                 <button type="button"
                         class="bk-month-total"
                         data-action="month-breakdown"
@@ -754,6 +754,17 @@
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="bk-month-chevron" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg>
                 </button>
             </div>`;
+    }
+
+    /** Each month header's box after a row was ticked: all, some (a dash) or none. */
+    function syncMonthChecks() {
+        if (!state.monthRows || !els.tableWrap) return;
+        els.tableWrap.querySelectorAll('.bk-month-check').forEach(box => {
+            const ids = state.monthRows.get(box.dataset.month) || [];
+            const picked = ids.filter(id => state.selection.has(id)).length;
+            box.checked = ids.length > 0 && picked === ids.length;
+            box.indeterminate = picked > 0 && picked < ids.length;
+        });
     }
 
     /**
@@ -1198,12 +1209,27 @@
         html += '<th class="bk-col-fill" aria-hidden="true"></th>';
         html += '</tr></thead><tbody>';
 
+        // Each month's rows, for the checkbox in its header: it selects them all.
+        state.monthRows = new Map();
+        if (groupByMonth) {
+            displayRows.forEach(row => {
+                const month = monthLabel(row.row_date);
+                if (!state.monthRows.has(month)) state.monthRows.set(month, []);
+                state.monthRows.get(month).push(row.id);
+            });
+        }
+
         let previousMonth = null;
         displayRows.forEach(row => {
             if (groupByMonth) {
                 const month = monthLabel(row.row_date);
                 if (month !== previousMonth) {
-                    html += `<tr class="bk-month-row"><td colspan="${colCount}">${monthRowContent(row.row_date, month, totals)}</td></tr>`;
+                    const ids = state.monthRows.get(month);
+                    const picked = ids.filter(id => state.selection.has(id)).length;
+                    const check = `<span class="bk-month-check-wrap"><input type="checkbox" class="bk-month-check" data-month="${escapeHtml(month)}"
+                        ${picked === ids.length ? 'checked' : ''} data-some="${picked > 0 && picked < ids.length ? 1 : 0}"
+                        title="Select all of ${escapeHtml(month)}" aria-label="Select all of ${escapeHtml(month)}"></span>`;
+                    html += `<tr class="bk-month-row"><td colspan="${colCount}">${monthRowContent(row.row_date, month, totals, check)}</td></tr>`;
                     previousMonth = month;
                 }
             }
@@ -1232,6 +1258,8 @@
 
         html += '</tbody></table>';
         wrap.innerHTML = html;
+        // Part of a month chosen: a dash in its box (only settable in script).
+        wrap.querySelectorAll('.bk-month-check[data-some="1"]').forEach(box => { box.indeterminate = true; });
 
         const table = wrap.querySelector('table.bk-table');
         if (allSized) {
@@ -3930,6 +3958,14 @@
                 return;
             }
 
+            const monthCheck = event.target.closest('.bk-month-check');
+            if (monthCheck) {
+                const ids = (state.monthRows && state.monthRows.get(monthCheck.dataset.month)) || [];
+                ids.forEach(id => (monthCheck.checked ? state.selection.add(id) : state.selection.delete(id)));
+                render();
+                return;
+            }
+
             const check = event.target.closest('.bk-row-check');
             if (check) {
                 const id = parseInt(check.dataset.rowId, 10);
@@ -3942,6 +3978,7 @@
                     const visible = getDisplayRows();
                     selectAllBox.checked = visible.length > 0 && visible.every(r => state.selection.has(r.id));
                 }
+                syncMonthChecks();
                 return;
             }
 

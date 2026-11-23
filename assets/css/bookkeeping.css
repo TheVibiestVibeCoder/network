@@ -732,6 +732,14 @@ body.bk-col-resizing * {
     flex-wrap: wrap;
 }
 
+/* The month's box sits over the rows' boxes and selects all of the month. */
+.bk-month-check-wrap {
+    display: inline-flex;
+    justify-content: center;
+    width: calc(34px - var(--spacing-3));
+    margin-right: calc(-1 * var(--spacing-5) + var(--spacing-3));
+}
+
 .bk-month-name {
     font-size: var(--font-size-sm);
     font-weight: 600;
