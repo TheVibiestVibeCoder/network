@@ -22,7 +22,19 @@ if (!defined('APP_ROOT')) {
 
 class ProjectHistory
 {
-    public const FIELDS = ['stage' => 'stage', 'chance' => 'success_chance'];
+    public const FIELDS = [
+        'stage' => 'stage',
+        'chance' => 'success_chance',
+        'budget_min' => 'budget_min',
+        'budget_max' => 'budget_max',
+        'end' => 'estimated_completion',
+    ];
+
+    /** The fields the activity log knows enough about to rebuild (backfill). */
+    private const BACKFILL_FIELDS = ['stage' => 'stage', 'chance' => 'success_chance'];
+
+    /** Fields kept as whole numbers. */
+    private const NUMERIC = ['chance', 'budget_min', 'budget_max'];
 
     /** German labels the activity log uses for the two fields. */
     private const LOG_LABELS = ['stage' => 'Phase', 'chance' => 'Erfolgschance'];
@@ -50,7 +62,7 @@ class ProjectHistory
         if ($value === null || $value === '') {
             return null;
         }
-        return $field === 'chance' ? (string) (int) round((float) $value) : (string) $value;
+        return in_array($field, self::NUMERIC, true) ? (string) (int) round((float) $value) : (string) $value;
     }
 
     /** The values a new project starts with. */
@@ -110,6 +122,53 @@ class ProjectHistory
     }
 
     /**
+     * Once, when budget and planned end joined the history: every project's
+     * values as they are now, so a later change has something before it.
+     */
+    public static function seedLaterFields(PDO $db): void
+    {
+        self::ensureSchema($db);
+        if ($db->query("SELECT value FROM app_settings WHERE key = 'project_history_budget_seeded'")->fetchColumn()) {
+            return;
+        }
+        $db->beginTransaction();
+        try {
+            $insert = $db->prepare("INSERT INTO project_history (project_id, field, value, source) VALUES (:p, :f, :v, 'live')");
+            $has = $db->prepare("SELECT 1 FROM project_history WHERE project_id = :p AND field = :f LIMIT 1");
+            foreach ($db->query("SELECT id, budget_min, budget_max, estimated_completion FROM projects")->fetchAll() as $project) {
+                foreach (['budget_min' => 'budget_min', 'budget_max' => 'budget_max', 'end' => 'estimated_completion'] as $field => $column) {
+                    $has->execute(['p' => $project['id'], 'f' => $field]);
+                    if (!$has->fetchColumn()) {
+                        $insert->execute(['p' => $project['id'], 'f' => $field, 'v' => self::norm($field, $project[$column])]);
+                    }
+                }
+            }
+            $db->exec("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('project_history_budget_seeded', '1')");
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollBack();
+            error_log('Project history seed failed: ' . $e->getMessage());
+        }
+    }
+
+    /** Every recorded change of the projects there are, oldest first (the Insights page). */
+    public static function all(PDO $db): array
+    {
+        self::ensureSchema($db);
+        return array_map(fn($row) => [
+            'project_id' => (int) $row['project_id'],
+            'field' => $row['field'],
+            'value' => $row['value'],
+            'changed_at' => $row['changed_at'],
+            'source' => $row['source'],
+        ], $db->query("
+            SELECT h.project_id, h.field, h.value, h.changed_at, h.source
+            FROM project_history h JOIN projects p ON p.id = h.project_id
+            ORDER BY h.changed_at, h.id
+        ")->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
      * Once: the history before there was one, from what the CRM kept anyway.
      * Per project and field: the value at creation (Claude's proposal for the
      * project, or the first change's "before"), every accepted proposal of
@@ -158,7 +217,7 @@ class ProjectHistory
                     }
                 }
 
-                foreach (self::FIELDS as $field => $column) {
+                foreach (self::BACKFILL_FIELDS as $field => $column) {
                     $rows = [];
                     $moves = array_values(array_filter($proposals, fn($p) => array_key_exists($column, $p['payload'])));
                     $log = $db->prepare("

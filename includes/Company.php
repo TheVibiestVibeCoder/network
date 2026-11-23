@@ -182,7 +182,7 @@ class Company
     public static function all(PDO $db): array
     {
         $rows = $db->query("
-            SELECT c.id, c.name, c.website, c.address, c.vat_id, c.invoice_name, c.latitude, c.longitude,
+            SELECT c.id, c.name, c.website, c.address, c.vat_id, c.sector, c.invoice_name, c.latitude, c.longitude,
                 (SELECT COUNT(*) FROM contacts k WHERE k.company_id = c.id) AS contacts,
                 (SELECT MAX(n.created_at) FROM notes n JOIN contacts k ON k.id = n.contact_id WHERE k.company_id = c.id) AS last_contact_note,
                 (SELECT MAX(pn.created_at) FROM project_notes pn JOIN project_companies pc ON pc.project_id = pn.project_id
@@ -325,7 +325,7 @@ class Company
         };
         $actor = Auth::actor();
         $db->prepare("
-            UPDATE companies SET name = :name, website = :website, address = :address, vat_id = :vat,
+            UPDATE companies SET name = :name, website = :website, address = :address, vat_id = :vat, sector = :sector,
                 updated_at = CURRENT_TIMESTAMP, updated_by = :a, updated_by_name = :an
             WHERE id = :id
         ")->execute([
@@ -333,6 +333,7 @@ class Company
             'website' => $field('website', 255),
             'address' => $field('address', 2000),
             'vat' => $field('vat_id', 64),
+            'sector' => $field('sector', 64),
             'a' => $actor['id'],
             'an' => $actor['name'],
             'id' => $id,

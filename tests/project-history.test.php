@@ -129,6 +129,52 @@ test('the history before it existed is rebuilt from proposals and the activity l
     eq(count($at(500, 'chance')), 4, 'runs once');
 });
 
+test('budget and planned end are recorded too, as whole numbers', function () {
+    $db = Database::getInstance();
+    $model = new Project();
+    $id = $model->create(['name' => 'D', 'description' => 'd', 'budget_min' => 5000, 'budget_max' => '8000.00', 'estimated_completion' => '2027-01-31']);
+    $model->update($id, ['name' => 'D', 'description' => 'd', 'budget_min' => '5000.00', 'budget_max' => 8000, 'estimated_completion' => '2027-01-31']);
+    $model->update($id, ['name' => 'D', 'description' => 'd', 'budget_min' => 4000, 'budget_max' => 8000, 'estimated_completion' => '2027-03-31']);
+    $rows = fn($field) => array_column(array_values(array_filter(ProjectHistory::all($db),
+        fn($r) => $r['project_id'] === $id && $r['field'] === $field)), 'value');
+    eq($rows('budget_min'), ['5000', '4000'], 'budget_min');
+    eq($rows('budget_max'), ['8000'], 'budget_max unchanged');
+    eq($rows('end'), ['2027-01-31', '2027-03-31'], 'end');
+    eq(array_keys(ProjectHistory::forProject($db, $id)), ['created_at', 'stage', 'chance'], 'the sheet still reads stage and chance only');
+});
+
+test('projects from before get their budget once as a starting point', function () {
+    $db = Database::getInstance();
+    $db->exec("INSERT INTO projects (id, name, start_date, description, budget_min, budget_max) VALUES (600, 'Older', '2026-01-01', 'd', 2500, 2500)");
+    $db->exec("DELETE FROM app_settings WHERE key = 'project_history_budget_seeded'");
+    ProjectHistory::seedLaterFields($db);
+    ProjectHistory::seedLaterFields($db);
+    eq((int) col("SELECT COUNT(*) FROM project_history WHERE project_id = 600 AND field = 'budget_min'"), 1, 'once');
+    eq(col("SELECT value FROM project_history WHERE project_id = 600 AND field = 'budget_max'"), '2500', 'value');
+});
+
+test('an archived project keeps why it was archived', function () {
+    $db = Database::getInstance();
+    $model = new Project();
+    $won = $model->create(['name' => 'E', 'description' => 'd', 'stage' => 'Complete', 'success_chance' => 100, 'product' => 'Workshop', 'budget_min' => 2500]);
+    $lost = $model->create(['name' => 'F', 'description' => 'd', 'stage' => 'Proposal', 'success_chance' => 60]);
+    $odd = $model->create(['name' => 'G', 'description' => 'd']);
+    $model->delete($won, 'done');
+    $model->delete($lost, 'nonsense');
+    $model->delete($odd);
+    $entry = fn($id) => array_values(array_filter(ProjectArchive::forInsights($db), fn($e) => $e['project_id'] === $id))[0];
+    eq($entry($won)['reason'], 'done', 'given');
+    eq($entry($lost)['reason'], null, 'an unknown reason is none');
+    eq($entry($won)['project']['product'], 'Workshop', 'the project as it was');
+    eq(array_column($entry($lost)['history'], 'value', 'field')['chance'], '60', 'its history');
+    ProjectArchive::setReason($db, $entry($lost)['id'], 'went_elsewhere');
+    eq($entry($lost)['reason'], 'went_elsewhere', 'said later');
+    ProjectArchive::setReason($db, $entry($lost)['id'], null);
+    eq($entry($lost)['reason'], null, 'cleared');
+    $listed = array_values(array_filter(ProjectArchive::list($db), fn($e) => $e['project_id'] === $won))[0];
+    eq($listed['reason'], 'done', 'the archive list shows it');
+});
+
 // =============================================================================
 
 $failed = 0;

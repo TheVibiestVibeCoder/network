@@ -6,7 +6,7 @@
  * GET    ?id=              one company with its contacts and projects
  * GET    ?action=similar   pairs of companies that look like the same firm
  * GET    ?action=map       the companies with a place on the map
- * POST                      create {name, website?, address?, vat_id?}
+ * POST                      create {name, website?, address?, vat_id?, sector?}
  * POST   ?action=merge      {from, into}: move everything over, delete "from"
  * POST   ?action=keep-apart {a, b}: no longer list this pair as similar
  * PUT    ?id=              change name and details (invoice_name: the name taken from an invoice)
@@ -98,7 +98,7 @@ try {
         }
         $company = Database::transactional(function (PDO $d) use ($name, $input) {
             $newId = Company::findOrCreate($d, $name);
-            return Company::update($d, $newId, array_intersect_key($input, array_flip(['website', 'address', 'vat_id'])));
+            return Company::update($d, $newId, array_intersect_key($input, array_flip(['website', 'address', 'vat_id', 'sector'])));
         });
         Company::locate($db, (int) $company['id']);
         respond($company, 201);
@@ -106,7 +106,7 @@ try {
     }
 
     if ($method === 'PUT' && $id !== null) {
-        $fields = array_intersect_key($input, array_flip(['name', 'website', 'address', 'vat_id', 'invoice_name']));
+        $fields = array_intersect_key($input, array_flip(['name', 'website', 'address', 'vat_id', 'sector', 'invoice_name']));
         $company = Database::transactional(fn(PDO $d) => Company::update($d, $id, $fields));
         if (array_key_exists('address', $fields)) {
             Company::locate($db, $id);

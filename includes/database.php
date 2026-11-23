@@ -362,6 +362,9 @@ class Database
             )
         ");
 
+        // Why it was archived (ProjectArchive::REASONS); NULL when not said.
+        self::addColumnIfMissing($db, 'deleted_projects', 'reason', 'VARCHAR(24)');
+
         // Lightweight migration for existing databases that don't yet have parent_todo_id
         $todoColumns = $db->query("PRAGMA table_info(todos)")->fetchAll(PDO::FETCH_ASSOC);
         $hasParentTodoColumn = false;
@@ -668,6 +671,7 @@ class Database
         // Claude's proposals and the activity log (includes/ProjectHistory.php).
         require_once __DIR__ . '/ProjectHistory.php';
         ProjectHistory::backfill($db);
+        ProjectHistory::seedLaterFields($db);
     }
 
     /**
@@ -719,6 +723,8 @@ class Database
         self::addColumnIfMissing($db, 'companies', 'longitude', 'REAL');
         self::addColumnIfMissing($db, 'companies', 'geo_source', 'TEXT');
         $db->exec("CREATE INDEX IF NOT EXISTS idx_contacts_company_id ON contacts(company_id)");
+        // The sector the company works in ("Public sector", "Energy"), for the Insights page.
+        self::addColumnIfMissing($db, 'companies', 'sector', 'VARCHAR(64)');
 
         // The product a project is about: one of the products (by name), or NULL.
         self::addColumnIfMissing($db, 'projects', 'product', 'VARCHAR(32)');

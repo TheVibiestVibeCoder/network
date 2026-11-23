@@ -101,6 +101,18 @@ test('the migration runs once', function () use ($migrate, $db) {
     eq(col("SELECT id FROM companies WHERE name = 'Gamma'"), false, 'not created again');
 });
 
+test('a company keeps its sector, and an update without it leaves it', function () use ($db) {
+    $id = Company::findOrCreate($db, 'Sector Test AG');
+    Company::update($db, $id, ['sector' => '  Energy ']);
+    eq(Company::get($db, $id)['sector'], 'Energy', 'set');
+    Company::update($db, $id, ['website' => 'sector.example']);
+    eq(Company::get($db, $id)['sector'], 'Energy', 'kept');
+    $listed = array_values(array_filter(Company::all($db), fn($c) => (int) $c['id'] === $id))[0];
+    eq($listed['sector'], 'Energy', 'in the list');
+    Company::update($db, $id, ['sector' => '']);
+    eq(Company::get($db, $id)['sector'], null, 'cleared');
+});
+
 test('a contact saved with a company name is linked, created if new', function () {
     $model = new Contact();
     $id = $model->create(['name' => 'Fay', 'company' => 'delta  ltd']);

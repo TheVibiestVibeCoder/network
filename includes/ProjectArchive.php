@@ -21,10 +21,33 @@ class ProjectArchive
     private const TABLES = ['projects', 'project_notes', 'project_contacts', 'project_tags', 'project_companies', 'project_history', 'project_documents', 'todos', 'todo_links'];
 
     /**
+     * Why a project was archived. "done" is finished work (it counts as won),
+     * "mistake" a test or a duplicate (left out of every figure); the rest
+     * are the ways a project is lost. NULL: not said (archived before there
+     * was a reason, or through a proposal of Claude's).
+     */
+    public const REASONS = [
+        'done' => 'Done',
+        'no_budget' => 'No budget',
+        'no_answer' => 'No answer',
+        'went_elsewhere' => 'Went elsewhere',
+        'postponed' => 'Postponed',
+        'not_a_fit' => 'Not a fit',
+        'mistake' => 'Test or duplicate',
+    ];
+
+    /** A reason as stored: one of REASONS, or null. */
+    public static function reason($value): ?string
+    {
+        $value = is_string($value) ? trim($value) : '';
+        return array_key_exists($value, self::REASONS) ? $value : null;
+    }
+
+    /**
      * Write a project and everything that hangs off it into the archive.
      * Call inside the same transaction as the delete.
      */
-    public static function archive(PDO $db, int $projectId, array $actor): void
+    public static function archive(PDO $db, int $projectId, array $actor, ?string $reason = null): void
     {
         $rows = self::collect($db, $projectId);
         if (empty($rows['projects'])) {
@@ -33,13 +56,14 @@ class ProjectArchive
 
         $project = $rows['projects'][0];
         $db->prepare('
-            INSERT INTO deleted_projects (project_id, name, company, stage, deleted_by, deleted_by_name, snapshot)
-            VALUES (:project_id, :name, :company, :stage, :deleted_by, :deleted_by_name, :snapshot)
+            INSERT INTO deleted_projects (project_id, name, company, stage, reason, deleted_by, deleted_by_name, snapshot)
+            VALUES (:project_id, :name, :company, :stage, :reason, :deleted_by, :deleted_by_name, :snapshot)
         ')->execute([
             'project_id' => $projectId,
             'name' => $project['name'] ?? '',
             'company' => $project['company'] ?? null,
             'stage' => $project['stage'] ?? null,
+            'reason' => self::reason($reason),
             'deleted_by' => $actor['id'],
             'deleted_by_name' => $actor['name'],
             'snapshot' => json_encode($rows, JSON_UNESCAPED_UNICODE),
@@ -58,6 +82,7 @@ class ProjectArchive
                 'name' => $row['name'],
                 'company' => $row['company'],
                 'stage' => $row['stage'],
+                'reason' => $row['reason'] ?? null,
                 'deleted_at' => $row['deleted_at'],
                 'deleted_by_name' => $row['deleted_by_name'],
                 'counts' => [
@@ -146,6 +171,55 @@ class ProjectArchive
         }
 
         return $projectId;
+    }
+
+    /** Say (or change) why an archived project was archived; null clears it. */
+    public static function setReason(PDO $db, int $archiveId, ?string $reason): void
+    {
+        self::find($db, $archiveId);
+        $db->prepare('UPDATE deleted_projects SET reason = :r WHERE id = :id')
+            ->execute(['r' => self::reason($reason), 'id' => $archiveId]);
+    }
+
+    /**
+     * The archived projects as the Insights page reads them: when and why
+     * each was archived, the project as it was then, how its stage, chance
+     * and budget developed, and its companies.
+     */
+    public static function forInsights(PDO $db): array
+    {
+        $out = [];
+        foreach ($db->query('SELECT * FROM deleted_projects ORDER BY deleted_at, id')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $snapshot = json_decode((string) $row['snapshot'], true) ?: [];
+            $project = $snapshot['projects'][0] ?? [];
+            $out[] = [
+                'id' => (int) $row['id'],
+                'project_id' => (int) $row['project_id'],
+                'name' => $row['name'],
+                'company' => $row['company'],
+                'stage' => $row['stage'],
+                'reason' => $row['reason'] ?? null,
+                'deleted_at' => $row['deleted_at'],
+                'project' => [
+                    'created_at' => $project['created_at'] ?? null,
+                    'start_date' => $project['start_date'] ?? null,
+                    'estimated_completion' => $project['estimated_completion'] ?? null,
+                    'product' => $project['product'] ?? null,
+                    'budget_min' => $project['budget_min'] ?? null,
+                    'budget_max' => $project['budget_max'] ?? null,
+                    'success_chance' => $project['success_chance'] ?? null,
+                    'review_status' => $project['review_status'] ?? null,
+                ],
+                'companies' => array_values(array_map(fn($c) => (int) $c['company_id'], $snapshot['project_companies'] ?? [])),
+                'history' => array_values(array_map(fn($h) => [
+                    'field' => $h['field'],
+                    'value' => $h['value'],
+                    'changed_at' => $h['changed_at'],
+                    'source' => $h['source'] ?? 'live',
+                ], $snapshot['project_history'] ?? [])),
+            ];
+        }
+        return $out;
     }
 
     /** Delete for good: the archive entry and the document files. */

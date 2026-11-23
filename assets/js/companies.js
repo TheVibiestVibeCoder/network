@@ -173,7 +173,7 @@
             if (known) return known;
         }
         state.token++;
-        state.company = { id: null, name: p.name || '', website: '', address: '', vat_id: '' };
+        state.company = { id: null, name: p.name || '', website: '', address: '', vat_id: '', sector: '' };
         state.invoices = null;
         state.name = null;
         state.editing = true;
@@ -207,7 +207,8 @@
                 name,
                 website: els.websiteInput.value.trim(),
                 address: address ? address.value : '',
-                vat_id: vat ? vat.value : ''
+                vat_id: vat ? vat.value : '',
+                sector: sectorValue('')
             });
             await refresh();
             const pending = state.creating;
@@ -239,7 +240,7 @@
         if (website) {
             lines.push(`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(website.replace(/^https?:\/\//i, '').replace(/\/$/, ''))}</a>`);
         }
-        const details = [c.address ? String(c.address).replace(/\s*\n\s*/g, ', ') : '', c.vat_id ? `UID ${c.vat_id}` : ''].filter(Boolean);
+        const details = [c.sector || '', c.address ? String(c.address).replace(/\s*\n\s*/g, ', ') : '', c.vat_id ? `UID ${c.vat_id}` : ''].filter(Boolean);
         if (details.length) lines.push(`<span class="co-head-details">${esc(details.join(', '))}</span>`);
         els.sub.innerHTML = lines.join('');
     }
@@ -588,6 +589,24 @@
 
     // ---- Editing ----
 
+    /** The sectors in use, for the field's suggestions - the same spelling every time. */
+    function sectors() {
+        const seen = new Map();
+        (state.list || []).forEach(x => {
+            const v = String(x.sector || '').trim();
+            if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+        });
+        return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+    }
+
+    /** What the sector field says, spelled as an existing sector when it is one. */
+    function sectorValue(fallback) {
+        const input = $('companyEditSector');
+        if (!input) return fallback || '';
+        const v = input.value.trim().replace(/\s+/g, ' ');
+        return sectors().find(x => x.toLowerCase() === v.toLowerCase()) || v;
+    }
+
     function editForm() {
         const c = state.company;
         const others = (state.list || []).filter(x => x.id !== c.id);
@@ -602,6 +621,11 @@
                     <div class="overview-detail-item">
                         <label class="detail-label" for="companyEditVat">VAT ID</label>
                         <input type="text" id="companyEditVat" class="form-input ov-field" maxlength="64" value="${esc(c.vat_id || '')}">
+                    </div>
+                    <div class="overview-detail-item">
+                        <label class="detail-label" for="companyEditSector">Sector</label>
+                        <input type="text" id="companyEditSector" class="form-input ov-field" maxlength="64" list="companySectorList" autocomplete="off" value="${esc(c.sector || '')}">
+                        <datalist id="companySectorList">${sectors().map(x => `<option value="${esc(x)}"></option>`).join('')}</datalist>
                     </div>
                 </div>
             </div>
@@ -661,7 +685,8 @@
                 name,
                 website: els.websiteInput.value.trim(),
                 address: address ? address.value : state.company.address,
-                vat_id: vat ? vat.value : state.company.vat_id
+                vat_id: vat ? vat.value : state.company.vat_id,
+                sector: sectorValue(state.company.sector)
             });
             const id = state.company.id;
             await refresh();

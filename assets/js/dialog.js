@@ -15,6 +15,11 @@
  *
  *   const name = await CRMDialog.prompt('New product', { confirm: 'Add', placeholder: 'Name' });
  *
+ * choose() asks to pick one of a few answers and resolves to its value, or
+ * null when cancelled; the main button waits until one is picked:
+ *
+ *   const why = await CRMDialog.choose('Archive it?', { choices: [{ value: 'done', label: 'Done' }], confirm: 'Archive' });
+ *
  * One popup at a time: a second one waits for the first.
  */
 (function () {
@@ -37,6 +42,7 @@
                 <div class="modal-body crm-dialog-body">
                     <p class="crm-dialog-text" id="crmDialogText"></p>
                     <input type="text" class="form-input crm-dialog-input" maxlength="80" autocomplete="off" hidden>
+                    <div class="crm-dialog-choices" role="radiogroup" hidden></div>
                 </div>
                 <div class="modal-footer crm-dialog-actions"></div>
             </div>`;
@@ -64,10 +70,16 @@
             input.value = opts.value || '';
             input.placeholder = opts.placeholder || '';
             text.hidden = !text.textContent;
-            el.querySelector('.crm-dialog-body').hidden = !text.textContent && kind !== 'prompt';
+            const choices = el.querySelector('.crm-dialog-choices');
+            let picked = kind === 'choose' && opts.value ? opts.value : null;
+            choices.hidden = kind !== 'choose';
+            choices.setAttribute('aria-label', heading);
+            choices.innerHTML = kind === 'choose' ? (opts.choices || []).map(c =>
+                `<button type="button" class="crm-dialog-choice" role="radio" aria-checked="${c.value === picked}" data-dialog-choice="${escapeHtml(c.value)}">${escapeHtml(c.label)}</button>`).join('') : '';
+            el.querySelector('.crm-dialog-body').hidden = !text.textContent && kind !== 'prompt' && kind !== 'choose';
 
             const okLabel = opts.confirm || 'OK';
-            actions.innerHTML = (kind === 'confirm' || kind === 'prompt'
+            actions.innerHTML = (kind === 'confirm' || kind === 'prompt' || kind === 'choose'
                 ? `<button type="button" class="btn btn-secondary" data-dialog-cancel>${escapeHtml(opts.cancel || 'Cancel')}</button>` : '')
                 + `<button type="button" class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}" data-dialog-ok>${escapeHtml(okLabel)}</button>`;
 
@@ -80,36 +92,46 @@
                 }
                 resolve(value);
             };
+            const okButton = () => actions.querySelector('[data-dialog-ok]');
             const answer = () => {
+                if (kind === 'choose') return picked;
                 if (kind !== 'prompt') return true;
                 const v = input.value.trim();
                 return v === '' ? null : v;
             };
+            const cancelled = kind === 'prompt' || kind === 'choose' ? null : false;
             const onClick = event => {
-                if (event.target.closest('[data-dialog-ok]')) finish(answer());
-                else if (event.target.closest('[data-dialog-cancel]')) finish(kind === 'prompt' ? null : false);
+                const choice = event.target.closest('[data-dialog-choice]');
+                if (choice) {
+                    picked = choice.dataset.dialogChoice;
+                    choices.querySelectorAll('[data-dialog-choice]').forEach(b => b.setAttribute('aria-checked', String(b === choice)));
+                    okButton().disabled = false;
+                } else if (event.target.closest('[data-dialog-ok]')) finish(answer());
+                else if (event.target.closest('[data-dialog-cancel]')) finish(cancelled);
             };
             // Before every other Escape handler: only the popup closes.
             const onKey = event => {
                 if (event.key === 'Escape') {
                     event.preventDefault();
                     event.stopImmediatePropagation();
-                    finish(kind === 'prompt' ? null : false);
+                    finish(cancelled);
                 } else if (event.key === 'Enter' && kind === 'prompt' && event.target === input) {
                     event.preventDefault();
                     finish(answer());
                 } else if (event.key === 'Tab') {
-                    const buttons = (kind === 'prompt' ? [input] : []).concat(Array.from(actions.querySelectorAll('button')));
+                    const buttons = (kind === 'prompt' ? [input] : []).concat(Array.from(choices.querySelectorAll('button')), Array.from(actions.querySelectorAll('button:not(:disabled)')));
                     const i = buttons.indexOf(document.activeElement);
                     event.preventDefault();
                     buttons[(i + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
                 }
             };
+            if (kind === 'choose') okButton().disabled = !picked;
             el.addEventListener('click', onClick);
             document.addEventListener('keydown', onKey, true);
             el.classList.add('active');
             // A dangerous action does not get the focus: Enter alone must not delete.
             const focus = kind === 'prompt' ? input
+                : kind === 'choose' ? (choices.querySelector('[aria-checked="true"]') || choices.querySelector('button') || actions.querySelector('[data-dialog-cancel]'))
                 : kind === 'confirm' && opts.danger ? actions.querySelector('[data-dialog-cancel]') : actions.querySelector('[data-dialog-ok]');
             focus.focus();
         });
@@ -126,5 +148,6 @@
         confirm: (message, options) => show('confirm', message, options),
         alert: (message, options) => show('alert', message, options),
         prompt: (message, options) => show('prompt', message, options),
+        choose: (message, options) => show('choose', message, options),
     };
 })();

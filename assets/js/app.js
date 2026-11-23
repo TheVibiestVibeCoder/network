@@ -678,6 +678,15 @@
             return response.json();
         },
 
+        async setArchiveReason(archiveId, reason) {
+            const response = await fetch('api/projects.php?action=archive-reason', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                body: JSON.stringify({ id: archiveId, reason: reason || null })
+            });
+            return response.json();
+        },
+
         async purgeProject(archiveId) {
             const response = await fetch('api/projects.php?action=purge', {
                 method: 'POST',
@@ -705,8 +714,8 @@
             return response.json();
         },
 
-        async deleteProject(id) {
-            const response = await fetch(`api/projects.php?id=${id}`, {
+        async deleteProject(id, reason) {
+            const response = await fetch(`api/projects.php?id=${id}${reason ? '&reason=' + encodeURIComponent(reason) : ''}`, {
                 method: 'DELETE',
                 headers: { 'X-CSRF-Token': getCsrfToken() }
             });
@@ -4455,6 +4464,12 @@
 
     // ---- Deleted projects ----------------------------------------------------
 
+    // Why a project was archived (ProjectArchive::REASONS), in the order offered.
+    const ARCHIVE_REASONS = [
+        ['done', 'Done'], ['no_budget', 'No budget'], ['no_answer', 'No answer'], ['went_elsewhere', 'Went elsewhere'],
+        ['postponed', 'Postponed'], ['not_a_fit', 'Not a fit'], ['mistake', 'Test or duplicate']
+    ];
+
     async function loadDeletedProjects() {
         const section = document.getElementById('deletedProjects');
         if (!section) return;
@@ -4494,6 +4509,10 @@
                         <span class="deleted-project-name">${escapeHtml(entry.name)}</span>
                         <span class="deleted-project-meta">${meta}</span>
                     </div>
+                    <select class="form-select deleted-project-reason${entry.reason ? '' : ' is-empty'}" data-deleted-reason="${entry.id}" aria-label="Why ${escapeHtml(entry.name)} was archived">
+                        <option value="">Why?</option>
+                        ${ARCHIVE_REASONS.map(([value, label]) => `<option value="${value}"${entry.reason === value ? ' selected' : ''}>${label}</option>`).join('')}
+                    </select>
                     <button type="button" class="btn btn-secondary btn-small" data-deleted-restore="${entry.id}">Restore</button>
                     <button type="button" class="btn btn-small deleted-project-purge" data-deleted-purge="${entry.id}" data-name="${escapeHtml(entry.name)}">Delete permanently</button>
                 </div>`;
@@ -4503,6 +4522,21 @@
     function bindDeletedProjects() {
         const list = document.getElementById('deletedProjectsList');
         if (!list) return;
+
+        list.addEventListener('change', async (e) => {
+            const select = e.target.closest('[data-deleted-reason]');
+            if (!select) return;
+            select.disabled = true;
+            try {
+                const result = await api.setArchiveReason(Number(select.dataset.deletedReason), select.value);
+                if (!result.success) CRMDialog.alert(result.error || 'The reason could not be saved.');
+                select.classList.toggle('is-empty', !select.value);
+            } catch (error) {
+                CRMDialog.alert('The reason could not be saved.');
+            } finally {
+                select.disabled = false;
+            }
+        });
 
         list.addEventListener('click', async (e) => {
             const restore = e.target.closest('[data-deleted-restore]');
@@ -4925,9 +4959,9 @@
         return `<span class="project-card-assignee${chip ? '' : ' is-empty'}">${chip}${button}</span>`;
     }
 
-    async function deleteProject() {
+    async function deleteProject(reason) {
         try {
-            const result = await api.deleteProject(state.editingProjectId);
+            const result = await api.deleteProject(state.editingProjectId, reason);
 
             if (result.success) {
                 state.editingProjectId = null;
@@ -7174,15 +7208,18 @@
             elements.deleteProjectOverviewBtn.addEventListener('click', async () => {
                 const project = state.viewingProject;
                 if (!project) return;
-                const ok = await CRMDialog.confirm(`Archive ${project.name}?`, {
-                    text: 'It moves to "Archived projects" at the bottom of the Projects page, where it can be restored with everything in it.',
+                // Why it goes: finished work, a loss (and why), or a test - Insights counts it so.
+                const reason = await CRMDialog.choose(`Archive ${project.name}?`, {
+                    text: 'Why? It moves to "Archived projects" at the bottom of the Projects page, where it can be restored with everything in it.',
+                    choices: ARCHIVE_REASONS.map(([value, label]) => ({ value, label })),
+                    value: project.stage === 'Complete' ? 'done' : null,
                     confirm: 'Archive', danger: true
                 });
-                if (!ok) return;
+                if (!reason) return;
                 // Set editingProjectId so deleteProject() knows which to archive
                 state.editingProjectId = project.id;
                 closeProjectOverview();
-                await deleteProject();
+                await deleteProject(reason);
             });
         }
 

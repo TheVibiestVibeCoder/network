@@ -250,7 +250,7 @@ class Project
             $params['product'] = self::cleanProduct($data['product']);
         }
 
-        $before = $this->db->prepare("SELECT stage, success_chance FROM projects WHERE id = :id");
+        $before = $this->db->prepare("SELECT stage, success_chance, budget_min, budget_max, estimated_completion FROM projects WHERE id = :id");
         $before->execute(['id' => $id]);
         $previous = $before->fetch() ?: [];
 
@@ -260,6 +260,9 @@ class Project
             ProjectHistory::recordChanges($this->db, $id, $previous, [
                 'stage' => $params['stage'],
                 'success_chance' => $params['success_chance'],
+                'budget_min' => $params['budget_min'],
+                'budget_max' => $params['budget_max'],
+                'estimated_completion' => $params['estimated_completion'],
             ]);
         }
         return $ok;
@@ -570,10 +573,10 @@ class Project
      * everything that hangs off it, so it can be restored; its document files
      * stay on disk until it is deleted from there for good.
      */
-    public function delete(int $id): bool
+    public function delete(int $id, ?string $reason = null): bool
     {
-        return Database::transactional(function (PDO $db) use ($id) {
-            ProjectArchive::archive($db, $id, Auth::actor());
+        return Database::transactional(function (PDO $db) use ($id, $reason) {
+            ProjectArchive::archive($db, $id, Auth::actor(), $reason);
 
             $stmt = $db->prepare("DELETE FROM projects WHERE id = :id");
             return $stmt->execute(['id' => $id]);

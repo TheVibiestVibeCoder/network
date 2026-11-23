@@ -286,6 +286,25 @@ function handlePost(Project $model, string $action): void
         return;
     }
 
+    // Why an archived project was archived: { id, reason } (null clears it).
+    if ($action === 'archive-reason') {
+        $input = Auth::getJsonInput();
+        $archiveId = is_array($input) ? parsePositiveId($input['id'] ?? null) : null;
+        if ($archiveId === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'An archived project id is required']);
+            return;
+        }
+        try {
+            ProjectArchive::setReason(Database::getInstance(), $archiveId, $input['reason'] ?? null);
+            echo json_encode(['success' => true]);
+        } catch (RuntimeException $e) {
+            http_response_code(404);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        return;
+    }
+
     // Bring an archived project back, or delete it for good: { id } of the
     // deleted_projects entry.
     if ($action === 'restore' || $action === 'purge') {
@@ -744,8 +763,8 @@ function handleDelete(Project $model, string $action, ?int $id): void
         return;
     }
 
-    // Archive project
-    $model->delete($id);
+    // Archive project, with why (ProjectArchive::REASONS) when it was said
+    $model->delete($id, ProjectArchive::reason($_GET['reason'] ?? null));
     logProjectActivityEvent('deleted', null, $existing);
 
     echo json_encode(['success' => true, 'message' => 'Project archived']);
