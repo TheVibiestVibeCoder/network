@@ -19,10 +19,6 @@
     const VIEW_KEY = 'crm.insights.view';
     const PERIOD_KEY = 'crm.insights.period';
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const STAGE_TONE = {
-        Lead: 'var(--stage-lead)', Negotiation: 'var(--stage-negotiation)', Proposal: 'var(--stage-proposal)',
-        'In Progress': 'var(--stage-progress)', Won: 'var(--stage-progress)'
-    };
     const NONE_TONE = 'var(--product-none)';
 
     const state = {
@@ -330,22 +326,27 @@
 
     function funnelCard(f) {
         if (!f.entered) return card('ins-span-12', head('From lead to order'), empty('No projects entered in this period.'));
+        // Like the stage band on the home page: a block in the stage's colour
+        // with the count in it, the name below in that colour, then what
+        // became of them.
+        const TONES = ['lead', 'negotiation', 'proposal', 'progress'];
         const stage = (s, i) => {
-            const tone = STAGE_TONE[s.name];
             const won = i === 3;
-            return `<div class="ins-stage">
-                <span class="ins-stage-bar" style="background:${tone}"></span>
-                <span class="ins-stage-n">${s.reached}</span>
+            const pills = won
+                ? (f.winRate === null ? '<span class="ins-pill">Nothing decided yet</span>' : `<span class="ins-pill is-won">${esc(pct(f.winRate))} of decided</span>`)
+                    + (f.wonVolume ? `<span class="ins-pill">${esc(money(f.wonVolume))} in orders</span>` : '')
+                : (s.lost ? `<span class="ins-pill is-lost">${s.lost} lost</span>` : '') + (s.open ? `<span class="ins-pill">${s.open} open</span>` : '');
+            return `<div class="ins-stage" data-tone="${TONES[i]}">
+                <span class="ins-stage-fill"><span class="ins-stage-n">${s.reached}</span></span>
                 <span class="ins-stage-l">${esc(s.name)}</span>
-                ${won ? `<span class="ins-stage-o">${f.winRate === null ? 'Nothing decided yet' : esc(pct(f.winRate)) + ' of decided'}</span>${f.wonVolume ? `<span class="ins-stage-o is-tight">${esc(money(f.wonVolume))} in orders</span>` : ''}`
-                    : `${s.lost ? `<span class="ins-stage-x">${dot('is-lost')}${s.lost} lost</span>` : ''}${s.open ? `<span class="ins-stage-o">${s.open} open</span>` : ''}`}
+                ${pills ? `<span class="ins-pills">${pills}</span>` : ''}
             </div>`;
         };
         const step = s => `<div class="ins-step"><b>${s.next === null ? '–' : pct(s.next)}</b>${ARROW}<span>${s.days === null ? '' : esc(days(s.days))}</span></div>`;
         const html = f.steps.map((s, i) => stage(s, i) + (i < 3 ? step(s) : '')).join('');
         return card('ins-span-12', head('From lead to order',
-            `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached${f.unclear ? `; ${f.unclear} archived without a reason` : ''}`,
-            legend([[dot('is-lost'), 'Lost at this stage']])), `<div class="ins-flow">${html}</div>`);
+            `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached${f.unclear ? `; ${f.unclear} archived without a reason` : ''}`),
+            `<div class="ins-flow">${html}</div>`);
     }
 
     function cohortCard(list) {
