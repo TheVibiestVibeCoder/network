@@ -14849,10 +14849,10 @@ textarea.form-input:focus,
 .ins-sk-wrap { overflow-x: auto; }
 .ins-sk { position: relative; min-width: 640px; margin: 0 4px; }
 .ins-sk svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.ins-sk-flow { opacity: 0.6; }
+.ins-sk-flow { opacity: 0.55; }
+.ins-sk-rest { opacity: 0.35; }
 .ins-sk-out { opacity: 0.3; }
 .ins-sk-out.is-lost, .ins-sk-end.is-lost { fill: var(--c-danger); }
-.ins-sk-out.is-open { opacity: 0.35; }
 .ins-sk-out.is-unclear { fill: var(--c-ink-4); opacity: 0.18; }
 .ins-sk-end.is-unclear { fill: var(--c-ink-4); opacity: 0.5; }
 .ins-sk-flow:hover { opacity: 0.75; }
@@ -14862,7 +14862,8 @@ textarea.form-input:focus,
     font-size: var(--t-md); font-weight: 600; color: var(--c-ink-2); white-space: nowrap;
 }
 .ins-sk-stage b { font-size: 28px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
-.ins-sk-stage.is-end { transform: translateX(-100%); flex-direction: row-reverse; }
+.ins-sk-open { position: absolute; font-size: var(--t-xs); color: var(--c-ink-3); white-space: nowrap; }
+.ins-sk-open b { font-size: var(--t-sm); font-weight: 700; color: var(--c-ink-2); }
 .ins-sk-rate {
     position: absolute; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%);
     font-size: var(--t-xs); color: var(--c-ink-2); white-space: nowrap; pointer-events: none;
@@ -14871,7 +14872,7 @@ textarea.form-input:focus,
 .ins-sk-out-l { position: absolute; transform: translate(8px, -50%); font-size: var(--t-xs); color: var(--c-ink-3); white-space: nowrap; }
 .ins-sk-out-l b { font-size: var(--t-sm); font-weight: 700; color: var(--c-ink-2); }
 .ins-sk-out-l.is-lost, .ins-sk-out-l.is-lost b { color: var(--c-danger-ink); }
-.ins-sk-won { position: absolute; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; transform: translateX(-100%); font-size: var(--t-sm); color: var(--c-ink-2); white-space: nowrap; }
+.ins-sk-won { position: absolute; display: flex; flex-direction: column; gap: 2px; font-size: var(--t-sm); color: var(--c-ink-2); white-space: nowrap; }
 .ins-sk-won span:first-child { font-weight: 600; color: var(--c-ink); }
 
 /* Two panels side by side */
