@@ -425,10 +425,60 @@
     let loadPromise = null;
     let loading = false;
 
+    /**
+     * The table and the drop zone as they will look, with placeholders: a
+     * month row and entries in the table's own markup, and files in the drop
+     * zone. Shown until the first table arrives.
+     */
+    function renderSkeleton() {
+        const S = window.Skel;
+        if (!S || !els.tableInner) return;
+        const t = S.text;
+        const cells = i => `
+            <td class="bk-col-check"></td>
+            <td class="bk-col-menu"></td>
+            <td>${t('46px')}</td>
+            <td>${t(S.width(i, 0.8))}</td>
+            <td class="bk-col-amount">${t('64px')}</td>
+            <td class="bk-col-amount bk-col-vat">${t('40px')}</td>
+            <td>${t(S.width(i + 2, 0.9))}</td>
+            <td class="bk-col-fill"></td>`;
+        const month = `<tr class="bk-month-row"><td colspan="8">${t('150px')}</td></tr>`;
+        const rows = (n, offset) => S.rows(n, i => `<tr class="bk-row">${cells(i + offset)}</tr>`);
+        els.tableInner.innerHTML = `
+            <div class="is-skeleton" aria-busy="true">${S.label('Loading the bookkeeping')}
+                <table class="bk-table" aria-hidden="true">
+                    <colgroup><col class="bk-col-check"><col class="bk-col-menu"><col style="width:120px"><col style="width:26%">
+                        <col style="width:110px"><col style="width:80px"><col><col class="bk-col-fill"></colgroup>
+                    <thead><tr>
+                        <th class="bk-col-check"></th><th class="bk-col-menu"></th>
+                        <th>${t('80px')}</th><th>${t('76px')}</th><th class="bk-col-amount">${t('44px')}</th>
+                        <th class="bk-col-amount bk-col-vat">${t('26px')}</th><th>${t('96px')}</th><th class="bk-col-fill"></th>
+                    </tr></thead>
+                    <tbody>${month}${rows(3, 0)}${month}${rows(6, 3)}</tbody>
+                </table>
+            </div>`;
+
+        // The drop zone open, as it is whenever it holds files; folded only
+        // if it was folded by hand.
+        if (els.dropzone) els.dropzone.classList.toggle('is-folded', dropzoneFoldedByUser);
+        if (els.poolList) {
+            els.poolList.innerHTML = `<div class="is-skeleton" aria-hidden="true">${S.rows(3, i => `
+                <div class="bk-pool-item">
+                    ${S.block('18px', '18px')}
+                    <div class="bk-pool-item-info">
+                        <span class="bk-pool-item-name">${t(S.width(i, 1.1))}</span>
+                        <span class="bk-pool-item-size">${t('84px')}</span>
+                    </div>
+                </div>`)}</div>`;
+        }
+    }
+
     function load() {
         init();
         // Admins only: without the view there is nothing to load into.
         if (!$('bookkeepingView')) return Promise.resolve();
+        if (!state.loaded) renderSkeleton();
         loading = true;
         loadPromise = (async () => {
             try {

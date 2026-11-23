@@ -355,10 +355,33 @@
     // Drawing
     // ------------------------------------------------------------------
 
+    /**
+     * The page as it will look while its data loads: the months switch in
+     * the header, the three figures in their own markup (label, number,
+     * line, two tiles, "Show details") and the chart's card.
+     */
     function renderSkeleton() {
+        const S = window.Skel;
         els.finPage.setAttribute('aria-busy', 'true');
-        els.finKpis.innerHTML = [0, 1, 2].map(() => '<div class="fin-kpi is-skeleton"><span class="fin-skel"></span><span class="fin-skel is-big"></span><span class="fin-skel"></span></div>').join('');
-        els.finChart.innerHTML = '<div class="fin-skel is-chart"></div>';
+        renderHead();
+        const t = w => (S ? S.text(w) : '');
+        const tile = () => `
+            <div class="fin-tile">
+                <span class="fin-tile-label">${t('56px')}</span>
+                <strong class="fin-tile-value">${t('76px')}</strong>
+                <small class="fin-tile-sub">${t('64px')}</small>
+            </div>`;
+        els.finKpis.innerHTML = [0, 1, 2].map(i => `
+            <article class="fin-kpi is-skeleton" aria-hidden="true">
+                <span class="fin-kpi-label">${t('84px')}</span>
+                <span class="fin-kpi-value">${t(['150px', '130px', '110px'][i])}</span>
+                <span class="fin-kpi-sub">${t('120px')}</span>
+                <div class="fin-tiles">${tile()}${tile()}</div>
+                <span class="fin-kpi-toggle">${t('84px')}</span>
+            </article>`).join('');
+        els.finChart.innerHTML = `
+            <div class="fin-card-head"><h2 class="fin-card-title">Cashflow</h2></div>
+            <div class="fin-plot-wrap"><div class="fin-skel is-chart"></div></div>`;
     }
 
     function renderError() {

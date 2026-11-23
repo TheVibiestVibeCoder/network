@@ -1028,13 +1028,46 @@
             </div>`;
     }
 
+    /**
+     * The list as it will look, with placeholders: a group heading and its
+     * card of proposals, in the page's own markup.
+     */
+    function skeleton() {
+        const S = window.Skel;
+        if (!S) return '<div class="review-empty"><p>Loading…</p></div>';
+        const t = S.text;
+        const row = i => `
+            <article class="review-row">
+                <div class="review-row-head">
+                    <span class="review-row-open">
+                        <span class="review-type-icon"></span>
+                        <span class="review-row-text">
+                            <span class="review-row-title">${t(S.width(i, 0.45))}</span>
+                            <span class="review-row-summary">${t(S.width(i + 2, 0.9))}</span>
+                        </span>
+                        <span class="review-row-when">${t('36px')}</span>
+                    </span>
+                    <div class="review-row-actions">
+                        <span class="review-act"></span><span class="review-act"></span>
+                    </div>
+                </div>
+            </article>`;
+        const group = (n, offset, width) => `
+            <section class="review-group">
+                <h2 class="review-group-title">${t(width)}</h2>
+                <div class="review-list-card">${S.rows(n, i => row(i + offset))}</div>
+            </section>`;
+        return `<div class="review-list is-skeleton" aria-busy="true">${S.label('Loading proposals')}
+            <div class="review-list" aria-hidden="true">${group(3, 0, '72px')}${group(2, 3, '56px')}</div></div>`;
+    }
+
     function render() {
         if (!els.list) return;
         updateTabs();
         renderBulk();
 
         if (state.loading && state.items.length === 0) {
-            els.list.innerHTML = '<div class="review-empty"><p>Loading…</p></div>';
+            els.list.innerHTML = skeleton();
             return;
         }
 

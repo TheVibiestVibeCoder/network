@@ -374,7 +374,7 @@
         const to = addDays(days[days.length - 1], 1);
         const seq = ++state.requestSeq;
         if (!state.data) {
-            els.body.innerHTML = '<div class="tcal-loading">Loading the calendar…</div>';
+            renderSkeleton();
         }
         root.classList.add('is-loading');
         try {
@@ -382,6 +382,7 @@
             if (seq !== state.requestSeq) return;
             state.data = data;
             state.loadedAt = Date.now();
+            rememberHours(data.working_hours);
             render();
             if (!opts.skipSync) {
                 maybeSync(false);
@@ -391,6 +392,50 @@
             els.body.innerHTML = `<div class="empty-state tcal-empty"><p>${esc(e.message)}</p></div>`;
         } finally {
             if (seq === state.requestSeq) root.classList.remove('is-loading');
+        }
+    }
+
+    // ---- While the first load is on its way ----------------------------------
+
+    const HOURS_KEY = 'crm.calendar.workingHours';
+    const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' };
+
+    /** The working hours last seen, so the empty grid is drawn with them. */
+    function rememberHours(hours) {
+        if (!hours) return;
+        try { localStorage.setItem(HOURS_KEY, JSON.stringify(hours)); } catch (e) { /* this visit only */ }
+    }
+
+    function rememberedHours() {
+        try {
+            const hours = JSON.parse(localStorage.getItem(HOURS_KEY) || 'null');
+            if (hours && Array.isArray(hours.days) && hours.start && hours.end) return hours;
+        } catch (e) { /* fall back */ }
+        return DEFAULT_HOURS;
+    }
+
+    /**
+     * The grid as it will be - the days, the hours, the working time - only
+     * without appointments, scrolled to the start of the working day. The
+     * real one replaces it in place when the data is in.
+     */
+    function renderSkeleton() {
+        renderTitle();
+        renderModes();
+        state.data = { items: [], people: [], working_hours: rememberedHours() };
+        try {
+            fitHours(state.headHeight || 64);
+            renderGrid();
+            const scroll = els.body.querySelector('.tcal-scroll');
+            if (scroll) scroll.scrollTop = workingMinutes()[0] * hourPx / 60 - EDGE_PX;
+            const cal = els.body.querySelector('.tcal-cal');
+            if (cal) {
+                cal.classList.add('is-skeleton');
+                cal.setAttribute('aria-busy', 'true');
+                cal.insertAdjacentHTML('afterbegin', window.Skel ? window.Skel.label('Loading the calendar') : '');
+            }
+        } finally {
+            state.data = null;
         }
     }
 

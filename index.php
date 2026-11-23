@@ -2580,6 +2580,7 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/dialog.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/sheet-motion.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/format.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/skeleton.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/products.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/project-payments.js') ?>"></script>
         <?php if ($isAdmin): ?>

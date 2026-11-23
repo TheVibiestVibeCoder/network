@@ -608,17 +608,39 @@
                 </details>`;
         }
 
+        /**
+         * The card as it will look while the projects load: its title and
+         * switch, the big number with its lines and the three scenarios,
+         * and the chart's frame - placeholders where the figures go.
+         */
         function skeleton() {
+            const S = window.Skel;
+            const t = w => (S ? S.text(w) : '');
+            const H = state.expanded ? CHART_H.expanded : CHART_H.compact;
             return `
-                <div class="rf-top">
-                    <div class="rf-head"><h2 class="rf-title">Revenue forecast</h2></div>
-                    <div class="rf-body">
-                        <div class="rf-summary">
-                            <span class="rf-skel rf-skel--line"></span>
-                            <span class="rf-skel rf-skel--hero"></span>
-                            <span class="rf-skel rf-skel--line"></span>
+                <div class="rf-top is-skeleton">
+                    <div class="rf-head">
+                        <div class="rf-title-wrap">
+                            <h2 class="rf-title">Revenue forecast</h2>
+                            ${splitSwitch()}
                         </div>
-                        <div class="rf-chart"><div class="rf-skel rf-skel--chart"></div></div>
+                        <span class="rf-expand">${t('84px')}</span>
+                    </div>
+                    <div class="rf-body" aria-hidden="true">
+                        <div class="rf-summary">
+                            <span class="rf-hero">${t('180px')}</span>
+                            <span class="rf-split">
+                                <span class="rf-split-line">${t('150px')}</span>
+                                <span class="rf-split-line">${t('96px')}</span>
+                            </span>
+                            <span class="rf-compare">${RF.PRESETS.map(() => `
+                                <span class="rf-compare-item">${t('48px')}<strong>${t('64px')}</strong></span>`).join('')}</span>
+                        </div>
+                        <div class="rf-chart">
+                            <div class="rf-plot-wrap" style="height:${H}px"><span class="rf-skel" style="height:100%"></span></div>
+                            <div class="rf-axis">${t('100%')}</div>
+                            <div class="rf-legend">${t('320px')}</div>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -653,6 +675,13 @@
             if (state.loading) {
                 el.innerHTML = skeleton();
                 clearOutside();
+                // The scenario switch in the header is there from the start:
+                // which one is in use is known before the projects are.
+                if (outside) {
+                    try {
+                        outside.innerHTML = controls({ f: { active: RF.activePreset(state.settings) } });
+                    } catch (e) { /* drawn with the data */ }
+                }
                 return;
             }
 

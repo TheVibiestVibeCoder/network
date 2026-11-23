@@ -475,8 +475,8 @@
             </article>`;
     }
 
-    function renderHead(openCount, projectCount, contactCount, bookkeepingCount) {
-        const person = state.person || {};
+    function renderHead(openCount, projectCount, contactCount, bookkeepingCount, provisional) {
+        const person = provisional || state.person || {};
         const isMe = state.who === 'me';
         const name = person.unassigned ? 'Unassigned' : (person.name || '');
 
@@ -664,43 +664,112 @@
     }
 
     /**
-     * Placeholders in the shape of the two cards, shown while a person's work
-     * loads, so nothing jumps when it arrives.
+     * The dashboard as it will look, with placeholders where the numbers,
+     * names and dates go: the same cards, bands, rows and footers, so
+     * nothing moves when the work arrives. The week strip is left out, as it
+     * is whenever nothing is due.
      */
     function skeleton() {
-        const bar = (width, extra) => `<span class="home-skel${extra ? ' ' + extra : ''}" style="width:${width}"></span>`;
-        const rows = n => Array.from({ length: n }, (_, i) => `
-            <div class="home-skel-row">
-                ${bar('22px', 'is-round')}
-                <span class="home-skel-lines">${bar(['70%', '55%', '62%', '48%', '66%'][i % 5])}${bar('38%', 'is-small')}</span>
-            </div>`).join('');
-        const band = '<span class="home-skel is-meter"></span>';
+        const S = window.Skel;
+        const t = S.text;
+        const band = grows => `
+            <div class="home-meter is-skel">${grows.map(g => `
+                <span class="home-meter-seg" style="flex-grow:${g}">
+                    <span class="home-meter-fill"></span>
+                    <span class="home-meter-label">${t('56px')}</span>
+                </span>`).join('')}
+            </div>`;
+        const head = (title) => `
+            <div class="home-card-top">
+                <div class="home-card-head">
+                    <h2 class="home-card-title">${t(title)}</h2>
+                    <span class="home-link">${t('34px')}</span>
+                </div>
+            </div>`;
+        const todo = i => `
+            <li class="home-todo">
+                <span class="home-check"></span>
+                <span class="home-todo-main">
+                    <span class="home-row-body">
+                        <span class="home-row-title">${t(S.width(i))}</span>
+                        <span class="home-row-context">${t(S.width(i + 3, 0.6))}</span>
+                    </span>
+                </span>
+            </li>`;
+        const project = i => `
+            <li>
+                <span class="home-project">
+                    <span class="home-project-bar"></span>
+                    <span class="home-row-body">
+                        <span class="home-row-title">${t(S.width(i + 2, 0.9))}</span>
+                        <span class="home-row-context">${t(S.width(i + 5, 0.55))}</span>
+                    </span>
+                </span>
+            </li>`;
+        const contact = i => `
+            <span class="workload-row">
+                <span class="workload-row-body">
+                    <span class="workload-row-title">${t(S.width(i + 1, 0.6))}</span>
+                    <span class="workload-row-context">${t(S.width(i + 4, 0.5))}</span>
+                </span>
+            </span>`;
 
         return `
-            <section class="home-dash is-loading" aria-label="Loading" aria-busy="true">
-                <div class="home-card home-todos">
-                    ${band}
-                    <div class="home-card-top">
-                        <div class="home-card-head">${bar('120px', 'is-title')}</div>
-                        <div class="home-week">
-                            <div class="home-week-head">${bar('80px', 'is-small')}</div>
-                            <div class="home-week-days">${Array.from({ length: 7 }, () => bar('100%', 'is-day')).join('')}</div>
-                        </div>
+            <section class="home-dash is-skeleton" aria-busy="true">
+                ${S.label('Loading your work')}
+                <article class="home-card home-todos" aria-hidden="true">
+                    ${band([4, 2, 3])}
+                    ${head('96px')}
+                    <div class="home-list-wrap">
+                        <div class="home-group-head"><span class="home-group-name">${t('58px')}</span></div>
+                        <ul class="home-list">${S.rows(6, todo)}</ul>
                     </div>
-                    <div class="home-filterbar">${bar('160px', 'is-small')}</div>
-                    <div class="home-list-wrap">${rows(5)}</div>
-                </div>
-                <div class="home-side">
-                    <div class="home-card home-projects">
-                        ${band}
-                        <div class="home-card-top">
-                            <div class="home-card-head">${bar('120px', 'is-title')}</div>
-                        </div>
-                        <div class="home-filterbar">${bar('100px', 'is-small')}</div>
-                        <div class="home-list-wrap">${rows(4)}</div>
+                    <div class="home-card-foot">
+                        <span class="home-more">${t('84px')}</span>
+                        <span class="home-foot-link">${t('84px')}</span>
                     </div>
+                </article>
+                <div class="home-side" aria-hidden="true">
+                    <article class="home-card home-projects">
+                        ${band([1, 1, 1])}
+                        ${head('104px')}
+                        <div class="home-list-wrap"><ul class="home-list">${S.rows(3, project)}</ul></div>
+                    </article>
+                    <article class="home-card home-mini is-contact">
+                        <div class="home-card-head">
+                            <h2 class="home-card-title"><span class="home-mini-icon"></span>${t('72px')}</h2>
+                        </div>
+                        <div class="workload-list">${S.rows(4, contact)}</div>
+                    </article>
                 </div>
             </section>`;
+    }
+
+    /**
+     * The head while the first load is on its way. Your own page already
+     * knows whom it greets (the signed-in name is in the page), so it is
+     * drawn as it will be; someone else's shows placeholders until their
+     * name arrives with their work.
+     */
+    function provisionalHead() {
+        if (state.person) return;
+        if (state.who === 'me') {
+            const meta = document.querySelector('meta[name="current-user"]');
+            const idMeta = document.querySelector('meta[name="current-user-id"]');
+            const id = idMeta && idMeta.content !== '' ? Number(idMeta.content) : 0;
+            renderHead(0, 0, 0, 0, { id, name: meta ? meta.content : '' });
+            // The photo is known once the directory is in; until then a
+            // placeholder, not initials that turn into a photo a moment later.
+            if (window.CRMPeople && !window.CRMPeople.ready()) {
+                els.face.className = 'workload-person-face skel is-round';
+                els.face.innerHTML = '';
+            }
+            return;
+        }
+        els.title.innerHTML = window.Skel.text('220px');
+        els.summary.innerHTML = window.Skel.text('140px');
+        els.face.className = 'workload-person-face skel is-round';
+        els.face.innerHTML = '';
     }
 
     // ------------------------------------------------------------------
@@ -924,6 +993,8 @@
     // ------------------------------------------------------------------
 
     async function load(who, quiet = false) {
+        // Someone else's page: their name arrives with their work.
+        if (who && who !== state.who) state.person = null;
         if (who) state.who = who;
 
         // No-op once it has run; here for the case where this is the first
@@ -935,6 +1006,7 @@
         // screen until the new list is ready, instead of flashing placeholders.
         if (!quiet || !state.loaded) {
             els.body.innerHTML = skeleton();
+            provisionalHead();
         }
 
         try {

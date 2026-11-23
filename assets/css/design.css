@@ -2636,24 +2636,12 @@ input[type="checkbox"] {
 
 .rf-skel {
     display: block;
-    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
-    background: linear-gradient(90deg, var(--c-tint-2) 25%, var(--c-tint-3) 50%, var(--c-tint-2) 75%);
-    background-size: 200% 100%;
-    animation: rf-shimmer 1.4s ease-in-out infinite;
 }
 
 .rf-skel--line { width: 70%; height: 14px; }
 .rf-skel--hero { width: 55%; height: 44px; }
 .rf-skel--chart { height: 140px; }
 
-@keyframes rf-shimmer {
-    from { background-position: 100% 0; }
-    to { background-position: -100% 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .rf-skel { animation: none; }
-}
 
 /* ---- Phones ---- */
 
@@ -10006,53 +9994,10 @@ details.import-instructions p {
     box-shadow: inset 0 0 0 1px var(--c-accent);
 }
 
-/* ---- Loading: the cards' shape in placeholders ---- */
+/* ---- Loading: the dashboard's own cards with placeholders (workload.js) ---- */
 
-.home-skel {
-    display: block;
-    height: 12px;
-    border-radius: var(--r-xs); corner-shape: var(--squircle-shape);
-    background: var(--c-tint-2);
-    animation: home-skel-pulse 1.4s var(--ease) infinite alternate;
-}
-
-.home-skel.is-title { height: 18px; }
-.home-skel.is-small { height: 10px; }
-.home-skel.is-line { height: 14px; margin: 7px 0; }
-.home-skel.is-round { height: 22px; flex-shrink: 0; border-radius: var(--r-full); corner-shape: round; }
-.home-skel.is-day { height: 52px; border-radius: var(--r-md); corner-shape: var(--squircle-shape); }
-
-.home-skel.is-meter {
-    display: block;
-    height: 64px;
-    margin: 20px 22px 0;
-    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
-}
-
-.home-skel-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 11px 22px;
-}
-
-.home-skel-lines {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    padding-top: 2px;
-}
-
-@keyframes home-skel-pulse {
-    from { opacity: 1; }
-    to { opacity: 0.45; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .home-skel {
-        animation: none;
-    }
+.home-dash.is-skeleton .home-check {
+    border-color: var(--c-tint-2);
 }
 
 /* ---- Phones ---- */
@@ -10062,13 +10007,11 @@ details.import-instructions p {
         padding: 16px 16px 14px;
     }
 
-    .home-meter,
-    .home-skel.is-meter {
+    .home-meter {
         margin: 16px 16px 0;
     }
 
-    .home-meter-fill,
-    .home-skel.is-meter {
+    .home-meter-fill {
         height: 54px;
     }
 
@@ -10091,7 +10034,6 @@ details.import-instructions p {
     .home-todo,
     .home-project,
     .home-empty,
-    .home-skel-row,
     .home-card-foot,
     #workloadView .home-mini .home-card-head,
     #workloadView .home-mini .workload-row {
@@ -10475,6 +10417,11 @@ details.import-instructions p {
     border: 1px solid transparent;
     border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
+}
+
+/* A card whose content has not arrived yet takes no room. */
+.fin-card:empty {
+    display: none;
 }
 
 .fin-card-head {
@@ -11300,17 +11247,10 @@ details.import-instructions p {
     display: block;
     height: 12px;
     width: 60%;
-    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
-    background: var(--c-tint-2);
-    animation: rf-shimmer 1.4s ease-in-out infinite;
 }
 
 .fin-skel.is-big { height: 30px; width: 80%; }
 .fin-skel.is-chart { height: 320px; width: 100%; border-radius: var(--r-xl); corner-shape: var(--squircle-shape); }
-
-@media (prefers-reduced-motion: reduce) {
-    .fin-skel { animation: none; }
-}
 
 /* ---- Narrower screens ---- */
 
@@ -14618,3 +14558,75 @@ textarea.form-input:focus,
     border-color: transparent !important;
     box-shadow: none !important;
 }
+
+/* --------------------------------------------------------------------------
+   Loading placeholders
+   --------------------------------------------------------------------------
+   One look for every page while its data is on the way: grey shapes where
+   the text and controls will be, drawn inside the page's own cards and rows
+   (assets/js/skeleton.js), so nothing moves when the content arrives.
+
+   .skel is a block of its own size. .skel.is-text sits in a line of real
+   text instead, so the line keeps the height of that text's font. */
+
+/* The shimmer, also on parts of a page's own markup that stand in for
+   something while it loads (a stage bar, a band, an icon). */
+.skel,
+.rf-skel,
+.fin-skel,
+.home-meter.is-skel .home-meter-fill,
+.home-dash.is-skeleton :is(.home-project-bar, .home-mini-icon),
+.is-skeleton :is(.company-mark, .review-type-icon, .review-act) {
+    background: linear-gradient(90deg, var(--c-tint-2) 25%, var(--c-tint-3) 50%, var(--c-tint-2) 75%);
+    background-size: 200% 100%;
+    animation: skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.skel,
+.rf-skel,
+.fin-skel {
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
+}
+
+.skel {
+    display: block;
+    height: 12px;
+}
+
+.skel.is-text {
+    display: inline-block;
+    height: 0.75em;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+.skel.is-round {
+    border-radius: var(--r-full); corner-shape: round;
+}
+
+/* A stage pill without its stage: a quiet tint behind the placeholder. */
+.is-skeleton .project-group-pill {
+    background: var(--c-tint-3);
+}
+
+/* Placeholders are not controls: nothing in them reacts to the pointer. */
+.is-skeleton {
+    pointer-events: none;
+}
+
+@keyframes skel-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skel,
+    .rf-skel,
+    .fin-skel,
+    .home-meter.is-skel .home-meter-fill,
+    .home-dash.is-skeleton :is(.home-project-bar, .home-mini-icon),
+    .is-skeleton :is(.company-mark, .review-type-icon, .review-act) {
+        animation: none;
+    }
+}
+

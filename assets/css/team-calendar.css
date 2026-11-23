@@ -921,14 +921,7 @@
     color: var(--c-ink-4);
 }
 
-/* ---- Empty and loading --------------------------------------------------- */
-
-.tcal-loading {
-    padding: 56px 24px;
-    text-align: center;
-    color: var(--c-ink-4);
-    font-size: var(--t-sm);
-}
+/* ---- Empty ---------------------------------------------------------------- */
 
 .tcal-empty h3 {
     margin: 0 0 6px;

@@ -1000,7 +1000,46 @@
     // List Functions
     // ============================================
 
+    /**
+     * The company list as it will look, with placeholders: the column heads
+     * and a row per company, in the list's own markup. People and tags show
+     * the same rows; they are lists of names too.
+     */
+    function contactsSkeleton() {
+        const S = window.Skel;
+        const t = S.text;
+        const row = i => `
+            <div class="company-group">
+                <div class="company-header company-row">
+                    <span class="company-chevron-space"></span>
+                    <span class="company-mark">${''}</span>
+                    <span class="company-main">
+                        <span class="company-name">${t(S.width(i, 0.5))}</span>
+                        <span class="company-meta"><span class="company-kind">${t('52px')}</span></span>
+                    </span>
+                    <span class="company-cell company-last">${t('70px')}</span>
+                    <span class="company-cell company-pipeline">${i % 3 ? t('52px') : ''}</span>
+                    <span class="company-cell company-revenue">${i % 2 ? t('52px') : ''}</span>
+                    <span class="company-count">${t('18px')}</span>
+                </div>
+            </div>`;
+        return `<div class="is-skeleton" aria-busy="true">${S.label('Loading companies and people')}
+            <div aria-hidden="true">
+                <div class="company-columns">
+                    <span>${t('60px')}</span><span class="company-cell company-last">${t('70px')}</span>
+                    <span class="company-cell company-pipeline">${t('50px')}</span>
+                    <span class="company-cell company-revenue">${t('50px')}</span><span class="company-count-head"></span>
+                </div>
+                ${S.rows(8, row)}
+            </div></div>`;
+    }
+
     async function loadContacts() {
+        // The first time only: later loads keep the list until the new one is in.
+        if (elements.contactsList && !elements.contactsList.children.length && window.Skel) {
+            elements.contactsList.classList.add('has-money');
+            elements.contactsList.innerHTML = contactsSkeleton();
+        }
         try {
             if (state.groupBy === 'tags') {
                 // Load tag-grouped contacts
@@ -1879,9 +1918,44 @@
         }
     }
 
+    /**
+     * The To-dos list as it will look, with placeholders: group headings and
+     * their one-line to-dos, in the page's own markup.
+     */
+    function todosSkeleton() {
+        const S = window.Skel;
+        const t = S.text;
+        const item = i => `
+            <div class="todo-item ptodo">
+                <div class="ptodo-row">
+                    <span class="todo-check"><span class="todo-check-indicator"></span></span>
+                    <span class="ptodo-title">${t(S.width(i, 0.75))}</span>
+                    <span class="ptodo-meta">${t('44px')}${S.round('22px')}</span>
+                </div>
+            </div>`;
+        const group = (n, offset) => `
+            <div class="todo-group">
+                <div class="todo-group-header">
+                    <div class="todo-group-title-wrap">
+                        <span class="todo-group-kind">${S.block('14px', '14px')}</span>
+                        <span class="todo-group-title">${t(S.width(offset, 0.4))}</span>
+                    </div>
+                    <span class="todo-group-count">${t('10px')}</span>
+                </div>
+                <div class="todo-group-items">${S.rows(n, i => item(i + offset))}</div>
+            </div>`;
+        return `<div class="is-skeleton" aria-busy="true">${S.label('Loading to-dos')}
+            <div aria-hidden="true">${group(2, 0)}${group(4, 2)}${group(3, 6)}</div></div>`;
+    }
+
     async function loadTodos() {
         if (!elements.todosList) {
             return;
+        }
+
+        // The first time only: later loads keep the list until the new one is in.
+        if (!elements.todosList.children.length && window.Skel) {
+            elements.todosList.innerHTML = todosSkeleton();
         }
 
         try {
@@ -4305,7 +4379,61 @@
     // Project Functions
     // ============================================
 
+    /**
+     * Placeholders in the shape of the list, shown until the first projects
+     * arrive: a stage heading and its cards (or rows), with the cards' own
+     * markup so nothing moves when they come.
+     */
+    function projectsSkeleton() {
+        const S = window.Skel;
+        const t = S.text;
+        const card = i => `
+            <article class="project-card">
+                <div class="project-card-head">
+                    <div class="project-card-title-wrap">
+                        <h3 class="project-card-title">${t(S.width(i, 0.95))}</h3>
+                        <p class="project-card-company">${t(S.width(i + 3, 0.6))}</p>
+                    </div>
+                </div>
+                <div class="project-card-bottom">
+                    <div class="project-card-foot">
+                        <div class="project-stat project-stat--budget"><span class="project-stat-value">${t('64px')}</span></div>
+                        <div class="project-stat project-stat--chance"><span class="project-stat-value">${t('40px')}</span></div>
+                    </div>
+                </div>
+            </article>`;
+        const row = i => `
+            <article class="project-row">
+                <div class="project-row-main">
+                    <span class="project-row-title">${t(S.width(i, 0.7))}</span>
+                    <span class="project-row-company">${t(S.width(i + 3, 0.45))}</span>
+                </div>
+                <div class="project-row-when">${t('90px')}</div>
+                <span class="project-row-budget">${t('60px')}</span>
+                <div class="project-row-pay"></div>
+                <span class="project-row-chance">${t('32px')}</span>
+                <span class="project-row-assignee"></span>
+            </article>`;
+        const group = (n, offset) => `
+            <section class="project-group is-by-stage">
+                <header class="project-group-head">
+                    <div class="project-group-pill is-skel">
+                        <h2 class="project-group-title">${t('76px')}</h2>
+                    </div>
+                </header>
+                ${state.projectView === 'list'
+                    ? `<div class="project-rows">${S.rows(n, i => row(i + offset))}</div>`
+                    : `<div class="project-grid">${S.rows(n, i => card(i + offset))}</div>`}
+            </section>`;
+        return `<div class="is-skeleton" aria-busy="true">${S.label('Loading projects')}
+            <div aria-hidden="true">${group(3, 0)}${group(3, 3)}</div></div>`;
+    }
+
     async function loadProjects() {
+        // The first time only: later loads keep the list until the new one is in.
+        if (elements.projectsList && !elements.projectsList.children.length && window.Skel) {
+            elements.projectsList.innerHTML = projectsSkeleton();
+        }
         try {
             const result = await api.getProjects(
                 state.projectSearchQuery,
