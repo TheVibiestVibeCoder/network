@@ -14697,22 +14697,47 @@ textarea.form-input:focus,
 .ins-kd.is-hollow { box-shadow: inset 0 0 0 2px var(--c-ink-3); }
 .ins-kd.is-lost { box-shadow: inset 0 0 0 2px var(--c-danger); }
 
-/* Highlights */
-.ins-ins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.ins-in {
-    display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border: 0;
-    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
-    background: var(--c-tint-3); color: var(--c-ink-2); font: inherit; font-size: var(--t-base); line-height: 1.45; text-align: left; cursor: pointer;
+/* Highlights: one card per finding, tinted by what it says */
+.ins-hls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.ins-hl {
+    --hl: var(--c-accent); --hl-ink: var(--c-accent-2);
+    position: relative; overflow: hidden; isolation: isolate;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    min-width: 0; min-height: 156px; padding: 16px 18px 18px; border: 0;
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
+    background: linear-gradient(140deg, color-mix(in srgb, var(--hl) 22%, var(--c-surface)) 0%, color-mix(in srgb, var(--hl) 5%, var(--c-surface)) 75%);
+    box-shadow: var(--e-1), inset 0 0 0 1px color-mix(in srgb, var(--hl) 20%, transparent);
+    color: var(--c-ink-2); font: inherit; text-align: left; cursor: pointer;
+    transition: box-shadow var(--dur-2) var(--ease);
 }
-.ins-in:hover { background: var(--c-tint-2); }
-.ins-in b { font-weight: 600; color: var(--c-ink); }
-.ins-in svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.ins-in-t { flex: 1 1 auto; min-width: 0; }
-.ins-ic.is-good { color: var(--c-success-ink); }
-.ins-ic.is-warn { color: var(--c-warning-ink); }
-.ins-ic.is-info { color: var(--c-accent); }
-.ins-go { color: var(--c-ink-4); }
-@media (max-width: 800px) { .ins-ins { grid-template-columns: minmax(0, 1fr); } }
+.ins-hl.is-good { --hl: var(--c-success); --hl-ink: var(--c-success-ink); }
+.ins-hl.is-warn { --hl: var(--c-danger); --hl-ink: var(--c-danger-ink); }
+.ins-hl:hover { box-shadow: var(--e-2), inset 0 0 0 1px color-mix(in srgb, var(--hl) 34%, transparent); }
+.ins-hl:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.ins-hl-top { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); font-weight: 600; color: var(--hl-ink); }
+.ins-hl-ic {
+    flex: none; width: 26px; height: 26px; padding: 5px; border-radius: 50%;
+    background: var(--hl); color: #FFFFFF;
+    fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.ins-hl-f { margin-top: 8px; font-size: 34px; font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; color: var(--hl-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-hl-s { max-width: 36ch; font-size: var(--t-sm); line-height: 1.45; color: var(--c-ink-2); }
+.ins-hl-s b { font-weight: 600; color: var(--c-ink); }
+/* The finding's sign once more, large and faint in the corner. */
+.ins-hl-bg {
+    position: absolute; z-index: -1; right: -22px; bottom: -26px; width: 128px; height: 128px; pointer-events: none;
+    fill: none; stroke: var(--hl); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.16;
+}
+.ins-hl .ins-go {
+    position: absolute; top: 18px; right: 16px; width: 16px; height: 16px;
+    fill: none; stroke: var(--hl-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0; transition: opacity var(--dur-2) var(--ease);
+}
+.ins-hl:hover .ins-go, .ins-hl:focus-visible .ins-go { opacity: 1; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .ins-hl-ic { color: #0E1626; }
+}
+:root[data-theme="dark"] .ins-hl-ic { color: #0E1626; }
 
 /* Figures */
 .ins-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }

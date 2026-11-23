@@ -895,7 +895,8 @@
     }
 
     // ------------------------------------------------------------------
-    // Highlights: a few sentences from the figures
+    // Highlights: a few findings from the figures, each
+    // { tone, view, title, figure, parts: [[text, 'b'?]] }
     // ------------------------------------------------------------------
 
     function highlights(data, p, parts) {
@@ -908,7 +909,7 @@
             const prevFull = revenueIn(data.invoices, { start: (p.year - 1) + '-01-01', end: (p.year - 1) + '-12-31' });
             const passed = p.running && prevFull > 0 ? parts.cumulative.cur.find(pt => pt.value >= prevFull) : null;
             out.push({
-                tone: delta >= 0 ? 'good' : 'warn', view: 'overview',
+                tone: delta >= 0 ? 'good' : 'warn', view: 'overview', title: 'Revenue', figure: signedPct(delta),
                 parts: passed
                     ? [['Revenue passed all of ' + (p.year - 1) + ' in ' + MONTHS[+passed.month.slice(5) - 1] + '. Year to date '], [signedPct(delta), 'b'], [' on last year.']]
                     : [[p.running ? 'Year to date, revenue is ' : 'Revenue was '], [signedPct(delta), 'b'], [' on ' + (p.year - 1) + '.']]
@@ -920,7 +921,7 @@
             .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
         if (cal && Math.abs(cal.gap) >= 0.15) {
             out.push({
-                tone: 'warn', view: 'sales',
+                tone: 'warn', view: 'sales', title: 'Our estimates', figure: cal.won + ' of ' + cal.n,
                 parts: [['Estimates of ' + cal.label.toLowerCase() + ' came true '], [cal.won + ' of ' + cal.n, 'b'], [' times' + (cal.gap > 0 ? ', less often than estimated.' : ', more often than estimated.')]]
             });
         }
@@ -930,6 +931,7 @@
             const prev = cf.sharesPrev && cf.sharesPrev.top1 !== null ? cf.sharesPrev.top1 : null;
             out.push({
                 tone: prev !== null && cf.shares.top1 < prev ? 'good' : (cf.shares.top1 > 0.4 ? 'warn' : 'info'), view: 'customers',
+                title: 'Biggest customer', figure: pct(cf.shares.top1),
                 parts: [['The biggest customer brings '], [pct(cf.shares.top1), 'b'], [' of revenue' + (prev !== null ? ', ' + (cf.shares.top1 < prev ? 'down' : 'up') + ' from ' + pct(prev) + '.' : '.')]]
             });
         }
@@ -937,7 +939,7 @@
         const dr = parts.doors;
         if (dr.items.length >= 3) {
             out.push({
-                tone: 'info', view: 'customers',
+                tone: 'info', view: 'customers', title: 'From talk to order', figure: dr.hits + ' of ' + dr.items.length,
                 parts: [[''], [dr.hits + ' of ' + dr.items.length, 'b'], [' talks led to a paid project within a year' + (dr.months !== null && dr.hits ? ', a median of ' + Math.round(dr.months) + ' months later.' : '.')]]
             });
         }
@@ -950,7 +952,7 @@
             const b = sum(before, x => x.offers);
             if (a + b >= 4 && b > 0 && Math.abs(a - b) / b >= 0.3) {
                 out.push({
-                    tone: a > b ? 'good' : 'warn', view: 'overview',
+                    tone: a > b ? 'good' : 'warn', view: 'overview', title: 'Offers sent', figure: String(a),
                     parts: [['Offers sent in the last 3 months: '], [String(a), 'b'], [', against ' + b + ' in the 3 before.']]
                 });
             }
@@ -958,7 +960,7 @@
 
         if (data.unclear > 0) {
             out.push({
-                tone: 'warn', view: 'archive',
+                tone: 'warn', view: 'archive', title: 'Archive', figure: String(data.unclear),
                 parts: [[''], [data.unclear + (data.unclear === 1 ? ' archived project has' : ' archived projects have'), 'b'], [' no reason yet, so they count neither as won nor as lost.']]
             });
         }

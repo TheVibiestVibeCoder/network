@@ -161,14 +161,17 @@
         info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>'
     };
 
+    /** The findings as cards: what it is about, its figure big, the sentence; a click goes where it is shown. */
     function highlights(list) {
         if (!list.length) return '';
-        return card('ins-span-12', head('Highlights'), `<div class="ins-ins">${list.map(h => `
-            <button type="button" class="ins-in" data-goto="${esc(h.view)}">
-                <svg class="ins-ic is-${h.tone}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>
-                <span class="ins-in-t">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>
+        return `<div class="ins-hls ins-span-12">${list.map(h => `
+            <button type="button" class="ins-hl is-${h.tone}" data-goto="${esc(h.view)}">
+                <span class="ins-hl-top"><svg class="ins-hl-ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>${esc(h.title)}</span>
+                <span class="ins-hl-f">${esc(h.figure)}</span>
+                <span class="ins-hl-s">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>
+                <svg class="ins-hl-bg" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>
                 <svg class="ins-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-            </button>`).join('')}</div>`);
+            </button>`).join('')}</div>`;
     }
 
     function overviewKpis(k) {
