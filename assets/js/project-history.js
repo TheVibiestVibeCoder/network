@@ -80,10 +80,6 @@
             <text x="${L - 8}" y="${y(v) + 4}" class="ph-label" text-anchor="end">${v}%</text>`).join('');
         const ticks = [0, Math.round(span / 2), span].filter((v, i, a) => a.indexOf(v) === i).map((d, i, a) => `
             <text x="${x(d)}" y="${H - 6}" class="ph-label" text-anchor="${i === 0 ? 'start' : i === a.length - 1 ? 'end' : 'middle'}">${d === 0 ? 'Created' : days(d)}</text>`).join('');
-        const dots = points.map(p => `
-            <circle cx="${x(p.d).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="4" class="ph-dot">
-                <title>${esc(`${p.v}% from ${day(time(p.r.at))}${p.r.by ? ` (${p.r.by})` : ''}`)}</title>
-            </circle>`).join('');
 
         return `
             <div class="ph-block">
@@ -93,7 +89,6 @@
                     ${grid}
                     <path d="${area}" class="ph-area"/>
                     <path d="${path}" class="ph-line"/>
-                    ${dots}
                     ${ticks}
                 </svg>
             </div>`;
