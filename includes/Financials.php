@@ -41,7 +41,8 @@ class Financials
         // Recurring costs spotted in Bookkeeping that somebody turned down
         // (cashflow.js recurringSuggestions), as a JSON list of their keys.
         'dismissed_recurring' => '[]',
-        // The first VAT quarter tracked ("2026-Q3"); empty: the one before today's.
+        // The first VAT quarter tracked ("2026-Q3"); set to the one before
+        // today's the first time the settings are read (settings()).
         'vat_from' => '',
         // Which bank rows paid a quarter's VAT, or that it was settled
         // without one: {"2026-Q3": {"rows": [12], "settled": false}}.
@@ -409,7 +410,26 @@ class Financials
         $out['dismissed_recurring'] = is_array($dismissed) ? array_values(array_filter($dismissed, 'is_string')) : [];
         $out['vat_links'] = (object) self::cleanVatLinks(json_decode($out['vat_links'], true));
         $out['invoice_reminders'] = (object) self::cleanReminders(json_decode($out['invoice_reminders'], true));
+        // Without a first quarter the tracked ones would move on with each
+        // new quarter, and one not paid yet would drop out (on 1 January, Q3
+        // of the year before): the first look pins the one before today's.
+        if (!self::isQuarter($out['vat_from'])) {
+            $out['vat_from'] = self::quarterBeforeToday();
+            $this->db->prepare("
+                INSERT INTO app_settings (key, value, updated_at) VALUES ('fin_vat_from', :value, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+            ")->execute(['value' => $out['vat_from']]);
+        }
         return $out;
+    }
+
+    /** "2026-Q3" on a day in Q4 2026, in the CRM's time zone. */
+    private static function quarterBeforeToday(): string
+    {
+        $zone = defined('CALENDAR_TIMEZONE') ? CALENDAR_TIMEZONE : 'Europe/Vienna';
+        $today = new DateTimeImmutable('now', new DateTimeZone($zone));
+        $index = (int) $today->format('Y') * 4 + intdiv((int) $today->format('n') - 1, 3) - 1;
+        return intdiv($index, 4) . '-Q' . ($index % 4 + 1);
     }
 
     private static function isQuarter($value): bool
@@ -513,7 +533,7 @@ class Financials
         }
         if (array_key_exists('vat_from', $in)) {
             $from = (string) $in['vat_from'];
-            if ($from !== '' && !self::isQuarter($from)) {
+            if (!self::isQuarter($from)) {
                 return 'Unknown quarter';
             }
             $clean['vat_from'] = $from;

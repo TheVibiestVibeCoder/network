@@ -74,7 +74,7 @@
         // the two results), the liquidity card (low point, buffer), and the
         // months gone by in the table (one summary row when folded), and the
         // paid invoices (only the open ones when folded).
-        folds: { year: false, liquidity: false, past: false, invoices: false },
+        folds: { year: false, liquidity: false, past: false, lastYear: false, invoices: false },
         openMonths: new Set(),
         // A debt being added or edited (its detail view): a draft, id null for new.
         debtDraft: null,
@@ -346,6 +346,7 @@
         state.next12 = twelve.kpis;
         const toDecember = state.months >= 12 - input.now.month ? state.plan : twelve;
         state.year = CF.yearResult(state.txRows, toDecember, input.now);
+        state.lastYear = CF.lastYearMonths(state.txRows, input.now, toDecember.balance);
         state.invoices = buildInvoices();
         state.suggestions = CF.recurringSuggestions(state.txRows, state.overview.costs,
             (state.overview.settings || {}).dismissed_recurring || [], todayIso());
@@ -637,11 +638,11 @@
         const settings = state.overview.settings || {};
         const current = CF.quarterOf(todayIso());
         const from = CF.vatFrom(settings, todayIso());
-        const options = [];
-        for (let i = 0; i <= 8; i++) {
-            const key = CF.shiftQuarter(current, -i);
-            options.push(`<option value="${esc(key)}"${key === from ? ' selected' : ''}>${esc(CF.quarterLabel(key))}</option>`);
-        }
+        const keys = [];
+        for (let i = 0; i <= 8; i++) keys.push(CF.shiftQuarter(current, -i));
+        // Tracked from longer ago than the last two years: that one too.
+        if (from < keys[keys.length - 1]) keys.push(from);
+        const options = keys.map(key => `<option value="${esc(key)}"${key === from ? ' selected' : ''}>${esc(CF.quarterLabel(key))}</option>`);
         return `
             <div class="fin-balance-form fin-vat-panel">
                 <ul class="fin-vat-list">${quarters.map(vatQuarterRow).join('')}</ul>
@@ -816,10 +817,10 @@
     /** Past months (actuals) then the plan, as columns. */
     function chartColumns() {
         const p = state.plan;
-        // A past month's net is its result without VAT where this year's
-        // bookkeeping gives it, otherwise what came in less what went out.
+        // A past month's net is its result without VAT where Bookkeeping
+        // gives it (this year and last), otherwise what came in less what went out.
         const result = o => {
-            const m = state.year && state.year.months.find(x => x.offset === o);
+            const m = (state.year ? state.year.months : []).concat(state.lastYear || []).find(x => x.offset === o);
             return m ? m.result : null;
         };
         return p.past.map(m => {
@@ -1085,7 +1086,7 @@
         const dash = '<span class="fin-muted">–</span>';
         const months = state.year.months.filter(m => m.offset < 0);
         const pastOpen = state.folds.past;
-        const pastRows = months.map(m => {
+        const monthRows = list => list.map(m => {
             const open = state.openMonths.has(m.offset);
             return `
                 <tr class="fin-month is-past${open ? ' is-open' : ''}">
@@ -1101,7 +1102,11 @@
                 </tr>
                 ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(m.offset, null)}</td></tr>` : ''}`;
         }).join('');
-        const past = months.length ? pastSummary(months, pastOpen, balClass) + (pastOpen ? pastRows : '') : '';
+        // Last year, closed: one row above, so it stays in reach after New Year.
+        const last = (state.lastYear || []).some(m => m.rows) ? state.lastYear : [];
+        const lastOpen = state.folds.lastYear;
+        const past = (last.length ? pastSummary(last, lastOpen, balClass, 'lastYear') + (lastOpen ? monthRows(last) : '') : '')
+            + (months.length ? pastSummary(months, pastOpen, balClass, 'past') + (pastOpen ? monthRows(months) : '') : '');
 
         const sofar = state.year.months.find(m => m.offset === 0);
         const body = past + p.rows.map(r => {
@@ -1145,8 +1150,8 @@
             </div>`;
     }
 
-    /** "Jan – Oct 2026": the months gone by this year, in one row with their totals. */
-    function pastSummary(months, open, balClass) {
+    /** "Jan – Oct 2026": months gone by, in one row with their totals; fold: its key in state.folds. */
+    function pastSummary(months, open, balClass, fold) {
         const first = months[0];
         const last = months[months.length - 1];
         const label = months.length === 1 ? last.label
@@ -1160,7 +1165,7 @@
         return `
                 <tr class="fin-month is-past is-summary${open ? ' is-open' : ''}">
                     <th scope="row">
-                        <button type="button" class="fin-month-toggle" data-fin-fold="past" data-fin-focus="fold-past" aria-expanded="${open}"
+                        <button type="button" class="fin-month-toggle" data-fin-fold="${fold}" data-fin-focus="fold-${fold}" aria-expanded="${open}"
                             title="${open ? 'Fold the months gone by' : 'Show each month gone by'}">
                             ${ICON.chevron}<span>${esc(label)}</span><span class="fin-tag">actual</span>
                         </button>
@@ -1528,19 +1533,23 @@
         els.finInvoices.hidden = false;
         if (!years.length) years.push(new Date().getFullYear());
         const year = years.indexOf(state.invYear) >= 0 ? state.invYear : years[0];
-        const items = all.filter(i => i.year === year);
-        const sum = IL.summary(items);
-        // Folded: only the invoices still to be paid; the sums stay the year's.
+        // Folded: every invoice still to be paid, whatever its year - an
+        // unpaid one of last year must not vanish with the first of the new
+        // one. Unfolded: the chosen year, paid ones too.
         const open = state.folds.invoices;
-        const shown = open ? items : items.filter(i => i.outstanding > 0.005);
-        const settled = items.length - sum.open.count;
+        const unpaid = all.filter(i => i.outstanding > 0.005);
+        const items = open ? all.filter(i => i.year === year) : unpaid;
+        const sum = IL.summary(items);
+        const shown = items;
+        const settled = all.length - unpaid.length;
         const gaps = IL.gaps(all, year);
         const bankUntil = state.tx.invoices && state.tx.invoices.bankUntil;
 
         const head = [];
-        // Net, like the projects' amounts.
-        if (sum.open.amount > 0.005) head.push(`<strong>${esc(cents(sum.open.amount))}</strong> open`);
-        if (sum.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(sum.overdue.amount))}</strong> overdue`);
+        // Net, like the projects' amounts; what is owed counts all years.
+        const owed = IL.summary(unpaid);
+        if (owed.open.amount > 0.005) head.push(`<strong>${esc(cents(owed.open.amount))}</strong> open`);
+        if (owed.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(owed.overdue.amount))}</strong> overdue`);
 
         els.finInvoices.innerHTML = `
             <div class="fin-card-head">
@@ -1549,7 +1558,7 @@
                     ${head.length ? `<p class="fin-card-sub fin-inv-sums" title="Net${bankUntil ? `, payments booked until ${esc(fullDay(bankUntil))}` : ''}">${head.join(', ')}</p>` : ''}
                 </div>
                 <div class="fin-inv-tools">
-                    ${years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
+                    ${open && years.length > 1 ? segmented('inv-year', 'Year', years.map(y => ({ key: y, label: String(y) })), year) : ''}
                     <button type="button" class="fin-icon-btn" data-fin-inv-import data-fin-focus="inv-import" aria-expanded="${!!state.invImport}"
                         title="Add invoices from the invoice list" aria-label="Add invoices from the invoice list">${ICON_PASTE}</button>
                 </div>
@@ -1566,7 +1575,7 @@
                         <th scope="col">Net</th><th scope="col">VAT</th><th scope="col">Gross</th><th scope="col"><span class="sr-only">Reminder</span></th>
                     </tr></thead>
                     <tbody>${shown.map(invoiceRow).join('')}${shown.length ? '' : `
-                        <tr class="fin-inv-none"><td colspan="12">${items.length ? 'All paid' : 'No invoices yet'}</td></tr>`}</tbody>
+                        <tr class="fin-inv-none"><td colspan="12">${open || !all.length ? 'No invoices yet' : 'All paid'}</td></tr>`}</tbody>
                     <tfoot><tr>
                         <th scope="row" colspan="8">${esc(plural(sum.count, 'invoice'))}</th>
                         <td>${esc(cents(sum.net))}</td><td>${esc(cents(sum.vat))}</td><td><strong>${esc(cents(sum.gross))}</strong></td><td></td>
@@ -1574,7 +1583,7 @@
                 </table>
             </div>
             ${settled > 0 ? `<button type="button" class="fin-kpi-toggle fin-inv-toggle" data-fin-fold="invoices" data-fin-focus="fold-invoices" aria-expanded="${open}">
-                ${open ? 'Only open ones' : `Show paid (${settled})`}${ICON.chevron}
+                ${open ? 'Only open ones' : `All of ${year}`}${ICON.chevron}
             </button>` : ''}`;
     }
 
@@ -2233,8 +2242,9 @@
                 state.folds[key] = !state.folds[key];
                 if (key === 'liquidity' && !state.folds[key]) state.bufferOpen = false;
                 try { localStorage.setItem(FOLD_KEY + key, state.folds[key] ? '1' : '0'); } catch (e) { /* this visit only */ }
-                const host = key === 'past' ? els.finMonths : key === 'invoices' ? els.finInvoices : els.finKpis;
-                if (key === 'past') renderMonths(); else if (key === 'invoices') renderInvoices(); else renderKpis();
+                const months = key === 'past' || key === 'lastYear';
+                const host = months ? els.finMonths : key === 'invoices' ? els.finInvoices : els.finKpis;
+                if (months) renderMonths(); else if (key === 'invoices') renderInvoices(); else renderKpis();
                 const again = host.querySelector(`[data-fin-fold="${key}"]`);
                 if (again) again.focus();
             } else if (t.hasAttribute('data-fin-scenario-jump')) {

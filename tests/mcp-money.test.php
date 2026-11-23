@@ -379,6 +379,17 @@ test('the review snapshot carries the payments, so a stale proposal shows', func
     mcp('reviews.withdraw', ['review_id' => $r['review_id']]);
 });
 
+test('the first VAT quarter tracked is pinned on the first read, not moved on later', function () {
+    $db = Database::getInstance();
+    $db->exec("DELETE FROM app_settings WHERE key = 'fin_vat_from'");
+    $from = (new Financials())->settings()['vat_from'];
+    $today = new DateTimeImmutable('now', new DateTimeZone('Europe/Vienna'));
+    $index = (int) $today->format('Y') * 4 + intdiv((int) $today->format('n') - 1, 3) - 1;
+    eq($from, intdiv($index, 4) . '-Q' . ($index % 4 + 1), 'the quarter before today\'s');
+    eq($db->query("SELECT value FROM app_settings WHERE key = 'fin_vat_from'")->fetchColumn(), $from, 'stored');
+    eq((new Financials())->saveSettings(['vat_from' => '']), 'Unknown quarter', 'cannot be emptied');
+});
+
 test('meta says whether Financials are available', function () {
     eq(mcp('meta')['financials_available'], true, 'flag');
 });

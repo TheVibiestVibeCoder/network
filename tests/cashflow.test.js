@@ -243,6 +243,16 @@
         eq(months[7].closing, null, 'no balance, no closing');
     });
 
+    test('in January, last year\'s months stay at hand', () => {
+        const jan = { year: 2027, month: 0 };
+        const tx = [row('2026-03-10', 1200, -200), row('2026-12-02', -600, 100), row('2027-01-05', 500, 0)];
+        const last = CF.lastYearMonths(tx, jan, null);
+        eq([last.length, last[0].label, last[0].offset, last[11].label, last[11].offset], [12, 'Jan 2026', -12, 'Dec 2026', -1]);
+        eq([last[2].income, last[11].costs], [1000, 500], 'March and December, net');
+        const now = CF.yearMonths(tx, jan, null);
+        eq([now.length, now[0].income], [1, 500], 'the new year: only January');
+    });
+
     test('the year: actual so far plus the plan to December', () => {
         const p = run({
             months: 6,

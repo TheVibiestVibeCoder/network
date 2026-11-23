@@ -265,12 +265,24 @@
      *   -> [{ offset, label, income, costs, result, open, rows, closing }]
      */
     function yearMonths(transactions, now, today) {
+        return monthsBetween(transactions, now, today, -now.month, 0);
+    }
+
+    /**
+     * Last year's twelve months, the same way: on Financials it stays
+     * readable once the new year has begun.
+     */
+    function lastYearMonths(transactions, now, today) {
+        return monthsBetween(transactions, now, today, -now.month - 12, -now.month - 1);
+    }
+
+    function monthsBetween(transactions, now, today, from, to) {
         const rows = (transactions || []).filter(t => !t.excluded);
         const net = t => t.amount + (number(t.vat) || 0);
         const out = [];
-        for (let m = 0; m <= now.month; m++) {
-            const o = m - now.month;
-            const prefix = now.year + '-' + String(m + 1).padStart(2, '0');
+        for (let o = from; o <= to; o++) {
+            const c = RF.calendarMonth(o, now);
+            const prefix = c.year + '-' + String(c.month + 1).padStart(2, '0');
             const inMonth = rows.filter(t => t.date.slice(0, 7) === prefix);
             // VAT paid to or back from the tax office is neither.
             const flows = inMonth.filter(t => !t.vatQuarter);
@@ -868,7 +880,7 @@
         HORIZONS, DEFAULT_HORIZON, PAST_MONTHS, DEFAULT_SETTINGS,
         cleanSettings, incomeItems, costOccurrences, monthlyFixed,
         anchorOf, balanceToday, pastMonths, lastDayOf,
-        yearMonths, yearResult, recurringSuggestions,
+        yearMonths, lastYearMonths, yearResult, recurringSuggestions,
         quarterOf, quarterLabel, shiftQuarter, vatDue, vatLinks, markVatPayments, vatFrom, vatQuarters, vatCandidates, vatSuggestion,
         daysBetween, debtInterest, debtSummary,
         plan
