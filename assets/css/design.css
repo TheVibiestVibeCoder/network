@@ -14459,8 +14459,7 @@ textarea.form-input:focus,
 .ph-label { font-size: 11px; fill: var(--c-ink-4); font-variant-numeric: tabular-nums; }
 .ph-area { fill: color-mix(in srgb, var(--c-accent) 10%, transparent); }
 .ph-line { fill: none; stroke: var(--c-accent); stroke-width: 2; stroke-linejoin: round; }
-.ph-dot { fill: var(--c-surface); stroke: var(--c-accent); stroke-width: 2; }
-.ph-dot.is-rebuilt { stroke-dasharray: 2 2; }
+.ph-dot { fill: var(--c-accent); }
 
 .ph-bar {
     display: flex;
