@@ -77,7 +77,7 @@
 .review-list-card {
     background: var(--c-surface);
     border: 1px solid transparent;
-    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }

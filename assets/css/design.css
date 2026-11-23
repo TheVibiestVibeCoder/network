@@ -1458,7 +1458,7 @@ input[type="checkbox"] {
 .view-panel .todos-list {
     gap: 0;
     background: var(--c-surface);
-    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     overflow: hidden;
 }
@@ -5309,7 +5309,7 @@ textarea.form-input:focus {
     flex-direction: column;
     background: var(--c-surface);
     border: 1px solid var(--c-line);
-    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     overflow: hidden;
 }
 
@@ -5434,7 +5434,7 @@ textarea.form-input:focus {
 #bookkeepingView .bk-table-wrap,
 #bookkeepingView .bk-dropzone {
     border: 1px solid transparent;
-    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
     box-shadow: var(--e-1);
     background: var(--c-surface);
 }
