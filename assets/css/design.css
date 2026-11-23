@@ -14697,29 +14697,33 @@ textarea.form-input:focus,
 .ins-kd.is-hollow { box-shadow: inset 0 0 0 2px var(--c-ink-3); }
 .ins-kd.is-lost { box-shadow: inset 0 0 0 2px var(--c-danger); }
 
-/* Highlights: one card per finding, its figure in the finding's colour */
+/* Highlights: one card per finding, flat in a light shade of its colour */
 .ins-hls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .ins-hl {
-    --hl-ink: var(--c-accent);
-    position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-    min-width: 0; padding: 16px 18px; border: 1px solid transparent;
+    --hl: var(--c-accent); --hl-ink: var(--c-accent-2);
+    position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    min-width: 0; padding: 16px 18px 18px; border: 0;
     border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
-    background: var(--c-surface); box-shadow: var(--e-1);
+    background: color-mix(in srgb, var(--hl) 11%, var(--c-surface));
     color: var(--c-ink-2); font: inherit; text-align: left; cursor: pointer;
-    transition: box-shadow var(--dur-2) var(--ease);
+    transition: background-color var(--dur-2) var(--ease);
 }
-.ins-hl.is-good { --hl-ink: var(--c-success-ink); }
-.ins-hl.is-warn { --hl-ink: var(--c-danger-ink); }
-.ins-hl:hover { box-shadow: var(--e-2); }
+.ins-hl.is-good { --hl: var(--c-success); --hl-ink: var(--c-success-ink); }
+.ins-hl.is-warn { --hl: var(--c-danger); --hl-ink: var(--c-danger-ink); }
+.ins-hl:hover { background: color-mix(in srgb, var(--hl) 17%, var(--c-surface)); }
 .ins-hl:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
-.ins-hl-top { display: flex; align-items: center; gap: 6px; font-size: var(--t-sm); font-weight: 500; color: var(--c-ink-3); }
-.ins-hl-ic { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--hl-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.ins-hl-f { font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; color: var(--hl-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ins-hl-s { font-size: var(--t-sm); line-height: 1.45; color: var(--c-ink-3); }
-.ins-hl-s b { font-weight: 600; color: var(--c-ink-2); }
+.ins-hl-top { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); font-weight: 600; color: var(--hl-ink); }
+.ins-hl-ic {
+    flex: none; width: 26px; height: 26px; padding: 5px; border-radius: 50%;
+    background: color-mix(in srgb, var(--hl) 22%, var(--c-surface));
+    fill: none; stroke: var(--hl-ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.ins-hl-f { margin-top: 4px; font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; color: var(--hl-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-hl-s { font-size: var(--t-sm); line-height: 1.45; color: var(--c-ink-2); }
+.ins-hl-s b { font-weight: 600; color: var(--c-ink); }
 .ins-hl .ins-go {
-    position: absolute; top: 17px; right: 16px; width: 15px; height: 15px;
-    fill: none; stroke: var(--c-ink-4); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    position: absolute; top: 20px; right: 16px; width: 16px; height: 16px;
+    fill: none; stroke: var(--hl-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
     opacity: 0; transition: opacity var(--dur-2) var(--ease);
 }
 .ins-hl:hover .ins-go, .ins-hl:focus-visible .ins-go { opacity: 1; }
