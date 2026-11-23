@@ -54,7 +54,7 @@
 
     const RF = root.RevenueForecast;
 
-    const HORIZONS = [6, 12, 24];
+    const HORIZONS = [3, 6, 12];
     const DEFAULT_HORIZON = 12;
     // Past months shown from Bookkeeping, before this one.
     const PAST_MONTHS = 6;
