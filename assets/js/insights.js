@@ -494,25 +494,42 @@
             legend([[lk('var(--ins-prev)'), 'Open'], [lk('var(--c-accent)'), 'Weighted']])), body);
     }
 
-    /** One tile per product: its revenue and share, then won, order size and time to win. */
+    /** A ring of shares, 2px apart: [{ share, color, title }]. */
+    function donut(parts, center) {
+        const shown = parts.filter(x => x.share > 0.0005);
+        const gap = shown.length > 1 ? 0.6 : 0;
+        let at = 0;
+        const rings = shown.map(x => {
+            const len = x.share * 100;
+            const html = `<circle cx="70" cy="70" r="58" pathLength="100" stroke="${x.color}" stroke-dasharray="${Math.max(0.01, len - gap).toFixed(2)} 100" stroke-dashoffset="${(-at).toFixed(2)}"><title>${esc(x.title)}</title></circle>`;
+            at += len;
+            return html;
+        }).join('');
+        return `<div class="ins-donut" role="img" aria-label="${esc(shown.map(x => x.title).join(', '))}">
+            <svg viewBox="0 0 140 140" aria-hidden="true"><circle class="ins-donut-bg" cx="70" cy="70" r="58" pathLength="100"/>${rings}</svg>
+            <span class="ins-donut-c">${center}</span>
+        </div>`;
+    }
+
+    /** Revenue by product as a ring; beside it each product with its won, order size and time to win. */
     function productCard(t) {
         const sub = 'Revenue invoiced and projects decided in this period';
         if (!t.rows.length) return card('ins-span-12', head('By product', sub), empty('Nothing invoiced or decided in this period.'));
-        const tile = r => {
-            const none = r.name === IC.NO_PRODUCT;
-            const color = r.color || NONE_TONE;
-            return `<div class="ins-prod${none ? ' is-none' : ''}">
-                <p class="ins-prod-n">${sw(color)}<span>${esc(r.name)}</span></p>
-                <p class="ins-big">${esc(money(r.revenue))}${r.share !== null && r.revenue > 0 ? `<small>${pct(r.share)}</small>` : ''}</p>
-                <div class="ins-track is-thin"><span class="ins-hb" style="width:${P(Math.max(0, r.share || 0))};background:${color}"></span></div>
-                <ul class="ins-list">
-                    <li><span>Won</span><span>${r.decided ? `${r.won} of ${r.decided}` : (r.won ? String(r.won) : '–')}</span></li>
-                    <li><span>Median order</span><span>${r.order ? esc(money(r.order)) : '–'}</span></li>
-                    <li><span>Time to win</span><span>${esc(days(r.days))}</span></li>
-                </ul>
-            </div>`;
-        };
-        return card('ins-span-12', head('By product', sub), `<div class="ins-prods">${t.rows.map(tile).join('')}</div>`);
+        const rows = t.rows.slice().sort((a, b) => (a.name === IC.NO_PRODUCT) - (b.name === IC.NO_PRODUCT) || b.revenue - a.revenue);
+        const color = r => r.color || NONE_TONE;
+        const ring = donut(rows.filter(r => r.revenue > 0).map(r => ({ share: r.share || 0, color: color(r), title: r.name + ': ' + pct(r.share) + ' (' + money(r.revenue) + ')' })),
+            `<b>${esc(money(t.total.revenue))}</b><small>revenue</small>`);
+        const facts = r => [
+            r.decided ? `${r.won} of ${r.decided} won` : (r.won ? `${r.won} won` : ''),
+            r.order ? `median order ${money(r.order)}` : '',
+            r.days !== null ? `${Math.round(r.days)} days to win` : ''
+        ].filter(Boolean).join(', ');
+        const list = rows.map(r => `<li class="ins-prow${r.name === IC.NO_PRODUCT ? ' is-none' : ''}">
+            <span class="ins-prow-n">${sw(color(r))}<span>${esc(r.name)}</span></span>
+            <span class="ins-prow-v">${esc(money(r.revenue))}${r.revenue > 0 && r.share !== null ? `<small>${pct(r.share)}</small>` : ''}</span>
+            ${facts(r) ? `<span class="ins-prow-s">${esc(facts(r))}</span>` : ''}
+        </li>`).join('');
+        return card('ins-span-12', head('By product', sub), `<div class="ins-byp">${t.total.revenue > 0 ? ring : ''}<ul class="ins-plist">${list}</ul></div>`);
     }
 
     function renderSales(parts) {
