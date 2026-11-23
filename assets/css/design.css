@@ -947,7 +947,9 @@ h1, h2, h3, h4 {
 
 /* Every page's title in the same place: 12px below the panel's padding,
    centred in a row 42px high - where the sticky toolbars of Contacts,
-   To-dos and Projects put it (Bookkeeping and Calendar match it below). */
+   To-dos and Projects put it (Bookkeeping, Calendar and Log match it below).
+   The first card starts 12px under that row, on every page: 94px from the
+   top of the panel. */
 .view-head {
     display: flex;
     align-items: center;
@@ -956,7 +958,7 @@ h1, h2, h3, h4 {
     flex-wrap: wrap;
     box-sizing: border-box;
     min-height: 54px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     padding-top: 12px;
 }
 
@@ -1003,7 +1005,7 @@ h1, h2, h3, h4 {
     position: sticky;
     top: -28px;
     z-index: 20;
-    margin: 0 0 18px;
+    margin: 0;
     padding: 12px 0;
     background: var(--c-bg);
     border: 0;
@@ -4200,8 +4202,12 @@ input[type="checkbox"] {
         padding: 18px var(--page-pad) 28px;
     }
 
+    /* The title 10px below the panel's padding, as in the toolbars below,
+       and 12px between the head and the first card, as on wide screens. */
     .view-head {
-        margin-bottom: 14px;
+        min-height: 0;
+        margin-bottom: 12px;
+        padding-top: 10px;
         align-items: center;
     }
 
@@ -4214,8 +4220,8 @@ input[type="checkbox"] {
        actions as icons. */
     .view-panel .list-header {
         top: -18px;
-        margin-bottom: 12px;
-        padding: 10px 0;
+        margin-bottom: 0;
+        padding: 10px 0 12px;
     }
 
     .view-panel .list-header-top {
@@ -4349,7 +4355,7 @@ input[type="checkbox"] {
 #projectsView > .list-header {
     top: -28px;
     padding: 12px 0;
-    margin-bottom: 18px;
+    margin-bottom: 0;
     background: var(--c-bg);
 }
 
@@ -4380,8 +4386,8 @@ input[type="checkbox"] {
     #todoView .list-header,
     #projectsView > .list-header {
         top: -18px;
-        padding: 10px 0;
-        margin-bottom: 12px;
+        padding: 10px 0 12px;
+        margin-bottom: 0;
     }
 }
 
@@ -5197,7 +5203,7 @@ textarea.form-input:focus {
    -------------------------------------------------------------------------- */
 
 #logView .calendar-toolbar {
-    padding: 12px 0 14px;
+    padding: 12px 0;
     border: 0;
     background: transparent;
 }
@@ -5223,6 +5229,14 @@ textarea.form-input:focus {
         flex-basis: 100%;
         margin: 0 0 8px;
         font-size: 22px;
+    }
+
+    #logView .calendar-toolbar {
+        padding-top: 10px;
+    }
+
+    #logView .calendar-toolbar-left {
+        min-height: 0;
     }
 }
 
@@ -5383,7 +5397,7 @@ textarea.form-input:focus {
     box-sizing: border-box;
     height: auto;
     min-height: 54px;
-    margin: 0 0 16px;
+    margin: 0 0 12px;
     padding: 12px 0 0;
     background: transparent;
     border: 0;
@@ -5392,6 +5406,18 @@ textarea.form-input:focus {
 #bookkeepingView .bk-row-count {
     font-size: var(--t-sm);
     color: var(--c-ink-3);
+}
+
+/* Narrow screens: the title as small and as high as on every other page. */
+@media (max-width: 768px) {
+    #bookkeepingView .bk-bar {
+        min-height: 0;
+        padding-top: 10px;
+    }
+
+    #bookkeepingView .bk-bar-title {
+        font-size: 22px;
+    }
 }
 
 /* Column names come from the imported file; showing them as written is
@@ -10168,7 +10194,7 @@ details.import-instructions p {
 .fin-adjust {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .fin-adjust:empty {
