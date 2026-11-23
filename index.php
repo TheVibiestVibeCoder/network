@@ -804,6 +804,12 @@ function assetUrl(string $path): string
                         </svg>
                         <span class="nav-label">Financials</span>
                     </button>
+                    <button type="button" class="toggle-btn nav-item" data-view="insights" title="Insights">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 20.5V13"/><path d="M9.5 20.5V8.5"/><path d="M15 20.5V11"/><path d="M20.5 20.5V4.5"/>
+                        </svg>
+                        <span class="nav-label">Insights</span>
+                    </button>
                     <button type="button" class="toggle-btn nav-item" data-view="bookkeeping" title="Bookkeeping">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-2.5-1.6L14 21l-2-1.6L10 21l-2.5-1.6L5 21V4.5a1 1 0 0 1 1-1z"/><path d="M9 8.5h6M9 12.5h6"/>
@@ -1205,6 +1211,21 @@ function assetUrl(string $path): string
                     </div>
                     <!-- The costs, opened from the "Fixed costs" figure: a sheet like
                          a project's, where they are added and edited (financials.js). -->
+                </div>
+                <?php endif; ?>
+
+                <?php if ($isAdmin): ?>
+                <!-- Insights (admins only): how the company developed, from history
+                     only - Overview, Sales, Customers. Drawn by assets/js/insights.js,
+                     the figures from assets/js/insights-calc.js. -->
+                <div class="view-panel" id="insightsView">
+                    <div class="view-head ins-top">
+                        <div class="view-head-text">
+                            <h1 class="view-title">Insights</h1>
+                        </div>
+                        <div class="ins-tools" id="insTools"></div>
+                    </div>
+                    <div class="ins-page" id="insPage" aria-busy="true"></div>
                 </div>
                 <?php endif; ?>
 
@@ -2590,6 +2611,8 @@ function assetUrl(string $path): string
         <script src="<?= assetUrl('assets/js/cashflow.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/invoice-list.js') ?>"></script>
         <script src="<?= assetUrl('assets/js/financials.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/insights-calc.js') ?>"></script>
+        <script src="<?= assetUrl('assets/js/insights.js') ?>"></script>
         <?php endif; ?>
         <script src="<?= assetUrl('assets/js/review.js') ?>"></script>
         <?php if ($summaryEnabled): ?>

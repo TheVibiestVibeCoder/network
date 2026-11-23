@@ -2489,6 +2489,7 @@
         renderInvoices();
     });
 
-    window.CompanyInvoices = { forCompany: invoicesForCompany, all: invoicesByCompany };
+    // items: every invoice with its company and project, for the Insights tab.
+    window.CompanyInvoices = { forCompany: invoicesForCompany, all: invoicesByCompany, items: allInvoices };
     window.Financials = { load };
 })();

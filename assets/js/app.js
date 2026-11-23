@@ -127,6 +127,7 @@
         mapView: document.getElementById('mapView'),
         bookkeepingView: document.getElementById('bookkeepingView'),
         financialsView: document.getElementById('financialsView'),
+        insightsView: document.getElementById('insightsView'),
         reviewView: document.getElementById('reviewView'),
         composeView: document.getElementById('composeView'),
         usersView: document.getElementById('usersView'),
@@ -1608,7 +1609,7 @@
     // Every tab that can be opened. Used to vet what comes back out of
     // storage, so a stale or hand-edited value cannot leave the app with no
     // panel showing at all.
-    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'log', 'bookkeeping', 'financials', 'review', 'users'];
+    const VIEWS = ['workload', 'projects', 'todos', 'compose', 'list', 'calendar', 'log', 'bookkeeping', 'financials', 'insights', 'review', 'users'];
     const HOME_VIEW = 'workload';
     const VIEW_STORAGE_KEY = 'crm.currentView';
 
@@ -1629,7 +1630,7 @@
         // Bookkeeping, Financials, Users and the Log are only on the page for
         // admins, the Calendar for people with the calendar right, Quick add
         // only while it is switched on.
-        if ((stored === 'financials' || stored === 'bookkeeping' || stored === 'users' || stored === 'log' || stored === 'calendar' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
+        if ((stored === 'financials' || stored === 'insights' || stored === 'bookkeeping' || stored === 'users' || stored === 'log' || stored === 'calendar' || stored === 'compose') && !document.getElementById(stored + 'View')) return HOME_VIEW;
 
         return VIEWS.includes(stored) ? stored : HOME_VIEW;
     }
@@ -1686,6 +1687,9 @@
             // side with the current one until it replaces it.
             elements.financialsView.classList.toggle('active', view === 'financials');
         }
+        if (elements.insightsView) {
+            elements.insightsView.classList.toggle('active', view === 'insights');
+        }
         if (elements.reviewView) {
             elements.reviewView.classList.toggle('active', view === 'review');
         }
@@ -1724,6 +1728,10 @@
         } else if (view === 'financials') {
             if (window.Financials) {
                 window.Financials.load();
+            }
+        } else if (view === 'insights') {
+            if (window.Insights) {
+                window.Insights.load();
             }
         } else if (view === 'review') {
             if (window.CRMReview) {
