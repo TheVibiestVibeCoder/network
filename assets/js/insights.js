@@ -324,29 +324,87 @@
     // Sales
     // ------------------------------------------------------------------
 
-    const ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg>';
-
+    /**
+     * From lead to order as a sankey: each stage a bar in its colour, as
+     * tall as the projects that reached it; the stream along the top to the
+     * next stage, with the share that got there and how long it took; what
+     * got no further bends down - lost, still open, archived without a reason.
+     */
     function funnelCard(f) {
+        const sub = `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached`;
         if (!f.entered) return card('ins-span-12', head('From lead to order'), empty('No projects entered in this period.'));
-        // Like the stage band on the home page: a block in the stage's colour
-        // with the count, the stage's name and what became of them in it.
-        const TONES = ['lead', 'negotiation', 'proposal', 'progress'];
-        const stage = (s, i) => {
-            const won = i === 3;
-            const pills = won
-                ? (f.winRate === null ? '<span class="ins-pill">Nothing decided yet</span>' : `<span class="ins-pill">${esc(pct(f.winRate))} of decided</span>`)
-                    + (f.wonVolume ? `<span class="ins-pill">${esc(money(f.wonVolume))} in orders</span>` : '')
-                : (s.lost ? `<span class="ins-pill is-lost">${s.lost} lost</span>` : '') + (s.open ? `<span class="ins-pill">${s.open} open</span>` : '');
-            return `<div class="ins-stage" data-tone="${TONES[i]}">
-                <span class="ins-stage-top"><span class="ins-stage-n">${s.reached}</span><span class="ins-stage-l">${esc(s.name)}</span></span>
-                ${pills ? `<span class="ins-pills">${pills}</span>` : ''}
-            </div>`;
+        const TONES = ['var(--stage-lead)', 'var(--stage-negotiation)', 'var(--stage-proposal)', 'var(--stage-progress)'];
+        const EXITS = [
+            { key: 'lost', word: 'lost', cls: 'is-lost' },
+            { key: 'open', word: 'open', cls: 'is-open' },
+            { key: 'unclear', word: 'no reason', cls: 'is-unclear' }
+        ];
+        const NW = 12;
+        const TOP = 58;
+        const MAIN = 170;
+        const k = MAIN / f.entered;
+        const h = n => (n > 0 ? Math.max(3, n * k) : 0);
+        const xs = [0, 1, 2, 3].map(i => i * (1000 - NW) / 3);
+        const hs = f.steps.map(st => h(st.reached));
+        const exitTop = TOP + MAIN + 30;
+        const ribbon = (sx, y0, y1, tx, t0, t1) => {
+            const mx = (sx + tx) / 2;
+            return `M${sx.toFixed(1)} ${y0.toFixed(1)} C${mx.toFixed(1)} ${y0.toFixed(1)} ${mx.toFixed(1)} ${t0.toFixed(1)} ${tx.toFixed(1)} ${t0.toFixed(1)}`
+                + ` L${tx.toFixed(1)} ${t1.toFixed(1)} C${mx.toFixed(1)} ${t1.toFixed(1)} ${mx.toFixed(1)} ${y1.toFixed(1)} ${sx.toFixed(1)} ${y1.toFixed(1)} Z`;
         };
-        const step = s => `<div class="ins-step"><b>${s.next === null ? '–' : pct(s.next)}</b>${ARROW}<span>${s.days === null ? '' : esc(days(s.days))}</span></div>`;
-        const html = f.steps.map((s, i) => stage(s, i) + (i < 3 ? step(s) : '')).join('');
-        return card('ins-span-12', head('From lead to order',
-            `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached${f.unclear ? `; ${f.unclear} archived without a reason` : ''}`),
-            `<div class="ins-flow">${html}</div>`);
+        const left = x => P(x / 1000);
+
+        let svg = '';
+        let html = '';
+        let bottom = TOP + MAIN;
+        f.steps.forEach((st, i) => {
+            // The stage: its bar, its name and count above it.
+            svg += `<rect x="${xs[i].toFixed(1)}" y="${TOP}" width="${NW}" height="${hs[i].toFixed(1)}" rx="3" style="fill:${TONES[i]}"><title>${esc(st.name + ': ' + st.reached)}</title></rect>`;
+            const last = i === 3;
+            html += `<span class="ins-sk-stage${last ? ' is-end' : ''}" style="left:${left(last ? xs[i] + NW : xs[i])}"><b>${st.reached}</b>${esc(st.name)}</span>`;
+            if (last) return;
+
+            // On to the next stage, along the top.
+            const next = f.steps[i + 1];
+            const sx = xs[i] + NW;
+            if (hs[i + 1] > 0) {
+                svg += `<path class="ins-sk-flow" d="${ribbon(sx, TOP, TOP + hs[i + 1], xs[i + 1], TOP, TOP + hs[i + 1])}" style="fill:url(#insSk${i})"><title>${esc(next.reached + ' on to ' + next.name)}</title></path>`;
+            }
+            html += `<span class="ins-sk-rate" style="left:${left((sx + xs[i + 1]) / 2)};top:${(TOP + Math.max(hs[i + 1], 22) / 2).toFixed(0)}px"><b>${st.next === null ? '–' : pct(st.next)}</b>${st.days === null ? '' : `<small>${esc(days(st.days))}</small>`}</span>`;
+
+            // What got no further bends down to its own small bars.
+            const tx = sx + (xs[i + 1] - sx) * 0.42;
+            let y = TOP + hs[i + 1];
+            let ty = exitTop;
+            let labelY = -Infinity;
+            EXITS.forEach(ex => {
+                const n = st.stopped ? st.stopped[ex.key] : 0;
+                if (!n) return;
+                const hh = h(n);
+                // Still open: in the colour of the stage they are waiting in.
+                const tone = ex.key === 'open' ? ` style="fill:${TONES[i]}"` : '';
+                svg += `<path class="ins-sk-out ${ex.cls}" d="${ribbon(sx, y, y + hh, tx, ty, ty + hh)}"${tone}><title>${esc(n + ' ' + ex.word + ' at ' + st.name)}</title></path>`;
+                svg += `<rect class="ins-sk-end ${ex.cls}" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" width="${NW}" height="${hh.toFixed(1)}" rx="2"${tone}/>`;
+                labelY = Math.max(ty + hh / 2, labelY + 16);
+                html += `<span class="ins-sk-out-l ${ex.cls}" style="left:${left(tx + NW)};top:${labelY.toFixed(0)}px"><b>${n}</b> ${esc(ex.word)}</span>`;
+                y += hh;
+                ty += hh + 4;
+                bottom = Math.max(bottom, ty, labelY + 10);
+            });
+        });
+
+        // Won: how many of those decided, and what the orders came to.
+        const won = [f.winRate === null ? 'Nothing decided yet' : pct(f.winRate) + ' of decided', f.wonVolume ? money(f.wonVolume) + ' in orders' : ''].filter(Boolean);
+        html += `<span class="ins-sk-won" style="left:${left(1000)};top:${(TOP + hs[3] + 10).toFixed(0)}px">${won.map(x => `<span>${esc(x)}</span>`).join('')}</span>`;
+        bottom = Math.max(bottom, TOP + hs[3] + 40);
+
+        const H = Math.ceil(bottom + 12);
+        const grads = [0, 1, 2].map(i => `<linearGradient id="insSk${i}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:${TONES[i]}"/><stop offset="1" style="stop-color:${TONES[i + 1]}"/></linearGradient>`).join('');
+        return card('ins-span-12', head('From lead to order', f.unclear ? `${sub}; ${f.unclear} archived without a reason` : sub),
+            `<div class="ins-sk-wrap"><div class="ins-sk" style="height:${H}px" role="img" aria-label="${esc(f.steps.map(st => st.name + ' ' + st.reached).join(', '))}">
+                <svg viewBox="0 0 1000 ${H}" preserveAspectRatio="none" aria-hidden="true"><defs>${grads}</defs>${svg}</svg>
+                ${html}
+            </div></div>`);
     }
 
     function cohortCard(list) {

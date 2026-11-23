@@ -514,7 +514,12 @@
                 lost: rank < 3 ? cohort.filter(d => d.outcome === 'lost' && Math.min(RANK[d.stageNow] || 0, 2) === rank).length : 0,
                 open: cohort.filter(d => d.outcome === 'open' && d.furthest === rank).length,
                 next: rank < 3 ? (reached.length ? next.length / reached.length : null) : null,
-                days: rank < 3 ? median(days) : null
+                days: rank < 3 ? median(days) : null,
+                // Those that got no further than this stage, by what became of them.
+                stopped: rank < 3 ? ['lost', 'open', 'unclear'].reduce((out, outcome) => {
+                    out[outcome] = cohort.filter(d => d.furthest === rank && d.outcome === outcome).length;
+                    return out;
+                }, {}) : null
             };
         });
         const won = cohort.filter(d => d.outcome === 'won');

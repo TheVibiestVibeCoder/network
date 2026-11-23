@@ -169,6 +169,7 @@
         eq(f.unclear, 1);
         eq(f.winRate, 0.8);
         eq(f.steps[0].days, 30, 'median of 28, 97, 0, 45 and 30 days out of Lead');
+        eq(f.steps.slice(0, 3).map(s => s.stopped), [{ lost: 0, open: 0, unclear: 1 }, { lost: 0, open: 0, unclear: 0 }, { lost: 1, open: 1, unclear: 0 }], 'got no further: the flows out of the sankey');
     });
 
     test('moves rebuilt from the log give no durations', () => {
