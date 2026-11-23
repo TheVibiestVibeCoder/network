@@ -169,7 +169,6 @@
                 <span class="ins-hl-top"><svg class="ins-hl-ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>${esc(h.title)}</span>
                 <span class="ins-hl-f">${esc(h.figure)}</span>
                 <span class="ins-hl-s">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>
-                <svg class="ins-hl-bg" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>
                 <svg class="ins-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
             </button>`).join('')}</div>`;
     }
