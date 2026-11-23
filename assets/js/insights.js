@@ -27,7 +27,8 @@
 
     const state = {
         view: stored(VIEW_KEY, 'overview'),
-        period: stored(PERIOD_KEY, null),
+        // A year is not kept: the page opens on the running one, also after New Year.
+        period: /^(12m|all)$/.test(stored(PERIOD_KEY, '')) ? stored(PERIOD_KEY, '') : null,
         data: null,
         parts: null,
         reasons: {},
@@ -97,11 +98,6 @@
         return lum > 0.6 ? 'is-dark' : 'is-light';
     }
 
-    function productColor(name) {
-        const p = (state.data ? state.data.products : []).find(x => x.name === name);
-        return p && p.color ? p.color : null;
-    }
-
     // ------------------------------------------------------------------
     // Pieces every chart is made of
     // ------------------------------------------------------------------
@@ -125,8 +121,10 @@
         return `<section class="ins-card${cls ? ' ' + cls : ''}">${head}${body}${note ? `<p class="ins-note">${note}</p>` : ''}</section>`;
     }
 
+    /** A card's title, a line below it (text, or { html }) and a legend on the right. */
     function head(title, sub, right) {
-        return `<div class="ins-head"><div><h2 class="ins-h">${esc(title)}</h2>${sub ? `<p class="ins-sub">${esc(sub)}</p>` : ''}</div>${right || ''}</div>`;
+        const line = sub && sub.html ? sub.html : esc(sub);
+        return `<div class="ins-head"><div><h2 class="ins-h">${esc(title)}</h2>${sub ? `<p class="ins-sub">${line}</p>` : ''}</div>${right || ''}</div>`;
     }
 
     function legend(items) {
@@ -177,12 +175,10 @@
             </button>`).join('')}</div>`);
     }
 
-    function overviewKpis(k, cumulative) {
+    function overviewKpis(k) {
         const p = state.parts.period;
-        const spark = cumulative.cur.length ? sparkBars() : '';
-        return `<div class="ins-kpis ins-span-12">
-            ${kpi('Revenue', esc(money(k.revenue)), delta(k.revenue, k.revenuePrev, true, money), spark)}
-            ${kpi('Cash in', esc(money(k.cash)), delta(k.cash, k.cashPrev, true, money))}
+        return `<div class="ins-kpis is-five ins-span-12">
+            ${kpi('Payments received', esc(money(k.cash)), delta(k.cash, k.cashPrev, true, money))}
             ${kpi('Customers', String(k.customers), `${k.newCustomers} new, ${k.returning} returning${k.customersPrev !== null && p.prev ? ` (${p.kind === 'year' ? p.year - 1 : 'before'}: ${k.customersPrev})` : ''}`)}
             ${kpi('Won', `${k.won}<small>${k.won === 1 ? 'project' : 'projects'}</small>`, k.wonVolume ? `${esc(money(k.wonVolume))} in orders` : '')}
             ${kpi('Win rate', k.decided >= 10 ? pct(k.winRate) : (k.decided ? `${k.won}<small>of ${k.decided}</small>` : '–'), !k.decided ? 'Nothing decided yet' : (k.decided >= 10 ? `${k.won} of ${k.decided} decided` : 'Won of decided'))}
@@ -190,19 +186,14 @@
         </div>`;
     }
 
-    /** Revenue per month over the last 12, for the tile. */
-    function sparkBars() {
-        const data = state.data;
-        const end = data.today.slice(0, 7);
-        const months = [];
-        for (let i = 11; i >= 0; i--) months.push(IC.addMonths(end, -i));
-        const values = months.map(m => data.invoices.filter(x => x.date.slice(0, 7) === m).reduce((s, x) => s + x.net, 0));
-        const max = Math.max.apply(null, values.concat([1]));
+    /** "+52% on 2025 to the same day": the period's revenue against the one before. */
+    function revenueChange(k) {
         const p = state.parts.period;
-        return `<div class="ins-spark" role="img" aria-label="Revenue per month over the last 12 months">${values.map((v, i) => {
-            const inPeriod = months[i] + '-01' >= p.start.slice(0, 7) + '-01' && months[i] + '-01' <= p.end;
-            return `<span class="ins-sb${inPeriod ? '' : ' is-prev'}" style="left:${P(i / 12)};height:${P(Math.max(0, v) / max)}" title="${esc(monthLabel(months[i]) + ' ' + months[i].slice(0, 4) + ': ' + money(v))}"></span>`;
-        }).join('')}</div>`;
+        if (!p.prev || !k.revenuePrev) return '';
+        const d = (k.revenue - k.revenuePrev) / Math.abs(k.revenuePrev);
+        const cls = Math.abs(d) < 0.005 ? '' : (d > 0 ? 'is-up' : 'is-down');
+        const vs = p.kind === 'year' ? 'on ' + (p.year - 1) + (p.running ? ' to the same day' : '') : 'on the 12 months before';
+        return `<span class="ins-chg ${cls}">${signed(d)}</span> ${vs}, net by invoice date`;
     }
 
     function revenueCard(c) {
@@ -238,7 +229,8 @@
                     ${xLabels(labels)}
                 </div>
             </div>`;
-        return card('ins-span-8', head(p.kind === 'year' && p.running ? 'Revenue year to date' : 'Revenue added up', 'Net, by invoice date',
+        const change = revenueChange(state.parts.kpis);
+        return card('ins-span-8', head(p.kind === 'year' && p.running ? 'Revenue year to date' : 'Revenue added up', change ? { html: change } : 'Net, by invoice date',
             prev ? legend([[lk('var(--c-accent)'), curName], [lk('var(--ins-prev)'), prevName]]) : ''), body);
     }
 
@@ -323,7 +315,7 @@
 
     function renderOverview(parts) {
         return `${highlights(parts.highlights)}
-            ${overviewKpis(parts.kpis, parts.cumulative)}
+            ${overviewKpis(parts.kpis)}
             ${revenueCard(parts.cumulative)}
             ${quartersCard(parts.quarters)}
             ${mixCard(parts.mix)}
@@ -502,21 +494,25 @@
             legend([[lk('var(--ins-prev)'), 'Open'], [lk('var(--c-accent)'), 'Weighted']])), body);
     }
 
-    function productTable(t) {
-        if (!t.rows.length) return card('ins-span-12', head('By product', 'Projects entered in this period'), empty('No projects in this period.'));
-        const row = (name, color, r, cls) => `<div class="ins-tr${cls || ''}">
-            <span class="ins-pn">${color !== undefined ? sw(color || NONE_TONE) : ''}${esc(name)}</span>
-            <span class="ins-num">${r.won}</span>
-            <span class="ins-num">${rate(r.won, r.decided)}</span>
-            <span class="ins-num">${r.order ? esc(money(r.order)) : '–'}</span>
-            <span class="ins-num">${esc(days(r.days))}</span>
-            <span class="ins-num">${esc(money(r.revenue))}</span>
-        </div>`;
-        return card('ins-span-12', head('By product', 'Projects entered in this period, revenue invoiced in it'), `<div class="ins-tbl">
-            <div class="ins-tr is-th"><span>Product</span><span class="ins-num">Won</span><span class="ins-num">Win rate</span><span class="ins-num">Median order</span><span class="ins-num">Time to win</span><span class="ins-num">Revenue</span></div>
-            ${t.rows.map(r => row(r.name, r.color, r)).join('')}
-            ${row('All products', undefined, t.total, ' is-total')}
-        </div>`);
+    /** One tile per product: its revenue and share, then won, order size and time to win. */
+    function productCard(t) {
+        const sub = 'Revenue invoiced and projects decided in this period';
+        if (!t.rows.length) return card('ins-span-12', head('By product', sub), empty('Nothing invoiced or decided in this period.'));
+        const tile = r => {
+            const none = r.name === IC.NO_PRODUCT;
+            const color = r.color || NONE_TONE;
+            return `<div class="ins-prod${none ? ' is-none' : ''}">
+                <p class="ins-prod-n">${sw(color)}<span>${esc(r.name)}</span></p>
+                <p class="ins-big">${esc(money(r.revenue))}${r.share !== null && r.revenue > 0 ? `<small>${pct(r.share)}</small>` : ''}</p>
+                <div class="ins-track is-thin"><span class="ins-hb" style="width:${P(Math.max(0, r.share || 0))};background:${color}"></span></div>
+                <ul class="ins-list">
+                    <li><span>Won</span><span>${r.decided ? `${r.won} of ${r.decided}` : (r.won ? String(r.won) : '–')}</span></li>
+                    <li><span>Median order</span><span>${r.order ? esc(money(r.order)) : '–'}</span></li>
+                    <li><span>Time to win</span><span>${esc(days(r.days))}</span></li>
+                </ul>
+            </div>`;
+        };
+        return card('ins-span-12', head('By product', sub), `<div class="ins-prods">${t.rows.map(tile).join('')}</div>`);
     }
 
     function renderSales(parts) {
@@ -527,7 +523,7 @@
             ${curvesCard(parts.curves)}
             ${lossesCard(parts.losses)}
             ${pipelineCard(parts.pipeline)}
-            ${productTable(parts.byProduct)}`;
+            ${productCard(parts.byProduct)}`;
     }
 
     // ------------------------------------------------------------------
@@ -560,14 +556,14 @@
         const rest = paying.slice(8);
         const restNet = rest.reduce((s, x) => s + x.net, 0);
         const max = Math.max(top[0].net, restNet);
-        const row = (x, label, sub, cls, attrs) => `<div class="ins-hrow">
-            <span class="ins-hrow-l">${attrs ? `<button type="button" class="ins-name" ${attrs}>${esc(label)}</button>` : esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+        const row = (x, label, isNew, cls, attrs) => `<div class="ins-hrow">
+            <span class="ins-hrow-l is-named">${attrs ? `<button type="button" class="ins-name" ${attrs} title="${esc(label)}">${esc(label)}</button>` : `<span>${esc(label)}</span>`}${isNew ? '<span class="ins-chip">New</span>' : ''}</span>
             <div class="ins-track"><span class="ins-hb${cls}" style="width:${P(x / max)}"></span></div>
             <span class="ins-hrow-v">${esc(money(x))}<small>${pct(c.total > 0 ? x / c.total : null)}</small></span>
         </div>`;
-        const rows = top.map(x => row(x.net, x.name, [x.sector, x.isNew ? 'new' : ''].filter(Boolean).join(', '), '', x.companyId ? `data-company="${x.companyId}"` : '')).join('')
-            + (rest.length ? row(restNet, plural(rest.length, 'other', 'others'), '', ' is-grey', '') : '');
-        return card('ins-span-6', head('Revenue by customer', 'Net, by invoice date'), `<div class="ins-rows">${rows}</div>`);
+        const rows = top.map(x => row(x.net, x.name, x.isNew, '', x.companyId ? `data-company="${x.companyId}"` : '')).join('')
+            + (rest.length ? row(restNet, plural(rest.length, 'other', 'others'), false, ' is-grey', '') : '');
+        return card('ins-span-6', head('Revenue by customer', 'Net, by invoice date'), `<div class="ins-rows is-wide">${rows}</div>`);
     }
 
     function newReturningCard(list) {
@@ -592,41 +588,54 @@
             total > 0 ? `New customers brought <b>${pct(fresh / total)}</b> of revenue.` : '');
     }
 
-    function lanesCard(l) {
-        if (!l.rows.length) return card('ins-span-12', head('How customers grew', 'Their projects over the last 24 months'), empty('No customer with invoices in this period yet.'));
-        const size = b => (8 + Math.sqrt(Math.max(0, b || 0) / 1000) * 3.2).toFixed(1) + 'px';
-        const lane = r => `<div class="ins-lane">
-            <span class="ins-lane-l"><button type="button" class="ins-name" data-company="${r.companyId}">${esc(r.name)}</button>${r.sector ? `<small>${esc(r.sector)}</small>` : ''}</span>
-            <div class="ins-ltrack">
-                ${l.today !== null ? `<span class="ins-today" style="left:${P(l.today)}"></span>` : ''}
-                ${r.events.map(e => {
-                    const d = e.deal;
-                    const attrs = d.archived ? 'disabled' : `data-project="${d.id}"`;
-                    if (e.kind === 'lost') return `<button type="button" class="ins-ev is-lost" style="left:${P(e.x)}" ${attrs} title="${esc(d.name + ': lost')}" aria-label="${esc(d.name + ': lost')}"></button>`;
-                    if (e.kind === 'talk') return `<button type="button" class="ins-ev is-talk" style="left:${P(e.x)}" ${attrs} title="${esc(d.name)}" aria-label="${esc(d.name)}"></button>`;
-                    const color = productColor(d.product) || 'var(--c-accent)';
-                    return `<button type="button" class="ins-ev" style="left:${P(e.x)};width:${size(e.budget)};height:${size(e.budget)};background:${color}" ${attrs} title="${esc(d.name + ': ' + (d.product || 'won') + ', ' + money(e.budget))}" aria-label="${esc(d.name)}"></button>`;
-                }).join('')}
-            </div>
+    /**
+     * Revenue per year as a table: each amount with a bar below, on one
+     * scale for the table; the last year darker, the years before grey; the
+     * change of the last year on the right.
+     */
+    function yearGrid(t, rows, opts) {
+        const n = t.years.length;
+        const last = t.years[n - 1];
+        const max = Math.max.apply(null, rows.reduce((list, r) => list.concat(r.values), []).concat([1]));
+        const label = y => (y.running ? y.year + ' so far' : String(y.year));
+        const changeTitle = last.running ? `${last.year} so far against ${last.year - 1} to the same day` : `${last.year} against ${last.year - 1}`;
+        const cell = (v, i, total, grey, bars) => {
+            if (Math.abs(v) < 0.005) return '<span class="ins-yc is-zero">–</span>';
+            const share = opts.shares && bars && total > 0 ? `<small>${pct(v / total)}</small>` : '';
+            return `<span class="ins-yc"><span>${esc(money(v))}${share}</span>${bars ? `<span class="ins-yc-b"><span class="${grey || i < n - 1 ? 'is-grey' : ''}" style="width:${P(Math.max(0, v) / max)}"></span></span>` : ''}</span>`;
+        };
+        const change = r => {
+            if (r.isNew) return '<span class="ins-chip">New</span>';
+            if (r.change === null || r.change === undefined) return '<span class="ins-yr-x">–</span>';
+            const cls = Math.abs(r.change) < 0.005 ? '' : (r.change > 0 ? 'is-up' : 'is-down');
+            return `<span class="${cls}">${signed(r.change)}</span>`;
+        };
+        const line = (r, cls, name, bars) => `<div class="ins-yr${cls || ''}">
+            <span class="ins-yr-n">${name}</span>
+            ${r.values.map((v, i) => cell(v, i, t.totals[i], cls === ' is-none', bars)).join('')}
+            ${n > 1 ? `<span class="ins-yr-c">${change(r)}</span>` : ''}
         </div>`;
-        const start = l.start;
-        // Quarters along the bottom, January with its year.
-        const ticks = [];
-        for (let i = 0; i < 24; i++) {
-            const m = IC.addMonths(start, i);
-            if ((+m.slice(5) - 1) % 3) continue;
-            ticks.push({ left: P(i / 24), label: m.slice(5) === '01' ? m.slice(0, 4) : monthLabel(m), year: m.slice(5) === '01' });
-        }
-        const products = state.data.products.filter(p => l.rows.some(r => r.events.some(e => e.kind === 'won' && e.deal.product === p.name)));
-        return card('ins-span-12', head('How customers grew', 'Their projects over the last 24 months, sized by the order',
-            legend(products.map(p => [`<span class="ins-kd" style="background:${p.color}"></span>`, p.name]).concat([[dot('is-small'), 'Talk or unpaid'], [dot('is-lost'), 'Lost']]))),
-            `${l.rows.map(lane).join('')}<div class="ins-laxis" aria-hidden="true">${ticks.map(t => `<span class="${t.year ? 'is-year' : ''}" style="left:${t.left}">${esc(t.label)}</span>`).join('')}</div>`);
+        return `<div class="ins-yt" style="--ins-years:${n}">
+            <div class="ins-yr is-th"><span>${esc(opts.what)}</span>${t.years.map(y => `<span>${esc(label(y))}</span>`).join('')}${n > 1 ? `<span class="ins-yr-c" title="${esc(changeTitle)}">Change</span>` : ''}</div>
+            ${rows.map(r => line(r, r.cls, r.nameHtml, true)).join('')}
+            ${line({ values: t.totals, change: t.change }, ' is-total', esc(opts.total), false)}
+        </div>`;
+    }
+
+    function growthCard(g) {
+        const sub = 'Revenue per year, net by invoice date';
+        if (!g.rows.length) return card('ins-span-8', head('How customers grew', sub), empty('No invoices in these years.'));
+        const rows = g.rows.map(r => Object.assign({}, r, {
+            nameHtml: r.companyId ? `<button type="button" class="ins-name" data-company="${r.companyId}" title="${esc(r.name)}">${esc(r.name)}</button>` : `<span>${esc(r.name)}</span>`
+        }));
+        return card('ins-span-8', head('How customers grew', sub),
+            yearGrid(g, rows, { what: 'Customer', total: g.more ? `All customers (${g.more} more)` : 'All customers' }));
     }
 
     function doorsCard(d) {
-        const sub = 'Talks and unpaid work at a customer without a paid order before';
-        if (!d.items.length) return card('ins-span-4', head('Talks that opened doors', sub), empty('No talk in this period at a customer we had no order from.'));
-        return card('ins-span-4', head('Talks that opened doors', sub), `
+        const sub = 'Talks and unpaid work for customers we had no paid order from yet';
+        if (!d.items.length) return card('ins-span-4', head('From talk to order', sub), empty('No talk in this period for a customer we had no order from.'));
+        return card('ins-span-4', head('From talk to order', sub), `
             <p class="ins-big">${d.hits}<small>of ${d.items.length}</small></p>
             <p class="ins-sub ins-big-sub">led to a paid project within 12 months</p>
             <div class="ins-units">${d.items.map(x => `<button type="button" class="ins-u is-round ${x.order ? 'is-hit' : 'is-miss'}" ${x.talk.archived ? 'disabled' : `data-project="${x.talk.id}"`} title="${esc(x.talk.name + (x.order ? ' → ' + x.order.name : ''))}" aria-label="${esc(x.talk.name)}"></button>`).join('')}</div>
@@ -664,28 +673,27 @@
     }
 
     function sectorsCard(s) {
-        const sub = 'Share of revenue, and orders won';
+        const sub = 'Revenue per year and its share, by the customer\'s sector';
         if (!s.withSector) {
-            return card('ins-span-4', head('By sector', sub), empty('No company has a sector yet. Add it in a company\'s sheet, under Edit.'));
+            return card('ins-span-8', head('By sector', sub), empty(s.anySector
+                ? 'No revenue in these years from a company with a sector.'
+                : 'No company has a sector yet. Add it in a company\'s sheet, under Edit.'));
         }
-        const rows = s.rows.concat(s.none ? [s.none] : []);
-        const max = Math.max.apply(null, rows.map(r => r.share || 0).concat([0.01]));
-        return card('ins-span-4', head('By sector', sub), `<div class="ins-rows">${rows.map(r => `
-            <div class="ins-srow${r.name === IC.NO_SECTOR ? ' is-none' : ''}">
-                <div class="ins-srow-t"><span>${esc(r.name)}</span><span>${pct(r.share)}${r.decided ? `<small>won ${r.won} of ${r.decided}</small>` : ''}</span></div>
-                <div class="ins-track is-thin"><span class="ins-hb${r.name === IC.NO_SECTOR ? ' is-grey' : ''}" style="width:${P((r.share || 0) / max)}"></span></div>
-            </div>`).join('')}</div>`,
-            s.none && s.none.share >= 0.2 ? `<b>${pct(s.none.share)}</b> of revenue comes from companies without a sector.` : '');
+        const rows = s.rows.map(r => Object.assign({}, r, { nameHtml: `<span>${esc(r.name)}</span>` }))
+            .concat(s.none ? [Object.assign({}, s.none, { cls: ' is-none', nameHtml: `<span>${esc(s.none.name)}</span>` })] : []);
+        const last = s.none ? s.none.values[s.none.values.length - 1] / (s.totals[s.totals.length - 1] || 1) : 0;
+        return card('ins-span-8', head('By sector', sub), yearGrid(s, rows, { what: 'Sector', total: 'All', shares: true }),
+            last >= 0.2 ? `<b>${pct(last)}</b> of the revenue in ${s.years[s.years.length - 1].year} comes from companies without a sector.` : '');
     }
 
     function renderCustomers(parts) {
         return `${customerKpis(parts.customers)}
             ${byCustomerCard(parts.customers)}
             ${newReturningCard(parts.newReturning)}
-            ${lanesCard(parts.lanes)}
+            ${growthCard(parts.growth)}
             ${doorsCard(parts.doors)}
-            ${paymentsCard(parts.payments)}
-            ${sectorsCard(parts.sectors)}`;
+            ${sectorsCard(parts.sectors)}
+            ${paymentsCard(parts.payments)}`;
     }
 
     // ------------------------------------------------------------------
@@ -728,7 +736,7 @@
         if (!S) return;
         const block = (h, span) => `<section class="ins-card ${span}"><div class="ins-head">${S.text('34%')}</div>${S.block('100%', h + 'px')}</section>`;
         const tile = `<div class="ins-kpi">${S.text('50%')}${S.block('62%', '26px')}${S.text('70%')}</div>`;
-        els.page.innerHTML = `${block(96, 'ins-span-12')}<div class="ins-kpis ins-span-12">${tile.repeat(6)}</div>${block(260, 'ins-span-8')}${block(260, 'ins-span-4')}`;
+        els.page.innerHTML = `${block(96, 'ins-span-12')}<div class="ins-kpis is-five ins-span-12">${tile.repeat(5)}</div>${block(260, 'ins-span-8')}${block(260, 'ins-span-4')}`;
         els.page.setAttribute('aria-busy', 'true');
     }
 
@@ -804,7 +812,7 @@
                 render();
             } else if (p) {
                 state.period = p.dataset.insPeriod;
-                store(PERIOD_KEY, state.period);
+                store(PERIOD_KEY, /^year:/.test(state.period) ? 'year' : state.period);
                 render();
             }
         });

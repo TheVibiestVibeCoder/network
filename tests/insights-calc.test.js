@@ -216,11 +216,39 @@
         eq(d.volume, 3000);
     });
 
-    test('sectors: revenue and orders by the customer\'s sector', () => {
+    test('sectors: revenue per year, 2026 against the same days of 2025', () => {
         const data = fixture();
         const s = IC.sectors(data, IC.period('year:2026', TODAY, data.first));
-        eq(s.rows.map(r => [r.name, r.net, r.won, r.decided]), [['Media', 3000, 2, 2], ['Energy', 5000, 1, 2]].sort((a, b) => b[1] - a[1]));
-        eq([s.none.net, s.none.won], [10000, 1], 'no sector yet');
+        eq(s.years.map(y => [y.year, y.running]), [[2025, false], [2026, true]], 'from the first data on');
+        eq(s.rows.map(r => [r.name, r.values]), [['Energy', [14000, 5000]], ['Media', [0, 3000]]], 'biggest in 2026 first');
+        near(s.rows[0].change, -0.5, 'Energy: 5k against 10k by 23 Nov 2025');
+        eq(s.rows[1].change, null, 'nothing from Media the year before');
+        eq(s.none.values, [2000, 10000], 'no sector yet');
+        eq(s.totals, [16000, 18000]);
+        near(s.change, 0.5, 'all: 18k against 12k');
+    });
+
+    test('how customers grew: revenue per year, new ones marked', () => {
+        const data = fixture();
+        const g = IC.customerYears(data, IC.period('12m', TODAY, data.first), 8);
+        eq(g.rows.map(r => [r.name, r.values, r.isNew]), [
+            ['Alpha GmbH', [14000, 5000], false], ['Beta', [2000, 9000], false], ['Gamma AG', [0, 3000], true], ['Somebody', [0, 1000], true]
+        ], 'biggest over both years first');
+        near(g.rows[1].change, 3.5, 'Beta: 9k against 2k');
+        const past = IC.customerYears(data, IC.period('year:2025', TODAY, data.first), 8);
+        eq(past.years.map(y => y.year), [2025], 'a past year: no years before the first data');
+        eq(past.rows[0].change, null, 'nothing to compare with');
+    });
+
+    test('by product: what was decided and invoiced in the period', () => {
+        const data = fixture();
+        const t = IC.byProduct(data, IC.period('year:2026', TODAY, data.first));
+        const row = name => t.rows.find(r => r.name === name);
+        eq([row('Workshop').won, row('Workshop').decided, row('Workshop').revenue], [2, 3, 8000], 'P1 and P4 won, the lost one');
+        eq(row('Workshop').order, 4000, 'median of 5k and 3k');
+        eq(row('Workshop').days, 52, 'median of 59 and 45 days');
+        near(row('Risk Briefing').share, 0.5, '9k of 18k');
+        eq([t.total.won, t.total.decided], [4, 5]);
     });
 
     test('losses and reasons', () => {

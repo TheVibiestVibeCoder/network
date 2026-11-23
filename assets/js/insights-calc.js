@@ -683,39 +683,29 @@
         });
     }
 
-    /** Per product: won, win rate, median order, time to win, revenue. */
+    /**
+     * Per product, for the period: revenue and its share, projects won
+     * against those decided in it, the median order and time to win.
+     */
     function byProduct(data, p) {
         const names = data.products.map(x => x.name).concat([NO_PRODUCT]);
-        const nameOf = d => (d.product && names.includes(d.product) ? d.product : NO_PRODUCT);
-        const entered = data.deals.filter(d => within(d.created, p));
-        const rows = names.map(name => {
-            const mine = entered.filter(d => nameOf(d) === name);
-            const won = mine.filter(d => d.outcome === 'won');
-            const lost = mine.filter(d => d.outcome === 'lost');
-            const revenue = sum(data.invoices.filter(i => within(i.date, p) && (i.product && names.includes(i.product) ? i.product : NO_PRODUCT) === name), i => i.net);
-            const color = (data.products.find(x => x.name === name) || {}).color || null;
-            return {
-                name, color,
-                entered: mine.length,
-                won: won.length,
-                decided: won.length + lost.length,
-                order: median(won.map(d => d.budget).filter(b => b > 0)),
-                days: median(won.filter(d => d.enteredOpen).map(d => daysBetween(d.created, d.decidedAt)).filter(n => n > 0)),
-                revenue
-            };
-        }).filter(r => r.entered || Math.abs(r.revenue) > 0.005);
-        const won = entered.filter(d => d.outcome === 'won');
-        const lost = entered.filter(d => d.outcome === 'lost');
-        return {
-            rows,
-            total: {
-                won: won.length,
-                decided: won.length + lost.length,
-                order: median(won.map(d => d.budget).filter(b => b > 0)),
-                days: median(won.filter(d => d.enteredOpen).map(d => daysBetween(d.created, d.decidedAt)).filter(n => n > 0)),
-                revenue: revenueIn(data.invoices, p)
-            }
-        };
+        const nameOf = product => (product && names.includes(product) ? product : NO_PRODUCT);
+        const won = wonIn(data.deals, p);
+        const lost = lostIn(data.deals, p);
+        const total = revenueIn(data.invoices, p);
+        const figures = (w, l, revenue) => ({
+            won: w.length,
+            decided: w.length + l.length,
+            order: median(w.map(d => d.budget).filter(b => b > 0)),
+            days: median(w.filter(d => d.enteredOpen).map(d => daysBetween(d.created, d.decidedAt)).filter(n => n > 0)),
+            revenue,
+            share: total > 0 ? revenue / total : null
+        });
+        const rows = names.map(name => Object.assign({ name, color: (data.products.find(x => x.name === name) || {}).color || null },
+            figures(won.filter(d => nameOf(d.product) === name), lost.filter(d => nameOf(d.product) === name),
+                sum(data.invoices.filter(i => within(i.date, p) && nameOf(i.product) === name), i => i.net))))
+            .filter(r => r.decided || Math.abs(r.revenue) > 0.005);
+        return { rows, total: figures(won, lost, total) };
     }
 
     // ------------------------------------------------------------------
@@ -764,34 +754,73 @@
         });
     }
 
+    // ------------------------------------------------------------------
+    // Year against year
+    // ------------------------------------------------------------------
+
     /**
-     * How the biggest customers grew: their projects over the last 24
-     * months - won (by product, sized by order), talks and unpaid work, lost.
+     * The years a comparison shows: the period's last year and up to
+     * count - 1 before it, from the first data on. A running year ends today.
      */
-    function lanes(data, p, count) {
-        const endMonth = p.end.slice(0, 7);
-        const startMonth = addMonths(endMonth, -23);
-        const range = { start: startMonth + '-01', end: lastDay(endMonth) };
-        const top = byCustomer(data.invoices, p).filter(c => c.companyId && c.net > 0).slice(0, count || 8);
-        const pos = d => (daysBetween(range.start, d) + 0.5) / (daysBetween(range.start, range.end) + 1);
-        return {
-            start: startMonth,
-            end: endMonth,
-            today: within(data.today, range) ? pos(data.today) : null,
-            rows: top.map(c => {
-                const company = data.companyById.get(c.companyId) || {};
-                const events = [];
-                data.deals.filter(d => d.companyIds.includes(c.companyId)).forEach(d => {
-                    if (d.outcome === 'won' && within(d.decidedAt, range)) {
-                        const paid = !d.talk && d.budget > 0;
-                        events.push({ deal: d, at: d.decidedAt, x: pos(d.decidedAt), kind: paid ? 'won' : 'talk', budget: d.budget });
-                    } else if (d.outcome === 'lost' && within(d.decidedAt, range)) {
-                        events.push({ deal: d, at: d.decidedAt, x: pos(d.decidedAt), kind: 'lost' });
-                    }
-                });
-                return { companyId: c.companyId, name: c.name, sector: company.sector || null, net: c.net, events: events.sort((a, b) => a.at.localeCompare(b.at)) };
-            })
-        };
+    function yearColumns(data, p, count) {
+        const endYear = +p.end.slice(0, 4);
+        const firstYear = Math.min(+data.first.slice(0, 4), endYear);
+        const out = [];
+        for (let y = Math.max(firstYear, endYear - (count || 3) + 1); y <= endYear; y++) {
+            const running = String(y) === data.today.slice(0, 4);
+            out.push({ year: y, running, start: y + '-01-01', end: running ? data.today : y + '-12-31' });
+        }
+        return out;
+    }
+
+    /**
+     * Revenue per year by something of the invoice (its customer, the
+     * customer's sector): { years, rows: [{ key, name, values, total, change }],
+     * totals, change }. change is the last year against the one before - a
+     * running year against the same days of the year before - and null
+     * without revenue then.
+     */
+    function yearTable(data, p, keyOf, count) {
+        const years = yearColumns(data, p, count);
+        const last = years[years.length - 1];
+        const same = years.length > 1 ? period('year:' + last.year, data.today, data.first).prev : null;
+        const map = new Map();
+        const totals = years.map(() => 0);
+        let totalSame = 0;
+        data.invoices.forEach(i => {
+            const col = years.findIndex(y => within(i.date, y));
+            const inSame = !!same && within(i.date, same);
+            if (col < 0 && !inSame) return;
+            const k = keyOf(i);
+            if (!map.has(k.key)) map.set(k.key, Object.assign({ values: years.map(() => 0), same: 0 }, k));
+            const row = map.get(k.key);
+            if (col >= 0) {
+                row.values[col] += i.net;
+                totals[col] += i.net;
+            }
+            if (inSame) {
+                row.same += i.net;
+                totalSame += i.net;
+            }
+        });
+        const change = (now, before) => (same && before > 0.005 ? (now - before) / before : null);
+        const rows = Array.from(map.values())
+            .filter(r => r.values.some(v => Math.abs(v) > 0.005))
+            .map(r => Object.assign(r, { total: sum(r.values), change: change(r.values[r.values.length - 1], r.same) }));
+        return { years, rows, totals, change: change(totals[totals.length - 1], totalSame) };
+    }
+
+    /**
+     * How the customers grew: revenue per year of the biggest ones (over
+     * the years shown); new when the first invoice falls in the last year.
+     */
+    function customerYears(data, p, count) {
+        const t = yearTable(data, p, i => ({ key: i.customer, name: i.customerName, companyId: i.companyId }), 3);
+        const firsts = firstInvoice(data.invoices);
+        const lastStart = t.years[t.years.length - 1].start;
+        const rows = t.rows.filter(r => r.total > 0.005).sort((a, b) => b.total - a.total);
+        rows.forEach(r => { r.isNew = (firsts.get(r.key) || '') >= lastStart; });
+        return Object.assign(t, { rows: rows.slice(0, count || 8), more: Math.max(0, rows.length - (count || 8)) });
     }
 
     /**
@@ -842,28 +871,27 @@
         return { perQuarter, late: late.length, count: inPeriod.length, slowest, median: median(paid.filter(i => within(i.date, p)).map(i => daysBetween(i.date, i.paid.date))) };
     }
 
-    /** Revenue and orders by the sector of the customer. */
+    /** Revenue per year by the sector of the customer, biggest in the last year first. */
     function sectors(data, p) {
-        const total = revenueIn(data.invoices, p);
         const sectorOf = id => {
             const c = id ? data.companyById.get(id) : null;
             return c && c.sector ? String(c.sector).trim() : NO_SECTOR;
         };
-        const map = new Map();
-        const row = name => {
-            if (!map.has(name)) map.set(name, { name, net: 0, won: 0, decided: 0 });
-            return map.get(name);
+        const t = yearTable(data, p, i => {
+            const name = sectorOf(i.companyId);
+            return { key: name, name };
+        }, 3);
+        const last = t.years.length - 1;
+        const named = t.rows.filter(r => r.name !== NO_SECTOR).sort((a, b) => b.values[last] - a.values[last] || b.total - a.total);
+        return {
+            years: t.years,
+            rows: named,
+            none: t.rows.find(r => r.name === NO_SECTOR) || null,
+            totals: t.totals,
+            change: t.change,
+            withSector: named.length,
+            anySector: data.companies.some(c => c.sector && String(c.sector).trim())
         };
-        data.invoices.filter(i => within(i.date, p)).forEach(i => { row(sectorOf(i.companyId)).net += i.net; });
-        data.deals.filter(d => (d.outcome === 'won' || d.outcome === 'lost') && within(d.decidedAt, p)).forEach(d => {
-            const r = row(sectorOf(d.companyIds[0]));
-            r.decided++;
-            if (d.outcome === 'won') r.won++;
-        });
-        const rows = Array.from(map.values()).map(r => Object.assign(r, { share: total > 0 ? r.net / total : null }));
-        const named = rows.filter(r => r.name !== NO_SECTOR).sort((a, b) => b.net - a.net || b.decided - a.decided);
-        const none = rows.find(r => r.name === NO_SECTOR) || null;
-        return { rows: named, none, withSector: named.length };
     }
 
     // ------------------------------------------------------------------
@@ -968,7 +996,7 @@
         parts.byProduct = byProduct(data, p);
         parts.customers = customerFigures(data, p);
         parts.newReturning = newReturning(data, p);
-        parts.lanes = lanes(data, p, 8);
+        parts.growth = customerYears(data, p, 8);
         parts.doors = doors(data, p);
         parts.payments = payments(data, p);
         parts.sectors = sectors(data, p);
@@ -990,6 +1018,6 @@
         daysBetween, median, budgetMid, asOf, addMonths, lastDay, quarterOf,
         kpis, cumulative, quarters, productMix, inflow,
         funnel, cohorts, timeToWin, calibration, chanceCurves, losses, pipeline, byProduct,
-        customerFigures, newReturning, lanes, doors, payments, sectors, highlights
+        customerFigures, newReturning, yearColumns, yearTable, customerYears, doors, payments, sectors, highlights
     };
 })(typeof window !== 'undefined' ? window : globalThis);
