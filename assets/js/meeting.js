@@ -160,6 +160,9 @@
                 mode: state.mode,
                 projects: state.projects,
                 index: state.index,
+                // The project on screen, so a reload shows it at once and
+                // brings it up to date behind (loadContext).
+                context: state.context && !state.context.error ? state.context : null,
                 drafts: state.drafts,
                 jobs: state.jobs.map(({ id, projectId, projectName, text, status, result, error }) =>
                     ({ id, projectId, projectName, text, status, result, error }))
@@ -190,6 +193,10 @@
         state.ended = !!saved.ended;
         state.projects = saved.projects;
         state.index = Math.min(Math.max(0, saved.index || 0), saved.projects.length - 1);
+        const shown = saved.context && saved.context.project ? saved.context : null;
+        if (shown && currentProject() && Number(shown.project.id) === currentProject().id) {
+            contexts.set(currentProject().id, shown);
+        }
         state.drafts = saved.drafts || {};
         state.jobs = (saved.jobs || []).map(job => ({
             ...job,
@@ -226,7 +233,7 @@
             if (state.ended) {
                 loadProposals();
             } else {
-                if (contexts.size === 0) prefetchContexts();
+                if (!prefetched) prefetchContexts();
                 if (!state.context) loadContext();
             }
             return;
@@ -250,6 +257,7 @@
 
         state.active = true;
         contexts.clear();
+        prefetched = false;
         open();
         prefetchContexts();
         await loadContext();
@@ -307,10 +315,13 @@
     // starts (prefetchContexts), so moving on shows the next project at once -
     // also while the server is still busy with Claude for the last one.
     const contexts = new Map();
+    // Whether all of them came in; one kept from before a reload is not all.
+    let prefetched = false;
 
     async function prefetchContexts() {
         try {
             const result = await request(`${API}?action=contexts`);
+            prefetched = true;
             Object.entries(result.data || {}).forEach(([id, context]) => {
                 // A fresher copy fetched meanwhile wins.
                 if (!contexts.has(Number(id))) contexts.set(Number(id), context);
@@ -347,6 +358,7 @@
             if (currentProject() === project) state.context = { error: error.message };
         }
         render();
+        persist();
         if (state.mode === 'open') focusText();
     }
 
@@ -362,6 +374,7 @@
             if (currentProject() === project) {
                 state.context = result.data;
                 render();
+                persist();
             }
         } catch (error) {
             // The old view stays; the next move loads it fresh anyway.
@@ -722,7 +735,7 @@
 
             <div class="meeting-body">
                 <section class="meeting-details" aria-label="Project details">
-                    ${ctx ? (ctx.error ? `<p class="meeting-error">${escapeHtml(ctx.error)}</p>` : detailsHtml(ctx)) : '<p class="empty-hint">Loading…</p>'}
+                    ${ctx ? (ctx.error ? `<p class="meeting-error">${escapeHtml(ctx.error)}</p>` : detailsHtml(ctx)) : detailsSkeleton()}
                 </section>
 
                 <section class="meeting-input">
@@ -890,6 +903,62 @@
                         <div class="note-content">${escapeHtml(n.content)}</div>
                     </div>`).join('')}</div>` : '<p class="empty-hint">No notes yet</p>'}
             </div>`;
+    }
+
+    /**
+     * The details while the project loads: the same sections with their
+     * headings and labels, placeholders where the values, contacts, to-dos
+     * and notes go.
+     */
+    function detailsSkeleton() {
+        const S = window.Skel;
+        if (!S) return '<p class="empty-hint">Loading…</p>';
+        const t = S.text;
+        const fact = (label, width) => `
+            <div class="overview-detail-item">
+                <span class="detail-label">${label}</span>
+                <span class="detail-value">${t(width)}</span>
+            </div>`;
+        const todo = i => `
+            <div class="todo-item ptodo">
+                <div class="ptodo-row">
+                    <span class="todo-check"><span class="todo-check-indicator"></span></span>
+                    <span class="ptodo-title">${t(S.width(i, 0.8))}</span>
+                    <span class="ptodo-meta">${t('40px')}${S.round('22px')}</span>
+                </div>
+            </div>`;
+        const note = i => `
+            <div class="note-item">
+                <div class="note-header"><span class="note-date">${t('70px')}</span></div>
+                <div class="note-content">${t(['280px', '240px'][i])}<br>${t(['160px', '200px'][i])}</div>
+            </div>`;
+        return `
+            <div class="is-skeleton" aria-busy="true">${S.label('Loading the project')}
+            <div aria-hidden="true">
+                <div class="overview-section">
+                    <div class="ov-section-head"><h3 class="overview-section-title">Project Information</h3></div>
+                    <div class="overview-details">
+                        ${fact('Stage', '80px')}${fact('Responsible', '110px')}${fact('Budget', '96px')}
+                        ${fact('Success Chance', '36px')}${fact('Start Date', '84px')}${fact('Est. Completion', '84px')}
+                        <div class="overview-detail-item full-width">
+                            <span class="detail-label">Description</span>
+                            <span class="detail-value">${t('300px')}<br>${t('190px')}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="overview-section">
+                    <div class="ov-section-head"><h3 class="overview-section-title">Assigned Contacts</h3></div>
+                    <div class="project-contacts-list">${S.rows(2, i => `<span class="pcontact-chip"><span class="pcontact-name">${t(['92px', '76px'][i])}</span></span>`)}</div>
+                </div>
+                <div class="overview-section">
+                    <h3 class="overview-section-title">To-Dos</h3>
+                    <div class="ptodo-card">${S.rows(3, todo)}</div>
+                </div>
+                <div class="overview-section">
+                    <h3 class="overview-section-title">Notes</h3>
+                    <div class="meeting-notes">${S.rows(2, note)}</div>
+                </div>
+            </div></div>`;
     }
 
     function jobHead(job) {
@@ -1219,7 +1288,7 @@
 
             <div class="meeting-body">
                 <section class="meeting-details" aria-label="Project details">
-                    ${ctx ? (ctx.error ? `<p class="meeting-error">${escapeHtml(ctx.error)}</p>` : detailsHtml(ctx)) : '<p class="empty-hint">Loading…</p>'}
+                    ${ctx ? (ctx.error ? `<p class="meeting-error">${escapeHtml(ctx.error)}</p>` : detailsHtml(ctx)) : detailsSkeleton()}
                 </section>
 
                 <section class="meeting-input">
