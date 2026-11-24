@@ -75,12 +75,12 @@
         return `<span class="ins-delta ${up !== !!lowerIsBetter ? 'is-good' : 'is-bad'}">${arrow(up, up !== !!lowerIsBetter)}${n}%</span>`;
     }
 
-    /** Against the period before: the arrow, then "2025: 33%". */
-    function trend(cur, prev, fmt, lowerIsBetter) {
+    /** Against the period before: the arrow, then "2025: 33%" (or another label for what came before). */
+    function trend(cur, prev, fmt, lowerIsBetter, label) {
         if (prev === null || prev === undefined || cur === null || cur === undefined) return '';
         const p = state.parts.period;
-        if (!p.prev) return '';
-        const name = p.kind === 'year' ? String(p.year - 1) : 'Before';
+        if (!p.prev && !label) return '';
+        const name = label || (p.kind === 'year' ? String(p.year - 1) : 'Before');
         const same = fmt(cur) === fmt(prev);
         const up = cur > prev;
         return `<span class="ins-trend">${same ? '' : arrow(up, up !== !!lowerIsBetter)}<span class="ins-was">${esc(name)}: <b>${esc(fmt(prev))}</b></span></span>`;
@@ -165,13 +165,19 @@
         info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>'
     };
 
-    /** The findings as cards: what it is about, its figure big, the sentence; a click goes where it is shown. */
+    /**
+     * The findings as cards: what it is about, its value big, below it the
+     * arrow and the value before, or a short note; a click goes where it is shown.
+     */
     function highlights(list) {
         if (!list.length) return '';
+        const FMT = { money, pct, count: String, text: String };
         return `<div class="ins-hls ins-span-12">${list.map(h => {
+            const fmt = FMT[h.kind] || String;
+            const below = h.prev !== null && h.prev !== undefined ? trend(h.value, h.prev, fmt, h.lower, h.prevLabel) : '';
             const inner = `<span class="ins-hl-top"><svg class="ins-hl-ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>${esc(h.title)}</span>
-                <span class="ins-hl-f">${esc(h.figure)}</span>
-                <span class="ins-hl-s">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>`;
+                <span class="ins-hl-f">${esc(fmt(h.value))}${below || !h.note ? '' : `<small>${esc(h.note)}</small>`}</span>
+                ${below ? `<span class="ins-hl-s">${below}</span>` : ''}`;
             // A finding without a card of its own to go to stays where it is.
             return h.view
                 ? `<button type="button" class="ins-hl is-${h.tone}" data-goto="${esc(h.view)}">${inner}<svg class="ins-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`

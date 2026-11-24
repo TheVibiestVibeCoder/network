@@ -276,12 +276,13 @@
         eq(l.unclear, 1);
     });
 
-    test('highlights speak of the figures, and of archived projects without a reason', () => {
+    test('highlights: a value against the one before, or a short note', () => {
         const data = fixture();
         const parts = IC.compute(data, 'year:2026', {});
-        const text = parts.highlights.map(x => x.parts.map(p => p[0]).join(''));
-        eq(text[0], 'Revenue passed all of 2025 in October. Year to date +50% on last year.');
-        eq(text.some(t => t.indexOf('1 archived project has no reason yet') === 0), true, 'the unclear one');
+        const h = parts.highlights;
+        eq([h[0].title, h[0].value, h[0].prev, h[0].tone], ['Revenue', 18000, 12000, 'good'], 'revenue against the same days of 2025');
+        const archive = h.find(x => x.title === 'Archive');
+        eq([archive.value, archive.note], [1, 'without a reason'], 'the unclear one');
     });
 
     test('compute runs for every period kind, also without any data', () => {

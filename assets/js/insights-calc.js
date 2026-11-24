@@ -944,23 +944,19 @@
 
     // ------------------------------------------------------------------
     // Highlights: a few findings from the figures, each
-    // { tone, view, title, figure, parts: [[text, 'b'?]] }
+    // { tone, view, title, value, kind: money | pct | count | text,
+    //   prev, prevLabel, lower (less is better), note }
+    // Drawn as the value, then the arrow and the value before - or the note.
     // ------------------------------------------------------------------
 
     function highlights(data, p, parts) {
         const out = [];
         const k = parts.kpis;
-        const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
         if (p.kind === 'year' && k.revenuePrev !== null && k.revenuePrev > 0) {
-            const delta = (k.revenue - k.revenuePrev) / k.revenuePrev;
-            const prevFull = revenueIn(data.invoices, { start: (p.year - 1) + '-01-01', end: (p.year - 1) + '-12-31' });
-            const passed = p.running && prevFull > 0 ? parts.cumulative.cur.find(pt => pt.value >= prevFull) : null;
             out.push({
-                tone: delta >= 0 ? 'good' : 'warn', view: 'overview', title: 'Revenue', figure: signedPct(delta),
-                parts: passed
-                    ? [['Revenue passed all of ' + (p.year - 1) + ' in ' + MONTHS[+passed.month.slice(5) - 1] + '. Year to date '], [signedPct(delta), 'b'], [' on last year.']]
-                    : [[p.running ? 'Year to date, revenue is ' : 'Revenue was '], [signedPct(delta), 'b'], [' on ' + (p.year - 1) + '.']]
+                tone: k.revenue >= k.revenuePrev ? 'good' : 'warn', view: 'overview', title: 'Revenue',
+                value: k.revenue, kind: 'money', prev: k.revenuePrev
             });
         }
 
@@ -969,8 +965,8 @@
             .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
         if (cal && Math.abs(cal.gap) >= 0.15) {
             out.push({
-                tone: 'warn', view: null, title: 'Our estimates', figure: cal.won + ' of ' + cal.n,
-                parts: [['Estimates of ' + cal.label.toLowerCase() + ' came true '], [cal.won + ' of ' + cal.n, 'b'], [' times' + (cal.gap > 0 ? ', less often than estimated.' : ', more often than estimated.')]]
+                tone: 'warn', view: null, title: 'Our estimates', value: cal.won + ' of ' + cal.n, kind: 'text',
+                note: 'won, estimated at ' + cal.label.toLowerCase()
             });
         }
 
@@ -979,49 +975,36 @@
             const prev = cf.sharesPrev && cf.sharesPrev.top1 !== null ? cf.sharesPrev.top1 : null;
             out.push({
                 tone: prev !== null && cf.shares.top1 < prev ? 'good' : (cf.shares.top1 > 0.4 ? 'warn' : 'info'), view: 'customers',
-                title: 'Biggest customer', figure: pct(cf.shares.top1),
-                parts: [['The biggest customer brings '], [pct(cf.shares.top1), 'b'], [' of revenue' + (prev !== null ? ', ' + (cf.shares.top1 < prev ? 'down' : 'up') + ' from ' + pct(prev) + '.' : '.')]]
+                title: 'Biggest customer', value: cf.shares.top1, kind: 'pct', prev, lower: true, note: 'of revenue'
             });
         }
 
         const dr = parts.doors;
         if (dr.items.length >= 3) {
             out.push({
-                tone: 'info', view: null, title: 'From talk to order', figure: dr.hits + ' of ' + dr.items.length,
-                parts: [[''], [dr.hits + ' of ' + dr.items.length, 'b'], [' talks led to a paid project within a year' + (dr.months !== null && dr.hits ? ', a median of ' + Math.round(dr.months) + ' months later.' : '.')]]
+                tone: 'info', view: null, title: 'From talk to order', value: dr.hits + ' of ' + dr.items.length, kind: 'text',
+                note: 'talks led to an order'
             });
         }
 
         const inf = parts.inflow;
         if (inf.length >= 6) {
-            const last = inf.slice(-3);
-            const before = inf.slice(-6, -3);
-            const a = sum(last, x => x.offers);
-            const b = sum(before, x => x.offers);
+            const a = sum(inf.slice(-3), x => x.offers);
+            const b = sum(inf.slice(-6, -3), x => x.offers);
             if (a + b >= 4 && b > 0 && Math.abs(a - b) / b >= 0.3) {
                 out.push({
-                    tone: a > b ? 'good' : 'warn', view: 'overview', title: 'Offers sent', figure: String(a),
-                    parts: [['Offers sent in the last 3 months: '], [String(a), 'b'], [', against ' + b + ' in the 3 before.']]
+                    tone: a > b ? 'good' : 'warn', view: 'overview', title: 'Offers, last 3 months',
+                    value: a, kind: 'count', prev: b, prevLabel: '3 before'
                 });
             }
         }
 
         if (data.unclear > 0) {
             out.push({
-                tone: 'warn', view: 'archive', title: 'Archive', figure: String(data.unclear),
-                parts: [[''], [data.unclear + (data.unclear === 1 ? ' archived project has' : ' archived projects have'), 'b'], [' no reason yet, so they count neither as won nor as lost.']]
+                tone: 'warn', view: 'archive', title: 'Archive', value: data.unclear, kind: 'count', note: 'without a reason'
             });
         }
         return out.slice(0, 4);
-    }
-
-    function pct(v) {
-        return Math.round(v * 100) + '%';
-    }
-
-    function signedPct(v) {
-        const n = Math.round(v * 100);
-        return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + '%';
     }
 
     // ------------------------------------------------------------------
