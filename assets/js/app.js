@@ -2085,7 +2085,7 @@
                 return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
             });
 
-            let contactOptions = '<option value="">All Contacts</option>';
+            let contactOptions = '<option value="">All contacts</option>';
             contacts.forEach(contact => {
                 const label = contact.company
                     ? `${contact.name} (${contact.company})`
@@ -2102,7 +2102,7 @@
                 return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base' });
             });
 
-            let projectOptions = '<option value="">All Projects</option>';
+            let projectOptions = '<option value="">All projects</option>';
             projects.forEach(project => {
                 projectOptions += `<option value="${project.id}">${escapeHtml(project.name || `Project #${project.id}`)}</option>`;
             });

@@ -1496,10 +1496,10 @@ function assetUrl(string $path): string
                                 <option value="">Assigned to anyone</option>
                             </select>
                             <select id="todoContactFilter" class="form-select">
-                                <option value="">All Contacts</option>
+                                <option value="">All contacts</option>
                             </select>
                             <select id="todoProjectFilter" class="form-select">
-                                <option value="">All Projects</option>
+                                <option value="">All projects</option>
                             </select>
                             <select id="todoStatusFilter" class="form-select">
                                 <option value="open">Open</option>
@@ -1507,9 +1507,9 @@ function assetUrl(string $path): string
                                 <option value="all">All</option>
                             </select>
                             <select id="todoSort" class="form-select" title="Sort to-dos">
-                                <option value="default">Sort: Default</option>
-                                <option value="priority_desc">Sort: Priority (High to Low)</option>
-                                <option value="priority_asc">Sort: Priority (Low to High)</option>
+                                <option value="default">Sort: default</option>
+                                <option value="priority_desc">Sort: priority, high first</option>
+                                <option value="priority_asc">Sort: priority, low first</option>
                             </select>
                         </div>
                     </div>
