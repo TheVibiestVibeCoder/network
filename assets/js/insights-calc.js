@@ -395,6 +395,7 @@
         const firsts = firstInvoice(data.invoices);
         const isNew = c => (firsts.get(c.key) || '') >= p.start;
         const won = wonIn(data.deals, p);
+        const wonPrev = p.prev ? wonIn(data.deals, p.prev) : null;
         const lost = lostIn(data.deals, p);
         const cycles = won.filter(d => d.enteredOpen).map(d => daysBetween(d.created, d.decidedAt)).filter(n => n > 0);
         return {
@@ -406,6 +407,7 @@
             returning: customers.filter(c => !isNew(c)).length,
             won: won.length,
             wonVolume: sum(won, d => d.budget),
+            wonPrev: wonPrev ? wonPrev.length : null,
             decided: won.length + lost.length,
             winRate: won.length + lost.length ? won.length / (won.length + lost.length) : null,
             timeToWin: median(cycles),
@@ -899,6 +901,47 @@
         };
     }
 
+    /**
+     * Revenue in the period by the customer's sector, biggest first, against
+     * the period before: { total, rows: [{ name, net, share, change, isNew }],
+     * none, withSector, anySector }. Without a sector: none.
+     */
+    function sectorShares(data, p) {
+        const sectorOf = id => {
+            const c = id ? data.companyById.get(id) : null;
+            return c && c.sector ? String(c.sector).trim() : NO_SECTOR;
+        };
+        const group = range => {
+            const map = new Map();
+            data.invoices.filter(i => within(i.date, range)).forEach(i => {
+                const k = sectorOf(i.companyId);
+                map.set(k, (map.get(k) || 0) + i.net);
+            });
+            return map;
+        };
+        const cur = group(p);
+        const prev = p.prev ? group(p.prev) : null;
+        const all = Array.from(cur.entries()).filter(([, net]) => net > 0.005);
+        const total = sum(all, ([, net]) => net);
+        const row = ([name, net]) => {
+            const before = prev ? prev.get(name) || 0 : null;
+            return {
+                name, net,
+                share: total > 0 ? net / total : null,
+                change: before !== null && before > 0.005 ? (net - before) / before : null,
+                isNew: before !== null && before <= 0.005
+            };
+        };
+        const rows = all.filter(([name]) => name !== NO_SECTOR).map(row).sort((a, b) => b.net - a.net);
+        const none = all.find(([name]) => name === NO_SECTOR);
+        return {
+            total, rows,
+            none: none ? row(none) : null,
+            withSector: rows.length,
+            anySector: data.companies.some(c => c.sector && String(c.sector).trim())
+        };
+    }
+
     // ------------------------------------------------------------------
     // Highlights: a few findings from the figures, each
     // { tone, view, title, figure, parts: [[text, 'b'?]] }
@@ -926,7 +969,7 @@
             .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
         if (cal && Math.abs(cal.gap) >= 0.15) {
             out.push({
-                tone: 'warn', view: 'sales', title: 'Our estimates', figure: cal.won + ' of ' + cal.n,
+                tone: 'warn', view: null, title: 'Our estimates', figure: cal.won + ' of ' + cal.n,
                 parts: [['Estimates of ' + cal.label.toLowerCase() + ' came true '], [cal.won + ' of ' + cal.n, 'b'], [' times' + (cal.gap > 0 ? ', less often than estimated.' : ', more often than estimated.')]]
             });
         }
@@ -944,7 +987,7 @@
         const dr = parts.doors;
         if (dr.items.length >= 3) {
             out.push({
-                tone: 'info', view: 'customers', title: 'From talk to order', figure: dr.hits + ' of ' + dr.items.length,
+                tone: 'info', view: null, title: 'From talk to order', figure: dr.hits + ' of ' + dr.items.length,
                 parts: [[''], [dr.hits + ' of ' + dr.items.length, 'b'], [' talks led to a paid project within a year' + (dr.months !== null && dr.hits ? ', a median of ' + Math.round(dr.months) + ' months later.' : '.')]]
             });
         }
@@ -994,19 +1037,14 @@
         parts.mix = { cur: productMix(data, p), prev: p.prev ? productMix(data, p.prev) : null };
         parts.inflow = inflow(data, p);
         parts.funnel = funnel(data, p);
-        parts.cohorts = cohorts(data, p);
-        parts.timeToWin = timeToWin(data, p);
-        parts.calibration = calibration(data, p);
-        parts.curves = chanceCurves(data, p);
-        parts.losses = losses(data, p, reasons);
-        parts.pipeline = pipeline(data, p);
+        parts.calibration = calibration(data, p); // behind a highlight only, no card of its own
         parts.byProduct = byProduct(data, p);
         parts.customers = customerFigures(data, p);
         parts.newReturning = newReturning(data, p);
-        parts.growth = customerYears(data, p, 8);
-        parts.doors = doors(data, p);
+        parts.growth = customerYears(data, p, 10);
+        parts.doors = doors(data, p); // behind a highlight only, no card of its own
         parts.payments = payments(data, p);
-        parts.sectors = sectors(data, p);
+        parts.sectors = sectorShares(data, p);
         parts.highlights = highlights(data, p, parts);
         return parts;
     }
@@ -1025,6 +1063,6 @@
         daysBetween, median, budgetMid, asOf, addMonths, lastDay, quarterOf,
         kpis, cumulative, quarters, productMix, inflow,
         funnel, cohorts, timeToWin, calibration, chanceCurves, losses, pipeline, byProduct,
-        customerFigures, newReturning, yearColumns, yearTable, customerYears, doors, payments, sectors, highlights
+        customerFigures, newReturning, yearColumns, yearTable, customerYears, doors, payments, sectors, sectorShares, highlights
     };
 })(typeof window !== 'undefined' ? window : globalThis);

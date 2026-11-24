@@ -138,6 +138,7 @@
         eq(k.cash, 8000, 'cash in: paid in 2026, net');
         eq([k.customers, k.newCustomers, k.returning], [4, 2, 2], 'customers');
         eq([k.won, k.wonVolume], [4, 5000 + 0 + 3000 + 9000], 'won and their budgets');
+        eq(k.wonPrev, 0, 'nothing won by 23 Nov 2025');
         eq([k.decided, k.winRate], [5, 0.8], 'won against lost');
         eq(k.timeToWin, 45, 'median of 59, 9 and 45 days, of those entered open');
     });
@@ -227,6 +228,19 @@
         eq(s.none.values, [2000, 10000], 'no sector yet');
         eq(s.totals, [16000, 18000]);
         near(s.change, 0.5, 'all: 18k against 12k');
+    });
+
+    test('sector shares: the period against the one before', () => {
+        const data = fixture();
+        const s = IC.sectorShares(data, IC.period('year:2026', TODAY, data.first));
+        eq(s.rows.map(r => [r.name, r.net, r.isNew]), [['Energy', 5000, false], ['Media', 3000, true]], 'biggest first');
+        near(s.rows[0].share, 5000 / 18000, 'of all revenue');
+        near(s.rows[0].change, -0.5, 'Energy: 5k against 10k by 23 Nov 2025');
+        eq(s.rows[1].change, null, 'nothing from Media the year before');
+        eq([s.none.name, s.none.net], ['No sector', 10000]);
+        eq(s.total, 18000);
+        const all = IC.sectorShares(data, IC.period('all', TODAY, data.first));
+        eq(all.rows.map(r => r.isNew), [false, false], 'nothing before all');
     });
 
     test('how customers grew: revenue per year, new ones marked', () => {

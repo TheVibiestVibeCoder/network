@@ -8,7 +8,7 @@
  * invoices as Financials matches them to companies and projects
  * (financials.js, CompanyInvoices.items).
  *
- * A project's dot opens its sheet, a customer opens the company's.
+ * A customer's name opens the company's sheet.
  */
 (function () {
     'use strict';
@@ -56,13 +56,6 @@
     const P = v => (Math.round(v * 10000) / 100) + '%';
     const days = n => (n === null || n === undefined ? '–' : Math.round(n) + (Math.round(n) === 1 ? ' day' : ' days'));
     const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
-
-    /** "3 of 8" while there are few, "46%" with a small "19 of 41" once there are enough. */
-    function rate(part, whole) {
-        if (!whole) return '–';
-        if (whole < 10) return `${part} of ${whole}`;
-        return `${pct(part / whole)}<small>${part} of ${whole}</small>`;
-    }
 
     function signed(v) {
         const n = Math.round(v * 100);
@@ -129,22 +122,9 @@
 
     const sw = color => `<span class="ins-sw" style="background:${color}"></span>`;
     const lk = color => `<span class="ins-lk" style="background:${color}"></span>`;
-    const dot = cls => `<span class="ins-kd ${cls || ''}"></span>`;
 
     function empty(text) {
         return `<p class="ins-empty">${esc(text)}</p>`;
-    }
-
-    /** "+52% on 2025 (73,3k €)", or nothing without a period before. */
-    function delta(cur, prev, good, fmt) {
-        const p = state.parts.period;
-        if (prev === null || prev === undefined || !p.prev) return '';
-        const vs = p.kind === 'year' ? 'on ' + (p.year - 1) : 'on the 12 months before';
-        if (!prev) return `${vs}: ${esc(fmt ? fmt(prev) : prev)}`;
-        const d = (cur - prev) / Math.abs(prev);
-        const up = d >= 0;
-        const cls = Math.abs(d) < 0.005 ? '' : ((up === (good !== false)) ? 'is-up' : 'is-down');
-        return `<span class="${cls}">${signed(d)}</span> ${vs}${fmt ? ' (' + esc(fmt(prev)) + ')' : ''}`;
     }
 
     function kpi(label, value, sub, extra) {
@@ -164,23 +144,39 @@
     /** The findings as cards: what it is about, its figure big, the sentence; a click goes where it is shown. */
     function highlights(list) {
         if (!list.length) return '';
-        return `<div class="ins-hls ins-span-12">${list.map(h => `
-            <button type="button" class="ins-hl is-${h.tone}" data-goto="${esc(h.view)}">
-                <span class="ins-hl-top"><svg class="ins-hl-ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>${esc(h.title)}</span>
+        return `<div class="ins-hls ins-span-12">${list.map(h => {
+            const inner = `<span class="ins-hl-top"><svg class="ins-hl-ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.tone] || ICONS.info}</svg>${esc(h.title)}</span>
                 <span class="ins-hl-f">${esc(h.figure)}</span>
-                <span class="ins-hl-s">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>
-                <svg class="ins-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-            </button>`).join('')}</div>`;
+                <span class="ins-hl-s">${h.parts.map(([text, style]) => style === 'b' ? `<b>${esc(text)}</b>` : esc(text)).join('')}</span>`;
+            // A finding without a card of its own to go to stays where it is.
+            return h.view
+                ? `<button type="button" class="ins-hl is-${h.tone}" data-goto="${esc(h.view)}">${inner}<svg class="ins-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`
+                : `<div class="ins-hl is-${h.tone} is-static">${inner}</div>`;
+        }).join('')}</div>`;
+    }
+
+    /** The period and the one before as two bars, the earlier one pale. */
+    function compareBars(cur, prev) {
+        const p = state.parts.period;
+        if (!p.prev || prev === null || prev === undefined) return '';
+        const max = Math.max(cur, prev, 1);
+        const line = (label, v, cls) => `<span class="ins-cmp-y">${esc(label)}</span>
+            <span class="ins-cmp-t">${v > 0 ? `<span class="ins-cmp-b${cls}" style="width:${P(v / max)}"></span>` : ''}</span>
+            <span class="ins-cmp-v">${v}</span>`;
+        const names = p.kind === 'year' ? [String(p.year - 1), p.running ? p.year + ' so far' : String(p.year)] : ['Before', '12 months'];
+        return `<div class="ins-cmp" aria-hidden="true">${line(names[0], prev, ' is-prev')}${line(names[1], cur, '')}</div>`;
     }
 
     function overviewKpis(k) {
-        const p = state.parts.period;
-        return `<div class="ins-kpis is-five ins-span-12">
-            ${kpi('Payments received', esc(money(k.cash)), delta(k.cash, k.cashPrev, true, money))}
-            ${kpi('Customers', String(k.customers), `${k.newCustomers} new, ${k.returning} returning${k.customersPrev !== null && p.prev ? ` (${p.kind === 'year' ? p.year - 1 : 'before'}: ${k.customersPrev})` : ''}`)}
-            ${kpi('Won', `${k.won}<small>${k.won === 1 ? 'project' : 'projects'}</small>`, k.wonVolume ? `${esc(money(k.wonVolume))} in orders` : '')}
-            ${kpi('Win rate', k.decided >= 10 ? pct(k.winRate) : (k.decided ? `${k.won}<small>of ${k.decided}</small>` : '–'), !k.decided ? 'Nothing decided yet' : (k.decided >= 10 ? `${k.won} of ${k.decided} decided` : 'Won of decided'))}
-            ${kpi('Time to win', k.timeToWin === null ? '–' : `${Math.round(k.timeToWin)}<small>days</small>`, k.timeToWinN ? `Median of ${k.timeToWinN}, first entry to order` : 'No order yet')}
+        const plain = (cur, prev) => {
+            const p = state.parts.period;
+            if (!p.prev || prev === null || !prev) return '';
+            const d = (cur - prev) / prev;
+            return ` <span class="${Math.abs(d) < 0.005 ? '' : (d > 0 ? 'is-up' : 'is-down')}">${signed(d)}</span>`;
+        };
+        return `<div class="ins-kpis is-two ins-span-12">
+            ${kpi('Customers', String(k.customers), `${k.newCustomers} new, ${k.returning} returning${plain(k.customers, k.customersPrev)}`, compareBars(k.customers, k.customersPrev))}
+            ${kpi('Won', `${k.won}<small>${k.won === 1 ? 'project' : 'projects'}</small>`, `${k.wonVolume ? esc(money(k.wonVolume)) + ' in orders' : 'No order yet'}${plain(k.won, k.wonPrev)}`, compareBars(k.won, k.wonPrev))}
         </div>`;
     }
 
@@ -412,152 +408,6 @@
             </div></div>`);
     }
 
-    function cohortCard(list) {
-        if (!list.length) return card('ins-span-6', head('Outcome by quarter entered', 'Each square is a project'), empty('No projects entered in this period.'));
-        const rows = list.map(r => `<div class="ins-urow">
-            <span class="ins-urow-l">${esc(r.label)}<small>${plural(r.deals.length, 'project', 'projects')}</small></span>
-            <div class="ins-units">${r.deals.map(d => unit(d)).join('')}</div>
-            <span class="ins-urow-v">${r.decided ? `<b>${r.won} of ${r.decided}</b> won` : 'open'}</span>
-        </div>`).join('');
-        return card('ins-span-6', head('Outcome by quarter entered', 'Each square is a project',
-            legend([[sw('var(--c-success)'), 'Won'], [sw('var(--c-tint-2)'), 'Open'], ['<span class="ins-sw is-lost"></span>', 'Lost'], ['<span class="ins-sw is-unclear"></span>', 'No reason']])), `<div class="ins-rows">${rows}</div>`);
-    }
-
-    function unit(d) {
-        const word = { won: 'won', open: 'open', lost: 'lost', unclear: 'archived without a reason' }[d.outcome];
-        return `<button type="button" class="ins-u is-${d.outcome}" ${d.archived ? 'disabled' : `data-project="${d.id}"`} title="${esc(d.name + ': ' + word)}" aria-label="${esc(d.name + ': ' + word)}"></button>`;
-    }
-
-    /** A project as a dot; it opens the project's sheet (an archived one cannot be opened). */
-    function dealDot(d, left, title, extra, cls) {
-        const attrs = d.archived ? 'disabled' : `data-project="${d.id}"`;
-        return `<button type="button" class="ins-dd${cls ? ' ' + cls : ''}" style="left:${left}${extra || ''}" ${attrs} title="${esc(title)}" aria-label="${esc(title)}"></button>`;
-    }
-
-    function axis(ticks, labelOf) {
-        return `<div class="ins-axis" aria-hidden="true">${ticks.map(t => `<span style="left:${t.left}">${esc(labelOf(t))}</span>`).join('')}</div>`;
-    }
-
-    function timeToWinCard(rows) {
-        const all = rows.reduce((list, r) => list.concat(r.items), []);
-        if (!all.length) return card('ins-span-6', head('Time to win', 'Days from first entry to order, each dot a project'), empty('No order won in this period from a project entered as a lead.'));
-        const sc = scale(Math.max.apply(null, all.map(x => x.days).concat([30])), 4);
-        const body = rows.map(r => `<div class="ins-hrow">
-            <span class="ins-hrow-l">${esc(r.name)}</span>
-            <div class="ins-track is-line">
-                ${r.items.length > 1 ? `<span class="ins-med" style="left:${P(r.median / sc.max)}"></span>` : ''}
-                ${r.items.map(x => dealDot(x.deal, P(x.days / sc.max), x.deal.name + ': ' + days(x.days))).join('')}
-            </div>
-            <span class="ins-hrow-v">${esc(days(r.median))}<small>${r.items.length} won</small></span>
-        </div>`).join('');
-        return card('ins-span-6', head('Time to win', 'Days from first entry to order, each dot a project',
-            legend([[dot('is-acc'), 'Project'], ['<span class="ins-lk is-tick"></span>', 'Median']])),
-            `<div class="ins-rows">${body}</div>${axis(sc.ticks.map(v => ({ left: P(v / sc.max), v })), t => (t.v === sc.max ? t.v + ' days' : String(t.v)))}`);
-    }
-
-    function calibrationCard(c) {
-        if (!c.n) return card('ins-span-6', head('Estimates against outcome', 'Last chance entered before the decision'), empty('No decided project with an estimate in this period.'));
-        const rows = c.rows.map(r => {
-            if (!r.n) return `<div class="ins-hrow"><span class="ins-hrow-l">${esc(r.label)}</span><div class="ins-track is-line"></div><span class="ins-hrow-v is-muted">–</span></div>`;
-            const lo = Math.min(r.estimated, r.actual);
-            return `<div class="ins-hrow">
-                <span class="ins-hrow-l">${esc(r.label)}<small>${plural(r.n, 'project', 'projects')}</small></span>
-                <div class="ins-track is-line">
-                    <span class="ins-conn" style="left:${P(lo)};width:${P(Math.abs(r.estimated - r.actual))}"></span>
-                    <span class="ins-dd is-ring" style="left:${P(r.estimated)}" title="${esc('Estimated ' + pct(r.estimated) + ' on average')}"></span>
-                    <span class="ins-dd" style="left:${P(r.actual)}" title="${esc(r.won + ' of ' + r.n + ' won')}"></span>
-                </div>
-                <span class="ins-hrow-v">${r.won} of ${r.n}</span>
-            </div>`;
-        }).join('');
-        const note = c.weighted > 0
-            ? `Weighted by chance, these projects stood at <b>${esc(money(c.weighted))}</b>. Won were <b>${esc(money(c.wonVolume))}</b>, ${pct(c.wonVolume / c.weighted)} of it.`
-            : '';
-        return card('ins-span-6', head('Estimates against outcome', 'Last chance entered before the decision',
-            legend([[dot('is-hollow'), 'Estimated'], [dot('is-acc'), 'Came true']])),
-            `<div class="ins-rows">${rows}</div>${axis([0, 0.5, 1].map(v => ({ left: P(v), v })), t => pct(t.v))}`, note);
-    }
-
-    function curvePanel(title, group, end) {
-        const x = d => (d + 90) / 90 * 1000;
-        const y = v => 300 - v * 3;
-        const step = line => line.map((pt, i) => (i ? 'H' + x(pt[0]).toFixed(1) + ' V' + y(pt[1]).toFixed(1) : 'M' + x(pt[0]).toFixed(1) + ' ' + y(pt[1]).toFixed(1))).join(' ');
-        const lines = group.lines.map(c => step(c.line)).join(' ');
-        const med = group.median.length > 1 ? step(group.median) : '';
-        return `<div>
-            <p class="ins-panel-t">${esc(title)}<small>${group.lines.length}${group.total > group.lines.length ? ' of ' + group.total : ''}</small></p>
-            ${group.lines.length ? `<div class="ins-chart is-small">
-                <div class="ins-plot" style="height:160px" role="img" aria-label="${esc(title + ': chance in the 90 days before')}">
-                    ${grid({ max: 100, ticks: [0, 50, 100] }, v => v + '%')}
-                    <svg class="ins-svg" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
-                        <path class="ins-ln is-faint" d="${lines}"/>
-                        ${med ? `<path class="ins-ln is-ink" d="${med}"/>` : ''}
-                    </svg>
-                    ${xLabels([{ left: '0%', label: '90 days', cls: 'is-start' }, { left: '50%', label: '45' }, { left: '100%', label: end, cls: 'is-end' }])}
-                </div>
-            </div>` : empty('No chance recorded before these decisions.')}
-        </div>`;
-    }
-
-    function curvesCard(c) {
-        if (!c.won.total && !c.lost.total) return card('ins-span-6', head('Chance before the decision', 'The 90 days before a project was won or lost'), empty('Nothing decided in this period.'));
-        const note = c.lostMonthN >= 3
-            ? `A month before they were lost, projects stood at a median chance of <b>${Math.round(c.lostMonthBefore)}%</b>.`
-            : 'Recorded since 20 Nov 2026; earlier changes were rebuilt from the log and are sparse.';
-        return card('ins-span-6', head('Chance before the decision', 'The 90 days before a project was won or lost',
-            legend([[lk('var(--c-line-strong)'), 'Project'], [lk('var(--c-ink)'), 'Median']])),
-            `<div class="ins-pair">${curvePanel('Won', c.won, 'Won')}${curvePanel('Lost', c.lost, 'Lost')}</div>`, note);
-    }
-
-    function lossesCard(l) {
-        const sub = 'Chance when the project was archived, by stage';
-        if (!l.total) {
-            return card('ins-span-6', head('Where we lose', sub), empty(l.unclear
-                ? `No project archived as lost in this period. ${plural(l.unclear, 'archived project has', 'archived projects have')} no reason yet.`
-                : 'No project lost in this period.'));
-        }
-        const rows = l.stages.map(s => {
-            const seen = {};
-            const dots = s.items.filter(x => x.chance !== null).map(x => {
-                const n = (seen[x.chance] = (seen[x.chance] || 0) + 1) - 1;
-                const dy = [0, -7, 7][n % 3];
-                return dealDot(x.deal, P(x.chance / 100), x.deal.name + ': ' + x.chance + '%', `;top:calc(50% + ${dy}px)`, 'is-lost');
-            }).join('');
-            return `<div class="ins-hrow"><span class="ins-hrow-l">${esc(s.name)}</span><div class="ins-track is-line">${dots}</div><span class="ins-hrow-v">${s.items.length}</span></div>`;
-        }).join('');
-        const max = Math.max.apply(null, l.why.map(w => w.n).concat([1]));
-        const why = l.why.length ? `<p class="ins-panel-t ins-why">Why</p><div class="ins-rows">${l.why.map(w => `
-            <div class="ins-hrow"><span class="ins-hrow-l">${esc(w.label)}</span><div class="ins-track"><span class="ins-hb is-ink" style="width:${P(w.n / max)}"></span></div><span class="ins-hrow-v">${w.n}</span></div>`).join('')}</div>` : '';
-        return card('ins-span-6', head('Where we lose', sub, legend([[dot('is-lost'), 'Lost project']])),
-            `<div class="ins-rows">${rows}</div>${axis([0, 0.5, 1].map(v => ({ left: P(v), v })), t => pct(t.v))}${why}`,
-            l.unclear ? `${plural(l.unclear, 'archived project has', 'archived projects have')} no reason yet. <button type="button" class="ins-link" data-goto="archive">Add the reasons</button>` : '');
-    }
-
-    function pipelineCard(list) {
-        if (!list.length || !list.some(x => x.open > 0)) return card('ins-span-6', head('Open pipeline at month end', 'Budgets of open projects, and weighted by chance'), empty('No open project with a budget in this period.'));
-        const n = list.length;
-        const sc = scale(Math.max.apply(null, list.map(x => x.open).concat([1])), 3);
-        const pt = (i, v) => [(i + 0.5) / n * 1000, 300 - v / sc.max * 300];
-        const last = list[n - 1];
-        const every = n > 12 ? Math.ceil(n / 12) : 1;
-        const body = `<div class="ins-chart">
-            <div class="ins-plot" style="height:230px" role="img" aria-label="${esc('Open pipeline at month end, ' + money(last.open) + ' open and ' + money(last.weighted) + ' weighted at the end')}">
-                ${grid(sc, money)}
-                <svg class="ins-svg" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
-                    <path class="ins-ln is-prev" d="${path(list.map((x, i) => pt(i, x.open)))}"/>
-                    <path class="ins-ln is-acc" d="${path(list.map((x, i) => pt(i, x.weighted)))}"/>
-                </svg>
-                ${list.map((x, i) => `<span class="ins-hit" style="left:${P((i + 0.5) / n)};top:${P(1 - x.open / sc.max)}" title="${esc(monthLabel(x.month) + ' ' + x.month.slice(0, 4) + ': ' + money(x.open) + ' open, ' + money(x.weighted) + ' weighted, ' + plural(x.count, 'project', 'projects'))}"></span>`).join('')}
-                <span class="ins-pt is-prev" style="left:${P((n - 0.5) / n)};top:${P(1 - last.open / sc.max)}"></span>
-                <span class="ins-lab is-muted is-left" style="left:${P((n - 0.5) / n)};top:${P(1 - last.open / sc.max)}">${esc(money(last.open))}</span>
-                <span class="ins-pt" style="left:${P((n - 0.5) / n)};top:${P(1 - last.weighted / sc.max)}"></span>
-                <span class="ins-lab is-left" style="left:${P((n - 0.5) / n)};top:${P(1 - last.weighted / sc.max)}">${esc(money(last.weighted))}</span>
-                ${xLabels(list.map((x, i) => ({ left: P((i + 0.5) / n), label: n > 12 ? monthLabel(x.month) + ' ' + x.month.slice(2, 4) : monthLabel(x.month) })).filter((x, i) => i % every === 0))}
-            </div></div>`;
-        return card('ins-span-6', head('Open pipeline at month end', 'Budgets of open projects, and weighted by chance',
-            legend([[lk('var(--ins-prev)'), 'Open'], [lk('var(--c-accent)'), 'Weighted']])), body);
-    }
-
     /** A ring of shares, 2px apart: [{ share, color, title }]. */
     function donut(parts, center) {
         const shown = parts.filter(x => x.share > 0.0005);
@@ -598,12 +448,6 @@
 
     function renderSales(parts) {
         return `${funnelCard(parts.funnel)}
-            ${cohortCard(parts.cohorts)}
-            ${timeToWinCard(parts.timeToWin)}
-            ${calibrationCard(parts.calibration)}
-            ${curvesCard(parts.curves)}
-            ${lossesCard(parts.losses)}
-            ${pipelineCard(parts.pipeline)}
             ${productCard(parts.byProduct)}`;
     }
 
@@ -630,25 +474,54 @@
         </div>`;
     }
 
+    /**
+     * Shares of a whole as a ring, the parts listed beside it: the biggest
+     * in their own colour, the rest folded into one grey part whose members
+     * are listed below it. slices: [{ name, net, share, nameHtml, after }].
+     */
+    const SLICES = ['var(--ins-c1)', 'var(--ins-c2)', 'var(--ins-c3)', 'var(--ins-c4)'];
+
+    function shareRing(slices, rest, center, extra) {
+        const total = slices.concat(rest ? [rest] : []).concat(extra ? [extra] : []);
+        const ring = donut(total.map(x => ({ share: x.share || 0, color: x.color, title: x.name + ': ' + pct(x.share) + ' (' + money(x.net) + ')' })), center);
+        const row = (x, cls) => `<li class="ins-sl${cls || ''}">
+            <span class="ins-sl-n">${sw(x.color)}${x.nameHtml || `<span>${esc(x.name)}</span>`}</span>
+            <span class="ins-sl-v">${esc(money(x.net))}<small>${pct(x.share)}</small></span>
+            ${x.after ? `<span class="ins-sl-a">${x.after}</span>` : ''}
+        </li>`;
+        const members = rest && rest.items ? `<li class="ins-sl-more">${rest.items.slice(0, 6).map(m => `<span>${m.nameHtml || esc(m.name)} <small>${esc(money(m.net))}</small></span>`).join('')}${rest.items.length > 6 ? `<span>and ${rest.items.length - 6} more</span>` : ''}</li>` : '';
+        return `<div class="ins-byp is-share">${ring}<ul class="ins-slist">${slices.map(x => row(x)).join('')}${rest ? row(rest, ' is-rest') + members : ''}${extra ? row(extra, ' is-none') : ''}</ul></div>`;
+    }
+
+    const companyName = (name, companyId) => (companyId
+        ? `<button type="button" class="ins-name" data-company="${companyId}" title="${esc(name)}">${esc(name)}</button>`
+        : `<span>${esc(name)}</span>`);
+
     function byCustomerCard(c) {
+        const sub = 'Net, by invoice date';
         const paying = c.list.filter(x => x.net > 0);
-        if (!paying.length) return card('ins-span-6', head('Revenue by customer', 'Net, by invoice date'), empty('No invoices in this period.'));
-        const top = paying.slice(0, 8);
-        const rest = paying.slice(8);
-        const restNet = rest.reduce((s, x) => s + x.net, 0);
-        const max = Math.max(top[0].net, restNet);
-        const row = (x, label, isNew, cls, attrs) => `<div class="ins-hrow">
-            <span class="ins-hrow-l is-named">${attrs ? `<button type="button" class="ins-name" ${attrs} title="${esc(label)}">${esc(label)}</button>` : `<span>${esc(label)}</span>`}${isNew ? '<span class="ins-chip">New</span>' : ''}</span>
-            <div class="ins-track"><span class="ins-hb${cls}" style="width:${P(x / max)}"></span></div>
-            <span class="ins-hrow-v">${esc(money(x))}<small>${pct(c.total > 0 ? x / c.total : null)}</small></span>
-        </div>`;
-        const rows = top.map(x => row(x.net, x.name, x.isNew, '', x.companyId ? `data-company="${x.companyId}"` : '')).join('')
-            + (rest.length ? row(restNet, plural(rest.length, 'other', 'others'), false, ' is-grey', '') : '');
-        return card('ins-span-6', head('Revenue by customer', 'Net, by invoice date'), `<div class="ins-rows is-wide">${rows}</div>`);
+        if (!paying.length) return card('ins-span-6', head('Revenue by customer', sub), empty('No invoices in this period.'));
+        const whole = paying.reduce((t, x) => t + x.net, 0);
+        // A fifth customer gets no colour of its own: four, and the rest together.
+        const own = paying.length <= SLICES.length + 1 ? paying.length : SLICES.length;
+        const slices = paying.slice(0, Math.min(own, SLICES.length)).map((x, i) => ({
+            name: x.name, net: x.net, share: x.net / whole, color: SLICES[i],
+            nameHtml: companyName(x.name, x.companyId) + (x.isNew ? '<span class="ins-chip">New</span>' : '')
+        }));
+        const others = paying.slice(slices.length);
+        const restNet = others.reduce((t, x) => t + x.net, 0);
+        const rest = others.length ? {
+            name: others.length === 1 ? others[0].name : plural(others.length, 'other', 'others'),
+            nameHtml: others.length === 1 ? companyName(others[0].name, others[0].companyId) : null,
+            net: restNet, share: restNet / whole, color: 'var(--ins-rest)',
+            items: others.length > 1 ? others.map(x => ({ name: x.name, net: x.net, nameHtml: companyName(x.name, x.companyId) })) : null
+        } : null;
+        return card('ins-span-6', head('Revenue by customer', sub),
+            shareRing(slices, rest, `<b>${esc(money(whole))}</b><small>${plural(paying.length, 'customer', 'customers')}</small>`));
     }
 
     function newReturningCard(list) {
-        if (!list.some(x => x.returning + x.fresh > 0)) return card('ins-span-6', head('New and returning', 'Revenue per quarter, by whether the customer bought before'), empty('No invoices in this period.'));
+        if (!list.some(x => x.returning + x.fresh > 0)) return card('ins-span-4', head('New and returning', 'Revenue per quarter, by whether the customer bought before'), empty('No invoices in this period.'));
         const n = list.length;
         const sc = scale(Math.max.apply(null, list.map(x => Math.max(0, x.returning) + Math.max(0, x.fresh)).concat([1])), 3);
         const total = list.reduce((s, x) => s + x.returning + x.fresh, 0);
@@ -664,66 +537,52 @@
                 }).join('')}
                 ${xLabels(list.map((x, i) => ({ left: P((i + 0.5) / n), label: x.label })))}
             </div></div>`;
-        return card('ins-span-6', head('New and returning', 'Revenue per quarter, by whether the customer bought before',
+        return card('ins-span-4', head('New and returning', 'Revenue per quarter, by whether the customer bought before',
             legend([[sw('var(--ins-navy)'), 'Returning'], [sw('var(--ins-light)'), 'New']])), body,
             total > 0 ? `New customers brought <b>${pct(fresh / total)}</b> of revenue.` : '');
     }
 
-    /**
-     * Revenue per year as a table: each amount with a bar below, on one
-     * scale for the table; the last year darker, the years before grey; the
-     * change of the last year on the right.
-     */
-    function yearGrid(t, rows, opts) {
-        const n = t.years.length;
-        const last = t.years[n - 1];
-        const max = Math.max.apply(null, rows.reduce((list, r) => list.concat(r.values), []).concat([1]));
-        const label = y => (y.running ? y.year + ' so far' : String(y.year));
-        const changeTitle = last.running ? `${last.year} so far against ${last.year - 1} to the same day` : `${last.year} against ${last.year - 1}`;
-        const cell = (v, i, total, grey, bars) => {
-            if (Math.abs(v) < 0.005) return '<span class="ins-yc is-zero">–</span>';
-            const share = opts.shares && bars && total > 0 ? `<small>${pct(v / total)}</small>` : '';
-            return `<span class="ins-yc"><span>${esc(money(v))}${share}</span>${bars ? `<span class="ins-yc-b"><span class="${grey || i < n - 1 ? 'is-grey' : ''}" style="width:${P(Math.max(0, v) / max)}"></span></span>` : ''}</span>`;
-        };
-        const change = r => {
-            if (r.isNew) return '<span class="ins-chip">New</span>';
-            if (r.change === null || r.change === undefined) return '<span class="ins-yr-x">–</span>';
-            const cls = Math.abs(r.change) < 0.005 ? '' : (r.change > 0 ? 'is-up' : 'is-down');
-            return `<span class="${cls}">${signed(r.change)}</span>`;
-        };
-        const line = (r, cls, name, bars) => `<div class="ins-yr${cls || ''}">
-            <span class="ins-yr-n">${name}</span>
-            ${r.values.map((v, i) => cell(v, i, t.totals[i], cls === ' is-none', bars)).join('')}
-            ${n > 1 ? `<span class="ins-yr-c">${change(r)}</span>` : ''}
-        </div>`;
-        return `<div class="ins-yt" style="--ins-years:${n}">
-            <div class="ins-yr is-th"><span>${esc(opts.what)}</span>${t.years.map(y => `<span>${esc(label(y))}</span>`).join('')}${n > 1 ? `<span class="ins-yr-c" title="${esc(changeTitle)}">Change</span>` : ''}</div>
-            ${rows.map(r => line(r, r.cls, r.nameHtml, true)).join('')}
-            ${line({ values: t.totals, change: t.change }, ' is-total', esc(opts.total), false)}
-        </div>`;
+    /** "+52%", "New" or "–": the last year against the one before. */
+    function changeOf(r) {
+        if (r.isNew) return '<span class="ins-chip">New</span>';
+        if (r.change === null || r.change === undefined) return '<span class="ins-gr-x">–</span>';
+        const cls = Math.abs(r.change) < 0.005 ? '' : (r.change > 0 ? 'is-up' : 'is-down');
+        return `<span class="${cls}">${signed(r.change)}</span>`;
     }
 
+    /**
+     * How customers grew: per customer one bar per year, one above the
+     * other on one scale, the years before pale, the last one dark; each
+     * with its amount, the change on the right.
+     */
     function growthCard(g) {
         const sub = 'Revenue per year, net by invoice date';
-        if (!g.rows.length) return card('ins-span-8', head('How customers grew', sub), empty('No invoices in these years.'));
-        const rows = g.rows.map(r => Object.assign({}, r, {
-            nameHtml: r.companyId ? `<button type="button" class="ins-name" data-company="${r.companyId}" title="${esc(r.name)}">${esc(r.name)}</button>` : `<span>${esc(r.name)}</span>`
-        }));
-        return card('ins-span-8', head('How customers grew', sub),
-            yearGrid(g, rows, { what: 'Customer', total: g.more ? `All customers (${g.more} more)` : 'All customers' }));
-    }
-
-    function doorsCard(d) {
-        const sub = 'Talks and unpaid work for customers we had no paid order from yet';
-        if (!d.items.length) return card('ins-span-4', head('From talk to order', sub), empty('No talk in this period for a customer we had no order from.'));
-        return card('ins-span-4', head('From talk to order', sub), `
-            <p class="ins-big">${d.hits}<small>of ${d.items.length}</small></p>
-            <p class="ins-sub ins-big-sub">led to a paid project within 12 months</p>
-            <div class="ins-units">${d.items.map(x => `<button type="button" class="ins-u is-round ${x.order ? 'is-hit' : 'is-miss'}" ${x.talk.archived ? 'disabled' : `data-project="${x.talk.id}"`} title="${esc(x.talk.name + (x.order ? ' → ' + x.order.name : ''))}" aria-label="${esc(x.talk.name)}"></button>`).join('')}</div>
-            <ul class="ins-list">
-                <li><span>Median time to the order</span><span>${d.months === null ? '–' : Math.round(d.months) + (Math.round(d.months) === 1 ? ' month' : ' months')}</span></li>
-                <li><span>Orders that followed</span><span>${esc(money(d.volume))}</span></li>
-            </ul>`);
+        const cls = 'ins-span-8 ins-rows-2';
+        if (!g.rows.length) return card(cls, head('How customers grew', sub), empty('No invoices in these years.'));
+        const n = g.years.length;
+        const yearName = y => (y.running ? y.year + ' so far' : String(y.year));
+        const max = Math.max.apply(null, g.rows.reduce((list, r) => list.concat(r.values), []).concat([1]));
+        const bars = r => r.values.map((v, i) => {
+            const zero = Math.abs(v) < 0.005;
+            return `<span class="ins-gr-line" title="${esc(r.name + ', ' + yearName(g.years[i]) + ': ' + (zero ? 'nothing' : money(v)))}">
+                ${zero ? '' : `<span class="ins-gr-b${i < n - 1 ? ' is-prev' : ''}" style="width:calc((100% - 72px) * ${(Math.max(0, v) / max).toFixed(4)})"></span>`}
+                <span class="ins-gr-v${zero ? ' is-zero' : ''}${i < n - 1 ? ' is-prev' : ''}">${zero ? '–' : esc(money(v))}</span>
+            </span>`;
+        }).join('');
+        const rows = g.rows.map(r => `<div class="ins-gr">
+            <span class="ins-gr-n">${companyName(r.name, r.companyId)}</span>
+            <div class="ins-gr-bars">${bars(r)}</div>
+            ${n > 1 ? `<span class="ins-gr-c">${changeOf(r)}</span>` : ''}
+        </div>`).join('');
+        const lastYear = g.years[n - 1];
+        const changeTitle = lastYear.running ? `${lastYear.year} so far against ${lastYear.year - 1} to the same day` : `${lastYear.year} against ${lastYear.year - 1}`;
+        const total = `<div class="ins-gr is-total">
+            <span class="ins-gr-n">${esc(g.more ? `All customers (${g.more} more)` : 'All customers')}</span>
+            <span class="ins-gr-sum">${g.totals.map((v, i) => `<span${i < n - 1 ? ' class="is-prev"' : ''}>${esc(yearName(g.years[i]))} <b>${esc(money(v))}</b></span>`).join('')}</span>
+            ${n > 1 ? `<span class="ins-gr-c" title="${esc(changeTitle)}">${changeOf({ change: g.change })}</span>` : ''}
+        </div>`;
+        const keys = legend(g.years.map((y, i) => [sw(i < n - 1 ? 'var(--ins-prev)' : 'var(--c-accent)'), yearName(y)]));
+        return card(cls, head('How customers grew', sub, keys), `<div class="ins-grs">${rows}${total}</div>`);
     }
 
     function paymentsCard(p) {
@@ -754,26 +613,34 @@
     }
 
     function sectorsCard(s) {
-        const sub = 'Revenue per year and its share, by the customer\'s sector';
+        const sub = 'Share of revenue, by the customer\'s sector';
         if (!s.withSector) {
-            return card('ins-span-8', head('By sector', sub), empty(s.anySector
-                ? 'No revenue in these years from a company with a sector.'
+            return card('ins-span-6', head('By sector', sub), empty(s.anySector
+                ? 'No revenue in this period from a company with a sector.'
                 : 'No company has a sector yet. Add it in a company\'s sheet, under Edit.'));
         }
-        const rows = s.rows.map(r => Object.assign({}, r, { nameHtml: `<span>${esc(r.name)}</span>` }))
-            .concat(s.none ? [Object.assign({}, s.none, { cls: ' is-none', nameHtml: `<span>${esc(s.none.name)}</span>` })] : []);
-        const last = s.none ? s.none.values[s.none.values.length - 1] / (s.totals[s.totals.length - 1] || 1) : 0;
-        return card('ins-span-8', head('By sector', sub), yearGrid(s, rows, { what: 'Sector', total: 'All', shares: true }),
-            last >= 0.2 ? `<b>${pct(last)}</b> of the revenue in ${s.years[s.years.length - 1].year} comes from companies without a sector.` : '');
+        const p = state.parts.period;
+        const vs = p.prev ? (p.kind === 'year' ? (p.year - 1) + (p.running ? ' to the same day' : '') : 'the 12 months before') : '';
+        const own = s.rows.length <= SLICES.length + 1 ? s.rows.length : SLICES.length;
+        const slice = (r, color) => Object.assign({}, r, { color, after: p.prev ? changeOf(r) : '' });
+        const slices = s.rows.slice(0, Math.min(own, SLICES.length)).map((r, i) => slice(r, SLICES[i]));
+        const others = s.rows.slice(slices.length);
+        const restNet = others.reduce((t, x) => t + x.net, 0);
+        const rest = others.length === 1 ? slice(others[0], 'var(--ins-rest)')
+            : others.length ? { name: plural(others.length, 'other sector', 'other sectors'), net: restNet, share: restNet / s.total, color: 'var(--ins-rest)', items: others } : null;
+        const none = s.none ? Object.assign({}, s.none, { color: NONE_TONE }) : null;
+        return card('ins-span-6', head('By sector', vs ? { html: `${esc(sub)}; change on ${esc(vs)}` } : sub),
+            shareRing(slices, rest, `<b>${esc(money(s.total))}</b><small>${plural(s.rows.length, 'sector', 'sectors')}</small>`, none),
+            none && none.share >= 0.2 ? `<b>${pct(none.share)}</b> of the revenue comes from companies without a sector.` : '');
     }
 
     function renderCustomers(parts) {
+        // How customers grew is two rows high: New and returning and Days to payment beside it.
         return `${customerKpis(parts.customers)}
             ${byCustomerCard(parts.customers)}
-            ${newReturningCard(parts.newReturning)}
-            ${growthCard(parts.growth)}
-            ${doorsCard(parts.doors)}
             ${sectorsCard(parts.sectors)}
+            ${growthCard(parts.growth)}
+            ${newReturningCard(parts.newReturning)}
             ${paymentsCard(parts.payments)}`;
     }
 
@@ -817,7 +684,7 @@
         if (!S) return;
         const block = (h, span) => `<section class="ins-card ${span}"><div class="ins-head">${S.text('34%')}</div>${S.block('100%', h + 'px')}</section>`;
         const tile = `<div class="ins-kpi">${S.text('50%')}${S.block('62%', '26px')}${S.text('70%')}</div>`;
-        els.page.innerHTML = `${block(96, 'ins-span-12')}<div class="ins-kpis is-five ins-span-12">${tile.repeat(5)}</div>${block(260, 'ins-span-8')}${block(260, 'ins-span-4')}`;
+        els.page.innerHTML = `${block(96, 'ins-span-12')}<div class="ins-kpis is-two ins-span-12">${tile.repeat(2)}</div>${block(260, 'ins-span-8')}${block(260, 'ins-span-4')}`;
         els.page.setAttribute('aria-busy', 'true');
     }
 
