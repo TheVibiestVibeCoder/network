@@ -7242,7 +7242,7 @@
                 if (!project) return;
                 // Why it goes: finished work, a loss (and why), or a test - Insights counts it so.
                 const reason = await CRMDialog.choose(`Archive ${project.name}?`, {
-                    text: 'Why? It moves to "Archived projects" at the bottom of the Projects page, where it can be restored with everything in it.',
+                    text: 'Why?',
                     choices: ARCHIVE_REASONS.map(([value, label]) => ({ value, label })),
                     value: project.stage === 'Complete' ? 'done' : null,
                     confirm: 'Archive', danger: true

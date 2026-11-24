@@ -15036,7 +15036,10 @@ textarea.form-input:focus,
 
 /* ---- Page titles: the one bold thing at the top of a page ---- */
 
-.view-title {
+.view-title,
+.view-title.tcal-title,
+#bookkeepingView .bk-bar-title,
+#logView .calendar-page-title {
     font-size: 30px;
     font-weight: 700;
     line-height: 1.1;
@@ -15044,7 +15047,10 @@ textarea.form-input:focus,
 }
 
 @media (max-width: 768px) {
-    .view-title {
+    .view-title,
+    .view-title.tcal-title,
+    #bookkeepingView .bk-bar-title,
+    #logView .calendar-page-title {
         font-size: 24px;
     }
 }
@@ -15343,4 +15349,32 @@ input[type="checkbox"]:disabled {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+}
+
+/* ---- Bookkeeping: the toolbar's controls as tall as every other page's ---- */
+
+#bookkeepingView .bk-bar {
+    --bk-control-height: var(--control-h);
+}
+
+#bookkeepingView .bk-bar .bk-search-input {
+    width: 240px;
+    padding-left: 36px;
+    font-size: var(--t-base);
+}
+
+#bookkeepingView .bk-bar .bk-search-input:focus {
+    width: 320px;
+}
+
+#bookkeepingView .bk-bar .bk-search-icon {
+    left: 12px;
+}
+
+/* ---- Financials: an opened card grows alone ----
+   The three cards used to stretch together, so opening one left two tall
+   empty boxes beside it. */
+
+.fin-kpis {
+    align-items: start;
 }
