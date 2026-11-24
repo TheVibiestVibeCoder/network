@@ -57,9 +57,33 @@
     const days = n => (n === null || n === undefined ? '–' : Math.round(n) + (Math.round(n) === 1 ? ' day' : ' days'));
     const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
-    function signed(v) {
-        const n = Math.round(v * 100);
-        return (n > 0 ? '+' : n < 0 ? F.MINUS : '') + Math.abs(n) + '%';
+    const ARROWS = {
+        up: '<path d="M12 19V5"/><path d="M5.5 11.5L12 5l6.5 6.5"/>',
+        down: '<path d="M12 5v14"/><path d="M5.5 12.5L12 19l6.5-6.5"/>'
+    };
+
+    /** A trend arrow: up or down, green when that is good, red when not. */
+    function arrow(up, good) {
+        return `<svg class="ins-arrow ${good ? 'is-good' : 'is-bad'}" viewBox="0 0 24 24" role="img" aria-label="${up ? 'Up' : 'Down'}">${ARROWS[up ? 'up' : 'down']}</svg>`;
+    }
+
+    /** A change as an arrow and its size: "↑ 338%". Down is good where lower is better. */
+    function changeBadge(d, lowerIsBetter) {
+        const n = Math.round(Math.abs(d) * 100);
+        if (!n) return '<span class="ins-delta">0%</span>';
+        const up = d > 0;
+        return `<span class="ins-delta ${up !== !!lowerIsBetter ? 'is-good' : 'is-bad'}">${arrow(up, up !== !!lowerIsBetter)}${n}%</span>`;
+    }
+
+    /** Against the period before: the arrow, then "2025: 33%". */
+    function trend(cur, prev, fmt, lowerIsBetter) {
+        if (prev === null || prev === undefined || cur === null || cur === undefined) return '';
+        const p = state.parts.period;
+        if (!p.prev) return '';
+        const name = p.kind === 'year' ? String(p.year - 1) : 'Before';
+        const same = fmt(cur) === fmt(prev);
+        const up = cur > prev;
+        return `<span class="ins-trend">${same ? '' : arrow(up, up !== !!lowerIsBetter)}<span class="ins-was">${esc(name)}: <b>${esc(fmt(prev))}</b></span></span>`;
     }
 
     function monthLabel(m) {
@@ -171,8 +195,7 @@
         const plain = (cur, prev) => {
             const p = state.parts.period;
             if (!p.prev || prev === null || !prev) return '';
-            const d = (cur - prev) / prev;
-            return ` <span class="${Math.abs(d) < 0.005 ? '' : (d > 0 ? 'is-up' : 'is-down')}">${signed(d)}</span>`;
+            return ' ' + changeBadge((cur - prev) / prev);
         };
         return `<div class="ins-kpis is-two ins-span-12">
             ${kpi('Customers', String(k.customers), `${k.newCustomers} new, ${k.returning} returning${plain(k.customers, k.customersPrev)}`, compareBars(k.customers, k.customersPrev))}
@@ -185,9 +208,8 @@
         const p = state.parts.period;
         if (!p.prev || !k.revenuePrev) return '';
         const d = (k.revenue - k.revenuePrev) / Math.abs(k.revenuePrev);
-        const cls = Math.abs(d) < 0.005 ? '' : (d > 0 ? 'is-up' : 'is-down');
         const vs = p.kind === 'year' ? 'on ' + (p.year - 1) + (p.running ? ' to the same day' : '') : 'on the 12 months before';
-        return `<span class="ins-chg ${cls}">${signed(d)}</span> ${vs}, net by invoice date`;
+        return `<span class="ins-chg">${changeBadge(d)}</span> ${vs}, net by invoice date`;
     }
 
     function revenueCard(c) {
@@ -474,14 +496,9 @@
         const p = state.parts.period;
         const prevName = p.kind === 'year' ? String(p.year - 1) : 'before';
         // Less of the revenue with the biggest customers is good: less depends on them.
-        const shareSub = (cur, prev) => {
-            if (prev === null || prev === undefined || cur === null) return '';
-            const when = p.kind === 'year' ? 'in ' + prevName : 'before';
-            if (Math.round(cur * 100) === Math.round(prev * 100)) return `Same as ${when}`;
-            return `${cur < prev ? '<span class="is-up">Down</span>' : '<span class="is-down">Up</span>'} from ${pct(prev)} ${when}`;
-        };
+        const shareSub = (cur, prev) => trend(cur, prev, pct, true);
         return `<div class="ins-kpis is-five ins-span-12">
-            ${kpi('Customers', String(c.customers), c.customersPrev !== null ? `${prevName}: ${c.customersPrev}` : '')}
+            ${kpi('Customers', String(c.customers), trend(c.customers, c.customersPrev, String))}
             ${kpi('New', String(c.newCount), c.newShare !== null ? `${pct(c.newShare)} of revenue` : '')}
             ${kpi('Bought again', c.prevCount ? `${c.again}<small>of ${c.prevCount}</small>` : '–', c.prevCount ? `Customers from ${prevName}` : 'No customers before')}
             ${kpi('Biggest customer', pct(c.shares.top1), shareSub(c.shares.top1, c.sharesPrev ? c.sharesPrev.top1 : null))}
@@ -561,8 +578,7 @@
     function changeOf(r) {
         if (r.isNew) return '<span class="ins-chip">New</span>';
         if (r.change === null || r.change === undefined) return '<span class="ins-gr-x">–</span>';
-        const cls = Math.abs(r.change) < 0.005 ? '' : (r.change > 0 ? 'is-up' : 'is-down');
-        return `<span class="${cls}">${signed(r.change)}</span>`;
+        return changeBadge(r.change);
     }
 
     /**
