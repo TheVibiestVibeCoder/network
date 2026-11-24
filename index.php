@@ -1864,47 +1864,27 @@ function assetUrl(string $path): string
         <!-- Import/Export Modal -->
         <div class="modal" id="importExportModal">
             <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large">
+            <div class="modal-content imex-content" role="dialog" aria-modal="true" aria-labelledby="imexTitle">
                 <div class="modal-header">
-                    <div class="overview-header-info">
-                        <div class="import-export-icon">
-                            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
-                        </div>
-                        <div class="overview-title-info">
-                            <h2>Import / Export Contacts</h2>
-                            <p class="overview-company">Bulk import from Excel or export all contacts</p>
-                        </div>
-                    </div>
-                    <button type="button" class="modal-close" id="closeImportExportModal">&times;</button>
+                    <h2 id="imexTitle">Import / export</h2>
+                    <button type="button" class="modal-close" id="closeImportExportModal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <!-- Export Section -->
-                    <div class="import-export-section">
-                        <h3>
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
-                            Export Contacts
-                        </h3>
-                        <p class="section-description">Download all your contacts as an Excel file (.xlsx)</p>
-                        <button type="button" class="btn btn-primary" id="exportBtn">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
-                            Export All Contacts
-                        </button>
-                    </div>
-
-                    <div class="import-export-divider"></div>
-
-                    <!-- Import Section -->
-                    <div class="import-export-section">
-                        <h3>
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
-                            Import Contacts
-                        </h3>
-                        <p class="section-description">Upload an Excel file to bulk import contacts</p>
-
-                        <!-- Excel format reference: needed once, so folded away. The drop
-                             zone below is what most visits are for. -->
-                        <details class="import-instructions">
-                            <summary>What should the Excel file look like?</summary>
+                    <!-- The drop zone is what most visits are for; the format is needed once. -->
+                    <div class="file-upload-area" id="fileUploadArea">
+                            <input type="file" id="importFileInput" accept=".xlsx,.xls" hidden>
+                            <div class="upload-content">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+                                <p class="upload-text">Drop an Excel file or <span class="upload-link">browse</span></p>
+                            </div>
+                            <div class="upload-file-info" id="uploadFileInfo" style="display: none;">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/></svg>
+                                <span class="file-name" id="uploadFileName"></span>
+                                <button type="button" class="file-remove" id="removeFileBtn">&times;</button>
+                            </div>
+                        </div>
+                    <details class="import-instructions">
+                            <summary>File format</summary>
                             <p>Your Excel file should have these columns in the <strong>first row</strong> (header row):</p>
                             <div class="column-list">
                                 <div class="column-item required">
@@ -1951,33 +1931,10 @@ function assetUrl(string $path): string
                             </div>
                             <button type="button" class="btn btn-secondary btn-small" id="downloadTemplateBtn">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/></svg>
-                                Download Template
+                                Download template
                             </button>
                         </details>
-
-                        <!-- File Upload Area -->
-                        <div class="file-upload-area" id="fileUploadArea">
-                            <input type="file" id="importFileInput" accept=".xlsx,.xls" hidden>
-                            <div class="upload-content">
-                                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
-                                <p class="upload-text">Drop your Excel file here or <span class="upload-link">browse</span></p>
-                                <p class="upload-hint">Supports .xlsx and .xls files</p>
-                            </div>
-                            <div class="upload-file-info" id="uploadFileInfo" style="display: none;">
-                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M9 13h6M9 16.5h4"/></svg>
-                                <span class="file-name" id="uploadFileName"></span>
-                                <button type="button" class="file-remove" id="removeFileBtn">&times;</button>
-                            </div>
-                        </div>
-
-                        <!-- Import Button -->
-                        <button type="button" class="btn btn-primary" id="importBtn" disabled>
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4.5"/><path d="m7.5 9 4.5-4.5L16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
-                            Import Contacts
-                        </button>
-
-                        <!-- Import Progress/Results -->
-                        <div class="import-results" id="importResults" style="display: none;">
+                    <div class="import-results" id="importResults" style="display: none;">
                             <div class="import-progress" id="importProgress">
                                 <div class="spinner"></div>
                                 <span>Importing contacts...</span>
@@ -1987,14 +1944,18 @@ function assetUrl(string $path): string
                                 <span id="importSuccessText"></span>
                             </div>
                             <div class="import-errors" id="importErrors" style="display: none;">
-                                <h4>Import Errors:</h4>
+                                <h4>Import errors</h4>
                                 <ul id="importErrorList"></ul>
                             </div>
                         </div>
-                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="closeImportExportBtn">Close</button>
+                <div class="modal-footer imex-footer">
+                    <button type="button" class="btn btn-secondary" id="exportBtn" title="All contacts as an Excel file">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v11"/><path d="m7.5 11 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></svg>
+                        Export all
+                    </button>
+                    <button type="button" id="closeImportExportBtn" hidden></button>
+                    <button type="button" class="btn btn-primary" id="importBtn" disabled>Import</button>
                 </div>
             </div>
         </div>

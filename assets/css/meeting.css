@@ -43,9 +43,10 @@
 .meeting-title {
     margin: 0;
     color: var(--c-ink);
-    font-size: var(--t-xl);
+    font-size: var(--t-2xl);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
 }
 
 .meeting-company {
@@ -609,15 +610,15 @@
 /* "Go to From Claude" in Claude's own colour: outlined, not filled, so the
    ways to finish stay the main buttons. */
 .btn.meeting-claude-btn {
-    background: var(--c-surface);
-    border-color: var(--c-claude);
-    color: var(--c-claude);
+    background: var(--c-claude-softer);
+    border-color: transparent;
+    color: var(--c-claude-2);
 }
 
 .btn.meeting-claude-btn:hover:not(:disabled) {
-    background: var(--c-claude-soft, color-mix(in srgb, var(--c-claude) 10%, var(--c-surface)));
-    border-color: var(--c-claude-2, var(--c-claude));
-    color: var(--c-claude-2, var(--c-claude));
+    background: var(--c-claude-soft);
+    border-color: transparent;
+    color: var(--c-claude-2);
 }
 
 .btn.meeting-claude-btn .meeting-claude-mark {
@@ -838,6 +839,7 @@
 .meeting-send-row {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
 }
 
@@ -907,4 +909,27 @@
 .meeting-job-answer .meeting-claude-mark {
     flex-shrink: 0;
     margin-top: 3px;
+}
+
+/* Where the meeting stands, beside the way through it. */
+.meeting-nav {
+    align-items: center;
+}
+
+.meeting-nav .meeting-position {
+    margin-right: 8px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+}
+
+/* The field for Claude: the sheets' grey, frameless field. */
+.meeting-input .meeting-text {
+    padding: 14px 16px;
+    border-color: transparent;
+    background: var(--c-tint-3);
+}
+
+.meeting-input .meeting-text:focus {
+    background: var(--c-surface);
+    border-color: var(--c-accent);
 }

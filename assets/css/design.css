@@ -15027,6 +15027,81 @@ textarea.form-input:focus,
 }
 
 .pinv-open:focus-visible {
+/* ==========================================================================
+   46. Polish (24.11.2026)
+   One pass over every page for the leftovers: frames where the rest has
+   none, the browser's own tick boxes, headings a size too timid. Each rule
+   brings a part back to what the system already does elsewhere.
+   ========================================================================== */
+
+/* ---- Page titles: the one bold thing at the top of a page ---- */
+
+.view-title {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+}
+
+@media (max-width: 768px) {
+    .view-title {
+        font-size: 24px;
+    }
+}
+
+/* ---- Tick boxes: ours, not the browser's ----
+   A rounded square in the field grey; navy with a white tick when on, a
+   dash when only part of a group is on. Green where a payment is ticked
+   off (--chk). The round to-do circles keep their own look. */
+
+input[type="checkbox"] {
+    --chk: var(--c-primary);
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1.5px solid var(--c-line-strong);
+    border-radius: 5px; corner-shape: round;
+    background: var(--c-surface);
+    vertical-align: -3px;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+input[type="checkbox"]::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background: var(--c-on-primary);
+    clip-path: polygon(13% 52%, 0 66%, 38% 100%, 100% 22%, 86% 9%, 37% 70%);
+    transform: scale(0);
+    transition: transform var(--dur-1) var(--ease);
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+    border-color: var(--c-ink-3);
+}
+
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+    border-color: var(--chk);
+    background: var(--chk);
+}
+
+input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+input[type="checkbox"]:indeterminate::before {
+    clip-path: inset(40% 8% 40% 8% round 1px);
+    transform: scale(1);
+}
+
+input[type="checkbox"]:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 2px;
 }
@@ -15036,4 +15111,236 @@ textarea.form-input:focus,
 
 #projectOverviewModal.is-editing .pinv-section {
     display: none;
+input[type="checkbox"]:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+:is(.ppaid-row, .pdone-pay) input[type="checkbox"] {
+    --chk: var(--c-success);
+}
+
+:root[data-theme="dark"] :is(.ppaid-row, .pdone-pay) input[type="checkbox"]::before {
+    background: #FFFFFF;
+}
+
+/* ---- No frames, the last of them ---- */
+
+/* Financials: "Adjust" and the stage switches behind it. */
+.rf-adjust {
+    height: 36px;
+    border-color: transparent;
+    background: var(--c-surface);
+    box-shadow: none;
+}
+
+.rf-adjust:hover,
+.rf-adjust[aria-expanded="true"] {
+    border-color: transparent;
+    background: var(--c-tint-3);
+}
+
+.rf-stage {
+    border: 0;
+    background: var(--c-tint-3);
+    color: var(--c-ink-3);
+}
+
+.rf-stage:not(.is-on) .rf-stage-dot {
+    opacity: 0.35;
+}
+
+.rf-stage.is-on {
+    border: 0;
+    background: var(--c-tint-2);
+    box-shadow: none;
+}
+
+/* A dialog's choices: grey pills, the picked one in the accent. */
+.crm-dialog-choice {
+    border-color: transparent;
+    background: var(--c-tint-3);
+}
+
+.crm-dialog-choice:hover {
+    border-color: transparent;
+    background: var(--c-tint-2);
+}
+
+.crm-dialog-choice[aria-checked="true"] {
+    border-color: transparent;
+}
+
+/* ---- Log: the other pages' top row, card and pills ---- */
+
+@media (min-width: 769px) {
+    #logView.active {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        align-items: center;
+    }
+
+    #logView .calendar-filters {
+        padding: 12px 0;
+    }
+
+    #logView .calendar-body {
+        grid-column: 1 / -1;
+        align-self: stretch;
+    }
+
+    #logView .calendar-search-box {
+        flex: 0 1 440px;
+        max-width: 440px;
+    }
+}
+
+#logView .cal-search-input {
+    height: var(--control-h);
+    padding-left: 38px;
+    border-color: transparent;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    font-size: var(--t-base);
+}
+
+#logView .cal-search-icon {
+    left: 13px;
+}
+
+#logView .cal-search-input:focus {
+    border-color: var(--c-accent);
+    box-shadow: none;
+}
+
+#logView .log-day-list {
+    border: 0;
+    box-shadow: var(--e-1);
+}
+
+#logView .cal-day-note {
+    padding: 12px 18px;
+}
+
+#logView .cal-day-note-type {
+    padding: 2px 9px;
+    border: 0;
+    background: var(--c-tint-3);
+    color: var(--c-ink-2);
+}
+
+#logView .cal-day-note-type--project-note,
+#logView .cal-day-note-type--account-activity {
+    background: var(--c-warning-soft);
+    color: var(--c-warning-ink);
+}
+
+#logView .cal-day-note-type--todo {
+    background: var(--c-success-soft);
+    color: var(--c-success-ink);
+}
+
+#logView .cal-day-note-type--contact-activity {
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+}
+
+/* ---- Projects, list view: every row the same two lines ----
+   The company used to sit beside the name when both fitted and under it
+   when not, so rows changed shape from one to the next. */
+
+.project-row-company {
+    flex-basis: 100%;
+}
+
+/* ---- Invoices: overdue marks what is late, not the whole line ----
+   The number, the due date and the sum stay red; the rest reads as ink,
+   so a list with several overdue invoices is still a list. */
+
+.fin-inv-table .fin-inv.is-overdue :is(td, td.fin-inv-text, .fin-inv-open) {
+    color: inherit;
+}
+
+.fin-inv-table .fin-inv.is-overdue td.fin-inv-text {
+    color: var(--c-ink);
+}
+
+.fin-inv-table .fin-inv.is-overdue :is(th, th .fin-inv-open, td:nth-child(3), td:nth-last-child(2)) {
+    color: var(--c-danger-ink);
+}
+
+/* ---- Import / export: a small dialog, the drop zone first ---- */
+
+#importExportModal .imex-content {
+    width: min(480px, 100%);
+    max-width: 480px;
+}
+
+#importExportModal .modal-header {
+    border-bottom: 0;
+    padding-bottom: 8px;
+}
+
+#importExportModal .modal-header h2 {
+    font-size: var(--t-xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+#importExportModal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 8px;
+}
+
+#importExportModal .file-upload-area {
+    padding: 34px 20px;
+    border: 1.5px dashed transparent;
+    cursor: pointer;
+}
+
+#importExportModal .file-upload-area:hover,
+#importExportModal .file-upload-area.drag-over,
+#importExportModal .file-upload-area.dragover {
+    border-color: var(--c-accent);
+}
+
+#importExportModal .upload-content {
+    gap: 10px;
+}
+
+#importExportModal details.import-instructions {
+    margin: 0;
+    background: transparent;
+}
+
+#importExportModal details.import-instructions > summary {
+    padding: 6px 2px;
+    color: var(--c-ink-3);
+}
+
+#importExportModal details.import-instructions > summary:hover {
+    background: transparent;
+    color: var(--c-ink);
+}
+
+#importExportModal details.import-instructions[open] {
+    padding: 0 2px 6px;
+}
+
+#importExportModal details.import-instructions[open] > summary {
+    margin: 0 0 4px;
+}
+
+#importExportModal .imex-footer {
+    justify-content: space-between;
+    border-top: 0;
+    padding-top: 4px;
+}
+
+#importExportModal .imex-footer .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }

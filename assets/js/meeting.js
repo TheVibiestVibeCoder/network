@@ -721,9 +721,6 @@
         return `
             <header class="meeting-head">
                 <div class="meeting-head-main">
-                    <div class="meeting-head-meta">
-                        <span class="meeting-position">Project ${state.index + 1} of ${count}</span>
-                    </div>
                     <h2 class="meeting-title">${escapeHtml(project.name)}</h2>
                     ${project.company ? `<p class="meeting-company">${escapeHtml(project.company)}</p>` : ''}
                 </div>
@@ -742,7 +739,6 @@
                     <span class="meeting-label">For Claude</span>
                     ${draftField(project, 'meeting-text')}
                     <div class="meeting-send-row">
-                        <p class="meeting-hint"><span>When you move on, Claude turns this into to-dos, notes and changes under <strong>From Claude</strong>. A question? Ask it now and the answer shows here.</span></p>
                         <button type="button" class="btn meeting-claude-btn" data-meeting-send title="Send to Claude now, without moving on">${ICON_CLAUDE}<span>Ask now</span></button>
                     </div>
                     ${jobsHtml(jobsFor(project.id))}
@@ -753,6 +749,7 @@
                 <button type="button" class="btn btn-secondary" data-meeting-end>End meeting</button>
                 <span class="meeting-status" role="status">${busy ? `<span class="meeting-spinner" aria-hidden="true"></span>Claude is working on ${plural(busy, 'project')}` : ''}</span>
                 <div class="meeting-nav">
+                    <span class="meeting-position" title="Project ${state.index + 1} of ${count}">${state.index + 1} / ${count}</span>
                     <button type="button" class="btn btn-secondary" data-meeting-prev ${state.index === 0 ? 'disabled' : ''}>${ICON_PREV}<span>Previous</span></button>
                     <button type="button" class="btn btn-primary" data-meeting-next ${state.index === count - 1 ? 'disabled' : ''} title="${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Enter"><span>Next project</span>${ICON_NEXT}</button>
                 </div>
@@ -841,7 +838,7 @@
         return `
             <div class="overview-section">
                 <div class="ov-section-head">
-                    <h3 class="overview-section-title">Project Information</h3>
+                    <h3 class="overview-section-title">Project</h3>
                     <button type="button" class="ov-add-btn" data-meeting-open-project data-mode="edit" title="Edit the project">Edit</button>
                 </div>
                 <div class="overview-details">
@@ -849,32 +846,32 @@
                     ${fact('Responsible', p.assigned_to_name
                         ? `<span class="meeting-person">${personChip(p.assigned_to, p.assigned_to_name)}${escapeHtml(p.assigned_to_name)}</span>`
                         : 'Nobody')}
-                    ${fact('Budget', escapeHtml(budget || 'N/A'))}
-                    ${fact('Success Chance', escapeHtml(p.success_chance !== null ? p.success_chance + '%' : 'N/A'))}
-                    ${fact('Start Date', escapeHtml(p.start_date ? formatDate(p.start_date) : 'N/A'))}
-                    ${fact('Est. Completion', escapeHtml(p.estimated_completion ? formatDate(p.estimated_completion) : 'N/A'))}
-                    <div class="overview-detail-item full-width">
+                    ${fact('Budget', escapeHtml(budget || '—'))}
+                    ${fact('Success chance', escapeHtml(p.success_chance !== null ? p.success_chance + '%' : '—'))}
+                    ${fact('Start date', escapeHtml(p.start_date ? formatDate(p.start_date) : '—'))}
+                    ${fact('Est. completion', escapeHtml(p.estimated_completion ? formatDate(p.estimated_completion) : '—'))}
+                    ${p.description ? `<div class="overview-detail-item full-width">
                         <span class="detail-label">Description</span>
-                        <span class="detail-value meeting-description">${escapeHtml(p.description || 'No description')}</span>
-                    </div>
+                        <span class="detail-value meeting-description">${escapeHtml(p.description)}</span>
+                    </div>` : ''}
                     ${window.CRMProjectSummary ? window.CRMProjectSummary.block(p.id) : ''}
                 </div>
             </div>
 
             <div class="overview-section">
                 <div class="ov-section-head">
-                    <h3 class="overview-section-title">Assigned Contacts</h3>
+                    <h3 class="overview-section-title">Contacts</h3>
                     <button type="button" class="ov-add-btn" data-meeting-open-project title="Add contacts in the project">Add</button>
                 </div>
                 ${ctx.contacts && ctx.contacts.length ? `<div class="project-contacts-list">${ctx.contacts.map(c => `
                     <span class="pcontact-chip" title="${escapeHtml(c.company ? `${c.name} · ${c.company}` : c.name)}">
                         <span class="pcontact-name">${escapeHtml(c.name)}</span>
                         <button type="button" class="pcontact-remove" data-meeting-remove-contact="${c.id}" data-name="${escapeHtml(c.name)}" title="Remove from the project" aria-label="Remove ${escapeHtml(c.name)}">&times;</button>
-                    </span>`).join('')}</div>` : '<p class="empty-hint">No contacts yet</p>'}
+                    </span>`).join('')}</div>` : ''}
             </div>
 
             <div class="overview-section">
-                <h3 class="overview-section-title">To-Dos</h3>
+                <h3 class="overview-section-title">To-dos</h3>
                 ${ctx.todos.length ? `<div class="ptodo-card">${ctx.todos.map(t => `
                     <div class="todo-item ptodo" data-todo-id="${t.id}">
                         <div class="ptodo-row">
@@ -889,7 +886,7 @@
                                 ${personChip(t.assigned_to, t.assigned_to_name) || '<span class="ptodo-no-assignee" aria-hidden="true"></span>'}
                             </span>
                         </div>
-                    </div>`).join('')}</div>` : '<p class="empty-hint">No open to-dos</p>'}
+                    </div>`).join('')}</div>` : ''}
             </div>
 
             <div class="overview-section">
@@ -901,7 +898,7 @@
                             ${n.author_name ? `<span class="meeting-note-author">${escapeHtml(n.author_name)}</span>` : ''}
                         </div>
                         <div class="note-content">${escapeHtml(n.content)}</div>
-                    </div>`).join('')}</div>` : '<p class="empty-hint">No notes yet</p>'}
+                    </div>`).join('')}</div>` : ''}
             </div>`;
     }
 
@@ -936,10 +933,10 @@
             <div class="is-skeleton" aria-busy="true">${S.label('Loading the project')}
             <div aria-hidden="true">
                 <div class="overview-section">
-                    <div class="ov-section-head"><h3 class="overview-section-title">Project Information</h3></div>
+                    <div class="ov-section-head"><h3 class="overview-section-title">Project</h3></div>
                     <div class="overview-details">
                         ${fact('Stage', '80px')}${fact('Responsible', '110px')}${fact('Budget', '96px')}
-                        ${fact('Success Chance', '36px')}${fact('Start Date', '84px')}${fact('Est. Completion', '84px')}
+                        ${fact('Success chance', '36px')}${fact('Start date', '84px')}${fact('Est. completion', '84px')}
                         <div class="overview-detail-item full-width">
                             <span class="detail-label">Description</span>
                             <span class="detail-value">${t('300px')}<br>${t('190px')}</span>
@@ -947,11 +944,11 @@
                     </div>
                 </div>
                 <div class="overview-section">
-                    <div class="ov-section-head"><h3 class="overview-section-title">Assigned Contacts</h3></div>
+                    <div class="ov-section-head"><h3 class="overview-section-title">Contacts</h3></div>
                     <div class="project-contacts-list">${S.rows(2, i => `<span class="pcontact-chip"><span class="pcontact-name">${t(['92px', '76px'][i])}</span></span>`)}</div>
                 </div>
                 <div class="overview-section">
-                    <h3 class="overview-section-title">To-Dos</h3>
+                    <h3 class="overview-section-title">To-dos</h3>
                     <div class="ptodo-card">${S.rows(3, todo)}</div>
                 </div>
                 <div class="overview-section">
