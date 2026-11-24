@@ -321,84 +321,75 @@
     // ------------------------------------------------------------------
 
     /**
-     * From lead to order as a sankey: each stage a block in its colour with
-     * its name and count, as tall as the projects that reached it, centred
-     * on one line; the pale stream to the next stage with the share that got there. Those still
-     * open end at their stage; those that left - lost, or archived without
-     * a reason - branch off downwards. Won's figures to the right.
+     * From lead to order as a sankey: each stage a block in its colour, as
+     * tall as the projects that reached it, centred on one line. A block is
+     * stacked: on top those that went on to the next stage, with the pale
+     * stream and its share leading there; below them, lighter, those still
+     * open; at the foot those archived in this stage - lost in red, without
+     * a reason in grey. Counts sit in their part, or beside it when it is
+     * too low.
      */
     function funnelCard(f) {
         const sub = `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached`;
         if (!f.entered) return card('ins-span-12', head('From lead to order'), empty('No projects entered in this period.'));
         const TONES = ['var(--stage-lead)', 'var(--stage-negotiation)', 'var(--stage-proposal)', 'var(--stage-progress)'];
-        const EXITS = [{ key: 'lost', word: 'lost', cls: 'is-lost' }, { key: 'unclear', word: 'no reason', cls: 'is-unclear' }];
-        const NW = 118;
-        const EW = 10;
-        const WIDTH = 820;
+        const PARTS = [{ key: 'open', word: 'open', cls: 'is-open' }, { key: 'unclear', word: 'no reason', cls: 'is-unclear' }, { key: 'lost', word: 'lost', cls: 'is-lost' }];
+        const NW = 196;
+        const GAP = 2;
         const TOP = 8;
-        const MAIN = 200;
+        const MAIN = 220;
         const MID = TOP + MAIN / 2;
         const k = MAIN / f.entered;
-        const h = n => (n > 0 ? Math.max(2, n * k) : 0);
-        const xs = [0, 1, 2, 3].map(i => i * (WIDTH - NW) / 3);
-        const hs = f.steps.map(st => h(st.reached));
-        const tops = hs.map(x => MID - x / 2);
+        const h = n => (n > 0 ? Math.max(3, n * k) : 0);
+        const xs = [0, 1, 2, 3].map(i => i * (1000 - NW) / 3);
         const left = x => P(x / 1000);
         const f1 = n => n.toFixed(1);
-        const ribbon = (sx, y0, y1, tx, t0, t1) => {
-            const mx = (sx + tx) / 2;
-            return `M${f1(sx)} ${f1(y0)} C${f1(mx)} ${f1(y0)} ${f1(mx)} ${f1(t0)} ${f1(tx)} ${f1(t0)} L${f1(tx)} ${f1(t1)} C${f1(mx)} ${f1(t1)} ${f1(mx)} ${f1(y1)} ${f1(sx)} ${f1(y1)} Z`;
-        };
-        const exitTop = TOP + MAIN + 24;
+
+        // Each block's parts, the last stage first: a block is the next one plus what stopped here.
+        const parts = f.steps.map((st, i) => (i === 3 ? [] : PARTS.map(x => Object.assign({ n: (st.stopped || {})[x.key] || 0 }, x)).filter(x => x.n)));
+        const hs = [];
+        for (let i = 3; i >= 0; i--) hs[i] = (i === 3 ? h(f.steps[3].reached) : hs[i + 1]) + parts[i].reduce((t, x) => t + h(x.n), 0);
+        const tops = hs.map(x => MID - x / 2);
 
         let svg = '';
         let html = '';
         let bottom = TOP + MAIN;
         f.steps.forEach((st, i) => {
             const x = xs[i];
-            // Name and count in the block; beside it when the block is too low for them.
-            const inside = hs[i] >= 40;
-            html += `<span class="ins-sk-stage${inside ? '' : ' is-out'}${i >= 2 ? ' is-dark' : ''}" style="left:${left(inside ? x + NW / 2 : x + NW)};top:${f1(MID)}px">${esc(st.name)}<b>${st.reached}</b></span>`;
+            const on = i < 3 ? hs[i + 1] : hs[i];
+            // The part that went on, in the stage's colour; name and count in it.
+            svg += `<rect x="${f1(x)}" y="${f1(tops[i])}" width="${NW}" height="${f1(Math.max(1, on - (parts[i].length ? GAP : 0)))}" style="fill:${TONES[i]}"><title>${esc(i < 3 ? `${st.name}: ${st.reached}, ${f.steps[i + 1].reached} on to ${f.steps[i + 1].name}` : `${st.name}: ${st.reached}`)}</title></rect>`;
+            const inside = on >= 44;
+            html += `<span class="ins-sk-stage${inside ? '' : ' is-out'}${i >= 2 ? ' is-dark' : ''}" style="left:${left(inside ? x + NW / 2 : x + NW)};top:${f1(inside ? tops[i] + on / 2 : MID)}px">${esc(st.name)}<b>${st.reached}</b></span>`;
+
+            // Below it: still open, then archived without a reason, then lost.
+            let y = tops[i] + on;
+            let besideY = -Infinity;
+            parts[i].forEach((part, j) => {
+                const hh = h(part.n);
+                const last = j === parts[i].length - 1;
+                svg += `<rect class="ins-sk-part ${part.cls}" x="${f1(x)}" y="${f1(y)}" width="${NW}" height="${f1(Math.max(1, hh - (last ? 0 : GAP)))}"${part.key === 'open' ? ` style="fill:${TONES[i]}"` : ''}><title>${esc(part.n + ' ' + part.word + ' at ' + st.name)}</title></rect>`;
+                const label = `<b>${part.n}</b> ${esc(part.word)}`;
+                if (hh >= 18) {
+                    html += `<span class="ins-sk-in ${part.cls}" style="left:${left(x + NW / 2)};top:${f1(y + (hh - (last ? 0 : GAP)) / 2)}px">${label}</span>`;
+                } else {
+                    besideY = Math.max(y + hh / 2, besideY + 15);
+                    html += `<span class="ins-sk-side ${part.cls}" style="left:${left(x + NW)};top:${f1(besideY)}px">${label}</span>`;
+                    bottom = Math.max(bottom, besideY + 9);
+                }
+                y += hh;
+            });
             if (i === 3) return;
+
+            // The stream on, from the top part to the whole next block.
             const sx = x + NW;
             const nx = xs[i + 1];
-            const on = hs[i + 1];
-            const stop = st.stopped || {};
-
-            // On to the next stage.
-            if (on > 0) svg += `<path class="ins-sk-flow" d="${ribbon(sx, tops[i], tops[i] + on, nx, tops[i + 1], tops[i + 1] + on)}" style="fill:${TONES[i]}"><title>${esc(f.steps[i + 1].reached + ' on to ' + f.steps[i + 1].name)}</title></path>`;
-            html += `<span class="ins-sk-rate" style="left:${left((sx + nx) / 2)};top:${f1((tops[i] + tops[i + 1] + on) / 2)}px"><b>${st.next === null ? '–' : pct(st.next)}</b>${st.days === null ? '' : `<small>${esc(days(st.days))}</small>`}</span>`;
-
-            // Those that left branch off from the bar's foot.
-            const outs = EXITS.map(ex => Object.assign({ n: stop[ex.key] || 0 }, ex)).filter(ex => ex.n);
-            let y = tops[i] + hs[i] - outs.reduce((t, ex) => t + h(ex.n), 0);
-            // Still open: they end here, between the stream on and those that left.
-            if (stop.open) {
-                html += `<span class="ins-sk-open" style="left:${left(sx)};top:${f1((tops[i] + on + y) / 2)}px"><b>${stop.open}</b> open</span>`;
-            }
-            const tx = sx + (nx - sx) * 0.5 - EW / 2;
-            let ty = exitTop;
-            let labelY = -Infinity;
-            outs.forEach(ex => {
-                const hh = h(ex.n);
-                svg += `<path class="ins-sk-out ${ex.cls}" d="${ribbon(sx, y, y + hh, tx, ty, ty + hh)}"><title>${esc(ex.n + ' ' + ex.word + ' at ' + st.name)}</title></path>`;
-                svg += `<rect class="ins-sk-end ${ex.cls}" x="${f1(tx)}" y="${f1(ty)}" width="${EW}" height="${f1(hh)}"/>`;
-                labelY = Math.max(ty + hh / 2, labelY + 16);
-                html += `<span class="ins-sk-out-l ${ex.cls}" style="left:${left(tx + EW)};top:${f1(labelY)}px"><b>${ex.n}</b> ${esc(ex.word)}</span>`;
-                y += hh;
-                ty += hh + 4;
-                bottom = Math.max(bottom, ty, labelY + 10);
-            });
+            const mx = (sx + nx) / 2;
+            const t0 = tops[i + 1];
+            const t1 = tops[i + 1] + hs[i + 1];
+            svg += `<path class="ins-sk-flow" d="M${f1(sx)} ${f1(tops[i])} C${f1(mx)} ${f1(tops[i])} ${f1(mx)} ${f1(t0)} ${f1(nx)} ${f1(t0)} L${f1(nx)} ${f1(t1)} C${f1(mx)} ${f1(t1)} ${f1(mx)} ${f1(tops[i] + on)} ${f1(sx)} ${f1(tops[i] + on)} Z" style="fill:${TONES[i]}"><title>${esc(f.steps[i + 1].reached + ' on to ' + f.steps[i + 1].name)}</title></path>`;
+            html += `<span class="ins-sk-rate" style="left:${left(mx)};top:${f1((tops[i] + t0) / 2 + on / 2)}px"><b>${st.next === null ? '–' : pct(st.next)}</b>${st.days === null ? '' : `<small>${esc(days(st.days))}</small>`}</span>`;
         });
-        // The blocks last, over the streams' ends.
-        svg += f.steps.map((st, i) => `<rect x="${f1(xs[i])}" y="${f1(tops[i])}" width="${NW}" height="${f1(hs[i])}" style="fill:${TONES[i]}"><title>${esc(st.name + ': ' + st.reached)}</title></rect>`).join('');
-
-        const won = f.steps[3];
-        html += `<span class="ins-sk-won" style="left:${left(xs[3] + NW + 20)};top:${f1(MID)}px">
-            <b>${f.winRate === null ? '–' : esc(pct(f.winRate))}</b>
-            <span>${f.winRate === null ? 'Nothing decided yet' : 'of decided were won'}</span>
-            ${f.wonVolume ? `<span>${esc(money(f.wonVolume))} in orders</span>` : ''}
-        </span>`;
 
         const H = Math.ceil(bottom + 10);
         return card('ins-span-12', head('From lead to order', f.unclear ? `${sub}; ${f.unclear} archived without a reason` : sub),
