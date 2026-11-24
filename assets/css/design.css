@@ -14820,7 +14820,6 @@ textarea.form-input:focus,
 .ins-sk-flow:hover { opacity: 0.46; }
 .ins-sk-part.is-open { opacity: 0.42; }
 .ins-sk-part.is-lost { fill: var(--c-danger); }
-.ins-sk-part.is-unclear { fill: var(--ins-rest); }
 .ins-sk-stage {
     position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px;
     transform: translate(-50%, -50%); pointer-events: none;
@@ -14843,14 +14842,9 @@ textarea.form-input:focus,
 .ins-sk-in { transform: translate(-50%, -50%); color: var(--c-ink); }
 .ins-sk-in b, .ins-sk-side b { font-weight: 700; }
 .ins-sk-in.is-lost { color: #FFFFFF; }
-.ins-sk-in.is-unclear { color: #1C3258; }
 .ins-sk-side { transform: translate(8px, -50%); color: var(--c-ink-3); }
 .ins-sk-side b { color: var(--c-ink-2); }
 .ins-sk-side.is-lost, .ins-sk-side.is-lost b { color: var(--c-danger-ink); }
-:root[data-theme="dark"] .ins-sk-in.is-unclear { color: #FFFFFF; }
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .ins-sk-in.is-unclear { color: #FFFFFF; }
-}
 
 /* By product: a ring of revenue shares, the products beside it */
 .ins-byp { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 32px; align-items: center; }
@@ -14862,18 +14856,27 @@ textarea.form-input:focus,
 .ins-donut-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
 .ins-donut-c b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--c-ink); }
 .ins-donut-c small { font-size: var(--t-xs); color: var(--c-ink-3); }
-.ins-plist { margin: 0; padding: 0; list-style: none; }
-.ins-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 2px; padding: 9px 0; border-bottom: 1px solid var(--c-line-2); }
-.ins-prow:last-child { border-bottom: 0; }
-.ins-prow-n { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--t-base); font-weight: 600; color: var(--c-ink); }
-.ins-prow-n span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ins-prow-v { text-align: right; font-size: var(--t-base); font-weight: 600; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ins-prow-v small { margin-left: 6px; font-size: var(--t-xs); font-weight: 500; color: var(--c-ink-3); }
-.ins-prow-s { grid-column: 1 / -1; padding-left: 18px; font-size: var(--t-xs); color: var(--c-ink-3); }
-.ins-prow.is-none .ins-prow-n, .ins-prow.is-none .ins-prow-v { color: var(--c-ink-3); }
+/* By product: a half ring, the products as tiles beside it */
+.ins-byp.is-half { grid-template-columns: 240px minmax(0, 1fr); gap: 36px; }
+.ins-half { position: relative; width: 240px; }
+.ins-half svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ins-half circle { fill: none; stroke-width: 20; }
+.ins-half .ins-donut-bg { stroke: var(--c-tint-3); }
+.ins-half circle:not(.ins-donut-bg):hover { stroke-width: 24; }
+.ins-half-c { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.ins-half-c b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--c-ink); }
+.ins-half-c small { font-size: var(--t-xs); color: var(--c-ink-3); }
+.ins-ptiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px 28px; margin: 0; padding: 0; list-style: none; }
+.ins-pt-tile { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-left: 14px; border-left: 1px solid var(--c-line-2); }
+.ins-pt-n { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--t-sm); font-weight: 600; color: var(--c-ink); }
+.ins-pt-n span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ins-pt-v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-pt-v small { margin-left: 6px; font-size: var(--t-xs); font-weight: 500; letter-spacing: 0; color: var(--c-ink-3); }
+.ins-pt-s { font-size: var(--t-xs); line-height: 1.45; color: var(--c-ink-3); }
+.ins-pt-tile.is-none .ins-pt-n, .ins-pt-tile.is-none .ins-pt-v { color: var(--c-ink-3); }
 @media (max-width: 640px) {
-    .ins-byp { grid-template-columns: minmax(0, 1fr); justify-items: center; }
-    .ins-plist, .ins-slist { width: 100%; }
+    .ins-byp, .ins-byp.is-half { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+    .ins-ptiles, .ins-slist { width: 100%; }
 }
 
 /* A ring's parts beside it: a compact list */

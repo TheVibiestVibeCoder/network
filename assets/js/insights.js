@@ -330,10 +330,10 @@
      * too low.
      */
     function funnelCard(f) {
-        const sub = `${plural(f.entered, 'project', 'projects')} entered in this period, by the furthest stage they reached`;
         if (!f.entered) return card('ins-span-12', head('From lead to order'), empty('No projects entered in this period.'));
         const TONES = ['var(--stage-lead)', 'var(--stage-negotiation)', 'var(--stage-proposal)', 'var(--stage-progress)'];
-        const PARTS = [{ key: 'open', word: 'open', cls: 'is-open' }, { key: 'unclear', word: 'no reason', cls: 'is-unclear' }, { key: 'lost', word: 'lost', cls: 'is-lost' }];
+        // Archived: lost, or archived without a reason yet - one red part.
+        const PARTS = [{ key: 'open', word: 'open', cls: 'is-open' }, { key: 'archived', word: 'archived', cls: 'is-lost' }];
         const NW = 196;
         const GAP = 2;
         const TOP = 8;
@@ -346,7 +346,13 @@
         const f1 = n => n.toFixed(1);
 
         // Each block's parts, the last stage first: a block is the next one plus what stopped here.
-        const parts = f.steps.map((st, i) => (i === 3 ? [] : PARTS.map(x => Object.assign({ n: (st.stopped || {})[x.key] || 0 }, x)).filter(x => x.n)));
+        const parts = f.steps.map((st, i) => {
+            if (i === 3) return [];
+            const stop = st.stopped || {};
+            const n = { open: stop.open || 0, archived: (stop.lost || 0) + (stop.unclear || 0) };
+            const why = stop.unclear ? ` (${stop.lost || 0} lost, ${stop.unclear} without a reason)` : '';
+            return PARTS.map(x => Object.assign({ n: n[x.key], why: x.key === 'archived' ? why : '' }, x)).filter(x => x.n);
+        });
         const hs = [];
         for (let i = 3; i >= 0; i--) hs[i] = (i === 3 ? h(f.steps[3].reached) : hs[i + 1]) + parts[i].reduce((t, x) => t + h(x.n), 0);
         const tops = hs.map(x => MID - x / 2);
@@ -368,7 +374,7 @@
             parts[i].forEach((part, j) => {
                 const hh = h(part.n);
                 const last = j === parts[i].length - 1;
-                svg += `<rect class="ins-sk-part ${part.cls}" x="${f1(x)}" y="${f1(y)}" width="${NW}" height="${f1(Math.max(1, hh - (last ? 0 : GAP)))}"${part.key === 'open' ? ` style="fill:${TONES[i]}"` : ''}><title>${esc(part.n + ' ' + part.word + ' at ' + st.name)}</title></rect>`;
+                svg += `<rect class="ins-sk-part ${part.cls}" x="${f1(x)}" y="${f1(y)}" width="${NW}" height="${f1(Math.max(1, hh - (last ? 0 : GAP)))}"${part.key === 'open' ? ` style="fill:${TONES[i]}"` : ''}><title>${esc(part.n + ' ' + part.word + ' at ' + st.name + part.why)}</title></rect>`;
                 const label = `<b>${part.n}</b> ${esc(part.word)}`;
                 if (hh >= 18) {
                     html += `<span class="ins-sk-in ${part.cls}" style="left:${left(x + NW / 2)};top:${f1(y + (hh - (last ? 0 : GAP)) / 2)}px">${label}</span>`;
@@ -392,7 +398,7 @@
         });
 
         const H = Math.ceil(bottom + 10);
-        return card('ins-span-12', head('From lead to order', f.unclear ? `${sub}; ${f.unclear} archived without a reason` : sub),
+        return card('ins-span-12', head('From lead to order'),
             `<div class="ins-sk-wrap"><div class="ins-sk" style="height:${H}px" role="img" aria-label="${esc(f.steps.map(st => st.name + ' ' + st.reached).join(', '))}">
                 <svg viewBox="0 0 1000 ${H}" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>
                 ${html}
@@ -416,25 +422,43 @@
         </div>`;
     }
 
-    /** Revenue by product as a ring; beside it each product with its won, order size and time to win. */
+    /** A half ring of shares, left to right, 2px apart: [{ share, color, title }]. */
+    function halfDonut(parts, center) {
+        const shown = parts.filter(x => x.share > 0.0005);
+        const gap = shown.length > 1 ? 0.6 : 0;
+        let at = 0;
+        // The circle is 200 long; its upper half, from the left, is the first 100.
+        const arcs = shown.map(x => {
+            const len = x.share * 100;
+            const html = `<circle cx="100" cy="100" r="78" pathLength="200" stroke="${x.color}" stroke-dasharray="${Math.max(0.01, len - gap).toFixed(2)} 200" stroke-dashoffset="${(-at).toFixed(2)}"><title>${esc(x.title)}</title></circle>`;
+            at += len;
+            return html;
+        }).join('');
+        return `<div class="ins-half" role="img" aria-label="${esc(shown.map(x => x.title).join(', '))}">
+            <svg viewBox="0 0 200 112" aria-hidden="true"><g transform="rotate(180 100 100)"><circle class="ins-donut-bg" cx="100" cy="100" r="78" pathLength="200" stroke-dasharray="100 200"/>${arcs}</g></svg>
+            <span class="ins-half-c">${center}</span>
+        </div>`;
+    }
+
+    /** Revenue by product as a half ring; beside it each product with its won, order size and time to win. */
     function productCard(t) {
         const sub = 'Revenue invoiced and projects decided in this period';
         if (!t.rows.length) return card('ins-span-12', head('By product', sub), empty('Nothing invoiced or decided in this period.'));
         const rows = t.rows.slice().sort((a, b) => (a.name === IC.NO_PRODUCT) - (b.name === IC.NO_PRODUCT) || b.revenue - a.revenue);
         const color = r => r.color || NONE_TONE;
-        const ring = donut(rows.filter(r => r.revenue > 0).map(r => ({ share: r.share || 0, color: color(r), title: r.name + ': ' + pct(r.share) + ' (' + money(r.revenue) + ')' })),
+        const ring = halfDonut(rows.filter(r => r.revenue > 0).map(r => ({ share: r.share || 0, color: color(r), title: r.name + ': ' + pct(r.share) + ' (' + money(r.revenue) + ')' })),
             `<b>${esc(money(t.total.revenue))}</b><small>revenue</small>`);
         const facts = r => [
             r.decided ? `${r.won} of ${r.decided} won` : (r.won ? `${r.won} won` : ''),
             r.order ? `median order ${money(r.order)}` : '',
             r.days !== null ? `${Math.round(r.days)} days to win` : ''
         ].filter(Boolean).join(', ');
-        const list = rows.map(r => `<li class="ins-prow${r.name === IC.NO_PRODUCT ? ' is-none' : ''}">
-            <span class="ins-prow-n">${sw(color(r))}<span>${esc(r.name)}</span></span>
-            <span class="ins-prow-v">${esc(money(r.revenue))}${r.revenue > 0 && r.share !== null ? `<small>${pct(r.share)}</small>` : ''}</span>
-            ${facts(r) ? `<span class="ins-prow-s">${esc(facts(r))}</span>` : ''}
+        const tiles = rows.map(r => `<li class="ins-pt-tile${r.name === IC.NO_PRODUCT ? ' is-none' : ''}">
+            <span class="ins-pt-n">${sw(color(r))}<span>${esc(r.name)}</span></span>
+            <span class="ins-pt-v">${esc(money(r.revenue))}${r.revenue > 0 && r.share !== null ? `<small>${pct(r.share)}</small>` : ''}</span>
+            ${facts(r) ? `<span class="ins-pt-s">${esc(facts(r))}</span>` : ''}
         </li>`).join('');
-        return card('ins-span-12', head('By product', sub), `<div class="ins-byp">${t.total.revenue > 0 ? ring : ''}<ul class="ins-plist">${list}</ul></div>`);
+        return card('ins-span-12', head('By product', sub), `<div class="ins-byp is-half">${t.total.revenue > 0 ? ring : ''}<ul class="ins-ptiles">${tiles}</ul></div>`);
     }
 
     function renderSales(parts) {
