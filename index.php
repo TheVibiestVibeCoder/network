@@ -1203,11 +1203,12 @@ function assetUrl(string $path): string
                         <div class="fin-kpis" id="finKpis"></div>
                         <div id="finAlerts"></div>
                         <section class="fin-card fin-chart-card" id="finChart" aria-label="Cashflow"></section>
-                        <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
                         <!-- Our own invoices, read from Bookkeeping's files (invoice-list.js). -->
                         <section class="fin-card" id="finInvoices" aria-label="Invoices" hidden></section>
                         <!-- Loans we owe: lender, dates, rate and the interest so far. -->
                         <section class="fin-card" id="finDebts" aria-label="Debts"></section>
+                        <!-- Month by month: the detail behind the chart, last on the page. -->
+                        <section class="fin-card" id="finMonths" aria-label="Month by month"></section>
                     </div>
                     <!-- The costs, opened from the "Fixed costs" figure: a sheet like
                          a project's, where they are added and edited (financials.js). -->
@@ -2098,6 +2099,10 @@ function assetUrl(string $path): string
                             <div class="overview-detail-item full-width ppay-panel" id="projectOverviewPaymentsList" data-ov="view" hidden></div>
                         </div>
                     </div>
+
+                    <!-- The project's own invoices (project-payments.js), for whoever
+                         may see Financials: each with its status, opening its PDF. -->
+                    <div class="overview-section ov-section pinv-section" id="projectOverviewInvoices" data-ov="view" hidden></div>
 
                     <!-- Expected payments while editing (project-payments.js); the
                          partial / in full switch sits on the right of the heading. -->
