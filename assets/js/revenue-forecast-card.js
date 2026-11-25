@@ -73,6 +73,8 @@
         months: null,
         // How the months are named under the total, e.g. "until Dec"; null: "in next 12 months".
         periodLabel: null,
+        // Our invoices still open, net (Financials' Invoices card); null: not shown.
+        invoiced: null,
         settings: RF.settingsFor(RF.DEFAULT_PRESET),
         cards: [],
         listeners: []
@@ -274,6 +276,7 @@
                 <span class="rf-split">
                     <span class="rf-split-line"><strong>${esc(RF.money(f.current.dated))}</strong> ${esc(period)}</span>
                     <span class="rf-split-line"><strong>${esc(RF.money(f.current.undated))}</strong> no date</span>
+                    ${shared.invoiced > 0.005 ? `<span class="rf-split-line is-aside" title="Our invoices still open, net - the sum under Invoices"><strong>${esc(RF.money(shared.invoiced))}</strong> invoiced</span>` : ''}
                 </span>`;
 
             return `
@@ -986,6 +989,18 @@
         renderAll();
     }
 
+    /**
+     * What is invoiced and not paid yet (net), shown under the total's two
+     * parts. It is not a third part: where the project has the payment
+     * planned, the same money is already in the forecast.
+     */
+    function setInvoiced(amount) {
+        const next = Number(amount) > 0.005 ? Number(amount) : null;
+        if (next === shared.invoiced) return;
+        shared.invoiced = next;
+        renderAll();
+    }
+
     /** Picks a scenario from outside the card (the Financials header). */
     function setPreset(key) {
         shared.settings = RF.settingsFor(key);
@@ -999,5 +1014,5 @@
         if (typeof fn === 'function') shared.listeners.push(fn);
     }
 
-    root.RevenueForecastCard = { init, setProjects, getSettings, setPreset, setMonths, onChange };
+    root.RevenueForecastCard = { init, setProjects, getSettings, setPreset, setMonths, setInvoiced, onChange };
 })(window);

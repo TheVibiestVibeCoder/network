@@ -1520,6 +1520,7 @@
         const all = state.invoices;
         const years = IL.years(all);
         if (!years.length && !state.invImport) {
+            Card.setInvoiced(0);
             // No invoices yet: only the way to add some from the invoice list.
             els.finInvoices.hidden = false;
             els.finInvoices.innerHTML = `
@@ -1548,6 +1549,8 @@
         const head = [];
         // Net, like the projects' amounts; what is owed counts all years.
         const owed = IL.summary(unpaid);
+        // The same sum under the revenue forecast's total.
+        Card.setInvoiced(owed.open.amount);
         if (owed.open.amount > 0.005) head.push(`<strong>${esc(cents(owed.open.amount))}</strong> open`);
         if (owed.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(owed.overdue.amount))}</strong> overdue`);
 
