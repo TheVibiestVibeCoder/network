@@ -5057,6 +5057,7 @@
             : (formatProjectValue(project) || 'Undetermined'));
         if (window.ProjectPayments) {
             window.ProjectPayments.renderView(project, elements.projectOverviewPayments, elements.projectOverviewPaymentsList);
+            loadProjectInvoices(project);
         }
 
         setDetailValue(elements.projectOverviewSuccessChance, project.success_chance ? `${project.success_chance}%` : '');
@@ -6293,6 +6294,29 @@
                 refreshTodoDetail();
             }
         });
+    }
+
+    /**
+     * The project's own invoices (Financials, admins): each payment then
+     * says how its invoice stands, and the sheet lists them. Drawn again
+     * once they are there; without them the sheet stays as it was.
+     */
+    async function loadProjectInvoices(project) {
+        const section = document.getElementById('projectOverviewInvoices');
+        const PP = window.ProjectPayments;
+        if (section) PP.renderInvoices(section, null);
+        if (!section || !project || !project.id || !window.CompanyInvoices || !window.CompanyInvoices.items) return;
+        try {
+            const all = await window.CompanyInvoices.items();
+            // Another project opened meanwhile: not ours to draw.
+            if (state.viewingProjectId !== project.id) return;
+            const mine = (all || []).filter(i => i.project && Number(i.project.id) === Number(project.id));
+            if (!mine.length) return;
+            PP.renderView(state.viewingProject || project, elements.projectOverviewPayments, elements.projectOverviewPaymentsList, mine);
+            PP.renderInvoices(section, mine);
+        } catch (error) {
+            // The sheet stands without them.
+        }
     }
 
     /**

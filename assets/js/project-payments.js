@@ -212,10 +212,12 @@
      * bar scales to the budget, or to the payments when they go past it, and
      * then marks where the budget ends. A legend gives each part's amount.
      */
-    function sumBlock(sum, ctx) {
-        if (sum.full) return fullBlock(sum, ctx);
+    function sumBlock(sum, ctx, invoicedOpen) {
+        if (sum.full) return fullBlock(sum, ctx, invoicedOpen);
         const b = sum.budget;
         const expected = sum.planned - sum.paid;
+        // Of what is expected, the part an invoice is out for.
+        const invoiced = Math.min(Math.max(0, invoicedOpen || 0), Math.max(0, expected));
         const open = openLabel(sum);
 
         const key = (tone, label, value) =>
@@ -232,7 +234,8 @@
         }
 
         const keys = (sum.paid > 0 ? key('paid', 'Paid', euro(sum.paid)) : '')
-            + (expected > 0 ? key('expected', 'Expected', euro(expected)) : '')
+            + (invoiced > 0.005 ? key('invoiced', 'Invoiced', euro(invoiced)) : '')
+            + (expected - invoiced > 0.005 ? key('expected', invoiced > 0.005 ? 'Not invoiced yet' : 'Expected', euro(expected - invoiced)) : '')
             + unplanned;
 
         return `
@@ -241,7 +244,7 @@
                     <span class="ppay-sum-planned">Planned <strong>${esc(euro(sum.planned))}</strong>${b ? ` of ${esc(euroRange(b))}` : ''}</span>
                     <span class="ppay-sum-open${open.done ? ' is-done' : ''}">${open.html}</span>
                 </div>
-                ${budgetBar(sum)}
+                ${budgetBar(sum, invoiced)}
                 ${keys ? `<ul class="ppay-legend">${keys}</ul>` : ''}
                 ${note}
             </div>`;
@@ -251,8 +254,9 @@
      * Under a payment in full: whether it has come in, and the budget for
      * reference when it says something else.
      */
-    function fullBlock(sum, ctx) {
+    function fullBlock(sum, ctx, invoicedOpen) {
         const open = openLabel(sum);
+        const invoiced = Math.min(Math.max(0, invoicedOpen || 0), Math.max(0, sum.planned - sum.paid));
         const b = budgetOf(ctx || {});
         const differs = b && (sum.planned < b.min - 0.005 || sum.planned > b.max + 0.005);
         return `
@@ -261,14 +265,16 @@
                     <span class="ppay-sum-planned">Payment in full <strong>${esc(euro(sum.planned))}</strong></span>
                     <span class="ppay-sum-open${open.done ? ' is-done' : ''}">${open.html}</span>
                 </div>
+                ${invoiced > 0.005 ? `<ul class="ppay-legend"><li><span class="ppay-key is-invoiced" aria-hidden="true"></span>Invoiced <strong>${esc(euro(invoiced))}</strong></li></ul>` : ''}
                 ${differs ? `<p class="ppay-note">The budget is ${esc(euroRange(b))}; the forecast counts the payment.</p>` : ''}
             </div>`;
     }
 
     /** The budget bar on its own; also on a project card. Its label reads out every part. */
-    function budgetBar(sum) {
+    function budgetBar(sum, invoicedOpen) {
         const b = sum.budget;
         const expected = sum.planned - sum.paid;
+        const invoiced = Math.min(Math.max(0, invoicedOpen || 0), Math.max(0, expected));
         const scale = Math.max(b ? b.max : 0, sum.planned) || 1;
         const pct = v => (Math.min(1, Math.max(0, v / scale)) * 100).toFixed(2) + '%';
 
@@ -278,7 +284,9 @@
         const mark = b && sum.above > 0
             ? `<span class="ppay-bar-over" style="left:${pct(b.max)}"></span><span class="ppay-bar-mark" style="left:${pct(b.max)}"></span>` : '';
 
-        const parts = [`Paid ${euro(sum.paid)}`, `expected ${euro(expected)}`];
+        const parts = [`Paid ${euro(sum.paid)}`];
+        if (invoiced > 0.005) parts.push(`invoiced ${euro(invoiced)}`);
+        parts.push(`${invoiced > 0.005 ? 'not invoiced yet' : 'expected'} ${euro(expected - invoiced)}`);
         if (b && sum.unplanned.max > 0) parts.push(`not planned yet ${euroRange(sum.unplanned)}`);
         if (b && sum.above > 0) parts.push(`${euro(sum.above)} above the budget of ${euro(b.max)}`);
         if (b) parts.push(`budget ${euroRange(b)}`);
@@ -288,7 +296,8 @@
             <div class="ppay-bar" role="img" aria-label="${esc(label)}" title="${esc(label)}">
                 ${range}
                 <span class="ppay-bar-seg is-paid" style="width:${pct(sum.paid)}"></span>
-                <span class="ppay-bar-seg is-expected" style="left:${pct(sum.paid)};width:${pct(expected)}"></span>
+                ${invoiced > 0.005 ? `<span class="ppay-bar-seg is-invoiced" style="left:${pct(sum.paid)};width:${pct(invoiced)}"></span>` : ''}
+                <span class="ppay-bar-seg is-expected" style="left:${pct(sum.paid + invoiced)};width:${pct(expected - invoiced)}"></span>
                 ${mark}
             </div>`;
     }
@@ -360,45 +369,103 @@
             </div>`;
     }
 
-    // ---- Reading: the summary under the budget and the list ----
+    // ---- Reading: the list, and the project's invoices ----
+
+    /** How a payment stands by its invoice: the label and its tone. */
+    const INVOICE_STATES = {
+        paid: { label: 'Paid', tone: 'paid' },
+        late: { label: 'Paid', tone: 'paid' },
+        partial: { label: 'Part paid', tone: 'invoiced' },
+        open: { label: 'Invoiced', tone: 'invoiced' },
+        overdue: { label: 'Overdue', tone: 'overdue' },
+        reminded: { label: 'Reminded', tone: 'overdue' }
+    };
+
+    const invoiceState = inv => INVOICE_STATES[inv.status] || INVOICE_STATES.open;
+    const isOpen = inv => inv.outstanding > 0.005;
+    const netOf = inv => (inv.net === null || inv.net === undefined ? inv.gross : inv.net) || 0;
+
+    /** Net of the project's invoices that are out and not paid yet. */
+    function invoicedOpen(invoices) {
+        return (invoices || []).filter(i => !i.credit && isOpen(i))
+            .reduce((sum, i) => sum + (Number(i.outstandingNet) || 0), 0);
+    }
 
     /**
-     * Under the budget: "3 expected payments", what is still open and a
-     * warning above the budget. The list itself always shows, full width.
+     * Which invoice belongs to which expected payment: one invoice each, the
+     * nearest pair first. An invoice over the payment's amount (net, to the
+     * euro) fits within half a year of its month; one over another amount
+     * only within two months. Credit notes and invoices that fit nowhere
+     * belong to no payment - they still show in the sheet's list. Returns
+     * one invoice or null per payment.
      */
-    function renderView(project, summaryEl, listEl) {
+    function matchInvoices(list, invoices) {
+        const out = list.map(() => null);
+        const own = (invoices || []).filter(i => !i.credit && i.date);
+        if (!own.length) return out;
+        const pairs = [];
+        list.forEach((p, pi) => own.forEach((inv, ii) => {
+            const apart = Math.abs(monthIndex(p.month) - monthIndex(inv.date));
+            const same = Math.abs(p.amount - netOf(inv)) <= 1;
+            if (apart <= (same ? 6 : 2)) pairs.push({ pi, ii, same, apart });
+        }));
+        // The same amount before another one, then the nearer month, then the earlier invoice.
+        pairs.sort((a, b) => (b.same - a.same) || (a.apart - b.apart)
+            || (own[a.ii].date < own[b.ii].date ? -1 : own[a.ii].date > own[b.ii].date ? 1 : 0) || (a.pi - b.pi));
+        const used = new Set();
+        pairs.forEach(x => {
+            if (out[x.pi] || used.has(x.ii)) return;
+            out[x.pi] = own[x.ii];
+            used.add(x.ii);
+        });
+        return out;
+    }
+
+    /**
+     * The expected payments as a list, full width, with its sums. The line
+     * under the budget that repeated them is gone (24.11.2026).
+     *
+     * `invoices`: the project's own invoices (Financials, admins), when they
+     * are known. A payment then says how its invoice stands - invoiced,
+     * overdue, reminded, paid - and carries its number; the sums show how
+     * much of what is expected is invoiced.
+     */
+    function renderView(project, summaryEl, listEl, invoices) {
         if (!summaryEl || !listEl) return;
         const list = parse(project && project.payments);
         const sum = summarize(project, list);
 
+        // Nothing under the budget any more: the list right below it carries
+        // the count, what is still open and the warning above the budget.
+        summaryEl.innerHTML = '';
+        summaryEl.hidden = true;
+
         if (!list.length) {
-            summaryEl.innerHTML = '';
-            summaryEl.hidden = true;
             listEl.innerHTML = '';
             listEl.hidden = true;
             return;
         }
 
-        const open = openLabel(sum);
-        summaryEl.hidden = false;
-        summaryEl.innerHTML = `
-            <span class="ppay-count">${sum.full ? 'Payment in full' : esc(plural(list.length, 'expected payment'))}</span>
-            <span class="ppay-open${open.done ? ' is-done' : ''}">${open.html}</span>
-            ${sum.above > 0 ? `<span class="ppay-flag is-warn">${ICON_WARN}${esc(euro(sum.above))} above budget</span>` : ''}`;
-
+        const matched = matchInvoices(list, invoices);
         const startDate = project.start_date;
         const endDate = project.estimated_completion;
         const now = monthIndex(new Date().toISOString());
         const rows = list.map((p, i) => {
             const outside = isOutside(p.month, startDate, endDate, null);
             const after = afterEndLabel(p.month, endDate);
-            const late = !p.paid && monthIndex(p.month) < now;
+            const inv = matched[i];
+            // The payment ticked off wins; then the invoice says how it stands.
+            const st = !p.paid && inv ? invoiceState(inv) : null;
+            const paid = p.paid || (st && st.tone === 'paid');
+            const late = !paid && (st ? st.tone === 'overdue' : monthIndex(p.month) < now);
+            const label = paid ? `${ICON_CHECK}Paid` : st ? esc(st.label) : late ? 'Overdue' : 'Expected';
+            const hint = inv ? `Invoice ${inv.number}${inv.due && !paid ? `, due ${window.CRMFormat ? window.CRMFormat.date(inv.due) : inv.due}` : ''}` : '';
             return `
-                <li class="ppay-item${p.paid ? ' is-paid' : ''}${late ? ' is-late' : ''}">
+                <li class="ppay-item${paid ? ' is-paid' : ''}${late ? ' is-late' : ''}${st && st.tone === 'invoiced' ? ' is-invoiced' : ''}">
                     <span class="ppay-num" aria-hidden="true">${sum.full ? '' : i + 1}</span>
-                    <span class="ppay-item-month">${esc(monthName(p.month))}${after ? `<span class="ppay-item-after">${esc(after)}</span>` : ''}${outside ? '<span class="ppay-flag is-warn">outside project dates</span>' : ''}</span>
+                    <span class="ppay-item-month">${esc(monthName(p.month))}${inv ? `<span class="ppay-item-inv" title="${esc(hint)}">${esc(inv.number)}</span>` : ''}${after ? `<span class="ppay-item-after">${esc(after)}</span>` : ''}${outside ? '<span class="ppay-flag is-warn">outside project dates</span>' : ''}</span>
                     <span class="ppay-item-amount">${esc(euro(p.amount))}</span>
-                    <span class="ppay-item-status">${p.paid ? `${ICON_CHECK}Paid` : late ? 'Overdue' : 'Expected'}</span>
+                    <span class="ppay-item-status"${hint ? ` title="${esc(hint)}"` : ''}>${label}</span>
                 </li>`;
         }).join('');
 
@@ -406,7 +473,57 @@
         listEl.innerHTML = `
             <span class="detail-label">${sum.full ? 'Payment in full' : 'Expected payments'}</span>
             <ol class="ppay-items${sum.full ? ' is-full' : ''}">${rows}</ol>
-            ${sumBlock(sum, project)}`;
+            ${sumBlock(sum, project, invoicedOpen(invoices))}`;
+    }
+
+    /**
+     * The project's invoices as a section of its sheet: number, date, what
+     * it is for, how it stands, net. A row opens the invoice's PDF where
+     * Bookkeeping has it. Empty and hidden without invoices.
+     */
+    function renderInvoices(sectionEl, invoices) {
+        if (!sectionEl) return;
+        const items = (invoices || []).slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        if (!items.length) {
+            sectionEl.hidden = true;
+            sectionEl.innerHTML = '';
+            return;
+        }
+        const day = iso => (iso && window.CRMFormat ? window.CRMFormat.date(iso) : iso || '');
+        const open = invoicedOpen(items);
+        const rows = items.map(i => {
+            const st = i.credit ? { label: 'Credit note', tone: 'plain' } : invoiceState(i);
+            const label = st.tone === 'paid' && i.paid && i.paid.date ? `Paid ${day(i.paid.date)}`
+                : st.label === 'Invoiced' && i.due ? `Due ${day(i.due)}` : st.label;
+            const canOpen = !i.archived && i.id && window.Bookkeeping && window.Bookkeeping.preview;
+            const no = canOpen
+                ? `<button type="button" class="pinv-open" data-pinv-open="${i.id}" data-pinv-file="${esc(i.file || '')}" title="Open the invoice">${esc(i.number)}</button>`
+                : esc(i.number);
+            return `
+                <li class="co-inv pinv is-${st.tone}">
+                    <span class="co-inv-no">${no}</span>
+                    <span class="co-inv-date">${esc(day(i.date))}</span>
+                    <span class="co-inv-what" title="${esc(i.subject || '')}">${esc(i.subject || '')}</span>
+                    <span class="co-inv-state">${esc(label)}</span>
+                    <span class="co-inv-amount">${esc(euro(netOf(i)))}</span>
+                </li>`;
+        }).join('');
+        sectionEl.hidden = false;
+        sectionEl.innerHTML = `
+            <div class="ov-section-head">
+                <h3 class="overview-section-title">Invoices</h3>
+                ${open > 0.005 ? `<span class="pinv-open-sum"><strong>${esc(euro(open))}</strong> open</span>` : ''}
+            </div>
+            <ul class="co-invoices">${rows}</ul>`;
+        if (!sectionEl.dataset.bound) {
+            sectionEl.dataset.bound = '1';
+            sectionEl.addEventListener('click', e => {
+                const btn = e.target.closest('[data-pinv-open]');
+                if (btn && window.Bookkeeping && window.Bookkeeping.preview) {
+                    window.Bookkeeping.preview(`api/bookkeeping.php?action=download-pdf&id=${btn.getAttribute('data-pinv-open')}`, btn.getAttribute('data-pinv-file'));
+                }
+            });
+        }
     }
 
     // ---- Editing ----
@@ -1111,7 +1228,7 @@
         // numbers
         parse, isFull, modeOf, budgetOf, summarize, monthRange, monthOptions, isOutside, afterEndLabel, monthName, euro, euroRange,
         // sheet
-        init, edit, read, renderView, cardSummary,
+        init, edit, read, renderView, renderInvoices, matchInvoices, invoicedOpen, cardSummary,
         // set to Complete
         needsCompleteCheck, askOnComplete,
         // bookkeeping
