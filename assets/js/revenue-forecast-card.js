@@ -195,7 +195,7 @@
                 <div class="rf-adjust-panel" id="${uid}-adjust" role="group" aria-label="Assumptions">
                     <div class="rf-adj-field">
                         <span class="rf-adj-label">Chance</span>
-                        ${segmented({ kind: 'chance', label: 'Chance of success' }, CHANCE_OPTIONS, s.chance, 'rf-seg-sm')}
+                        ${segmented({ kind: 'chance', label: 'Chance' }, CHANCE_OPTIONS, s.chance, 'rf-seg-sm')}
                     </div>
                     <div class="rf-adj-field">
                         <span class="rf-adj-label">Budget</span>
@@ -565,11 +565,11 @@
                                     p.payments ? p.payments + (p.payments === 1 ? ' payment' : ' payments') : ''].filter(Boolean).join(' · '))}</span>
                             </span>
                         </td>
-                        <td>${p.max > 0 ? esc(RF.budgetLabel(p.min, p.max)) : '<span class="rf-muted">–</span>'}</td>
+                        <td>${p.max > 0 ? esc(RF.budgetLabel(p.min, p.max)) : '<span class="rf-muted">—</span>'}</td>
                         <td>${p.complete ? '<span class="rf-muted">Done</span>' : `<span class="rf-chance"><span class="project-chance-ring" style="--chance:${p.chance}" aria-hidden="true"></span>${p.chance}%</span>`}</td>
                         <td class="rf-cell-runs">${esc(RF.periodLabel(p.s, p.e, now))}</td>
                         <td class="rf-cell-value" title="${esc(how.long)}">
-                            <span class="rf-value">${c.counted ? esc(RF.money(c.value)) : '–'}</span>
+                            <span class="rf-value">${c.counted ? esc(RF.money(c.value)) : '—'}</span>
                             <span class="rf-how" aria-hidden="true">${esc(how.short)}</span>
                             <span class="rf-sr">${esc(how.long)}</span>
                         </td>

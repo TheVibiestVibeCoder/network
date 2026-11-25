@@ -292,7 +292,7 @@
         return `
             <div class="co-hero">
                 <div class="co-hero-main">
-                    <span class="co-hero-value">${value ? esc(euro(value)) : '–'}</span>
+                    <span class="co-hero-value">${value ? esc(euro(value)) : '—'}</span>
                     <span class="co-hero-sub">${esc(sub)}</span>
                 </div>
                 ${ring}
@@ -304,7 +304,7 @@
         return `
             <div class="co-tile${t.tone ? ' ' + t.tone : ''}"${t.title ? ` title="${esc(t.title)}"` : ''}>
                 <span class="co-tile-label">${esc(t.label)}</span>
-                <strong class="co-tile-value">${t.value ? esc(t.value) : '–'}</strong>
+                <strong class="co-tile-value">${t.value ? esc(t.value) : '—'}</strong>
                 ${t.graphic || ''}
                 <small class="co-tile-sub">${t.subHtml || esc(t.sub || '')}</small>
             </div>`;
@@ -343,7 +343,7 @@
                 sub: paid.length ? (late ? `${onTime} on time, ${late} late` : 'always on time') : 'nothing paid yet'
             });
             out.push({
-                label: 'Open',
+                label: 'Invoiced, open',
                 value: inv.open > 0.005 ? euro(inv.open) : '',
                 tone: inv.overdue > 0.005 ? 'is-neg' : '',
                 graphic: inv.open > 0.005 ? partsBar([
@@ -372,14 +372,14 @@
         });
         const openBudget = open.reduce((s, p) => s + budgetMid(p), 0);
         out.push({
-            label: 'Pipeline',
+            label: 'Forecast',
             value: pipeline ? euro(pipeline) : '',
             title: `Open projects: budget × chance. ${euro(openBudget)} if all are won`,
             graphic: openBudget ? partsBar([
                 { n: pipeline, cls: 'is-paid', title: `${euro(pipeline)} weighted by chance` },
                 { n: openBudget - pipeline, cls: 'is-open', title: `${euro(openBudget)} if all are won` }
             ]) : '',
-            sub: open.length ? `of ${euro(openBudget)} open` : 'nothing open'
+            sub: open.length ? `of ${euro(openBudget)} pipeline` : 'nothing open'
         });
         return `<div class="co-tiles">${out.map(tile).join('')}</div>`;
     }
@@ -527,8 +527,8 @@
                             ${p.product ? `<span class="title-tag" data-product="${esc(p.product)}" title="${esc(p.product)}">${esc(window.CRMProducts ? window.CRMProducts.short(p.product) : p.product)}</span>` : ''}
                             ${p.companies > 1 ? `<span class="co-row-meta" title="This project is for ${p.companies} companies">shared</span>` : ''}
                         </span>
-                        <span class="title-tag is-stage stage-${esc(stageClass)}">${esc(stage)}</span>
-                        <span class="co-row-amount${budget ? '' : ' is-empty'}">${esc(budget || '–')}</span>
+                        <span class="title-tag is-stage stage-${esc(stageClass)}">${esc(window.CRMFormat.stage(stage))}</span>
+                        <span class="co-row-amount${budget ? '' : ' is-empty'}">${esc(budget || '—')}</span>
                     </button>
                 </li>`;
         }).join('');
@@ -570,7 +570,7 @@
             const status = i.outstanding > 0.005 ? (late ? 'overdue' : 'open') : 'paid';
             const label = status === 'paid'
                 ? (i.paid && i.paid.date ? `Paid ${day(i.paid.date)}` : 'Paid')
-                : status === 'overdue' ? 'Overdue' : (i.due ? `Due ${day(i.due)}` : 'Open');
+                : status === 'overdue' ? 'Overdue' : (i.due ? `Due ${day(i.due)}` : 'Invoiced');
             return `
                 <li class="co-inv is-${status}">
                     <span class="co-inv-no">${esc(i.number)}</span>

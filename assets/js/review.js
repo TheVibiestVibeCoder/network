@@ -42,7 +42,7 @@
     const FIELD_LABEL = {
         name: 'Name', company: 'Company', location: 'Location', email: 'Email', phone: 'Phone',
         website: 'Website', address: 'Address', note: 'Note', description: 'Description',
-        start_date: 'Start date', estimated_completion: 'Planned finish', stage: 'Stage',
+        start_date: 'Start', estimated_completion: 'End', stage: 'Stage',
         budget_min: 'Budget from', budget_max: 'Budget to', success_chance: 'Chance (%)',
         title: 'Title', due_date: 'Due', priority: 'Priority', is_completed: 'Done', content: 'Text',
         payments: 'Expected payments'
@@ -52,7 +52,7 @@
     const FIELD_NOUN = {
         name: 'name', company: 'company', location: 'location', email: 'email', phone: 'phone',
         website: 'website', address: 'address', note: 'note', description: 'description',
-        start_date: 'start date', estimated_completion: 'planned finish', stage: 'stage',
+        start_date: 'start', estimated_completion: 'end', stage: 'stage',
         budget_min: 'budget', budget_max: 'budget', success_chance: 'chance',
         title: 'title', due_date: 'due date', priority: 'priority', is_completed: 'status', content: 'text',
         payments: 'payments'

@@ -83,9 +83,9 @@
 
         return `
             <div class="ph-block">
-                <p class="ph-title">Chance of success</p>
+                <p class="ph-title">Chance</p>
                 <svg class="ph-chart" viewBox="0 0 ${W} ${H}" role="img"
-                     aria-label="${esc('Chance of success: ' + points.map(p => `${p.v}% from ${day(time(p.r.at))}`).join(', '))}">
+                     aria-label="${esc('Chance: ' + points.map(p => `${p.v}% from ${day(time(p.r.at))}`).join(', '))}">
                     ${grid}
                     <path d="${area}" class="ph-area"/>
                     <path d="${path}" class="ph-line"/>
@@ -111,7 +111,7 @@
             return `
                 <li class="ph-step${p.current ? ' is-current' : ''}">
                     <span class="ph-step-dot stage-${esc(stageClass(p.stage))}"></span>
-                    <span class="ph-step-stage">${esc(p.stage)}</span>
+                    <span class="ph-step-stage">${esc(window.CRMFormat.stage(p.stage))}</span>
                     <span class="ph-step-when">${esc(p.current ? `since ${day(p.from)}` : `${day(p.from)} – ${day(p.to)}`)}</span>
                     <span class="ph-step-days">${esc(days(n))}</span>
                 </li>`;

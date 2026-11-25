@@ -52,9 +52,9 @@
     const esc = value => String(value == null ? '' : value)
         .replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     const money = v => F.amountShort(v || 0);
-    const pct = v => (v === null || v === undefined ? '–' : Math.round(v * 100) + '%');
+    const pct = v => (v === null || v === undefined ? '—' : Math.round(v * 100) + '%');
     const P = v => (Math.round(v * 10000) / 100) + '%';
-    const days = n => (n === null || n === undefined ? '–' : Math.round(n) + (Math.round(n) === 1 ? ' day' : ' days'));
+    const days = n => (n === null || n === undefined ? '—' : Math.round(n) + (Math.round(n) === 1 ? ' day' : ' days'));
     const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
     const ARROWS = {
@@ -422,7 +422,7 @@
             const t0 = tops[i + 1];
             const t1 = tops[i + 1] + hs[i + 1];
             svg += `<path class="ins-sk-flow" d="M${f1(sx)} ${f1(tops[i])} C${f1(mx)} ${f1(tops[i])} ${f1(mx)} ${f1(t0)} ${f1(nx)} ${f1(t0)} L${f1(nx)} ${f1(t1)} C${f1(mx)} ${f1(t1)} ${f1(mx)} ${f1(tops[i] + on)} ${f1(sx)} ${f1(tops[i] + on)} Z" style="fill:${TONES[i]}"><title>${esc(f.steps[i + 1].reached + ' on to ' + f.steps[i + 1].name)}</title></path>`;
-            html += `<span class="ins-sk-rate" style="left:${left(mx)};top:${f1((tops[i] + t0) / 2 + on / 2)}px"><b>${st.next === null ? '–' : pct(st.next)}</b>${st.days === null ? '' : `<small>${esc(days(st.days))}</small>`}</span>`;
+            html += `<span class="ins-sk-rate" style="left:${left(mx)};top:${f1((tops[i] + t0) / 2 + on / 2)}px"><b>${st.next === null ? '—' : pct(st.next)}</b>${st.days === null ? '' : `<small>${esc(days(st.days))}</small>`}</span>`;
         });
 
         const H = Math.ceil(bottom + 10);
@@ -546,7 +546,7 @@
         return `<div class="ins-kpis is-five ins-span-12">
             ${kpi('Customers', String(c.customers), trend(c.customers, c.customersPrev, String))}
             ${kpi('New', String(c.newCount), c.newShare !== null ? `${pct(c.newShare)} of revenue` : '')}
-            ${kpi('Bought again', c.prevCount ? `${c.again}<small>of ${c.prevCount}</small>` : '–', c.prevCount ? `Customers from ${prevName}` : 'No customers before')}
+            ${kpi('Bought again', c.prevCount ? `${c.again}<small>of ${c.prevCount}</small>` : '—', c.prevCount ? `Customers from ${prevName}` : 'No customers before')}
             ${kpi('Biggest customer', pct(c.shares.top1), shareSub(c.shares.top1, c.sharesPrev ? c.sharesPrev.top1 : null))}
             ${kpi('Top 3 customers', pct(c.shares.top3), shareSub(c.shares.top3, c.sharesPrev ? c.sharesPrev.top3 : null))}
         </div>`;
@@ -623,7 +623,7 @@
     /** "+52%", "New" or "–": the last year against the one before. */
     function changeOf(r) {
         if (r.isNew) return '<span class="ins-chip">New</span>';
-        if (r.change === null || r.change === undefined) return '<span class="ins-gr-x">–</span>';
+        if (r.change === null || r.change === undefined) return '<span class="ins-gr-x">—</span>';
         return changeBadge(r.change);
     }
 
@@ -643,7 +643,7 @@
             const zero = Math.abs(v) < 0.005;
             return `<span class="ins-gr-line" title="${esc(r.name + ', ' + yearName(g.years[i]) + ': ' + (zero ? 'nothing' : money(v)))}">
                 ${zero ? '' : `<span class="ins-gr-b${i < n - 1 ? ' is-prev' : ''}" style="width:calc((100% - 72px) * ${(Math.max(0, v) / max).toFixed(4)})"></span>`}
-                <span class="ins-gr-v${zero ? ' is-zero' : ''}${i < n - 1 ? ' is-prev' : ''}">${zero ? '–' : esc(money(v))}</span>
+                <span class="ins-gr-v${zero ? ' is-zero' : ''}${i < n - 1 ? ' is-prev' : ''}">${zero ? '—' : esc(money(v))}</span>
             </span>`;
         }).join('');
         const rows = g.rows.map(r => `<div class="ins-gr">

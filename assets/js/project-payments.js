@@ -458,7 +458,7 @@
             const st = !p.paid && inv ? invoiceState(inv) : null;
             const paid = p.paid || (st && st.tone === 'paid');
             const late = !paid && (st ? st.tone === 'overdue' : monthIndex(p.month) < now);
-            const label = paid ? `${ICON_CHECK}Paid` : st ? esc(st.label) : late ? 'Overdue' : 'Expected';
+            const label = paid ? `${ICON_CHECK}Paid` : st ? esc(st.label) : late ? 'Not invoiced' : 'Expected';
             const hint = inv ? `Invoice ${inv.number}${inv.due && !paid ? `, due ${window.CRMFormat ? window.CRMFormat.date(inv.due) : inv.due}` : ''}` : '';
             return `
                 <li class="ppay-item${paid ? ' is-paid' : ''}${late ? ' is-late' : ''}${st && st.tone === 'invoiced' ? ' is-invoiced' : ''}">

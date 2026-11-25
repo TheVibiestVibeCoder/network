@@ -1375,7 +1375,6 @@ function assetUrl(string $path): string
                         <div class="list-header-top">
                             <div class="list-head-title">
                                 <h1 class="view-title">Network</h1>
-                                <span class="view-count" data-contact-count title="People"><?= (int) $contactCount ?></span>
                             </div>
                             <div class="search-box">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/></svg>
@@ -1430,8 +1429,8 @@ function assetUrl(string $path): string
                                     <select id="companySortField" class="form-select">
                                         <option value="name">Name</option>
                                         <option value="revenue" data-admin>Revenue</option>
-                                        <option value="pipeline">Pipeline</option>
-                                        <option value="last">Last contact</option>
+                                        <option value="pipeline">Forecast</option>
+                                        <option value="last">Last note</option>
                                     </select>
                                 </div>
                             </div>
@@ -1576,10 +1575,10 @@ function assetUrl(string $path): string
                                 <select id="projectSortField" class="form-select">
                                     <option value="name">Name</option>
                                     <option value="company">Company</option>
-                                    <option value="start_date">Start Date</option>
+                                    <option value="start_date">Start</option>
                                     <option value="stage" selected>Stage</option>
                                     <option value="product">Product</option>
-                                    <option value="success_chance">Success Chance</option>
+                                    <option value="success_chance">Chance</option>
                                 </select>
                                 <button type="button" id="projectSortOrderBtn" class="btn btn-icon" title="Toggle sort order">
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" id="projectSortOrderIcon"><path d="m6 9.5 6 6 6-6"/></svg>
@@ -2012,7 +2011,7 @@ function assetUrl(string $path): string
                                 <span class="detail-value" id="projectOverviewStage" data-ov="view"></span>
                                 <select id="projectEditStage" class="form-select ov-field" data-ov="edit">
                                     <option value="Complete">Complete</option>
-                                    <option value="In Progress">In Progress</option>
+                                    <option value="In Progress">In progress</option>
                                     <option value="Proposal">Proposal</option>
                                     <option value="Negotiation">Negotiation</option>
                                     <option value="Lead">Lead</option>
@@ -2027,7 +2026,7 @@ function assetUrl(string $path): string
                                 </select>
                             </div>
                             <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditSuccessChance">Success chance</label>
+                                <label class="detail-label" for="projectEditSuccessChance">Chance</label>
                                 <span class="detail-value" id="projectOverviewSuccessChance" data-ov="view"></span>
                                 <div class="ov-field-box" data-ov="edit">
                                     <input type="number" id="projectEditSuccessChance" class="form-input ov-field" min="0" max="100" placeholder="0–100">
@@ -2035,12 +2034,12 @@ function assetUrl(string $path): string
                                 </div>
                             </div>
                             <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditStartDate">Start date</label>
+                                <label class="detail-label" for="projectEditStartDate">Start</label>
                                 <span class="detail-value" id="projectOverviewStartDate" data-ov="view"></span>
                                 <input type="date" id="projectEditStartDate" class="form-input ov-field" data-ov="edit" required>
                             </div>
                             <div class="overview-detail-item">
-                                <label class="detail-label" for="projectEditEstCompletion">Est. completion</label>
+                                <label class="detail-label" for="projectEditEstCompletion">End</label>
                                 <span class="detail-value" id="projectOverviewEstCompletion" data-ov="view"></span>
                                 <input type="date" id="projectEditEstCompletion" class="form-input ov-field" data-ov="edit">
                             </div>

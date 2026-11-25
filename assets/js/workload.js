@@ -522,7 +522,7 @@
 
         // The cards below carry the counts, so the line above the name
         // orients instead: which day it is, or whose plate you are looking at.
-        const today = new Date().toLocaleDateString('en-US', {
+        const today = new Date().toLocaleDateString('en-GB', {
             timeZone: HD.TIME_ZONE, weekday: 'long', day: 'numeric', month: 'long'
         });
         els.summary.textContent = person.unassigned

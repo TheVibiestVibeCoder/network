@@ -624,7 +624,7 @@
         const sync = state.data.sync || {};
         // Short beside the button ("5m"), in full on hover.
         const at = sync.last_sync_at ? Date.parse(sync.last_sync_at) : null;
-        const text = state.syncing ? '…' : (at ? ago(at) : '–');
+        const text = state.syncing ? '…' : (at ? ago(at) : '—');
         const full = state.syncing ? 'Syncing…' : (at ? 'Synced ' + relative(at) : 'Not synced yet');
         const problem = sync.error
             ? `<span class="tcal-sync-problem" title="Last sync had a problem: ${esc(sync.error)}">!</span>`

@@ -450,7 +450,7 @@
     }
 
     function plainDate(iso) {
-        return fromIso(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        return fromIso(iso).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' });
     }
 
     function formatDue(iso) {

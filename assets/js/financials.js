@@ -472,9 +472,9 @@
         els.finKpis.innerHTML = `
             ${yearCard()}
             <article class="fin-kpi fin-kpi--costs${state.costsOpen ? ' is-open' : ''}">
-                <span class="fin-kpi-label">Costs</span>
-                <span class="fin-kpi-value">${esc(euro(total))}</span>
-                <span class="fin-kpi-sub">${esc(span)}</span>
+                <span class="fin-kpi-label">Fixed costs</span>
+                <span class="fin-kpi-value">${esc(euro(k.fixedPerMonth))}<span class="fin-kpi-unit">per month</span></span>
+                <span class="fin-kpi-sub" title="Fixed and planned costs and repayments"><strong>${esc(euro(total))}</strong> ${esc(span)}</span>
                 ${tiles([
                     { label: 'Fixed', value: euro(k.fixedTotal), sub: `${euro(k.fixedPerMonth)}/month` },
                     { label: 'Planned', value: euro(k.plannedTotal + k.debtTotal), sub: plannedNote }
@@ -701,9 +701,9 @@
                         title: `${euro(y.incomeRest)} still to come in, ${euro(y.costsRest)} still to pay` }
                 ])}
                 ${open ? tiles([
-                    { label: 'Revenue', icon: ICON.up, cls: 'is-up', value: signed(y.income), sub: `${euro(y.revenue)} for ${y.year}`,
+                    { label: 'Received', icon: ICON.up, cls: 'is-up', value: signed(y.income), sub: `${euro(y.revenue)} for ${y.year}`,
                         title: `Jan – Dec ${y.year}: ${euro(y.income)} so far + ${euro(y.incomeRest)} open` },
-                    { label: 'Costs', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), sub: `${euro(y.costsYear)} for ${y.year}`,
+                    { label: 'Paid', icon: ICON.down, cls: 'is-down', value: signed(-y.costs), sub: `${euro(y.costsYear)} for ${y.year}`,
                         title: `Paid so far, from Bookkeeping. Jan – Dec ${y.year}: ${euro(y.costs)} so far + ${euro(y.costsRest)} open` }
                 ]) : ''}
                 ${foldToggle('year')}
@@ -1083,7 +1083,7 @@
 
         // This year's months gone by, as their actual result from Bookkeeping:
         // one summary row, unfolded to the single months.
-        const dash = '<span class="fin-muted">–</span>';
+        const dash = '<span class="fin-muted">—</span>';
         const months = state.year.months.filter(m => m.offset < 0);
         const pastOpen = state.folds.past;
         const monthRows = list => list.map(m => {
@@ -1127,10 +1127,10 @@
                             ${ICON.chevron}<span>${esc(r.label)}</span>${r.offset === 0 ? '<span class="fin-tag">now</span>' : ''}
                         </button>
                     </th>
-                    <td class="is-pos">${inV > 0.005 ? esc(signed(inV)) : '<span class="fin-muted">–</span>'}</td>
-                    <td>${outV > 0.005 ? esc(signed(-outV)) : '<span class="fin-muted">–</span>'}</td>
+                    <td class="is-pos">${inV > 0.005 ? esc(signed(inV)) : '<span class="fin-muted">—</span>'}</td>
+                    <td>${outV > 0.005 ? esc(signed(-outV)) : '<span class="fin-muted">—</span>'}</td>
                     <td class="${net < 0 ? 'is-neg' : 'is-pos'}"><strong>${esc(signed(net))}</strong></td>
-                    <td class="fin-col-balance ${p.hasBalance ? balClass(r.closing) : ''}">${p.hasBalance ? esc((r.closing < 0 ? MINUS : '') + euro(Math.abs(r.closing))) : '<span class="fin-muted">–</span>'}</td>
+                    <td class="fin-col-balance ${p.hasBalance ? balClass(r.closing) : ''}">${p.hasBalance ? esc((r.closing < 0 ? MINUS : '') + euro(Math.abs(r.closing))) : '<span class="fin-muted">—</span>'}</td>
                 </tr>
                 ${open ? `<tr class="fin-month-detail"><td colspan="5">${monthDetail(r.offset, r)}</td></tr>` : ''}`;
         }).join('');
@@ -1161,7 +1161,7 @@
         const result = income - costs;
         const withBalance = months.filter(m => m.rows && m.closing !== null);
         const closing = withBalance.length ? withBalance[withBalance.length - 1].closing : null;
-        const dash = '<span class="fin-muted">–</span>';
+        const dash = '<span class="fin-muted">—</span>';
         return `
                 <tr class="fin-month is-past is-summary${open ? ' is-open' : ''}">
                     <th scope="row">
@@ -1312,7 +1312,7 @@
         paid: { label: 'Paid', tone: 'paid' },
         late: { label: 'Paid late', tone: 'late' },
         partial: { label: 'Part paid', tone: 'partial' },
-        open: { label: 'Sent', tone: 'open' },
+        open: { label: 'Invoiced', tone: 'open' },
         overdue: { label: 'Overdue', tone: 'overdue' },
         reminded: { label: 'Reminded', tone: 'reminded' }
     };
@@ -1350,7 +1350,7 @@
             title="Link to a project and company" aria-label="Link ${esc(i.number)} to a project">${ICON_LINK}</button>`;
         const name = i.project
             ? `<a href="#" class="fin-inv-link" data-crm-action="open-project-overview" data-project-id="${i.project.id}" title="${esc(what)}">${esc(i.project.name)}</a>`
-            : `<span class="fin-inv-plain fin-muted" title="${esc(what)}">${esc(i.subject || '–')}</span>`;
+            : `<span class="fin-inv-plain fin-muted" title="${esc(what)}">${esc(i.subject || '—')}</span>`;
         return `<span class="fin-inv-project">${name}${link}</span>`;
     }
 
@@ -1399,8 +1399,8 @@
     }
 
     function invoiceRow(i) {
-        const money = n => (n === null ? '<span class="fin-muted">–</span>' : esc((n < 0 ? MINUS : '') + cents(Math.abs(n))));
-        const day = iso => (iso ? esc(window.CRMFormat.date(iso)) : '<span class="fin-muted">–</span>');
+        const money = n => (n === null ? '<span class="fin-muted">—</span>' : esc((n < 0 ? MINUS : '') + cents(Math.abs(n))));
+        const day = iso => (iso ? esc(window.CRMFormat.date(iso)) : '<span class="fin-muted">—</span>');
         const unpaid = i.outstanding > 0.005;
         const reading = state.invReading.has(i.id);
         return `
@@ -1551,8 +1551,9 @@
         const owed = IL.summary(unpaid);
         // The same sum under the revenue forecast's total.
         Card.setInvoiced(owed.open.amount);
-        if (owed.open.amount > 0.005) head.push(`<strong>${esc(cents(owed.open.amount))}</strong> open`);
-        if (owed.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(cents(owed.overdue.amount))}</strong> overdue`);
+        // Rounded like every figure above the table; the table itself has the cents.
+        if (owed.open.amount > 0.005) head.push(`<strong>${esc(euro(owed.open.amount))}</strong> open`);
+        if (owed.overdue.amount > 0.005) head.push(`<strong class="is-neg">${esc(euro(owed.overdue.amount))}</strong> overdue`);
 
         els.finInvoices.innerHTML = `
             <div class="fin-card-head">

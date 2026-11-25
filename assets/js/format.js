@@ -5,9 +5,9 @@
  * (cents only when there are any, unless asked for), "4.000 – 10.000 €",
  * "+1.200 €", "−300 €" (a real minus sign).
  *
- * Dates: the month by its short name - "Sep 19" in the current year,
- * "Sep 19, 2025" in any other. With a time, the 24-hour clock: "Sep 19,
- * 13:55". Recent moments relative: "Just now", "5 minutes ago", "3 hours
+ * Dates: the day first, the month by its short name - "19 Sep" in the
+ * current year, "19 Sep 2025" in any other. With a time, the 24-hour
+ * clock: "19 Sep, 13:55". Recent moments relative: "Just now", "5 minutes ago", "3 hours
  * ago", "Yesterday", "4 days ago"; after a week the date.
  *
  * Plain functions on window.CRMFormat; loaded right after amount-input.js,
@@ -114,19 +114,19 @@
     }
 
     /**
-     * "Sep 19" this year, "Sep 19, 2025" otherwise. Options: year: true to
-     * always show it; weekday: true for "Fri, Sep 19".
+     * "19 Sep" this year, "19 Sep 2025" otherwise. Options: year: true to
+     * always show it; weekday: true for "Fri, 19 Sep".
      */
     function date(value, options = {}) {
         const d = toDate(value);
         if (!d) return '';
         const showYear = options.year || d.getFullYear() !== new Date().getFullYear();
         return (options.weekday ? WEEKDAYS[d.getDay()] + ', ' : '')
-            + MONTHS[d.getMonth()] + ' ' + d.getDate()
-            + (showYear ? ', ' + d.getFullYear() : '');
+            + d.getDate() + ' ' + MONTHS[d.getMonth()]
+            + (showYear ? ' ' + d.getFullYear() : '');
     }
 
-    /** "Sep 1 – Nov 13", "Dec 1, 2026 – Feb 8, 2027", or one end. */
+    /** "1 Sep – 13 Nov", "1 Dec 2026 – 8 Feb 2027", or one end. */
     function dateRange(start, end) {
         const a = toDate(start);
         const b = toDate(end);
@@ -134,7 +134,7 @@
         if (!a) return 'Until ' + date(b);
         if (!b) return 'From ' + date(a);
         const sameYear = a.getFullYear() === b.getFullYear();
-        const left = sameYear ? MONTHS[a.getMonth()] + ' ' + a.getDate() : date(a, { year: true });
+        const left = sameYear ? a.getDate() + ' ' + MONTHS[a.getMonth()] : date(a, { year: true });
         return left + ' – ' + date(b, { year: !sameYear || b.getFullYear() !== new Date().getFullYear() });
     }
 
@@ -145,7 +145,7 @@
         return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     }
 
-    /** "Sep 19, 13:55" (a calendar day alone stays a date). */
+    /** "19 Sep, 13:55" (a calendar day alone stays a date). */
     function dateTime(value) {
         const d = toDate(value);
         if (!d) return '';
@@ -187,8 +187,20 @@
             + (key === 'high' ? '!!' : '!') + '</span>';
     }
 
+    /**
+     * A stage as it is written on screen: sentence case like every other
+     * label ("In progress"). The stored value stays "In Progress".
+     */
+    function stage(name) {
+        const text = String(name || '');
+        return text === 'In Progress' ? 'In progress' : text;
+    }
+
+    /** Nothing there: one quiet dash, the same everywhere. */
+    const EMPTY = '—';
+
     root.CRMFormat = {
-        MINUS, MONTHS,
+        MINUS, MONTHS, EMPTY, stage,
         amount, amountRange, amountShort,
         toDate, date, dateRange, time, dateTime, month, ago,
         priorityMark

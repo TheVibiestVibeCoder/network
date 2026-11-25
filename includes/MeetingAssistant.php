@@ -350,7 +350,7 @@ class MeetingAssistant
         }
 
         $projectId = $context['project']['id'];
-        $reason = ($fromCard ? 'Asked on the project card on ' : 'From the project meeting on ') . date('M j, Y') . ': "'
+        $reason = ($fromCard ? 'Asked on the project card on ' : 'From the project meeting on ') . date('j M Y') . ': "'
             . (mb_strlen($text) > 300 ? mb_substr($text, 0, 300) . '…' : $text) . '"';
 
         // Everything below is written in Claude's name, as through the connector.
@@ -742,14 +742,14 @@ PROMPT;
     /**
      * A field change as the meeting window lists it, in the CRM's words and
      * formats (assets/js/format.js): "Budget max: 28.000 €", "Start date:
-     * Dec 1, 2026", "Success chance: 70 %".
+     * 1 Dec 2026", "Chance: 70 %".
      */
     private static function changeLabel(string $field, $value): string
     {
         $names = [
             'stage' => 'Stage', 'budget_min' => 'Budget min', 'budget_max' => 'Budget max',
-            'success_chance' => 'Success chance', 'start_date' => 'Start date',
-            'estimated_completion' => 'Est. completion', 'description' => 'Description',
+            'success_chance' => 'Chance', 'start_date' => 'Start',
+            'estimated_completion' => 'End', 'description' => 'Description',
         ];
         $text = (string) $value;
 
@@ -758,7 +758,7 @@ PROMPT;
             $text = number_format($n, fmod($n, 1.0) == 0.0 ? 0 : 2, ',', '.') . ' €';
         } elseif (($field === 'start_date' || $field === 'estimated_completion') && preg_match('/^\d{4}-\d{2}-\d{2}$/', $text)) {
             $time = strtotime($text);
-            $text = date('Y', $time) === date('Y') ? date('M j', $time) : date('M j, Y', $time);
+            $text = date('Y', $time) === date('Y') ? date('j M', $time) : date('j M Y', $time);
         } elseif ($field === 'success_chance' && is_numeric($value)) {
             $text = (int) $value . ' %';
         }

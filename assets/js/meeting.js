@@ -842,14 +842,14 @@
                     <button type="button" class="ov-add-btn" data-meeting-open-project data-mode="edit" title="Edit the project">Edit</button>
                 </div>
                 <div class="overview-details">
-                    ${fact('Stage', `<span class="meeting-stage stage-${stageClass(p.stage)}">${escapeHtml(p.stage)}</span>`)}
+                    ${fact('Stage', `<span class="meeting-stage stage-${stageClass(p.stage)}">${escapeHtml(window.CRMFormat.stage(p.stage))}</span>`)}
                     ${fact('Responsible', p.assigned_to_name
                         ? `<span class="meeting-person">${personChip(p.assigned_to, p.assigned_to_name)}${escapeHtml(p.assigned_to_name)}</span>`
                         : 'Nobody')}
                     ${fact('Budget', escapeHtml(budget || '—'))}
-                    ${fact('Success chance', escapeHtml(p.success_chance !== null ? p.success_chance + '%' : '—'))}
-                    ${fact('Start date', escapeHtml(p.start_date ? formatDate(p.start_date) : '—'))}
-                    ${fact('Est. completion', escapeHtml(p.estimated_completion ? formatDate(p.estimated_completion) : '—'))}
+                    ${fact('Chance', escapeHtml(p.success_chance !== null ? p.success_chance + '%' : '—'))}
+                    ${fact('Start', escapeHtml(p.start_date ? formatDate(p.start_date) : '—'))}
+                    ${fact('End', escapeHtml(p.estimated_completion ? formatDate(p.estimated_completion) : '—'))}
                     ${p.description ? `<div class="overview-detail-item full-width">
                         <span class="detail-label">Description</span>
                         <span class="detail-value meeting-description">${escapeHtml(p.description)}</span>
@@ -936,7 +936,7 @@
                     <div class="ov-section-head"><h3 class="overview-section-title">Project</h3></div>
                     <div class="overview-details">
                         ${fact('Stage', '80px')}${fact('Responsible', '110px')}${fact('Budget', '96px')}
-                        ${fact('Success chance', '36px')}${fact('Start date', '84px')}${fact('Est. completion', '84px')}
+                        ${fact('Chance', '36px')}${fact('Start', '84px')}${fact('End', '84px')}
                         <div class="overview-detail-item full-width">
                             <span class="detail-label">Description</span>
                             <span class="detail-value">${t('300px')}<br>${t('190px')}</span>
@@ -1107,7 +1107,7 @@
                 <section class="review-group mrev-group" aria-label="${escapeHtml(project.name)}">
                     <div class="mrev-group-head">
                         <h2 class="review-group-title">
-                            <span class="meeting-stage stage-${stageClass(project.stage)}">${escapeHtml(project.stage)}</span>
+                            <span class="meeting-stage stage-${stageClass(project.stage)}">${escapeHtml(window.CRMFormat.stage(project.stage))}</span>
                             ${escapeHtml(project.name)}
                             ${waiting.length ? `<span class="review-group-count">${waiting.length}</span>` : ''}
                         </h2>

@@ -1288,7 +1288,7 @@
 
         const lastText = c => {
             const days = daysSince(c.last_note);
-            if (days === null) return { text: 'No notes yet', quiet: false };
+            if (days === null) return { text: 'No note', quiet: false };
             const text = days < 1 ? 'Today' : days < 2 ? 'Yesterday' : days < 31 ? `${days} days ago`
                 : days < 365 ? `${Math.round(days / 30)} months ago` : `${Math.round(days / 365)} years ago`;
             return { text, quiet: days >= QUIET_DAYS };
@@ -1341,8 +1341,8 @@
         // Column heads above the companies, so the figures read without labels in every row.
         const head = filtered.length ? `
             <div class="company-columns" aria-hidden="true">
-                <span>Company</span><span class="company-cell company-last">Last contact</span>
-                <span class="company-cell company-pipeline">Pipeline</span>
+                <span>Company</span><span class="company-cell company-last">Last note</span>
+                <span class="company-cell company-pipeline" title="Open projects, budget × chance">Forecast</span>
                 ${money ? '<span class="company-cell company-revenue">Revenue</span>' : ''}<span class="company-count-head"></span>
             </div>` : '';
 
@@ -3602,7 +3602,7 @@
             <div class="project-mini-card" data-crm-action="open-project-overview" data-project-id="${project.id}">
                 <div class="project-mini-header">
                     <h4 class="project-mini-name">${escapeHtml(project.name)}</h4>
-                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(project.stage)}</span>
+                    <span class="project-stage-badge stage-${project.stage.toLowerCase().replace(' ', '-')}">${escapeHtml(window.CRMFormat.stage(project.stage))}</span>
                 </div>
                 ${project.company ? `<p class="project-mini-company">${escapeHtml(project.company)}</p>` : ''}
                 <p class="project-mini-desc">${escapeHtml(project.description).substring(0, 100)}${project.description.length > 100 ? '...' : ''}</p>
@@ -4666,7 +4666,7 @@
                 <section class="project-group is-by-stage">
                     <header class="project-group-head">
                         <div class="project-group-pill stage-${escapeHtml(stageClass)}">
-                            <h2 class="project-group-title">${escapeHtml(group.stage)}</h2>
+                            <h2 class="project-group-title">${escapeHtml(window.CRMFormat.stage(group.stage))}</h2>
                             <span class="project-group-count" title="${group.items.length === 1 ? '1 project' : group.items.length + ' projects'}">${group.items.length}</span>
                         </div>
                     </header>
@@ -4728,7 +4728,7 @@
     function titleTag(project) {
         if (state.projectSortField === 'product') {
             const stage = project.stage || 'Lead';
-            return `<span class="title-tag is-stage stage-${escapeHtml(stage.toLowerCase().replace(/ /g, '-'))}" title="${escapeHtml(stage)}">${escapeHtml(stage)}</span>`;
+            return `<span class="title-tag is-stage stage-${escapeHtml(stage.toLowerCase().replace(/ /g, '-'))}" title="${escapeHtml(window.CRMFormat.stage(stage))}">${escapeHtml(window.CRMFormat.stage(stage))}</span>`;
         }
         if (!project.product) return '';
         const short = window.CRMProducts ? window.CRMProducts.short(project.product) : project.product;
@@ -4910,7 +4910,7 @@
                 </div>
                 <div class="project-card-bottom">
                     <div class="project-card-foot">
-                        ${state.projectSortField === 'stage' || state.projectSortField === 'product' ? '' : `<span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(stageLabel)}</span>`}
+                        ${state.projectSortField === 'stage' || state.projectSortField === 'product' ? '' : `<span class="project-stage-badge stage-${escapeHtml(stageClass)}">${escapeHtml(window.CRMFormat.stage(stageLabel))}</span>`}
                         ${budgetStat}
                         ${chanceStat}
                     </div>
@@ -5042,7 +5042,7 @@
         setDetailValue(elements.projectOverviewStartDate, project.start_date
             ? window.CRMFormat.date(project.start_date)
             : '');
-        setDetailValue(elements.projectOverviewStage, project.stage);
+        setDetailValue(elements.projectOverviewStage, window.CRMFormat.stage(project.stage));
         const productView = document.getElementById('projectOverviewProduct');
         if (productView) {
             productView.innerHTML = project.product ? productChip(project.product) : '';
