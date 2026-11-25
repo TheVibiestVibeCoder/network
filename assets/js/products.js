@@ -27,10 +27,10 @@
 
     // Until the server answers: the products it starts with.
     let products = [
-        { id: 0, name: 'Workshop', short: 'WS', color: '#30599D', position: 0 },
-        { id: 0, name: 'Risk Briefing', short: 'RB', color: '#1C3258', position: 1 },
-        { id: 0, name: 'SHIELD', short: 'SH', color: '#1C7E7E', position: 2 },
-        { id: 0, name: 'RB & SHIELD', short: 'RB+SH', color: '#63A375', position: 3 },
+        { id: 0, name: 'Workshop', short: 'WS', color: '#8A68AE', position: 0 },
+        { id: 0, name: 'Risk Briefing', short: 'RB', color: '#4B3A7C', position: 1 },
+        { id: 0, name: 'SHIELD', short: 'SH', color: '#B0578D', position: 2 },
+        { id: 0, name: 'RB & SHIELD', short: 'RB+SH', color: '#D8A7C6', position: 3 },
         { id: 0, name: 'Other', short: 'Other', color: '#8A94A6', position: 4 }
     ];
 
@@ -135,9 +135,12 @@
     // The editor: name, short form, colour and order of every product
     // ------------------------------------------------------------------
 
-    // Colours to pick from: the company palette and tones that sit with it.
-    const SWATCHES = ['#1C3258', '#30599D', '#5B7DB8', '#8FB4E4', '#1C7E7E', '#2E8B9A', '#63A375', '#3F8F6B',
-        '#D76262', '#B07A3A', '#D08440', '#7A6FB0', '#9A5B7A', '#8A94A6', '#AAB5C5'];
+    // Colours to pick from: violets and berries, a family of their own. The
+    // blues, the teal and the green belong to the stages, red, gold and
+    // green to what is late or done - a product in one of those would read
+    // as a stage or a status. Two greys for what is no product of ours.
+    const SWATCHES = ['#8A68AE', '#4B3A7C', '#B0578D', '#D8A7C6', '#6A5598', '#A98BC9', '#C4B2DC', '#7E3A66',
+        '#C97FAA', '#5C4A6E', '#8A94A6', '#AAB5C5'];
 
     let editor = null;
     let draft = [];

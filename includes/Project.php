@@ -306,9 +306,12 @@ class Project
         return array_column(self::products(), 'name');
     }
 
-    /** Colours for new products, from the company palette and beside it. */
-    private const PRODUCT_COLORS = ['#30599D', '#1C3258', '#1C7E7E', '#63A375', '#8A94A6', '#5B7DB8', '#2E8B9A',
-        '#7A6FB0', '#B07A3A', '#4C6A92', '#3F8F6B', '#9A5B7A'];
+    /**
+     * Colours for new products: violets and berries, a family the stages
+     * and the statuses do not use (the picker in products.js has the same).
+     */
+    private const PRODUCT_COLORS = ['#8A68AE', '#4B3A7C', '#B0578D', '#D8A7C6', '#8A94A6', '#6A5598', '#A98BC9',
+        '#C4B2DC', '#7E3A66', '#C97FAA', '#5C4A6E', '#AAB5C5'];
 
     /** Add a product (or find the one of that name), with the next free colour. */
     public static function addProduct(string $name): array

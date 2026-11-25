@@ -747,10 +747,18 @@ class Database
         }
         if (!(int) $db->query("SELECT COUNT(*) FROM products")->fetchColumn()) {
             $seed = $db->prepare("INSERT OR IGNORE INTO products (name, short, color, position) VALUES (:n, :s, :c, :p)");
-            foreach ([['Workshop', 'WS', '#30599D'], ['Risk Briefing', 'RB', '#1C3258'], ['SHIELD', 'SH', '#1C7E7E'],
-                      ['RB & SHIELD', 'RB+SH', '#63A375'], ['Other', 'Other', '#8A94A6']] as $i => [$name, $short, $color]) {
+            foreach ([['Workshop', 'WS', '#8A68AE'], ['Risk Briefing', 'RB', '#4B3A7C'], ['SHIELD', 'SH', '#B0578D'],
+                      ['RB & SHIELD', 'RB+SH', '#D8A7C6'], ['Other', 'Other', '#8A94A6']] as $i => [$name, $short, $color]) {
                 $seed->execute(['n' => $name, 's' => $short, 'c' => $color, 'p' => $i]);
             }
+        }
+        // The products had the stages' own colours (blue, navy, teal, green).
+        // A product still in the colour it was seeded with moves to the
+        // violets (25.11.2026); one whose colour was changed by hand stays.
+        foreach ([['Workshop', '#30599D', '#8A68AE'], ['Risk Briefing', '#1C3258', '#4B3A7C'], ['SHIELD', '#1C7E7E', '#B0578D'],
+                  ['RB & SHIELD', '#63A375', '#D8A7C6']] as [$name, $was, $now]) {
+            $db->prepare("UPDATE products SET color = :now WHERE name = :n AND UPPER(color) = :was")
+                ->execute(['now' => $now, 'n' => $name, 'was' => $was]);
         }
 
         // Our invoices linked by hand to a project and a company, by invoice

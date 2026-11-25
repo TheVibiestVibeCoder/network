@@ -206,21 +206,22 @@
     --stage-progress: #1C7E7E;
     --stage-complete: #63A375;
 
-    /* Products (Project::PRODUCTS): the company blues for the two
-       briefings, the stage teal for SHIELD, the company green for the
-       whole package, grey for the rest. Always shown with their name. */
-    --product-workshop: #30599D;
-    --product-briefing: #1C3258;
-    --product-shield: #1C7E7E;
-    --product-combo: #63A375;
+    /* Products: violets and berries, a family of their own - the blues,
+       the teal and the green are the stages' (25.11.2026). Grey for the
+       rest. Always shown with their name. */
+    --product-workshop: #8A68AE;
+    --product-briefing: #4B3A7C;
+    --product-shield: #B0578D;
+    --product-combo: #D8A7C6;
     --product-other: #8A94A6;
     --product-none: #D3D9E3;
 
-    /* Medium priority: a light orange of its own, apart from the warning
-       colour. -ink is the same hue deep enough for text on -soft (AA). */
-    --pri-medium: #D08440;
-    --pri-medium-ink: #9E5A12;
-    --pri-medium-soft: rgba(208, 132, 64, 0.16);
+    /* Medium priority: the gold of "watch this". It used to be an orange
+       of its own, a step from Claude's - the two sat side by side in a
+       to-do row and read as one (25.11.2026). */
+    --pri-medium: #B48B39;
+    --pri-medium-ink: #89640D;
+    --pri-medium-soft: rgba(180, 139, 57, 0.16);
 
     --e-1: 0 1px 2px rgba(28, 50, 88, 0.05);
     --e-2: 0 1px 2px rgba(28, 50, 88, 0.04), 0 6px 16px -6px rgba(28, 50, 88, 0.10);
@@ -283,16 +284,16 @@
     --stage-progress: #6BCAC9;
     --stage-complete: #63A375;
 
-    --product-workshop: #6C92D2;
-    --product-briefing: #A9BCE0;
-    --product-shield: #6BCAC9;
-    --product-combo: #7DC08F;
+    --product-workshop: #A98BC9;
+    --product-briefing: #8E7CC0;
+    --product-shield: #D08AB4;
+    --product-combo: #E6C3DA;
     --product-other: #7E8A9E;
     --product-none: #3B475B;
 
-    --pri-medium: #EB9D5A;
-    --pri-medium-ink: #EB9D5A;
-    --pri-medium-soft: rgba(235, 157, 90, 0.16);
+    --pri-medium: #D4AA5A;
+    --pri-medium-ink: #D4AA5A;
+    --pri-medium-soft: rgba(212, 170, 90, 0.16);
 
     --e-1: 0 1px 2px rgba(0, 0, 0, 0.30);
     --e-2: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 20px -8px rgba(0, 0, 0, 0.45);
@@ -15398,4 +15399,16 @@ input[type="checkbox"]:disabled {
         min-width: 0;
         max-width: 220px;
     }
+}
+
+
+/* ==========================================================================
+   47. One meaning per colour (25.11.2026)
+   Red says something is wrong - late, missing, below zero. Money going out
+   is not wrong: an expense reads in ink, with its minus sign. Income stays
+   green.
+   ========================================================================== */
+
+#bookkeepingView .bk-amount-neg {
+    color: var(--c-ink);
 }
