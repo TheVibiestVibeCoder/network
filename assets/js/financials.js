@@ -559,7 +559,7 @@
         const owed = k.vatOwed;
         // Short enough for half a card: "Q4 so far, due Feb 15"; in full on hover.
         const q = next ? next.label.split(' ')[0] : '';
-        const day = next ? dayName(next.due).replace(/, \d{4}$/, '') : '';
+        const day = next ? dayName(next.due).replace(/,? \d{4}$/, '') : '';
         let sub;
         let full;
         if (!next) sub = full = 'nothing open';

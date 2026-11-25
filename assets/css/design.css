@@ -15412,3 +15412,296 @@ input[type="checkbox"]:disabled {
 #bookkeepingView .bk-amount-neg {
     color: var(--c-ink);
 }
+
+
+/* ==========================================================================
+   48. One scale, one set of parts (25.11.2026)
+   An audit of every screen found each part in several variants: three
+   toolbar heights, four sizes of the same switch, card titles in two sizes,
+   labels louder than their values. This section sets one rule per role;
+   where an older rule above says otherwise, this one wins.
+
+   Type, by role
+     page and sheet title   30 / 700
+     card title             18 / 700   a card's or a group's heading
+     section title          15 / 700   inside a sheet or a card
+     item title             15 / 600   a card's or a row's name
+     text                   14 / 400   secondary: 13, ink-3
+     label                  12 / 500   ink-3, over a value or a column
+     figure                 30 / 700   a card's one big number
+
+   Controls
+     40px in a page's toolbar, on every page; 32px inside cards and rows
+     one switch in two sizes: 32px in a toolbar, 26px inside a card
+     radius: controls --r-md, tiles and small cards --r-lg, cards --r-xl
+   ========================================================================== */
+
+/* ---- Type ---- */
+
+#workloadView .workload-title,
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-title-info h2,
+.meeting-title {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+}
+
+#financialsView .fin-card-title,
+.rf-card .rf-title,
+.ins-h,
+#workloadView .home-card-title,
+.project-group-title,
+#reviewView .review-group-title,
+#logView .log-day-head,
+.deleted-projects-title,
+.tcal-date {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal, #meetingModal, #meetingAskModal) .overview-section-title,
+#todoView .todo-group-title,
+.ph-title,
+#bookkeepingView .bk-dropzone-title,
+#bookkeepingView .bk-month-name {
+    font-size: var(--t-md);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+#projectsView .project-card-title,
+#listView .company-name,
+.project-mini-name,
+.project-row-title {
+    font-size: var(--t-md);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* A row's name in a list: the text size, a step heavier. */
+.home-row-title,
+.review-row-title,
+.workload-row-title,
+.ptodo-title,
+#todoView .todo-title {
+    font-size: var(--t-base);
+}
+
+/* Labels: quieter than what they name, the same over a value and a column. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .detail-label,
+.fin-kpi-label,
+.ins-kpi-l,
+.ins-hl-top,
+.fin-tile-label,
+.co-tile-label,
+.meeting-label,
+#bookkeepingView th,
+#bookkeepingView .bk-table th,
+.fin-table th,
+.fin-inv-table thead th,
+#listView .company-head span,
+.bk-month-stat-label {
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--c-ink-3);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .overview-details .detail-value {
+    font-weight: 600;
+}
+
+/* Figures: a card's one big number, the same on every page. */
+.fin-kpi-value,
+.ins-kpi-v,
+.ins-hl-f,
+.home-meter-count {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+}
+
+.fin-kpi-value .fin-kpi-unit {
+    margin-left: 6px;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--c-ink-3);
+}
+
+.fin-kpi-sub strong {
+    font-weight: 600;
+    color: var(--c-ink-2);
+}
+
+/* ---- Controls: one height in a toolbar ---- */
+
+#calendarView {
+    --tcal-ctl: var(--control-h);
+}
+
+#calendarView .tcal-toolbar .btn,
+#calendarView .tcal-nav,
+#calendarView .tcal-who-btn,
+#calendarView .tcal-search-input {
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+}
+
+/* The switch: 32px wherever it sits in a page's toolbar. */
+.fin-head .fin-seg,
+.ins-tools .segmented,
+#calendarView .tcal-mode {
+    padding: 3px;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+}
+
+.fin-head .fin-seg .segmented-btn,
+.ins-tools .segmented-btn,
+.rf-presets .segmented-btn,
+#calendarView .tcal-mode-btn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--r-sm); corner-shape: var(--squircle-shape);
+    font-size: var(--t-sm);
+}
+
+.segmented-btn,
+.view-panel .group-btn {
+    height: 34px;
+}
+
+.segmented-btn.active,
+.view-panel .group-btn.active,
+#calendarView .tcal-mode-btn.is-active {
+    font-weight: 600;
+}
+
+.rf-adjust {
+    height: var(--control-h);
+    padding: 0 14px;
+}
+
+/* ...and 26px inside a card. */
+.rf-split-by .segmented-btn,
+.rf-seg-sm .segmented-btn,
+#projectOverviewModal .ppay-mode .segmented-btn {
+    height: 26px;
+    padding: 0 10px;
+    font-size: var(--t-sm);
+}
+
+/* Accept and reject: one size on the From Claude page, one in a row. */
+#reviewView .review-act {
+    width: 32px;
+    height: 32px;
+}
+
+/* A sheet's Cancel and Save: the toolbar's height, not a size of their own. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #eventSheet, #reviewDetailModal, #companyNotesModal) .modal-footer .btn {
+    min-height: var(--control-h);
+    height: var(--control-h);
+}
+
+/* Bookkeeping's export: its buttons side by side on the right, like every dialog's. */
+#bkConfirmModal .modal-footer {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+#bkConfirmModal .modal-footer :is(.btn, .bk-btn) {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 96px;
+}
+
+/* ---- Surfaces ---- */
+
+/* Cards: one radius, one inner margin. Small cards and tiles a step down. */
+#projectsView .project-card,
+.project-rows,
+.deleted-projects-list {
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
+}
+
+#projectsView .project-card,
+.fin-kpi,
+.ins-kpi,
+.ins-hl {
+    padding: 20px;
+}
+
+.fin-card,
+.ins-card {
+    padding: 20px 22px 22px;
+}
+
+.pinned-card,
+.project-mini-card,
+.ptodo-card {
+    border-radius: var(--r-lg); corner-shape: var(--squircle-shape);
+}
+
+/* White surfaces carry grey controls: the ones the list in section 33 missed. */
+.ins-card,
+.ins-kpi,
+.ins-hl,
+.pinned-card,
+.fin-adjust .rf-adjust-panel,
+.meeting-content {
+    --ctl: var(--c-tint-3);
+    --ctl-hover: var(--c-tint-2);
+}
+
+/* ---- Room ---- */
+
+/* Lists of one line each read best at a column's width: the date sits by
+   its title instead of a screen away. Users and Log had 980 and 900px. */
+@media (min-width: 769px) {
+    #todoView > *,
+    #usersView > *,
+    #logView > * {
+        max-width: 1040px;
+    }
+
+    #logView .log-day,
+    #logView .log-more {
+        max-width: none;
+    }
+
+    .users-page {
+        max-width: 1040px;
+    }
+}
+
+/* "Adjust" opens across the page, under the header it belongs to. */
+.fin-adjust {
+    justify-content: stretch;
+}
+
+.fin-adjust .rf-adjust-panel {
+    flex: 1;
+    padding: 12px 20px;
+    border-radius: var(--r-xl); corner-shape: var(--squircle-shape);
+}
+
+/* A sheet's sections: a little closer, so a section with nothing in it
+   yet takes less of the sheet. */
+:is(#projectOverviewModal, #todoDetailModal, #overviewModal, #companyNotesModal) .ov-section {
+    padding-top: 18px;
+    margin-top: 18px;
+}
+
+/* From Claude's page actions: toolbar controls like any other page's. */
+#reviewView .view-head .btn {
+    height: var(--control-h);
+    padding: 0 16px;
+    border-radius: var(--r-md); corner-shape: var(--squircle-shape);
+    font-size: var(--t-base);
+}
