@@ -746,12 +746,16 @@
     }
 
     /**
-     * The scenario a figure rests on, as a small chip beside its label - on
-     * every figure that changes with the scenario, nowhere else (25.11.2026).
-     * It leads to the scenario switch.
+     * The scenario a figure rests on: a dot in the scenario's colour beside
+     * its label - on every figure that changes with the scenario, nowhere
+     * else. The switch in the header carries the same colours. It leads to
+     * the switch; its name is in the tooltip (25.11.2026).
      */
     function scenarioChip() {
-        return `<button type="button" class="fin-band-chip" data-fin-scenario-jump title="Changes with the scenario: ${esc(scenarioName())}. Click to change it">${esc(scenarioName())}</button>`;
+        const key = RF.activePreset(Card.getSettings()) || 'custom';
+        const name = scenarioName();
+        return `<button type="button" class="fin-sc-dot" data-scenario="${esc(key)}" data-fin-scenario-jump
+            title="Changes with the scenario: ${esc(name)}" aria-label="Scenario: ${esc(name)}"></button>`;
     }
 
     function bufferForm() {

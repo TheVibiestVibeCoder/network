@@ -15707,21 +15707,68 @@ input[type="checkbox"]:disabled {
 
 
 /* ---- The scenario beside every figure that changes with it ----
-   A small chip after the label (Projected, Until December, Lasts until,
-   Month by month); a figure without it does not depend on the scenario. */
+   A dot in the scenario's colour after the label (Projected, Until
+   December, Lasts until, Month by month); the switch in the header carries
+   the same dots. A figure without one does not depend on the scenario.
+   Worst in the gold of "watch this", Realistic in the accent, Best in the
+   green; a scenario adjusted by hand in grey. */
 
-.fin-tile-label .fin-band-chip,
-.fin-card-title .fin-band-chip {
-    margin-left: 6px;
-    padding: 0 7px;
-    line-height: 18px;
-    font-size: 11px;
-    letter-spacing: 0;
-    vertical-align: 1px;
-    background: var(--c-accent-soft);
-    color: var(--c-accent-2);
+:root {
+    --sc-worst: var(--c-warning);
+    --sc-realistic: var(--c-accent);
+    --sc-best: var(--c-success);
+    --sc-custom: var(--c-ink-4);
 }
 
-.fin-card-title .fin-band-chip {
+.fin-sc-dot {
+    --sc: var(--sc-custom);
+    display: inline-block;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: 0 0 1px 7px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%; corner-shape: round;
+    background: var(--sc);
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.fin-sc-dot[data-scenario="worst"] { --sc: var(--sc-worst); }
+.fin-sc-dot[data-scenario="realistic"] { --sc: var(--sc-realistic); }
+.fin-sc-dot[data-scenario="best"] { --sc: var(--sc-best); }
+
+/* A bigger hit area than the dot itself. */
+button.fin-sc-dot {
+    position: relative;
+}
+
+button.fin-sc-dot::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+}
+
+button.fin-sc-dot:hover {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc) 25%, transparent);
+}
+
+button.fin-sc-dot:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.fin-card-title .fin-sc-dot {
+    width: 9px;
+    height: 9px;
+    margin-left: 9px;
     vertical-align: 3px;
+}
+
+/* In the switch: before the name, not after it. */
+.rf-presets .fin-sc-dot.is-static,
+.rf-compare-item .fin-sc-dot.is-static {
+    margin: 0 7px 0 0;
+    cursor: inherit;
 }

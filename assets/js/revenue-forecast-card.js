@@ -154,9 +154,11 @@
             return `<div class="segmented ${extraClass || ''}" role="group" aria-label="${esc(group.label)}">${
                 options.map(o => {
                     const on = o.key === current;
+                    // A scenario carries its colour as a dot, the same as beside the figures that follow it.
+                    const dot = group.kind === 'preset' ? `<span class="fin-sc-dot is-static" data-scenario="${esc(o.key)}" aria-hidden="true"></span>` : '';
                     return `<button type="button" class="segmented-btn${on ? ' active' : ''}" aria-pressed="${on}"
                         data-rf-${group.kind}="${esc(o.key)}" data-rf-focus="${group.kind}-${esc(o.key)}"
-                        title="${esc(o.hint)}">${esc(o.label)}</button>`;
+                        title="${esc(o.hint)}">${dot}${esc(o.label)}</button>`;
                 }).join('')
             }</div>`;
         }
@@ -266,7 +268,7 @@
             const f = ctx.f;
             // All three scenarios, the one in use marked.
             const compare = RF.PRESETS.map(p => `
-                <span class="rf-compare-item${f.active === p.key ? ' is-active' : ''}">${esc(p.label)}
+                <span class="rf-compare-item${f.active === p.key ? ' is-active' : ''}"><span><span class="fin-sc-dot is-static" data-scenario="${esc(p.key)}" aria-hidden="true"></span>${esc(p.label)}</span>
                     <strong>${esc(RF.money(f.presets[p.key].total))}</strong></span>`).join('');
 
             // What the total is made of: the months on the axis, and what has
