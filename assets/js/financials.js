@@ -526,7 +526,7 @@
                 <span class="fin-kpi-sub" title="${esc(balanceNote())}">${b ? 'Bank balance today' : 'Enter today’s balance to plan from it'}</span>
                 ${tiles([
                     vatTile(),
-                    { label: 'Lasts until', value: lasts, valueCls: lastsTone, tone: lastsTone, subHtml: scenarioChip(),
+                    { label: 'Lasts until', scenario: true, value: lasts, valueCls: lastsTone, tone: lastsTone, sub: 'above zero',
                         title: 'The last month before the balance would fall below zero' }
                 ])}
                 ${state.vatOpen ? vatPanel() : ''}
@@ -695,9 +695,9 @@
                 <span class="fin-kpi-value ${tone(y.actual)}">${esc(signed(y.actual))}</span>
                 <span class="fin-kpi-sub">Jan 1 – ${esc(dayName(todayIso()))}, without VAT</span>
                 ${tiles([
-                    { label: `Projected ${y.year}`, value: signed(y.projected), valueCls: tone(y.projected), tone: tone(y.projected),
-                        subHtml: scenarioChip(), title: 'Where the year ends: the result so far plus what the plan nets until December' },
-                    { label: 'Until December', value: signed(y.planned), valueCls: tone(y.planned), sub: 'what the plan still nets',
+                    { label: `Projected ${y.year}`, scenario: true, value: signed(y.projected), valueCls: tone(y.projected), tone: tone(y.projected),
+                        sub: 'at year end', title: 'Where the year ends: the result so far plus what the plan nets until December' },
+                    { label: 'Until December', scenario: true, value: signed(y.planned), valueCls: tone(y.planned), sub: 'what the plan still nets',
                         title: `${euro(y.incomeRest)} still to come in, ${euro(y.costsRest)} still to pay` }
                 ])}
                 ${open ? tiles([
@@ -726,6 +726,7 @@
     /**
      * Two figures side by side on soft tiles inside a card:
      * [{ label, value, sub?, icon?, cls?, valueCls?, title?, valueHtml?,
+     *    scenario? (the figure changes with the scenario: its name beside the label),
      *    subHtml?, tone? (tints the tile: is-pos / is-neg / is-warn),
      *    button? (attributes: the whole tile is a button) }].
      * Every tile has its three lines, so tiles side by side - and on the
@@ -737,16 +738,20 @@
             const attrs = (t.button ? ` type="button" ${t.button}` : '') + (t.title ? ` title="${esc(t.title)}"` : '');
             return `
             <${tag} class="fin-tile${t.tone ? ' ' + t.tone : ''}${t.button ? ' is-button' : ''}"${attrs}>
-                <span class="fin-tile-label ${t.cls || ''}">${t.icon || ''}${esc(t.label)}${t.button ? ICON.chevron : ''}</span>
+                <span class="fin-tile-label ${t.cls || ''}">${t.icon || ''}${esc(t.label)}${t.button ? ICON.chevron : ''}${t.scenario ? scenarioChip() : ''}</span>
                 <strong class="fin-tile-value ${t.valueCls || ''}">${t.valueHtml || esc(t.value)}</strong>
                 <small class="fin-tile-sub">${t.subHtml || esc(t.sub || '')}</small>
             </${tag}>`;
         }).join('')}</div>`;
     }
 
-    /** The scenario a figure rests on, as a chip that leads to the forecast's switch. */
+    /**
+     * The scenario a figure rests on, as a small chip beside its label - on
+     * every figure that changes with the scenario, nowhere else (25.11.2026).
+     * It leads to the scenario switch.
+     */
     function scenarioChip() {
-        return `<button type="button" class="fin-band-chip" data-fin-scenario-jump title="The forecast scenario this rests on - change it in the revenue forecast">${esc(scenarioName())}</button>`;
+        return `<button type="button" class="fin-band-chip" data-fin-scenario-jump title="Changes with the scenario: ${esc(scenarioName())}. Click to change it">${esc(scenarioName())}</button>`;
     }
 
     function bufferForm() {
@@ -1137,7 +1142,7 @@
 
         els.finMonths.innerHTML = `
             <div class="fin-card-head">
-                <h2 class="fin-card-title">Month by month</h2>
+                <h2 class="fin-card-title">Month by month ${scenarioChip()}</h2>
             </div>
             <div class="fin-table-scroll">
                 <table class="fin-table">
@@ -1312,7 +1317,7 @@
         paid: { label: 'Paid', tone: 'paid' },
         late: { label: 'Paid late', tone: 'late' },
         partial: { label: 'Part paid', tone: 'partial' },
-        open: { label: 'Invoiced', tone: 'open' },
+        open: { label: 'Sent', tone: 'open' },
         overdue: { label: 'Overdue', tone: 'overdue' },
         reminded: { label: 'Reminded', tone: 'reminded' }
     };

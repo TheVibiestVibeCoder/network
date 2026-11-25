@@ -215,7 +215,7 @@
         if (!p.prev || !k.revenuePrev) return '';
         const d = (k.revenue - k.revenuePrev) / Math.abs(k.revenuePrev);
         const vs = p.kind === 'year' ? 'on ' + (p.year - 1) + (p.running ? ' to the same day' : '') : 'on the 12 months before';
-        return `<span class="ins-chg">${changeBadge(d)}</span> ${vs}, net by invoice date`;
+        return `<span class="ins-chg">${changeBadge(d)}</span> ${vs}`;
     }
 
     function revenueCard(c) {
@@ -252,7 +252,7 @@
                 </div>
             </div>`;
         const change = revenueChange(state.parts.kpis);
-        return card('ins-span-8', head(p.kind === 'year' && p.running ? 'Revenue year to date' : 'Revenue added up', change ? { html: change } : 'Net, by invoice date',
+        return card('ins-span-8', head(p.kind === 'year' && p.running ? 'Revenue year to date' : 'Revenue added up', change ? { html: change } : '',
             prev ? legend([[lk('var(--c-accent)'), curName], [lk('var(--ins-prev)'), prevName]]) : ''), body);
     }
 
@@ -276,7 +276,7 @@
                     ${xLabels(years.map(y => ({ left: P(((y.from + y.to) / 2 + 0.5) / n), label: y.year, cls: 'is-y2' })))}
                 </div>
             </div>`;
-        return card('ins-span-4', head('Revenue per quarter', 'Net, by invoice date'), body);
+        return card('ins-span-4', head('Revenue per quarter'), body);
     }
 
     function mixRow(label, mix) {
@@ -292,17 +292,17 @@
 
     function mixCard(m) {
         const p = state.parts.period;
-        if (!m.cur.parts.length) return card('ins-span-6', head('Product mix', 'Share of revenue'), empty('No invoices in this period.'));
+        if (!m.cur.parts.length) return card('ins-span-6', head('Product mix'), empty('No invoices in this period.'));
         const names = [];
         [m.cur].concat(m.prev && m.prev.parts.length ? [m.prev] : []).forEach(x => x.parts.forEach(part => { if (!names.find(n => n.name === part.name)) names.push(part); }));
         const order = state.data.products.map(x => x.name).concat([IC.NO_PRODUCT]);
         names.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
         const none = m.cur.parts.find(x => x.name === IC.NO_PRODUCT);
         const note = none && none.share >= 0.2
-            ? `<b>${pct(none.share)}</b> of the revenue is not linked to a project with a product yet (Financials, Invoices).`
+            ? `<b>${pct(none.share)}</b> of the revenue without a product.`
             : '';
         const rows = (m.prev && m.prev.parts.length ? mixRow(p.kind === 'year' ? String(p.year - 1) : 'Before', m.prev) : '') + mixRow(p.kind === 'year' ? String(p.year) : (p.kind === '12m' ? '12 months' : 'All'), m.cur);
-        return card('ins-span-6', head('Product mix', 'Share of revenue'),
+        return card('ins-span-6', head('Product mix'),
             `<div class="ins-mix">${rows}</div>${legend(names.map(x => [sw(x.color || NONE_TONE), x.name]))}`, note);
     }
 
@@ -319,7 +319,7 @@
     }
 
     function inflowCard(list) {
-        if (!list.length) return card('ins-span-6', head('Inflow', 'New projects and offers sent per month'), empty('Nothing in this period yet.'));
+        if (!list.length) return card('ins-span-6', head('Inflow'), empty('Nothing in this period yet.'));
         const sc = Math.max.apply(null, list.map(x => Math.max(x.leads, x.offers)).concat([1]));
         const n = list.length;
         const every = n > 12 ? Math.ceil(n / 12) : 1;
@@ -332,7 +332,7 @@
         const body = `${miniBars(list, 'leads', sc, 'New projects')}
             <div class="ins-mini-gap"></div>
             ${miniBars(list, 'offers', sc, 'Offers sent', xLabels(list.map((x, i) => ({ left: P((i + 0.5) / n), label: n > 12 ? monthLabel(x.month) + ' ' + x.month.slice(2, 4) : monthLabel(x.month) })).filter((x, i) => i % every === 0)))}`;
-        return card('ins-span-6', head('Inflow', 'New projects and offers sent per month'), body, note);
+        return card('ins-span-6', head('Inflow'), body, note);
     }
 
     function renderOverview(parts) {
@@ -470,7 +470,7 @@
 
     /** Revenue by product as a half ring; beside it each product with its won, order size and time to win. */
     function productCard(t) {
-        const sub = 'Revenue invoiced and projects decided in this period';
+        const sub = '';
         if (!t.rows.length) return card('ins-span-12', head('By product', sub), empty('Nothing invoiced or decided in this period.'));
         const rows = t.rows.slice().sort((a, b) => (a.name === IC.NO_PRODUCT) - (b.name === IC.NO_PRODUCT) || b.revenue - a.revenue);
         const color = r => r.color || NONE_TONE;
@@ -494,7 +494,7 @@
      * size of what we win changes. A quarter without an order has no bar.
      */
     function orderSizeCard(qs) {
-        const sub = 'Budget of the projects won, per quarter';
+        const sub = '';
         if (!qs.some(q => q.n)) return card('ins-span-12', head('Average order', sub), empty('No project won in these quarters.'));
         const sc = scale(Math.max.apply(null, qs.map(q => q.value || 0).concat([1])), 3);
         const n = qs.length;
@@ -576,7 +576,7 @@
         : `<span>${esc(name)}</span>`);
 
     function byCustomerCard(c) {
-        const sub = 'Net, by invoice date';
+        const sub = '';
         const paying = c.list.filter(x => x.net > 0);
         if (!paying.length) return card('ins-span-6', head('Revenue by customer', sub), empty('No invoices in this period.'));
         const whole = paying.reduce((t, x) => t + x.net, 0);
@@ -599,7 +599,7 @@
     }
 
     function newReturningCard(list) {
-        if (!list.some(x => x.returning + x.fresh > 0)) return card('ins-span-4', head('New and returning', 'Revenue per quarter, by whether the customer bought before'), empty('No invoices in this period.'));
+        if (!list.some(x => x.returning + x.fresh > 0)) return card('ins-span-4', head('New and returning'), empty('No invoices in this period.'));
         const n = list.length;
         const sc = scale(Math.max.apply(null, list.map(x => Math.max(0, x.returning) + Math.max(0, x.fresh)).concat([1])), 3);
         const total = list.reduce((s, x) => s + x.returning + x.fresh, 0);
@@ -615,7 +615,7 @@
                 }).join('')}
                 ${xLabels(list.map((x, i) => ({ left: P((i + 0.5) / n), label: x.label })))}
             </div></div>`;
-        return card('ins-span-4', head('New and returning', 'Revenue per quarter, by whether the customer bought before',
+        return card('ins-span-4', head('New and returning', '',
             legend([[sw('var(--ins-navy)'), 'Returning'], [sw('var(--ins-light)'), 'New']])), body,
             total > 0 ? `New customers brought <b>${pct(fresh / total)}</b> of revenue.` : '');
     }
@@ -633,7 +633,7 @@
      * with its amount, the change on the right.
      */
     function growthCard(g) {
-        const sub = 'Revenue per year, net by invoice date';
+        const sub = '';
         const cls = 'ins-span-8 ins-rows-2';
         if (!g.rows.length) return card(cls, head('How customers grew', sub), empty('No invoices in these years.'));
         const n = g.years.length;
@@ -665,7 +665,7 @@
     function paymentsCard(p) {
         const qs = p.perQuarter;
         const known = qs.filter(q => q.days !== null);
-        if (!known.length) return card('ins-span-4', head('Days to payment', 'Median per quarter, from invoice to bank'), empty('No paid invoice yet.'));
+        if (!known.length) return card('ins-span-4', head('Days to payment', 'Median'), empty('No paid invoice yet.'));
         const sc = scale(Math.max.apply(null, known.map(q => q.days).concat([10])), 2);
         const n = qs.length;
         const years = [];
@@ -686,11 +686,11 @@
                 <li><span>Paid late or overdue</span><span>${p.late} of ${p.count}</span></li>
                 ${p.slowest.map((s, i) => `<li><span>${i ? '' : 'Slowest: '}${s.companyId ? `<button type="button" class="ins-name" data-company="${s.companyId}">${esc(s.name)}</button>` : esc(s.name)}</span><span>${esc(days(s.days))}</span></li>`).join('')}
             </ul>`;
-        return card('ins-span-4', head('Days to payment', 'Median per quarter, from invoice to bank'), body);
+        return card('ins-span-4', head('Days to payment', 'Median'), body);
     }
 
     function sectorsCard(s) {
-        const sub = 'Share of revenue, by the customer\'s sector';
+        const sub = '';
         if (!s.withSector) {
             return card('ins-span-6', head('By sector', sub), empty(s.anySector
                 ? 'No revenue in this period from a company with a sector.'
@@ -706,7 +706,7 @@
         const rest = others.length === 1 ? slice(others[0], 'var(--ins-rest)')
             : others.length ? { name: plural(others.length, 'other sector', 'other sectors'), net: restNet, share: restNet / s.total, color: 'var(--ins-rest)', items: others } : null;
         const none = s.none ? Object.assign({}, s.none, { color: NONE_TONE }) : null;
-        return card('ins-span-6', head('By sector', vs ? { html: `${esc(sub)}; change on ${esc(vs)}` } : sub),
+        return card('ins-span-6', head('By sector', vs ? `Change on ${vs}` : ''),
             shareRing(slices, rest, `<b>${esc(money(s.total))}</b><small>${plural(s.rows.length, 'sector', 'sectors')}</small>`, none),
             none && none.share >= 0.2 ? `<b>${pct(none.share)}</b> of the revenue comes from companies without a sector.` : '');
     }

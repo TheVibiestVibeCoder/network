@@ -15451,7 +15451,6 @@ input[type="checkbox"]:disabled {
 .rf-card .rf-title,
 .ins-h,
 #workloadView .home-card-title,
-.project-group-title,
 #reviewView .review-group-title,
 #logView .log-day-head,
 .deleted-projects-title,
@@ -15704,4 +15703,25 @@ input[type="checkbox"]:disabled {
     padding: 0 16px;
     border-radius: var(--r-md); corner-shape: var(--squircle-shape);
     font-size: var(--t-base);
+}
+
+
+/* ---- The scenario beside every figure that changes with it ----
+   A small chip after the label (Projected, Until December, Lasts until,
+   Month by month); a figure without it does not depend on the scenario. */
+
+.fin-tile-label .fin-band-chip,
+.fin-card-title .fin-band-chip {
+    margin-left: 6px;
+    padding: 0 7px;
+    line-height: 18px;
+    font-size: 11px;
+    letter-spacing: 0;
+    vertical-align: 1px;
+    background: var(--c-accent-soft);
+    color: var(--c-accent-2);
+}
+
+.fin-card-title .fin-band-chip {
+    vertical-align: 3px;
 }
