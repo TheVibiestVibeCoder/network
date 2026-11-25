@@ -489,8 +489,48 @@
         return card('ins-span-12', head('By product', sub), `<div class="ins-byp is-half">${t.total.revenue > 0 ? ring : ''}<ul class="ins-ptiles">${tiles}</ul></div>`);
     }
 
+    /**
+     * The average order per quarter as bars, each with its figure: how the
+     * size of what we win changes. A quarter without an order has no bar.
+     */
+    function orderSizeCard(qs) {
+        const sub = 'Budget of the projects won, per quarter';
+        if (!qs.some(q => q.n)) return card('ins-span-12', head('Average order', sub), empty('No project won in these quarters.'));
+        const sc = scale(Math.max.apply(null, qs.map(q => q.value || 0).concat([1])), 3);
+        const n = qs.length;
+        const years = [];
+        qs.forEach((q, i) => {
+            const y = years.find(x => x.year === q.year);
+            if (y) y.to = i; else years.push({ year: q.year, from: i, to: i });
+        });
+        const cur = qs.filter(q => q.inPeriod && q.n);
+        const prev = qs.filter(q => !q.inPeriod && q.n);
+        const mean = list => {
+            const count = list.reduce((s, q) => s + q.n, 0);
+            return count ? list.reduce((s, q) => s + q.value * q.n, 0) / count : null;
+        };
+        const now = mean(cur);
+        const before = mean(prev);
+        // The period's own average, with the one before as everywhere: arrow, then "2025: 9k €".
+        const right = now !== null
+            ? `<span class="ins-order-now"><b>${esc(money(now))}</b>${trend(now, before, money)}</span>`
+            : '';
+        const body = `
+            <div class="ins-chart is-two-rows">
+                <div class="ins-plot" style="height:200px" role="img" aria-label="Average order per quarter">
+                    ${grid(sc, money)}
+                    ${qs.map((q, i) => (q.n ? `<span class="ins-col is-wide${q.inPeriod ? '' : ' is-prev'}${q.partial ? ' is-part' : ''}" style="left:${P((i + 0.5) / n)};height:${P(q.value / sc.max)}" title="${esc(q.label + ' ' + q.year + ': ' + money(q.value) + ' on average, ' + plural(q.n, 'order', 'orders') + (q.partial ? ' so far' : ''))}"></span>
+                        <span class="ins-cap${q.inPeriod ? '' : ' is-muted'}" style="left:${P((i + 0.5) / n)};bottom:${P(q.value / sc.max)}">${esc(money(q.value))}</span>` : '')).join('')}
+                    ${xLabels(qs.map((q, i) => ({ left: P((i + 0.5) / n), label: q.label })))}
+                    ${xLabels(years.map(y => ({ left: P(((y.from + y.to) / 2 + 0.5) / n), label: y.year, cls: 'is-y2' })))}
+                </div>
+            </div>`;
+        return card('ins-span-12', head('Average order', sub, right), body);
+    }
+
     function renderSales(parts) {
         return `${funnelCard(parts.funnel)}
+            ${orderSizeCard(parts.orderSizes)}
             ${productCard(parts.byProduct)}`;
     }
 

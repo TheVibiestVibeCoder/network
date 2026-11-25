@@ -465,6 +465,36 @@
         });
     }
 
+    /**
+     * The average order per quarter, over the same quarters as the revenue:
+     * the budgets of the projects won in a quarter (the middle of a range),
+     * talks and unpaid work left out. `value` is null in a quarter without
+     * an order, `n` says how many it is the average of.
+     */
+    function orderSizes(data, p) {
+        const last = quarterOf(p.end);
+        const first = p.kind === 'all' ? quarterOf(p.start) : addQuarters(quarterOf(p.start), -4);
+        const list = [];
+        for (let q = first, n = 0; q <= last && n < 40; q = addQuarters(q, 1), n++) list.push(q);
+        return list.slice(-12).map(q => {
+            const start = quarterStart(q);
+            const end = addDays(quarterStart(addQuarters(q, 1)), -1);
+            const range = { start, end: end < data.today ? end : data.today };
+            const won = data.deals
+                .filter(d => d.outcome === 'won' && !d.talk && d.budget > 0 && within(d.decidedAt, range))
+                .map(d => d.budget);
+            return {
+                quarter: q,
+                label: 'Q' + q.slice(6),
+                year: q.slice(0, 4),
+                n: won.length,
+                value: won.length ? won.reduce((sum, b) => sum + b, 0) / won.length : null,
+                partial: data.today < end && data.today >= start,
+                inPeriod: end >= p.start && start <= p.end
+            };
+        });
+    }
+
     /** Share of revenue per product, in the products' order: [{ name, color, net, share }]. */
     function productMix(data, range) {
         const total = revenueIn(data.invoices, range);
@@ -1017,6 +1047,7 @@
         parts.kpis = kpis(data, p);
         parts.cumulative = cumulative(data, p);
         parts.quarters = quarters(data, p);
+        parts.orderSizes = orderSizes(data, p);
         parts.mix = { cur: productMix(data, p), prev: p.prev ? productMix(data, p.prev) : null };
         parts.inflow = inflow(data, p);
         parts.funnel = funnel(data, p);
@@ -1044,7 +1075,7 @@
         NO_PRODUCT, NO_SECTOR, LOST_REASONS,
         prepare, compute, period, years,
         daysBetween, median, budgetMid, asOf, addMonths, lastDay, quarterOf,
-        kpis, cumulative, quarters, productMix, inflow,
+        kpis, cumulative, quarters, orderSizes, productMix, inflow,
         funnel, cohorts, timeToWin, calibration, chanceCurves, losses, pipeline, byProduct,
         customerFigures, newReturning, yearColumns, yearTable, customerYears, doors, payments, sectors, sectorShares, highlights
     };

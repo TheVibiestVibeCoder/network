@@ -285,6 +285,16 @@
         eq([archive.value, archive.note], [1, 'without a reason'], 'the unclear one');
     });
 
+    test('average order per quarter: the budgets of the projects won, talks left out', () => {
+        const data = fixture();
+        const qs = IC.orderSizes(data, IC.period('year:2026', TODAY, data.first));
+        eq(qs.map(q => q.label + ' ' + q.year), ['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025', 'Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026'], 'the year and the four quarters before');
+        eq(qs.slice(0, 4).map(q => q.value), [null, null, null, null], 'nothing won in 2025');
+        eq([qs[4].n, qs[4].value], [1, 9000], 'Q1: the finished one');
+        eq([qs[5].n, qs[5].value], [2, 4000], 'Q2: 5.000 (the middle of 4.000-6.000) and 3.000; the talk in Q1 does not count');
+        eq([qs[6].value, qs[7].value, qs[7].partial], [null, null, true], 'no order: no figure; the running quarter is marked');
+    });
+
     test('compute runs for every period kind, also without any data', () => {
         const data = fixture();
         ['year:2026', 'year:2025', '12m', 'all'].forEach(key => IC.compute(data, key, {}));

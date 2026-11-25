@@ -11568,6 +11568,11 @@ details.import-instructions p {
     color: var(--c-ink-2);
 }
 
+/* What is invoiced and open: beside the two parts of the total, not one of them. */
+.rf-split-line.is-aside {
+    margin-top: 6px;
+}
+
 .rf-overdue {
     display: inline-block;
     align-self: flex-start;
@@ -14791,6 +14796,10 @@ textarea.form-input:focus,
 .ins-col.is-navy { background: var(--ins-navy); }
 .ins-col.is-light { background: var(--ins-light); }
 .ins-col.is-flat { border-radius: 0; }
+.ins-col.is-wide { width: 34px; }
+.ins-order-now { display: inline-flex; align-items: center; gap: 10px; }
+.ins-order-now > b { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.ins-order-now .ins-trend { margin-top: 0; }
 .ins-cap { position: absolute; transform: translate(-50%, -6px); font-size: var(--t-xs); font-weight: 600; color: var(--c-ink); white-space: nowrap; }
 .ins-cap.is-muted { font-weight: 500; color: var(--c-ink-3); }
 .ins-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
